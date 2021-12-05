@@ -1218,7 +1218,33 @@ class PVFit():
 		lw=1,clip=None,plot_res=True,inmode='fits',xranges=[], yranges=[],
 		ln_hor=True, ln_var=True, pvalpha=None):
 		'''
+		Plot fitting results on a PV diagram.
 
+		Parameters
+		----------
+		 outname: Output file name.
+		 outformat: Format of the output file. Deafult pdf.
+		 marker: Marker for the data points.
+		 colors: Colors for the data points. Given as a list. If PVFit object has multiple results, more than one colors can be given.
+		 alpha: Transparency alpha for the plot.
+		 ax: Axis of python matplotlib.
+		 pvcolor: Plot PV diagram in color scale? Default True.
+		 cmap: Color map.
+		 vmin, vmax: Minimum and maximum values for the color scale.
+		 vsys: Plot the systemic velocity with a dashed line if given.
+		 contour: Plot a PV diagram with contour? Default True.
+		 clevels: Contour levels. Given in absolute intensity.
+		 pvccolor: Contour color.
+		 pa: Position angle of the PV diagram. Used to calculate angular resolution along the PV slice if given.
+		 vrel: Vaxis will be in the relative velocity with respect to vsys if True.
+		 x_offset: xaxis will be offset axis if True. Default False, which means xaxis is velocity axis.
+		 ratio: Aspect ration of the plot.
+		 lw: Line width of the contour.
+		 inmode: Data and header information can be given with parameters of data and header if inmode=data. Default fits.
+		          This option is used when you want to modify data before plot (e.g., multipy a factor to data).
+		 data: Data of PV diagram. Must be given as an array.
+		 header: Header information. Only used when inmode=data.
+		 xranges, yranges: x and y ranges for plot. Given as a list, [minimum, maximum].
 		'''
 		# output name
 		if outname:
