@@ -29,7 +29,7 @@ impv.pvfit_xcut(outname, rms, thr)
 impv.pvfit_vcut(outname, rms, thr)
 # -----------------------------
 ```
-What done here is to fit a Gaussian function to the intensity distribution at each velocity or the spectrum at each offset. Peak positions or velocities are output as results. Uncertainties of peak positions and velocities are estimated from the covariance matrix which calculated in the $\chi^2$ fitting. The result is recoreded in a file named `outname`_chi2_pv_xfit.txt or `outname`_chi2_pv_vfit.txt.
+What done here is to fit a Gaussian function to the intensity distribution at each velocity or the spectrum at each offset. Peak positions or velocities are output as results. Uncertainties of peak positions and velocities are estimated from the covariance matrix which calculated in the chi-square fitting. The result is recoreded in a file named `outname`_chi2_pv_xfit.txt or `outname`_chi2_pv_vfit.txt.
 
 To overplot fitting results on the PV diagram, you can do as follows.
 
@@ -42,7 +42,7 @@ impv.plotresults_onpvdiagram(outname=outname, clevels=clevels) # Draw a PV diagr
 
 ## More Opitions
 #### Specify Fitting Ranges
-You can specify the $x$ and $v$ ranges for the fitting with the parameters of `xlim` and `vlim`. The unit will be in arcsec and km s$^{-1}$.
+You can specify the x and v ranges for the fitting with the parameters of `xlim` and `vlim`. The unit will be in arcsec and km s^-1.
 
 ```
 vlim = [2,6]   # from 2 to 6 km s^-1
