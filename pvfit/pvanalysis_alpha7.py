@@ -233,30 +233,25 @@ class PVAnalysis():
                 s, ds, t, slim, tlim, d_input = x, dx, v, xlim, vlim, d
             elif mode == 'v':
                 s, ds, t, slim, tlim, d_input = v, dv, x, vlim, xlim, d.T
-            s_e, ds_e, s_r, ds_r = [], [], [], []
+            s_e, ds_e, s_r, ds_r = [[None] * len(t) for _ in range(4)]
             si_org = np.linspace(s[0], s[-1], (len(s) - 1) * 10 + 1)
-            for tt, dd in zip(t, d_input):
+            for i, (tt, dd) in enumerate(zip(t, d_input)):
                 tt_s, tt_a = np.sign(tt), np.abs(tt)
                 if not between(tt_a, tlim) \
                     or (mode == 'v' and not use_velocity) \
                     or (mode == 'x' and not use_position):
-                    for a in [s_e, ds_e, s_r, ds_r]: a.append(np.nan)
+                    for a in [s_e, ds_e, s_r, ds_r]: a[i] = np.nan
                     continue
+                di = interp1d(s, dd, kind='cubic')(si_org)
                 # Edge
-                if mode == 'x':
-                    M = kepler_mass(si_org, tt, self.__unit)
-                elif mode == 'v':
-                    M = kepler_mass(tt, si_org, self.__unit)
-                d0 = interp1d(s, dd, kind='cubic')(si_org)
-                val, err = edge(si_org, d0, sigma, thre, between(M, Mlim), tt)
+                args = (si_org, tt) if mode == 'x' else (tt, si_org)
+                M = kepler_mass(*args, self.__unit)
+                val, err = edge(si_org, di, sigma, thre, between(M, Mlim), tt)
                 err = clipped_error(err, val, mode=mode)
                 if not between(val * tt_s, slim): val = np.nan
-                for a, b in zip([s_e, ds_e], [val, err]): a.append(b)
+                for a, b in zip([s_e, ds_e], [val, err]): a[i] = b
                 # Ridge
-                if interp_ridge:
-                    d1, ss = interp1d(s, dd, kind='cubic')(si_org), si_org
-                else:
-                    d1, ss = dd, s
+                d1, ss = (di, si_org) if interp_ridge else (dd, s)
                 cond = (d1 > thre)
                 d1, ss = d1[cond], ss[cond]
                 if ridge == 'mean':
@@ -265,7 +260,7 @@ class PVAnalysis():
                     val, err = ridge_gauss(ss, d1, sigma)
                 err = clipped_error(err, val, mode=mode)
                 if not between(val * tt_s, slim): val = np.nan
-                for a, b in zip([s_r, ds_r], [val, err]): a.append(b)
+                for a, b in zip([s_r, ds_r], [val, err]): a[i] = b
             return np.array([s_e, ds_e, s_r, ds_r])
         x_e, dx_e, x_r, dx_r = get_points(mode='x')
         v_e, dv_e, v_r, dv_r = get_points(mode='v')
@@ -285,43 +280,45 @@ class PVAnalysis():
         Rs = [v0_r, x1_r, dx1_r, x0_r, v1_r, dv1_r]
         
         ### Remove points after turn over. ###
-        for a in [Es[1], Es[4], Rs[1], Rs[4]]:
-            for i in range(2):
-                if np.any(~np.isnan(a[i])):
-                    a[i][:np.nanargmax(a[i])] = np.nan
+        for aa in [Es[1], Es[4], Rs[1], Rs[4]]:
+            for a in aa:
+                if np.any(~np.isnan(a)):
+                    a[:np.nanargmax(a)] = np.nan
     
         ### Remove points outside Mlim. ###
         for Ds in [Es, Rs]:
-            for i in range(2):
-                M = kepler_mass(Ds[1][i], Ds[0][i], self.__unit)
-                Ds[1][i][~between(M, Mlim)] = np.nan
-                M = kepler_mass(Ds[3][i], Ds[4][i], self.__unit)
-                Ds[4][i][~between(M, Mlim)] = np.nan
+            for x1, v0, x0, v1 in zip(Ds[1], Ds[0], Ds[3], Ds[4]):
+                M = kepler_mass(x1, v0, self.__unit)
+                x1[~between(M, Mlim)] = np.nan
+                M = kepler_mass(x0, v1, self.__unit)
+                v1[~between(M, Mlim)] = np.nan
     
         ### Remove low-velocity positions and inner velocities. ###
         for Ds in [Es, Rs]:
-            for i in range(2):
-                xx, xv = np.meshgrid(Ds[1][i], Ds[3][i])
-                vx, vv = np.meshgrid(Ds[0][i], Ds[4][i])
+            for x1, v0, x0, v1 in zip(Ds[1], Ds[0], Ds[3], Ds[4]):
+                xx, xv = np.meshgrid(x1, x0)
+                vx, vv = np.meshgrid(v0, v1)
                 xvd = np.hypot((xx - xv) / dNyquist, (vx - vv) / dv)
                 if np.any(~np.isnan(xvd)):
                     iv, ix = np.unravel_index(np.nanargmin(xvd), np.shape(xx))
-                    Ds[1][i][:ix] = np.nan
-                    Ds[4][i][:iv] = np.nan
+                    x1[:ix] = np.nan
+                    v1[:iv] = np.nan
         
         ### Combine blue/red, remove nan, and sort. ###
         def comb_rmnan_sort(Dsin):
-            Dsout = [[], [], [], [], [], []]
+            Dsout = [[] for _ in range(6)]
             PVin, PVout = [Dsin[:3], Dsin[3:]], [Dsout[:3], Dsout[3:]]
             for c, A, B in zip([Dsin[1], Dsin[4]], PVout, PVin):
-                for i, s in zip([0, 1], [1, -1]):
-                    for a, b in zip(A, B):
-                        a.extend(s * b[i][~np.isnan(c[i])])
+                for a, b in zip(A, B):
+                    for b_br, c_br, s in zip(b, c, [1, -1]):
+                        a.extend(s * b_br[~np.isnan(c_br)])
             s = [np.argsort(Dsout[0])] * 3 + [np.argsort(Dsout[3])] * 3
-            for i in range(6): Dsout[i] = np.array(Dsout[i])[s[i]]
+            Dsout[:] = (np.array(DD)[ss] for DD, ss in zip(Dsout, s))
             return Dsout
         Es = comb_rmnan_sort(Es)
         Rs = comb_rmnan_sort(Rs)
+
+        ### Wrap up. ###
         if quadrant == '24': Es, Rs = flipx(Es), flipx(Rs)
         result = {'edge':{'position':Es[:3], 'velocity':Es[3:]},
                   'ridge':{'position':Rs[:3], 'velocity':Rs[3:]}}
@@ -383,18 +380,12 @@ class PVAnalysis():
         Es = flipx(self.__Es) if self.quadrant == '24' else self.__Es
         Rs = flipx(self.__Rs) if self.quadrant == '24' else self.__Rs
         popt_e, popt_r = [np.empty(5), np.empty(5)], [np.empty(5), np.empty(5)]
+        minabs = lambda a, i, j: np.min(np.abs(np.r_[a[i], a[j]]))
+        maxabs = lambda a, i, j: np.max(np.abs(np.r_[a[i], a[j]]))
         for args, ext, res in zip([Es, Rs], ['_e', '_r'], [popt_e, popt_r]):
             plim = np.array([
-                   [np.min(np.abs(np.r_[args[1], args[3]])),
-                    np.min(np.abs(np.r_[args[0], args[4]])),
-                    0.01,
-                    0.,
-                    -1],
-                   [np.max(np.abs(np.r_[args[1], args[3]])),
-                    np.max(np.abs(np.r_[args[0], args[4]])),
-                    10.,
-                    10,
-                    1.]])
+                   [minabs(args, 1, 3), minabs(args, 0, 4), 0.01, 0, -1],
+                   [maxabs(args, 1, 3), maxabs(args, 0, 4), 10.0, 10, 1]])
             q0 = np.array([0, np.sqrt(plim[0][1] * plim[1][1]), 0.5, 0, 0])
             q0 = np.where(include, np.nan, q0)
             def wpow_r_custom(v, *p):
@@ -443,7 +434,10 @@ class PVAnalysis():
             xall, vall = np.abs(np.r_[x0, x1]), np.abs(np.r_[v0, v1])
             rin, rout = np.min(xall), np.max(xall)
             vin, vout = np.max(vall), np.min(vall)
-            rin  = doublepower_r(vin, *popt)
+            if use_position:
+                rin  = doublepower_r(vin, *popt)
+            else:
+                vin  = doublepower_v(rin, *popt)
             if use_velocity:
                 vout = doublepower_v(rout, *popt)
             else:
@@ -573,9 +567,9 @@ class PVAnalysis():
         # Edge/ridge points
         for As, fmt in zip([Es, Rs], ['v', 'o']):
             v0, x1, dx1, x0, v1, dv1 = As
-            for i, c in zip([0, 1], ['pink', 'cyan']):
+            for i, c in enumerate(['pink', 'cyan']):
                 ax.plot(x0[i], v1[i], fmt, color=c, ms=5)
-            for i, c in zip([0, 1], ['red',  'blue']):
+            for i, c in enumerate(['red',  'blue']):
                 ax.plot(x1[i], v0[i], fmt, color=c, ms=5)
         ax.set_xlim(-xlim_plot[1], xlim_plot[1])  # au
         ax.set_ylim(-vlim_plot[1], vlim_plot[1])  # km/s
@@ -587,24 +581,23 @@ class PVAnalysis():
         plt.close()
     
         ### Make mean PV diagram for logR-logV diagram. ###
-        m_i, n_i = int(xlim_plot[1] / dx), int(vlim_plot[1] / dv)
-        x_i = np.linspace(-m_i * dx, m_i * dx, 2 * m_i + 1)
-        v_i = np.linspace(-n_i * dv, n_i * dv, 2 * n_i + 1)
+        mi, ni = int(xlim_plot[1] / dx), int(vlim_plot[1] / dv)
+        xi = np.linspace(-mi * dx, mi * dx, 2 * mi + 1)
+        vi = np.linspace(-ni * dv, ni * dv, 2 * ni + 1)
         d = self.data[:, ::-1] if self.quadrant == '24' else self.data
-        vsys = self.popt['edge'][0][4] * 0.5 + self.popt['ridge'][0][4] * 0.5
-        f = RBS(v - vsys, x, d)
-        d_i = f(v_i, x_i)
-        d = (d_i + d_i[::-1, ::-1]) / 2.
-        x_i, v_i, d = x_i[m_i:], v_i[n_i:], d[n_i:, m_i:]
+        vsys = np.mean([self.popt[i][0][4] for i in ['edge', 'ridge']])
+        di = RBS(v - vsys, x, d)(vi, xi)
+        d = (di + di[::-1, ::-1]) / 2.
+        xi, vi, d = xi[mi:], vi[ni:], d[ni:, mi:]
         
         ### Make logR-logV diagram. ###
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(1, 1, 1)
         # Log-log PV diagram
-        pco = ax.pcolormesh(x_i, v_i, np.log10(d.clip(sigma, None)),
+        pco = ax.pcolormesh(xi, vi, np.log10(d.clip(sigma, None)),
                             cmap='viridis', shading='nearest',
                             vmin=np.log10(sigma))
-        ax.contour(x_i, v_i, d, [3 * sigma, 6 * sigma], colors='lime')
+        ax.contour(xi, vi, d, [3 * sigma, 6 * sigma], colors='lime')
         cb = plt.colorbar(pco, ax=ax, label=r'log Jy beam$^{-1}$')
         cb.set_ticks(ticks := cb.get_ticks())
         cb.set_ticklabels([rf'${t:.1f}$' for t in ticks])
@@ -621,11 +614,11 @@ class PVAnalysis():
         for As, j, fmt in zip([Es, Rs], ['edge', 'ridge'], ['v', 'o']):
             v0, x1, dx1, x0, v1, dv1 = As
             vsys = self.popt[j][0][4]
-            for i, w, c in zip([0, 1], [vsys, -vsys], ['pink', 'cyan']):
-                ax.errorbar(np.abs(x0[i]), np.abs(v1[i]) - w,
+            for i, (s, c) in enumerate(zip([1, -1], ['pink', 'cyan'])):
+                ax.errorbar(np.abs(x0[i]), np.abs(v1[i]) - s * vsys,
                             yerr=dv1[i], fmt=fmt, color=c, ms=5)
-            for i, w, c in zip([0, 1], [vsys, -vsys], ['red',  'blue']):
-                ax.errorbar(np.abs(x1[i]), np.abs(v0[i]) - w,
+            for i, (s, c) in enumerate(zip([1, -1], ['red',  'blue'])):
+                ax.errorbar(np.abs(x1[i]), np.abs(v0[i]) - s * vsys,
                             xerr=dx1[i], fmt=fmt, color=c, ms=5)
         ax.set_xscale('log')
         ax.set_yscale('log')
