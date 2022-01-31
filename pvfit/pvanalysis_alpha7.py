@@ -2,7 +2,7 @@
 #----------------------------------------------------------------------------
 # Created By  : Yusuke Aso
 # Created Date: 2022 Jan 28
-# version = alpha6
+# version = alpha7
 # ---------------------------------------------------------------------------
 """
 This script derives the edge and ridge points from a position-velocity (PV) diagram, in the FITS form (AXIS1=arcsec, AXIS2=Hz) and fits the points with a double-power-law function. The outputs are linear and log-log PV diagrams and corner plots derived from the MCMC fitting.
