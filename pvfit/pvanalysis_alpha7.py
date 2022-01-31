@@ -65,6 +65,16 @@ def between(t, tlim):
 def flipx(Ds):
     return [Ds[0], -Ds[1], Ds[2], -Ds[3], Ds[4], Ds[5]]
 
+def nice_ticks(ticks, tlim):
+    order = 10**np.floor(np.log10(tlow := tlim[0]))
+    tlow = np.ceil(tlow / order) * order
+    order = 10**np.floor(np.log10(tup := tlim[1]))
+    tup = np.floor(tup / order) * order
+    return np.sort(np.r_[ticks, tlow, tup])
+
+def nice_labels(ticks):
+    digits = np.floor(np.log10(ticks)).astype('int').clip(None, 0)
+    return [f'{t:.{d:d}f}' for t, d in zip(ticks, -digits)]
 
 
 class PVAnalysis():
@@ -619,19 +629,8 @@ class PVAnalysis():
                             xerr=dx1[i], fmt=fmt, color=c, ms=5)
         ax.set_xscale('log')
         ax.set_yscale('log')
-        def nice_ticks(ticks, tlim):
-            order = 10**np.floor(np.log10(tlow := tlim[0]))
-            tlow = np.ceil(tlow / order) * order
-            order = 10**np.floor(np.log10(tup := tlim[1]))
-            tup = np.floor(tup / order) * order
-            return np.sort(np.r_[ticks, tlow, tup])
-        xticks = nice_ticks(ax.get_xticks(), xlim_plot)
-        yticks = nice_ticks(ax.get_yticks(), vlim_plot)
-        ax.set_xticks(xticks)
-        ax.set_yticks(yticks)
-        def nice_labels(ticks):
-            digits = np.floor(np.log10(ticks)).astype('int').clip(None, 0)
-            return [f'{t:.{d:d}f}' for t, d in zip(ticks, -digits)]
+        ax.set_xticks(xticks := nice_ticks(ax.get_xticks(), xlim_plot))
+        ax.set_yticks(yticks := nice_ticks(ax.get_yticks(), vlim_plot))
         ax.set_xticklabels(nice_labels(xticks))
         ax.set_yticklabels(nice_labels(yticks))
         ax.set_xlim(xlim_plot[0] * 0.999, xlim_plot[1] * 1.001)  # au
