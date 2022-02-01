@@ -207,7 +207,7 @@ class PVAnalysis():
             Inclination angle of the target in the unit of degree, used to calculate the central stellar mass from a radius and a velocity.
         cutoff : float
             The edge level is cutoff * sigma. The ridge also uses the data above cutoff * sigma.
-        quadrant : '13' of '24'
+        quadrant : '13' or '24'
             Quadrant of the PV diagram where the emission is expected.
         Mlim : tuple of float
             Data points outside Mlim are ignored.
