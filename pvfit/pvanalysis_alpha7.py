@@ -18,7 +18,7 @@ vsys     = 6.4  # km/s
 dist     = 140.  # pc
 sigma    = 1.7e-3  # Jy/beam; None means an automatic estimation.
 cutoff   = 5.0  # sigma
-quadrant = '24'  # '13' or '24', in which quadrants emission is.
+quadrant = None  # '13' or '24', emitting quadrants. None means automatic
 Mlim = (0.0, 10.0)  # M_sun; to remove unreasonable points.
 xlim = (0, 200)  # au
 vlim = (0, 5.0)  # km/s
@@ -47,6 +47,7 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
 from scipy.interpolate import RectBivariateSpline as RBS
 import emcee, corner, sys
+
 
 from analysis_tools import edge, ridge_gauss, ridge_mean, doublepower_v, doublepower_v_error, doublepower_r, doublepower_r_error
 sys.path.append('../')
@@ -182,8 +183,8 @@ class PVAnalysis():
             Inclination angle of the target in the unit of degree, used to calculate the central stellar mass from a radius and a velocity.
         cutoff : float
             The edge level is cutoff * sigma. The ridge also uses the data above cutoff * sigma.
-        quadrant : '13' of '24'
-            Quadrant of the PV diagram where the emission is expected.
+        quadrant : '13' or '24' or None
+            Quadrant of the PV diagram where the emission is expected. None means automatic.
         Mlim : tuple of float
             Data points outside Mlim are ignored.
         xlim : tuple of float
@@ -214,9 +215,18 @@ class PVAnalysis():
             self.read_pvfits(pvfits, dist, vsys, xlim[1], vlim[1], sigma)
         x, dx, dNyquist = self.x, self.dx, self.dNyquist
         v, dv = self.v, self.dv
-        sigma = self.sigma
-        d = self.data[:, ::-1] if quadrant == '24' else self.data
+        sigma, d = self.sigma, self.data
 
+        nvh, nxh = len(v) // 2, len(x) // 2
+        quadcheck = lambda a: np.sum(a[:nvh, :nxh]) + np.sum(a[nvh:, nxh:]) \
+                              - np.sum(a[:nvh, nxh:]) - np.sum(a[nvh:, :nxh])
+        if quadrant is None:
+            self.quadrant = '13' if quadcheck(d) > 0 else '24'
+        else:
+            self.quadrant = quadrant
+        if self.quadrant == '24': d = d[:, ::-1] 
+        if quadcheck(d) < 0: print('\nWARNING: quadrant seems opposite.\n')
+        
         GG = constants.G.si.value
         M_sun = constants.M_sun.si.value
         au = units.au.to('m')
@@ -319,13 +329,12 @@ class PVAnalysis():
         Rs = comb_rmnan_sort(Rs)
 
         ### Wrap up. ###
-        if quadrant == '24': Es, Rs = flipx(Es), flipx(Rs)
+        if self.quadrant == '24': Es, Rs = flipx(Es), flipx(Rs)
         result = {'edge':{'position':Es[:3], 'velocity':Es[3:]},
                   'ridge':{'position':Rs[:3], 'velocity':Rs[3:]}}
         self.edgeridge = result
         self.__Es = result['edge']['position'] + result['edge']['velocity']
         self.__Rs = result['ridge']['position'] + result['ridge']['velocity']
-        self.quadrant = quadrant
         return result
 
 
