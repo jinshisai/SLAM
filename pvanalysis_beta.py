@@ -12,7 +12,7 @@ Note. FITS files with multiple beams are not supported. A part of this script is
 """
 
 ############ INPUTS ############
-pvfits   = '/scratch/alma/yaso/home/eDisk/TMC1A/TMC1A_C18O_t2000klam.image.pv_invert.fits'
+pvfits   = './testfits/TMC1A_C18O_t2000klam.image.pv_invert.fits'
 incl     = 48.  # deg
 vsys     = 6.4  # km/s
 dist     = 140.  # pc
@@ -25,7 +25,7 @@ vlim = (0, 5.0)  # km/s
 xlim_plot = (200 / 20, 200)  # au
 vlim_plot = (6.0 / 20, 6.0)  # km/s
 use_velocity = True  # False: representative velocities are not used.
-use_position = False  # False: representative positions are not used.
+use_position = True  # False: representative positions are not used.
 include_vsys = False  # False: vsys is fixed at the value above.
 include_dp   = True  # False: dp=0, i.e., single power.
 include_pin  = False  # False: pin=0.5, i.e., Keplerian.
@@ -507,7 +507,10 @@ class PVAnalysis():
             xall, vall = np.abs(np.r_[x0, x1]), np.abs(np.r_[v0, v1])
             rin, rout = np.min(xall), np.max(xall)
             vin, vout = np.max(vall), np.min(vall)
-            rin  = doublepower_r(vin, *popt)
+            if use_position:
+                rin = doublepower_r(vin, *popt)
+            else:
+                vin = doublepower_v(rin, *popt)
             if use_velocity:
                 vout = doublepower_v(rout, *popt)
             else:
@@ -551,8 +554,12 @@ class PVAnalysis():
             M_in = kepler_mass(rin, vin, self.__unit)
             M_b = kepler_mass(rb, vb, self.__unit)
             M_out = kepler_mass(rout, vout, self.__unit)
-            drin = doublepower_r_error(vin, *params)
-            dM_in = M_in * drin / rin
+            if use_velocity:
+                drin = doublepower_r_error(vin, *params)
+                dM_in = M_in * drin / rin
+            else:
+                dvin = doublepower_v_error(rin, *params)
+                dM_in = 2. * M_in * dvin / vin
             if use_velocity:
                 dvout = doublepower_v_error(rout, *params)
                 dM_out = 2. * M_out * dvout / vout

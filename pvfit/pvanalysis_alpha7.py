@@ -481,8 +481,12 @@ class PVAnalysis():
             M_in = kepler_mass(rin, vin, self.__unit)
             M_b = kepler_mass(rb, vb, self.__unit)
             M_out = kepler_mass(rout, vout, self.__unit)
-            drin = doublepower_r_error(vin, *params)
-            dM_in = M_in * drin / rin
+            if use_velocity:
+                drin = doublepower_r_error(vin, *params)
+                dM_in = M_in * drin / rin
+            else:
+                dvin = doublepower_v_error(rin, *params)
+                dM_in = 2. * M_in * dvin / vin
             if use_velocity:
                 dvout = doublepower_v_error(rout, *params)
                 dM_out = 2. * M_out * dvout / vout
