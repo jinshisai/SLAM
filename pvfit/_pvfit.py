@@ -14,48 +14,60 @@ Test comment 3 by Yusuke Aso.
 Test comment 4 by Yusuke Aso.
 '''
 
-def test():
-        print('Hello World.')
 
 # modules
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from astropy.io import fits
+from astropy import constants, units
+
+from .fitfuncs import edge, ridge_mean, gaussfit, gauss1d
 
 
 # Constants (in cgs)
-clight     = 2.99792458e10 # light speed [cm s^-1]
+Ggrav  = constants.G.cgs.value     # Gravitational constant
+Msun   = constants.M_sun.cgs.value # Solar mass (g)
+au     = units.au.to('cm')         # au (cm)
+clight = constants.c.cgs.value     # light speed (cm s^-1)
 
 
 
 # Class
 class Impvfits:
 	'''
-	Perform fitting to a PV diagram
+	Read a fits file of a position-velocity (PV) diagram.
+
+
+	Variables
+	---------
+	self.file: fits file name
+	self.data (array): data
+	self.header: Header info.
+	self.
 	'''
 
-	def __init__(self, infile):
+	def __init__(self, infile, pa=None):
 		self.file = infile
 		self.data, self.header = fits.getdata(infile, header=True)
 
-		self.read_pvfits()
-
-		self.results = []
+		self.read_pvfits(pa=pa)
+		#self.results = []
 
 
 	# Read fits file of Poistion-velocity (PV) diagram
-	def read_pvfits(self):
+	def read_pvfits(self, pa=None):
 		'''
 		Read fits file of pv diagram.
 		'''
+
 		# read header
 		header = self.header
 
 		# number of axis
 		naxis    = header['NAXIS']
 		if naxis < 2:
-			print ('ERROR\treadfits: NAXIS of fits is < 2.')
+			print ('ERROR\tread_pvfits: NAXIS of fits is < 2.')
 			return
 		self.naxis = naxis
 
@@ -81,11 +93,17 @@ class Impvfits:
 
 
 		# Info. of P.A.
-		if 'PA' in header:
+		if pa:
+			print ('Input P.A.: %.1f'%pa)
+			self.pa = pa
+		elif 'PA' in header:
+			print ('P.A. is in header.')
 			self.pa = header['PA']
 		elif 'P.A.' in header:
+			print ('P.A. is in header.')
 			self.pa = header['P.A.']
 		else:
+			print ('CAUTION\tread_pvfits: No PA information is given.')
 			self.pa = None
 
 		# Resolution along offset axis
@@ -131,7 +149,7 @@ class Impvfits:
 			if 'CD%i_%i'%(i+1,j+1) in header else 0.
 			for j in range(naxis)] for i in range(naxis)])
 		else:
-			print ('CAUTION\tchannelmap: No keyword PCi_j or CDi_j are found. No rotation is assumed.')
+			print ('CAUTION\tread_pvfits: No keyword PCi_j or CDi_j are found. No rotation is assumed.')
 			pc_ij = np.array([
 				[1. if i==j else 0. for j in range(naxis)]
 				 for i in range(naxis)])
@@ -155,27 +173,22 @@ class Impvfits:
 				xaxis    = xaxis*3600.
 				del_i[0] = del_i[0]*3600.
 		else:
-			print ('WARNING: No unit information in the header.\
-				Assume units of arcesc and Hz for offset and frequency axes, respectively.')
+			print ('WARNING\tread_pvfits:: No unit information in the header.\
+				Assume the unit of the offset axis is arcesc.')
 
 		# frequency --> velocity
 		if label_i[1] == 'VRAD' or label_i[1] == 'VELO':
 			vaxis    = vaxis*1.e-3 # m/s --> km/s
-			#del_v    = del_v*1.e-3
-			#refval_v = refval_v*1.e-3
 		else:
 			print ('Convert frequency to velocity')
 			vaxis    = clight*(1.-vaxis/restfreq) # radio velocity c*(1-f/f0) [cm/s]
 			vaxis    = vaxis*1.e-5                # cm/s --> km/s
-			#del_i[1] = -del_i[1]*clight/restfreq  # delf --> delv [cm/s]
-			#del_i[1] = del_i[1]*1.e-5             # cm/s --> km/s
 
 		if naxis == 2:
-			axes_out = np.array([xaxis, vaxis], dtype=object)
+			saxis = None
 		elif naxis == 3:
 			saxis = axes[2]
 			saxis = saxis[:naxis_i[2]]
-			axes_out = np.array([xaxis, vaxis, saxis], dtype=object)
 		else:
 			print ('Error\tread_pvfits: naxis must be <= 3.')
 
@@ -184,16 +197,16 @@ class Impvfits:
 		delx = xaxis[1] - xaxis[0]
 		delv = vaxis[1] - vaxis[0]
 
-		self.axes  = axes_out
 		self.xaxis = xaxis
 		self.vaxis = vaxis
+		self.saxis = saxis
 		self.delx  = delx
 		self.delv  = delv
 
 
 	# Draw pv diagram
 	def draw_pvdiagram(self,outname,data=None,header=None,ax=None,outformat='pdf',color=True,cmap='Greys',
-		vmin=None,vmax=None,vsys=0,contour=True,clevels=None,ccolor='k', pa=None,
+		vmin=None,vmax=None,vsys=None,contour=True,clevels=None,ccolor='k',
 		vrel=False,logscale=False,x_offset=False,ratio=1.2, prop_vkep=None,fontsize=14,
 		lw=1,clip=None,plot_res=True,inmode='fits',xranges=[], yranges=[],
 		ln_hor=True, ln_var=True, alpha=None):
@@ -213,7 +226,7 @@ class Impvfits:
 
 		# properties of plots
 		#mpl.use('Agg')
-		plt.rcParams['font.family']     ='Arial' # font (Times New Roman, Helvetica, Arial)
+		plt.rcParams['font.family']     = 'Arial' # font (Times New Roman, Helvetica, Arial)
 		plt.rcParams['xtick.direction'] = 'in'   # directions of x ticks ('in'), ('out') or ('inout')
 		plt.rcParams['ytick.direction'] = 'in'   # directions of y ticks ('in'), ('out') or ('inout')
 		plt.rcParams['font.size']       = fontsize  # fontsize
@@ -237,7 +250,7 @@ class Impvfits:
 		if (outformat == formatlist).any():
 			outname = outname + '.' + outformat
 		else:
-			print ('ERROR\tsingleim_to_fig: Outformat is wrong.')
+			print ('ERROR\tdraw_pvdiagram: Outformat is wrong.')
 			return
 
 		# Input
@@ -273,22 +286,7 @@ class Impvfits:
 		if self.res_off:
 			res_off = self.res_off
 		else:
-			# Resolution along offset axis
-			if self.pa:
-				pa = self.pa
-
-			if pa:
-				# an ellipse of the beam
-				# (x/bmin)**2 + (y/bmaj)**2 = 1
-				# y = x*tan(theta)
-				# --> solve to get resolution in the direction of pv cut with P.A.=pa
-				del_pa = pa - bpa
-				del_pa = del_pa*np.pi/180. # radian
-				term_sin = (np.sin(del_pa)/bmin)**2.
-				term_cos = (np.cos(del_pa)/bmaj)**2.
-				res_off  = np.sqrt(1./(term_sin + term_cos))
-			else:
-				res_off = bmaj
+			res_off = bmaj
 
 		# relative velocity or LSRK
 		offlabel = r'$\mathrm{Offset\ (arcsec)}$'
@@ -316,15 +314,18 @@ class Impvfits:
 			ylabel = vlabel
 			hline_params = [vsys,offmin,offmax]
 			vline_params = [0.,velmin,velmax]
+			ln_hor = True if vsys else False
 			res_x = res_off
 			res_y = delv
 		else:
-			data   = np.rot90(data[0,:,:])
+			#data   = np.rot90(data[0,:,:])
+			data   = data[0,:,:].T
 			extent = (velmin,velmax,offmin,offmax)
 			xlabel = vlabel
 			ylabel = offlabel
 			hline_params = [0.,velmin,velmax]
-			vline_params = [vcenter,offmin,offmax]
+			vline_params = [vsys,offmin,offmax]
+			ln_var = True if vsys else False
 			res_x = delv
 			res_y = res_off
 
@@ -410,36 +411,66 @@ class Impvfits:
 class PVFit():
 
 	'''
-	Perform fitting to a PV diagram
+	Perform fitting to a PV diagram.
+
+	Parameters
+	----------
+	infile(str): An input fits file.
+	rms (float): rms noise level of the pv diagram.
+	thr (int/float): threshold above which emission is used for fitting.
 	'''
 
 	# Initializing
-	def __init__(self, infile):
-		self.fitsdata = Impvfits(infile)
+	def __init__(self, infile, pa=None):
+		'''
+		Parameters
+		----------
+		'''
 
-		self.outname = 'object'
-		self.results = {}
-		self.dicindx = 0
+		# read fits file
+		self.fitsdata = Impvfits(infile, pa=pa)
+
+		# initialize results
+		self.results = {'ridge': {'vcut': None, 'xcut': None},
+		'edge': {'vcut': None, 'xcut': None}
+		}
 
 
-	def read_results(self, infiles):
-		# initialize
-		self.results = {}
-		self.dicindx = 0
+	# get edge & ridge
+	def get_edgeridge(self, outname, rms, vsys, dist, thr=5.,
+		incl=90., quadrant='13', mode='mean', pixrng_vcut=2, pixrng_xcut=None,
+		Mlim=[], xlim=[], vlim=[],
+		use_velocity=True, use_position=True,
+		minrelerr=0.01, minabserr=0.1, interp_ridge=False):
+		'''
+		Get the edge/ridge at positions/velocities.
 
-		if type(infiles) != list:
-			print ('ERROR\tread_results: infiles must be the list type.')
-			return
 
-		for i in range(len(infiles)):
-			self.results.update({'%i'%i: np.genfromtxt(infiles[i], unpack=Trued, dtype='float64')})
-			self.dicindx += 1
+		'''
+
+		# remember output name
+		self.outname = outname
+
+		# Set of input data
+		# data
+		data = self.fitsdata.data
+
+		self.rms  = rms
+		self.vsys = vsys
+		self.dist = dist
+
+		# Get rigde
+		# get a position at each velocity
+		self.pvfit_vcut(outname, rms, thr=thr, vsys=vsys, dist=dist, incl=incl,
+			xlim=xlim, vlim=vlim, Mlim=Mlim, mode=mode, pixrng=pixrng_vcut)
+		self.pvfit_xcut(outname, rms, thr=thr, vsys=vsys, dist=dist, incl=incl,
+			xlim=xlim, vlim=vlim, Mlim=Mlim, mode=mode, pixrng=pixrng_xcut)
 
 
 	# pvfit
-	def pvfit_vcut(self, outname, rms, thr,
-		xlim=[], vlim=[], pixrng=2, multipeaks=False,
-		 i_peak=0, prominence=None, inverse=None):
+	def pvfit_vcut(self, outname, rms, thr=5., vsys=0, dist=140., incl=90.,
+		xlim=[], vlim=[], Mlim=[], mode='gauss', pixrng=2, multipeaks=False,
+		 i_peak=0, prominence=None, inverse=None, quadrant='13'):
 		'''
 		Fitting along the velocity axis, i.e., fitting to the spectrum at each offset.
 
@@ -460,28 +491,8 @@ class PVFit():
 		import math
 		from scipy import optimize
 		from scipy.signal import find_peaks
+		from scipy.interpolate import interp1d
 		from mpl_toolkits.axes_grid1 import ImageGrid
-
-
-		# functions
-		# gaussian
-		def gaussian(x,amp,mean,sig):
-			#coeff=A/(np.sqrt(2.0*np.pi)*sig)
-			exp=np.exp(-(x-mean)*(x-mean)/(2.0*sig*sig))
-			gauss=amp*exp
-			return gauss
-
-		#def fit_error()
-		# y-f(x)/yerr, contents of  xi square
-		def chi_gauss(param, xdata, ydata, ysig):
-			chi = (ydata - (gaussian(xdata, *param))) / ysig
-			return chi
-
-
-
-		# remember output name
-		self.outname = outname
-
 
 		# data
 		data = self.fitsdata.data
@@ -491,14 +502,12 @@ class PVFit():
 		elif self.fitsdata.naxis == 3:
 			data = data[0,:,:] # Remove stokes I
 		else:
-			print ('Error\tpvfit_vcut: n_axis must be 2 or 3.')
+			print ('ERROR\tpvfit_vcut: n_axis must be 2 or 3.')
 			return
-
 
 		# axes
 		xaxis = self.fitsdata.xaxis
 		vaxis = self.fitsdata.vaxis
-
 
 		# resolution
 		if self.fitsdata.res_off:
@@ -516,14 +525,6 @@ class PVFit():
 		# relative velocity or LSRK
 		xlabel = 'Offset (arcsec)'
 		vlabel = r'LSR velocity ($\mathrm{km~s^{-1}}$)'
-
-
-		# list to save final results
-		res_v = np.array([], dtype='float64')
-		res_x = np.array([], dtype='float64')
-		err_x = np.array([], dtype='float64')
-		err_v = np.array([], dtype='float64')
-		res_chi2 = np.array([], dtype='float64')
 
 
 		### calculate intensity-weighted mean positions
@@ -574,168 +575,144 @@ class PVFit():
 		while ncol*nrow <= nloop:
 			nrow += 1
 
-
 		# figure for check result
 		fig  = plt.figure(figsize=(11.69, 8.27))
 		grid = ImageGrid(fig, rect=111, nrows_ncols=(nrow,ncol),
 		axes_pad=0,share_all=True, aspect=False, label_mode='L') #,cbar_mode=cbar_mode)
 		gridi = 0
+		dlim  = [np.nanmin(data_fit), np.nanmax(data_fit)]
 
 		# x & y label
 		grid[(nrow*ncol-ncol)].set_xlabel(r'Velocity ($\mathrm{km\ s^{-1}}$)')
 		grid[(nrow*ncol-ncol)].set_ylabel(r'Intensity ($\mathrm{Jy\ beam^{-1}}$)')
 
 
+		# list to save final results
+		res_ridge = np.zeros((nloop, 4)) # x, v, err_x, err_v
+		res_edge  = np.zeros((nloop, 4))
+
 
 		# calculation
 		for i in range(nloop):
-			xi = xaxis_fit[i]
-			d_i = data_fit[:, i]
-			print ('x_now: %.2f arcsec'%xi)
-
-			# get peak indices
-			peaks, _ = find_peaks(d_i, height=thr*rms, prominence=1.5*rms)
-			#print (peaks)
-
-			if len(peaks) == 0:
-				continue
-			else:
-				snr    = np.nanmax(d_i)/rms
-				posacc = res_off/snr
-
-
-			# determining used data range
-			if pixrng:
-				# error check
-				if type(pixrng) != int:
-					print ('Error\tpvfit_vcut: pixrng must be integer.')
-					return
-
-				# get peak index
-				peakindex = peaks[i_peak] if multipeaks else np.argmax(d_i)
-
-				# use pixels only around intensity peak
-				vfit_indx = [peakindex - pixrng, peakindex + pixrng+1]
-				d_i  = d_i[vfit_indx[0]:vfit_indx[1]]
-				v_i  = vaxis_fit[vfit_indx[0]:vfit_indx[1]]
-				nd_i = len(d_i)
-			else:
-				v_i = vaxis_fit.copy()
-
-
-			# skip if pixel number for calculation is below 3
-			# just for safety
-			if d_i.size <= 3:
-				gridi = gridi + 1
-				continue
-
-
-			# set the initial parameter
-			indx_pini = d_i >= 3.*rms
-			vmean = np.nansum(d_i[indx_pini]*v_i[indx_pini])/np.nansum(d_i[indx_pini])
-			sigx  = np.sqrt(np.nansum(d_i[indx_pini]*(v_i[indx_pini] - vmean)**2.)/np.nansum(d_i[indx_pini]))
-			#print (d_i*(v_i - vmean)**2.)
-			#print (sigx)
-			if sigx <= 1e-6:
-				sigx = (np.nanmax(v_i) - np.nanmin(v_i))/3.
-			#mx   = v_i[pixrng]
-			mx    = vmean
-			amp  = np.nanmax(d_i) #*np.sqrt(2.*np.pi)*sigx
-			pinp = [amp, mx, sigx]
-
-
-			# fitting
-			results = optimize.leastsq(chi_gauss, pinp, args=(v_i, d_i, rms), full_output=True)
-
-			# recording output results
-			# param_out: fitted parameters
-			# err: error of fitted parameters
-			# chi2: chi-square
-			# DOF: degree of freedum
-			# reduced_chi2: reduced chi-square
-			param_out    = results[0]
-			param_cov    = results[1]
-			chi2         = np.sum(chi_gauss(param_out, v_i, d_i, rms)**2.)
-			ndata        = len(d_i)
-			nparam       = len(param_out)
-			dof          = ndata - nparam # - 1
-			reduced_chi2 = chi2/dof
-
-			#print (ndata, nparam, dof)
-			#print (param_cov)
-			if (dof >= 0) and (param_cov is not None):
-				pass
-				#param_cov = param_cov*reduced_chi2
-			else:
-				param_cov = np.full((nparam, nparam),np.inf)
-
-			# best fit value
-			amp_fit, mx_fit, sigx_fit = param_out
-
-			# fitting error
-			param_err = np.array([
-				np.abs(param_cov[j][j])**0.5 for j in range(nparam)
-				])
-			amp_fit_err, mx_fit_err, sigx_fit_err = param_err
-
-
-
-			res_x = np.append(res_x, xi)
-			res_v = np.append(res_v, mx_fit)
-			err_x = np.append(err_x, posacc)
-			err_v = np.append(err_v, mx_fit_err)
-			res_chi2 = np.append(res_chi2, reduced_chi2)
-			#print 'offmean: ', offmean, ' arcsec'
-			#print 'mean error: ', offm_err, ' arcsec'
-
-
-			# print results
-			print ('Chi2: ', reduced_chi2)
-			print ('Fitting results: amp   mean   sigma')
-			print (amp_fit, mx_fit, sigx_fit)
-			print ('Errors')
-			print (amp_fit_err, mx_fit_err, sigx_fit_err)
-
-
 			# plot results
 			ax = grid[gridi]
 
-			# observed data
-			ax.step(vaxis_fit, data_fit[:,i], linewidth=2., color='grey', where='mid')
-			ax.step(v_i, d_i, linewidth=3., color='k', where='mid')
-			#ax.errorbar(velcalc, Icalc, yerr=rms, fmt= 'k.', color = 'k', capsize = 2, capthick = 1)
+			# ith data
+			x_i = xaxis_fit[i]
+			d_i = data_fit[:, i]
+			print ('x_now: %.2f arcsec'%x_i)
 
-			# fitted Gaussian
-			x_model = np.linspace(np.nanmin(vaxis_fit), np.nanmax(vaxis_fit), 256) # offset axis for plot
-			g_model = gaussian(x_model, amp_fit, mx_fit, sigx_fit)
-			ax.plot(x_model, g_model, lw=2., color='r', ls='-', alpha=0.8)
+			snr    = np.nanmax(d_i)/rms
+			posacc = res_off/snr
+
+			# get ridge value
+			if mode == 'mean':
+				v_i = vaxis_fit[d_i >= thr*rms]
+				d_i = d_i[d_i >= thr*rms]
+				mv, mv_err = ridge_mean(v_i, d_i, rms)
+
+				# plot
+				if ~np.isnan(mv):
+					ax.vlines(mv, 0., dlim[-1], lw=1.5, color='r', ls='--', alpha=0.8)
+			elif mode == 'gauss':
+				# get peak indices
+				peaks, _ = find_peaks(d_i, height=thr*rms, prominence=1.5*rms)
+				#print (peaks)
+
+				if len(peaks) == 0:
+					pass
+				else:
+					snr    = np.nanmax(d_i)/rms
+					posacc = res_off/snr
+
+				# determining used data range
+				if pixrng:
+					# error check
+					if type(pixrng) != int:
+						print ('ERROR\tpvfit_vcut: pixrng must be integer.')
+						return
+
+					# get peak index
+					peakindex = peaks[i_peak] if multipeaks else np.argmax(d_i)
+
+					# use pixels only around intensity peak
+					vfit_indx = [peakindex - pixrng, peakindex + pixrng+1]
+					d_i  = d_i[vfit_indx[0]:vfit_indx[1]]
+					v_i  = vaxis_fit[vfit_indx[0]:vfit_indx[1]]
+					nd_i = len(d_i)
+				else:
+					v_i = vaxis_fit.copy()
+
+				if np.nanmax(d_i) >= thr*rms:
+					param_out, param_err = gaussfit(v_i, d_i, rms)
+				else:
+					param_out = np.full(3, np.nan)
+					param_err = np.full(3, np.nan)
+
+				mv, mv_err = param_out[1], param_err[1]
+
+				# Plot result
+				if ~np.isnan(mv):
+					x_model = np.linspace(np.nanmin(vaxis_fit), np.nanmax(vaxis_fit), 256) # offset axis for plot
+					g_model = gauss1d(x_model, *param_out)
+					ax.step(v_i, d_i, linewidth=1.5, color='r', where='mid')
+					ax.plot(x_model, g_model, lw=1.5, color='r', ls='-', alpha=0.8)
+					ax.vlines(mv, 0., dlim[-1], lw=1.5, color='r', ls='--', alpha=0.8)
+			else:
+				print ('ERROR\tpvfit_vcut: mode must be mean or gauss.')
+				return
+
+			# output ridge results
+			res_ridge[i, :] = [x_i, mv, posacc, mv_err]
+
+			# get edge values
+			# fitting axis
+			v_i = vaxis_fit.copy()
+			d_i = data_fit[:,i]
+
+			# interpolation
+			vi_interp  = np.linspace(v_i[0], v_i[-1], (len(v_i) - 1) * 10 + 1) # resample with a 10 times finer sampling rate
+			di_interp  = interp1d(v_i, d_i, kind='cubic')(vi_interp)           # interpolation
+
+			# flag by mass
+			unit  = au / Ggrav / Msun / np.sin(np.radians(incl))**2
+			mass_est = kepler_mass(x_i*dist, (vi_interp - vsys)*1e5, unit) # 1e5 for conversion from km/s to cm/s
+			goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
+			edgesign = v_i[np.nanargmax(d_i)] - vsys
+			mv, mv_err = edge(vi_interp, di_interp, rms, rms*thr, goodflag=goodflag, edgesign=edgesign)
+			res_edge[i, :] = [x_i, mv, posacc, mv_err]
+			if ~np.isnan(mv):
+				ax.vlines(mv, 0., dlim[-1], lw=1.5, color='b', ls='--', alpha=0.8)
+
+			# plot
+			# observed data
+			ax.step(vaxis_fit, data_fit[:,i], linewidth=1., color='k', where='mid')
 
 			# offset label
-			ax.text(0.9, 0.9, '%03.2f'%xi, horizontalalignment='right',
+			ax.text(0.9, 0.9, '%03.2f'%x_i, horizontalalignment='right',
 			    verticalalignment='top',transform=ax.transAxes)
 
 			ax.tick_params(which='both', direction='in',bottom=True, top=True, left=True, right=True, pad=9)
 
 			# step
-			gridi = gridi + 1
-
+			gridi += 1
 
 		# Store
-		self.results.update({'%i'%self.dicindx:np.array([res_x, res_v, err_x, err_v, res_chi2], dtype=object)})
-		self.dicindx += 1
+		self.results['ridge']['vcut'] = res_ridge
+		self.results['edge']['vcut']  = res_edge
 
 		#plt.show()
-		fig.savefig(outname+"_chi2_pv_vfit.pdf", transparent=True)
+		fig.savefig(outname+"_pvfit_vcut.pdf", transparent=True)
 		plt.close()
 
-
 		### output results as .txt file
-		res_hd  = 'offset[arcsec]\tvelocity[km/s]\toff_err[arcesc]\tvel_err[km/s]'
-		res_all = np.c_[res_x, res_v, err_x, err_v]
-		np.savetxt(outname+'_chi2_pv_vfit.txt', res_all,fmt = '%4.4f', delimiter ='\t', header = res_hd)
+		#res_hd  = 'offset[arcsec]\tvelocity[km/s]\toff_err[arcesc]\tvel_err[km/s]'
+		#res_all = np.c_[res_x, res_v, err_x, err_v]
+		#np.savetxt(outname+'_pv_vcut.txt', res_all,fmt = '%4.4f', delimiter ='\t', header = res_hd)
 
 
-	def pvfit_xcut(self, outname, rms, thr=None, xlim=[], vlim=[], pixrng=None):
+	def pvfit_xcut(self, outname, rms, thr=5., vsys=0, dist=140., incl=90.,
+		xlim=[], vlim=[], Mlim=[], mode='mean', pixrng=None):
 		'''
 		Fitting along x-axis, i.e., fitting to the intensity distribution at each velocity.
 
@@ -752,27 +729,8 @@ class PVFit():
 		import math
 		from scipy import optimize
 		from scipy.signal import find_peaks
+		from scipy.interpolate import interp1d
 		from mpl_toolkits.axes_grid1 import ImageGrid
-
-
-		# functions
-		# gaussian
-		def gaussian(x,amp,mean,sig):
-			#coeff=A/(np.sqrt(2.0*np.pi)*sig)
-			exp=np.exp(-(x-mean)*(x-mean)/(2.0*sig*sig))
-			gauss=amp*exp
-			return gauss
-
-		#def fit_error()
-		# y-f(x)/yerr, contents of  xi square
-		def chi_gauss(param, xdata, ydata, ysig):
-			chi = (ydata - (gaussian(xdata, *param))) / ysig
-			return chi
-
-
-		# remember output name
-		self.outname = outname
-
 
 		# data
 		data = self.fitsdata.data
@@ -796,20 +754,19 @@ class PVFit():
 			hob     = np.round((res_off*0.5/self.fitsdata.delx), 0) # harf of beamsize (pix)
 		else:
 			bmaj, bmin, bpa = self.fitsdata.beam
-			res_off = bmin # in arcsec
+			res_off = bmin                                          # in arcsec
 			hob     = np.round((res_off*0.5/self.fitsdata.delx), 0) # harf of beamsize [pix]
-
 
 		# sampling step; half of beam
 		hob  = int(hob) # (pix)
 		delv = self.fitsdata.delv
-
 
 		# for fitting
 		# Nyquist sampling
 		xaxis_fit = xaxis[::hob]
 		vaxis_fit = vaxis
 		data_fit  = data[:,::hob]
+
 
 		if len(xlim) == 2:
 			data_fit  = data_fit[:,np.where((xaxis_fit >= xlim[0]) & (xaxis_fit <= xlim[-1]))[0]]
@@ -819,7 +776,7 @@ class PVFit():
 		elif len(xlim) == 0:
 			pass
 		else:
-			print ('Warning\tpvfit_vcut: Size of xlim is not correct.\
+			print ('WARNING\tpvfit_xcut: Size of xlim is not correct.\
 			 xlim must be given as [xmin, xmax]. Given xlim is ignored.')
 
 		if len(vlim) == 2:
@@ -829,25 +786,17 @@ class PVFit():
 		elif len(vlim) == 0:
 			pass
 		else:
-			print ('Warning\tpvfit_vcut: Size of vlim is not correct.\
+			print ('WARNING\tpvfit_xcut: Size of vlim is not correct.\
 			 vlim must be given as [vmin, vmax]. Given vlim is ignored.')
 
 
-		# list to save final results
-		res_v = np.array([], dtype='float64')
-		res_x = np.array([], dtype='float64')
-		err_x = np.array([], dtype='float64')
-		err_v = np.array([], dtype='float64')
-		res_chi2 = np.array([], dtype='float64')
-
-		nloop     = len(vaxis_fit)
-
+		# loop
+		nloop = len(vaxis_fit)
 		ncol = math.ceil(np.sqrt(nloop))
 		ncol = int(ncol)
 		nrow = 1
 		while ncol*nrow <= nloop:
 			nrow += 1
-
 
 		# figure for check result
 		fig  = plt.figure(figsize=(11.69, 8.27))
@@ -858,102 +807,100 @@ class PVFit():
 		# x & y label
 		grid[(nrow*ncol-ncol)].set_xlabel('Offset (arcsec)')
 		grid[(nrow*ncol-ncol)].set_ylabel('Intensity')
+		dlim = [np.nanmin(data_fit), np.nanmax(data_fit)]
+
+		# list to save final results
+		res_ridge = np.zeros((nloop, 4)) # x, v, err_x, err_v
+		res_edge  = np.zeros((nloop, 4))
 
 
 		# calculation
 		for i in range(nloop):
-			# where it is now!!!
-			velnow = vaxis_fit[i]
-			print ('Channel #%i velocity %.2f km/s'%(i+1, velnow))
+			# plot results
+			ax = grid[gridi]
+
+			# where it is now
+			v_i = vaxis_fit[i]
+			print ('Channel #%i velocity %.2f km/s'%(i+1, v_i))
 
 			# set offset range used
 			d_i  = data_fit[i,:]
-			nd_i = len(d_i)
 
-			# using data points >= thr * sigma
-			if thr:
-				if np.nanmax(d_i) < thr*rms:
-					print ('SNR < %.f'%thr)
-					print (np.nanmax(d_i), thr*rms)
-					print ('skip this point')
-					continue
+			# get ridge value
+			if mode == 'mean':
+				x_i = xaxis_fit[d_i >= thr*rms]
+				d_i = d_i[d_i >= thr*rms]
+				mx, mx_err = ridge_mean(x_i, d_i, rms)
 
-			# skip if pixel number for calculation is below 3
-			if d_i.size <= 3 or xaxis_fit.size <= 3:
-				gridi = gridi + 1
-				continue
+				# plot
+				if ~np.isnan(mx):
+					ax.vlines(mx, 0., dlim[-1], lw=1.5, color='r', ls='--', alpha=0.8)
+			elif mode == 'gauss':
+				# determining used data range
+				if pixrng:
+					# error check
+					if type(pixrng) != int:
+						print ('ERROR\tpvfit_xcut: pixrng must be integer.')
+						return
 
+					# get peak index
+					peakindex = np.argmax(d_i)
 
-			# set the initial parameter
-			sigx = 0.25
-			mx   = xaxis_fit[np.argmax(d_i)]
-			amp  = np.nanmax(d_i)*np.sqrt(2.*np.pi)*sigx
-			pinp = [amp, mx, sigx]
+					# use pixels only around intensity peak
+					xfit_indx = [peakindex - pixrng, peakindex + pixrng+1]
+					d_i  = d_i[xfit_indx[0]:xfit_indx[1]]
+					x_i  = xaxis_fit[xfit_indx[0]:xfit_indx[1]]
+					nd_i = len(d_i)
+				else:
+					x_i = xaxis_fit.copy()
 
+				if np.nanmax(d_i) >= thr*rms:
+					param_out, param_err = gaussfit(x_i, d_i, rms)
+				else:
+					param_out = np.full(3, np.nan)
+					param_err = np.full(3, np.nan)
+				mx, mx_err = param_out[1], param_err[1]
 
-			# fitting
-			results = optimize.leastsq(chi_gauss, pinp, args=(xaxis_fit, d_i, rms), full_output=True)
-
-			# recording output results
-			# param_out: fitted parameters
-			# err: error of fitted parameters
-			# chi2: chi-square
-			# DOF: degree of freedum
-			# reduced_chi2: reduced chi-square
-			param_out    = results[0]
-			param_cov    = results[1]
-			chi2         = np.sum(chi_gauss(param_out, xaxis_fit, d_i, rms)**2.)
-			nparam       = len(param_out)
-			dof          = nd_i - nparam #- 1
-			reduced_chi2 = chi2/dof
-
-			#print (ndata, nparam, dof)
-			#print (param_cov)
-			if (dof >= 0) and (param_cov is not None):
-				pass
-				#param_cov = param_cov*reduced_chi2
+				# Plot result
+				if ~np.isnan(mx):
+					x_model = np.linspace(np.nanmin(xaxis_fit), np.nanmax(xaxis_fit), 256) # offset axis for plot
+					g_model = gauss1d(x_model, *param_out)
+					ax.step(x_i, d_i, linewidth=1.5, color='r', where='mid')
+					ax.plot(x_model, g_model, lw=1.5, color='r', ls='-', alpha=0.8)
+					ax.vlines(mx, 0., dlim[-1], lw=1.5, color='r', ls='--', alpha=0.8)
 			else:
-				param_cov = np.full((nparam, nparam),np.inf)
+				print ('ERROR\tpvfit_vcut: mode must be mean or gauss.')
+				break
 
-			# best fit value
-			amp_fit, mx_fit, sigx_fit = param_out
-
-			# fitting error
-			param_err = np.array([
-				np.abs(param_cov[j][j])**0.5 for j in range(nparam)
-				])
-			amp_fit_err, mx_fit_err, sigx_fit_err = param_err
+			# output ridge results
+			res_ridge[i, :] = [mx, v_i, mx_err, delv/(2.*np.sqrt(3))]
 
 
-			# output results
-			res_x = np.append(res_x, mx_fit)
-			res_v = np.append(res_v, velnow)
-			err_x = np.append(err_x, mx_fit_err)
-			err_v = np.append(err_v, delv*0.5)
-			res_chi2 = np.append(res_chi2, reduced_chi2)
+			# get edge values
+			# fit axes
+			x_i = xaxis_fit.copy()
+			d_i = data_fit[i,:]
 
+			# interpolation
+			xi_interp  = np.linspace(x_i[0], x_i[-1], (len(x_i) - 1) * 10 + 1) # resample with a 10 times finer sampling rate
+			di_interp  = interp1d(x_i, d_i, kind='cubic')(xi_interp)           # interpolation
 
-			# print results
-			print ('Chi2: ', reduced_chi2)
-			print ('Fitting results: amp   mean   sigma')
-			print (amp_fit, mx_fit, sigx_fit)
-			print ('Errors')
-			print (amp_fit_err, mx_fit_err, sigx_fit_err)
+			# flag by mass
+			unit  = au / Ggrav / Msun / np.sin(np.radians(incl))**2
+			mass_est = kepler_mass(xi_interp*dist, (v_i - vsys)*1e5, unit)
+			goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
+			edgesign = x_i[np.nanargmax(d_i)]
+			mx, mx_err = edge(xi_interp, di_interp, rms, rms*thr, goodflag=goodflag, edgesign=edgesign)
+			res_edge[i, :] = [mx, v_i, mx_err, delv/(2.*np.sqrt(3))]
+			if ~np.isnan(mx):
+				ax.vlines(mx, 0., dlim[-1], lw=2., color='b', ls='--', alpha=0.8)
 
-
-			### plot results
-			ax = grid[gridi]
-
+			# plot
 			# observed data
-			ax.step(xaxis_fit, d_i, linewidth=2., color='k', where='mid')
-
-			# fitted Gaussian
-			x_model = np.linspace(np.nanmin(xaxis_fit), np.nanmax(xaxis_fit), 256) # offset axis for plot
-			g_model = gaussian(x_model, amp_fit, mx_fit, sigx_fit)
-			ax.plot(x_model, g_model, lw=2., color='r', ls='-', alpha=0.7)
+			ax.step(xaxis_fit, data_fit[i,:], linewidth=1., color='k', where='mid')
 
 			# offset label
-			ax.text(0.9, 0.9, '%03.2f'%velnow, horizontalalignment='right',
+			ax.text(0.9, 0.9, '%03.2f'%v_i, horizontalalignment='right',
 				verticalalignment='top',transform=ax.transAxes)
 
 			ax.tick_params(which='both', direction='in',bottom=True, top=True, left=True, right=True, pad=9)
@@ -962,20 +909,18 @@ class PVFit():
 			gridi = gridi + 1
 
 		# Store
-		self.results.update({'%i'%self.dicindx:np.array([res_x, res_v, err_x, err_v, res_chi2], dtype=object)})
-		self.dicindx += 1
+		self.results['ridge']['xcut'] = res_ridge
+		self.results['edge']['xcut']  = res_edge
 
 		#plt.show()
-		fig.savefig(outname+"_chi2_pv_xfit.pdf", transparent=True)
+		fig.savefig(outname+"_pvfit_xcut.pdf", transparent=True)
 		plt.close()
 
 
-		### output results as .txt file
-		res_hd  = 'offset[arcsec]\tvelocity[km/s]\toff_err[arcesc]\tvel_err[km/s]'
-		res_all = np.c_[res_x, res_v, err_x, err_v]
-		np.savetxt(outname+'_chi2_pv_xfit.txt', res_all,fmt = '%4.4f', delimiter ='\t', header = res_hd)
-
-
+		# output results as .txt file
+		#res_hd  = 'offset[arcsec]\tvelocity[km/s]\toff_err[arcesc]\tvel_err[km/s]'
+		#res_all = np.c_[res_x, res_v, err_x, err_v]
+		#np.savetxt(outname+'_chi2_pv_xfit.txt', res_all,fmt = '%4.4f', delimiter ='\t', header = res_hd)
 
 
 	def plawfit(self, outname, params_inp, mode='sp',
@@ -1219,7 +1164,7 @@ class PVFit():
 	# Plot results
 	def plotresults_onpvdiagram(self, outname=None, marker='o', colors=['r'], alpha=1.,
 		data=None,header=None,ax=None,outformat='pdf',pvcolor=True,cmap='Greys',
-		vmin=None,vmax=None,vsys=0,contour=True,clevels=None,pvccolor='k', pa=None,
+		vmin=None,vmax=None, contour=True,clevels=None,pvccolor='k',
 		vrel=False,logscale=False,x_offset=False,ratio=1.2, prop_vkep=None,fontsize=14,
 		lw=1,clip=None,plot_res=True,inmode='fits',xranges=[], yranges=[],
 		ln_hor=True, ln_var=True, pvalpha=None):
@@ -1256,45 +1201,38 @@ class PVFit():
 		if outname:
 			pass
 		else:
-			outname = self.outname + '_chi2_pv_vfit_pvdiagram'
+			outname = self.outname + '_pvfit_pvdiagram'
+
+		def plotpoints(ax, x, v, xerr, verr, color, x_offset=False):
+			if x_offset:
+				ax.errorbar(x, v, xerr=xerr, yerr=verr, color=color,
+					capsize=2., capthick=2., linestyle='', marker='o')
+			else:
+				ax.errorbar(v, x, xerr=verr, yerr=xerr, color=color,
+					capsize=2., capthick=2., linestyle='', marker='o')
+			return ax
 
 		# draw pv diagram
 		ax = self.fitsdata.draw_pvdiagram(outname, data=data, header=header, ax=ax,
 			outformat=outformat, color=pvcolor, cmap=cmap,
-			vmin=vmin, vmax=vmax, vsys=vsys, contour=contour, clevels=clevels,
-			ccolor=pvccolor, pa=pa, vrel=vrel, logscale=logscale, x_offset=x_offset,
+			vmin=vmin, vmax=vmax, vsys=self.vsys, contour=contour, clevels=clevels,
+			ccolor=pvccolor, vrel=vrel, logscale=logscale, x_offset=x_offset,
 			ratio=ratio, prop_vkep=prop_vkep, fontsize=fontsize, lw=lw, clip=clip,
 			plot_res=plot_res, inmode=inmode, xranges=xranges, yranges=yranges,
 			ln_hor=ln_hor, ln_var=ln_var, alpha=pvalpha)
 
 
 		# plot fitting results
-		# color
-		if type(colors) == str:
-			colors = np.full(len(self.results), colors, dtype=str)
-		elif type(colors) == list:
-			if len(colors) == len(self.results):
-				pass
-			else:
-				print ('WARNING\tplotresults_onpvdiagram: ')
-				print ('len(colors) != len(results). Adopt the first color only.')
-				colors = np.full(len(self.results), colors[0], dtype=str)
-		else:
-			print ('WARNING\tplotresults_onpvdiagram: ')
-			print ('colors must be str or list type. Ignore the input.')
-			colors = np.full(len(self.results), 'k', dtype=str)
+		colors = {'ridge':'r', 'edge':'b'}
+		for i in self.results:
+			color = colors[i]
+			if self.results[i]['vcut'] is not None:
+				x, v, xerr, verr = self.results[i]['vcut'].T
+				ax = plotpoints(ax, x, v, xerr, verr, color, x_offset)
 
-		for i in range(len(self.results)):
-			res_x, res_v, err_x, err_v, res_chi2 = self.results['%i'%i]
-
-			if x_offset:
-				ax.errorbar(res_x, res_v, xerr=err_x, yerr=err_v,
-					color=colors[i], marker=marker, alpha=alpha, capsize=2.,
-					capthick=2., linestyle='')
-			else:
-				ax.errorbar(res_v, -res_x, xerr=err_v, yerr=err_x,
-					color=colors[i], marker=marker, alpha=alpha, capsize=2.,
-					capthick=2., linestyle='')
+			if self.results[i]['xcut'] is not None:
+				x, v, xerr, verr = self.results[i]['xcut'].T
+				ax = plotpoints(ax, x, v, xerr, verr, color, x_offset)
 
 		plt.savefig(outname+'.'+outformat, transparent=True)
 
@@ -1354,3 +1292,15 @@ class PVFit():
 		plt.savefig(outname+'.'+outformat, transparent=True)
 
 		return ax
+
+
+
+### functions
+def kepler_mass(r, v, unit):
+	return v**2 * np.abs(r) * unit
+
+def kepler_mass_error(r, v, dr, dv, unit):
+	return kepler_mass(r, v, unit) * np.sqrt((2 * dv / v)**2 + (dr / r)**2)
+
+def between(t, tlim):
+	return (tlim[0] < t) * (t < tlim[1])
