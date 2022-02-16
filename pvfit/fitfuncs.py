@@ -13,38 +13,97 @@ from scipy.stats import norm, uniform
 
 
 
+# functions
+# gaussian
+def gauss1d(x,amp,mean,sig):
+	return amp * np.exp(-(x-mean)*(x-mean)/(2.0*sig*sig))
 
-# read file
-def read_pvfitres(fname, inner_threshold=None, outer_threshold=None, toau=True, dist=140.):
+# for chi-square
+def chi_gauss1d(param, xdata, ydata, ysig):
+	return (ydata - (gauss1d(xdata, *param))) / ysig
+
+def edge(xdata, ydata, yerr, threshold, goodflag=None, edgesign=1):
+	grad = (np.roll(ydata, -1) - np.roll(ydata, 1)) / (xdata[2] - xdata[0])
+	cond = (ydata > threshold) if goodflag is None else (ydata > threshold) * goodflag
+	grad, x = grad[cond], xdata[cond]
+	if len(x) == 0:
+		return [np.nan, np.nan]
+	val = x[0] if edgesign < 0 else x[-1]
+	grad = grad[0] if edgesign < 0 else grad[-1]
+	err = yerr / np.abs(grad)
+	return [val, err]
+
+'''
+def ridge_gauss(xdata, ydata, yerr):
+    if len(xdata) < 4:
+        return [np.nan, np.nan]
+    bounds = [[0, np.min(xdata), np.abs(xdata[1] - xdata[0])],
+              [np.max(ydata) * 2., np.max(xdata), np.max(xdata)]]
+    try:
+        popt, pcov = curve_fit(gauss1d, xdata, ydata,
+                               sigma = np.full_like(xdata, yerr),
+                               absolute_sigma=True, bounds=bounds)
+        val, err = popt[1], np.sqrt(pcov[1][1])
+    except RuntimeError:
+        return [np.nan, np.nan]
+    return [val, err]
+'''
+
+def gaussfit(xdata, ydata, yerr):
 	'''
-	Read fitting-result files.
+	Gaussian fit through chi-square fit.
 	'''
-	# read files
-	offset, velocity, offerr, velerr = np.genfromtxt(fname, comments='#', unpack = True)
 
-	# offset threshold of used data point
-	if inner_threshold:
-		thrindx  = np.where(np.abs(offset) >= inner_threshold)
-		offset   = offset[thrindx]
-		velocity = velocity[thrindx]
-		offerr   = offerr[thrindx]
-		velerr   = velerr[thrindx]
+	# Get estimate of the initial parameters
+	indx_pini = ydata >= 3.*yerr
+	mx    = np.nansum(ydata[indx_pini]*xdata[indx_pini])/np.nansum(ydata[indx_pini]) # weighted mean
+	sigx  = np.sqrt(np.nansum(ydata[indx_pini]*(xdata[indx_pini] - mx)**2.)/np.nansum(ydata[indx_pini])) # standerd deviation
 
-	# offset threshold of used data point
-	if outer_threshold:
-		thrindx  = np.where(np.abs(offset) <= outer_threshold)
-		offset   = offset[thrindx]
-		velocity = velocity[thrindx]
-		offerr   = offerr[thrindx]
-		velerr   = velerr[thrindx]
+	# if sigx is too small
+	if sigx <= 1e-6:
+		sigx = np.abs(xdata[1] - xdata[0])/len(xdata)
 
-	if toau:
-		offset = offset*dist
-		offerr = offerr*dist
+	amp  = np.nanmax(ydata)
+	pinp = [amp, mx, sigx]
 
-	return offset, velocity, offerr, velerr
+	if len(xdata) < 3:
+		param_out = np.full(3, np.nan)
+		param_err = np.full(3, np.nan)
+		return param_out, param_err
+
+	# fitting
+	results   = optimize.leastsq(chi_gauss1d, pinp, args=(xdata, ydata, yerr), full_output=True)
+	param_out = results[0]
+	param_cov = results[1]
+	#print(results)
+	#print(param_out, param_cov)
+	# Do not multiply covariance by reduced chi^2 to obtain absolute errors
+
+	# parameter error estimates
+	if param_cov is not None:
+		param_err = np.array([
+			np.abs(param_cov[j][j])**0.5 for j in range(len(pinp))
+			])
+	else:
+		param_err = np.full(3, np.nan)
+		param_out = np.full(3, np.nan) if (param_out == pinp).all else param_out
+
+	# print results
+	#print ('Chi2: ', reduced_chi2)
+	#print ('Fitting results: amp   mean   sigma')
+	#print (amp_fit, mx_fit, sigx_fit)
+	#print ('Errors')
+	#print (amp_fit_err, mx_fit_err, sigx_fit_err)
+
+	return param_out, param_err
 
 
+def ridge_mean(xdata, ydata, yerr):
+    if len(xdata) < 2:
+        return np.nan, np.nan
+    val = np.average(xdata, weights=ydata)
+    err = yerr * np.abs(np.sum(xdata - val)) / np.sum(ydata)
+    return val, err
 
 
 # functions
