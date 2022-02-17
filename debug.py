@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from pvfit import PVFit
 
 
@@ -16,14 +17,17 @@ def main():
 	clevels = np.array([-3,3,6,9,12,15,20,25,30])*rms
 	xlim    = [-5, 5] # arcsec
 	vlim    = [2, 12.5]
-	Mlim    = [0.5, 5]
+	Mlim    = [1, 2]
 	# ---------------------
 
 
 	# -------- main --------
-	impv = PVFit(fitsfile, pa=69.)
-	impv.get_edgeridge(outname, rms, vsys, dist, thr, xlim=xlim, vlim=vlim, Mlim=Mlim, mode='gauss')
-	impv.plotresults_onpvdiagram(clevels=clevels)
+	impv = PVFit(fitsfile, rms, vsys, dist, pa=69.)
+	impv.get_edgeridge(outname, thr=thr, xlim=xlim, vlim=vlim, Mlim=Mlim, mode='gauss', incl=incl)
+	impv.plotresults_pvdiagram(clevels=clevels)
+	impv.plotresults_rvplane()
+	#print(impv.results_sorted)
+
 	#print(impv.results)
 	#impv.pvfit_xcut(outname, rms, thr)
 	#impv.plotresults_onpvdiagram(outname='test_xcut', clevels=clevels, colors=['r'])
