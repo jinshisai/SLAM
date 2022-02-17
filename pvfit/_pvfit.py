@@ -93,7 +93,7 @@ class Impvfits:
 
 
 		# Info. of P.A.
-		if pa:
+		if pa is not None:
 			print ('Input P.A.: %.1f deg'%pa)
 			self.pa = pa
 		elif 'PA' in header:
@@ -107,7 +107,7 @@ class Impvfits:
 			self.pa = None
 
 		# Resolution along offset axis
-		if self.pa:
+		if self.pa is not None:
 			# an ellipse of the beam
 			# (x/bmin)**2 + (y/bmaj)**2 = 1
 			# y = x*tan(theta)
@@ -577,9 +577,9 @@ class PVFit():
 			for j in ['red', 'blue']:
 				if (self.results[i]['xcut'] is not None) & (self.results[i]['vcut'] is not None):
 					xmax = np.nanmax(self.__store['xcut'][j][0])
-					vmin = np.nanmin(self.__store['vcut'][j][1])
+					vmax = np.nanmax(self.__store['vcut'][j][1])
 
-					self.__store['xcut'][j][0][self.__store['xcut'][j][1] < vmin] = np.nan
+					self.__store['xcut'][j][0][self.__store['xcut'][j][1] < vmax] = np.nan
 					self.__store['vcut'][j][1][self.__store['vcut'][j][0] < xmax] = np.nan
 
 					# remove nan
@@ -794,12 +794,16 @@ class PVFit():
 
 					# get peak index
 					peakindex = peaks[i_peak] if multipeaks else np.argmax(d_i)
-
-					# use pixels only around intensity peak
-					vfit_indx = [peakindex - pixrng, peakindex + pixrng+1]
-					d_i  = d_i[vfit_indx[0]:vfit_indx[1]]
-					v_i  = vaxis_fit[vfit_indx[0]:vfit_indx[1]]
-					nd_i = len(d_i)
+					if (peakindex < pixrng) | (peakindex > len(d_i) - pixrng - 1):
+						# peak position is too edge
+						mv, mv_err = np.nan, np.nan
+						pass
+					else:
+						# use pixels only around intensity peak
+						vfit_indx = [peakindex - pixrng, peakindex + pixrng+1]
+						d_i  = d_i[vfit_indx[0]:vfit_indx[1]]
+						v_i  = vaxis_fit[vfit_indx[0]:vfit_indx[1]]
+						nd_i = len(d_i)
 				else:
 					v_i = vaxis_fit.copy()
 
