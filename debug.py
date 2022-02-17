@@ -24,7 +24,7 @@ def main():
 	thr     = 6.     # 6 sigma
 	dist    = 140.
 	clevels = np.array([-3,3,6,9,12,15,20,25,30])*rms
-	xlim    = [-5, 5] # arcsec
+	xlim    = [] # arcsec
 	vlim    = []
 	Mlim    = []
 	# ---------------------
@@ -32,8 +32,7 @@ def main():
 
 	# -------- main --------
 	impv = PVFit(fitsfile, rms, vsys, dist, pa=pa)
-	impv.get_edgeridge(outname, thr=thr, xlim=xlim, vlim=vlim, Mlim=Mlim, mode='gauss', incl=incl,
-		use_velocity=False)
+	impv.get_edgeridge(outname, thr=thr, xlim=xlim, vlim=vlim, Mlim=Mlim, mode='gauss')
 	impv.plotresults_pvdiagram(clevels=clevels)
 	impv.plotresults_rvplane()
 	#print(impv.results_sorted)
