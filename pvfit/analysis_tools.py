@@ -5,9 +5,9 @@ Analysis tools for PVfit
 
 import sys
 import numpy as np
-import scipy.optimize
+#import scipy.optimize
 from scipy.optimize import curve_fit
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 sys.path.append('../')
 from utils import gauss1d
