@@ -4,7 +4,7 @@ Fitting functions
 
 # modules
 import numpy as np
-import os
+#import os
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from scipy import optimize
