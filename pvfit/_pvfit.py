@@ -117,6 +117,7 @@ class Impvfits:
             self.pa = None
 
         # Resolution along offset axis
+        self.res_off = None
         if self.pa is not None:
             # an ellipse of the beam
             # (x/bmin)**2 + (y/bmaj)**2 = 1
@@ -129,9 +130,6 @@ class Impvfits:
             term_cos = (np.cos(del_pa)/bmaj)**2.
             res_off  = np.sqrt(1./(term_sin + term_cos))
             self.res_off = res_off
-        else:
-            self.res_off = None
-
 
         # rest frequency (Hz)
         if 'RESTFRQ' in header:
@@ -186,7 +184,7 @@ class Impvfits:
                 xaxis    = xaxis*3600.
                 del_i[0] = del_i[0]*3600.
         else:
-            print ('WARNING\tread_pvfits::'
+            print ('WARNING\tread_pvfits:: '
                    + 'No unit information in the header.'
                    + 'Assume the unit of the offset axis is arcesc.')
 
@@ -517,7 +515,7 @@ class PVFit():
             return
 
         if (self.xsign != np.sign(i)):
-            print('WARNING\tget_edgeridge:'
+            print('WARNING\tget_edgeridge: '
                   + f'quadrant={i:.0f} seems opposite.')
 
         # store fitting conditions
@@ -555,24 +553,20 @@ class PVFit():
         self.__sorted = True
 
         # to store
-        self.results_sorted = {
-        'ridge': {'red': None, 'blue': None},
-        'edge': {'red': None, 'blue': None}
-        }
+        self.results_sorted = {'ridge': {'red': None, 'blue': None},
+                               'edge': {'red': None, 'blue': None}}
 
         # sort results
-        for i in self.results:
+        for i in ['ridge', 'edge']:
             # tentative space
             self.__store = {'xcut': {'red': None, 'blue': None},
             'vcut': {'red': None, 'blue': None}}
-
-            for j in self.results[i]:
+            for j in ['xcut', 'vcut']:
                 if self.results[i][j] is None:
                     continue
-                else:
-                    results     = copy.deepcopy(self.results[i][j].T)
-                    # nan after turn over# x, v, err_x, err_v
-                    results[1] -= self.vsys
+                results = copy.deepcopy(self.results[i][j].T)
+                # nan after turn over# x, v, err_x, err_v
+                results[1] -= self.vsys
 
                 # relative velocity to separate red/blue comp.
                 vrel = results[1]
@@ -583,24 +577,17 @@ class PVFit():
                             for k in results]
 
                 # nan after turn over
-                if j == 'xcut':
-                    if np.any(~np.isnan(res_red[0])):
-                        res_red[0][:np.nanargmax(res_red[0])]   = np.nan 
-                    if np.any(~np.isnan(res_blue[0])):
-                        res_blue[0][:np.nanargmax(res_blue[0])] = np.nan
-                else:
-                    if np.any(~np.isnan(res_red[1])):
-                        res_red[1][:np.nanargmax(res_red[1])]   = np.nan
-                    if np.any(~np.isnan(res_blue[1])):
-                        res_blue[1][:np.nanargmax(res_blue[1])] = np.nan
-
+                ##### need confirmation
+                jj = 0 if j == 'xcut' else 1
+                for a in [res_red[jj], res_blue[jj]]:
+                    if np.any(~np.isnan(a)):
+                        a[:np.nanargmax(a)] = np.nan 
                 # remove points outside Mlim
+                ##### need confirmation
                 if len(self.Mlim) == 2:
-                    jj = 0 if j == 'xcut' else 1
-                    mass_est = kepler_mass(res_red[0]*self.dist, res_red[1], self.__unit)
-                    res_red[jj][~between(mass_est, self.Mlim)] = np.nan
-                    mass_est = kepler_mass(res_blue[0]*self.dist, res_blue[1], self.__unit)
-                    res_blue[jj][~between(mass_est, self.Mlim)] = np.nan
+                    for a in [res_red, res_blue]:
+                        mass_est = kepler_mass(a[0]*self.dist, a[1], self.__unit)
+                        a[jj][~between(mass_est, self.Mlim)] = np.nan
 
                 self.__store[j]['red']  = res_red
                 self.__store[j]['blue'] = res_blue
@@ -611,44 +598,47 @@ class PVFit():
             for j in ['red', 'blue']:
                 if ((self.results[i]['xcut'] is not None) 
                     & (self.results[i]['vcut'] is not None)):
-                    xmax = np.nanmax(self.__store['xcut'][j][0])
-                    vmax = np.nanmax(self.__store['vcut'][j][1])
-
-                    ##### can be improved 
-                    self.__store['xcut'][j][0][self.__store['xcut'][j][1] < vmax] = np.nan
-                    self.__store['vcut'][j][1][self.__store['vcut'][j][0] < xmax] = np.nan
+                    ##### need confirmation
+                    x1, v0, _, _ = self.__store['xcut'][j]
+                    x0, v1, _, _ = self.__store['vcut'][j]
+                    xx, xv = np.meshgrid(x1, x0)
+                    vx, vv = np.meshgrid(v0, v1)
+                    xvd = np.hypot((xx - xv) / self.fitsdata.res_off,
+                                   (vx - vv) / self.fitsdata.delv)
+                    if np.any(~np.isnan(xvd)):
+                        iv, ix = np.unravel_index(np.nanargmin(xvd), np.shape(xx))
+                        x1[:ix] = np.nan
+                        v1[:iv] = np.nan
+                    
+                    #xmax = np.nanmax(self.__store['xcut'][j][0])
+                    #vmax = np.nanmax(self.__store['vcut'][j][1])
+                    #self.__store['xcut'][j][0][self.__store['xcut'][j][1] < vmax] = np.nan
+                    #self.__store['vcut'][j][1][self.__store['vcut'][j][0] < xmax] = np.nan
 
                     # remove nan
-                    refx = self.__store['xcut'][j][0] # use the position as a reference to remove nan
-                    self.__store['xcut'][j] = [
-                    k[~np.isnan(refx)] for k in self.__store['xcut'][j]
-                    ]
-                    refv = self.__store['vcut'][j][1] # use the velocity as a reference to remove nan
-                    self.__store['vcut'][j] = [
-                    k[~np.isnan(refv)] for k in self.__store['vcut'][j]
-                    ]
+                    for cut, jj in zip(['xcut', 'vcut'], [0, 1]):
+                        ref = self.__store[cut][j][jj]
+                        self.__store[cut][j] \
+                            = [k[~np.isnan(ref)]
+                               for k in self.__store[cut][j]]
 
                     # combine xcut/vcut
                     res_comb = np.array(
                         [np.append(self.__store['xcut'][j][k],
                                    self.__store['vcut'][j][k])
-                    for k in range(4)])
-                elif ((self.results[i]['xcut'] is not None)
-                      & (self.results[i]['vcut'] is None)):
+                         for k in range(4)])
+                ##### need confirmation
+                elif not ((self.results[i]['xcut'] is None)
+                          and (self.results[i]['vcut'] is None)):
                     # remove nan
-                    refx = self.__store['xcut'][j][0] # use the position as a reference to remove nan
-                    res_comb = [
-                    k[~np.isnan(refx)] for k in self.__store['xcut'][j]
-                    ]
-                elif ((self.results[i]['xcut'] is None)
-                      & (self.results[i]['vcut'] is not None)):
-                    # remove nan
-                    refv = self.__store['vcut'][j][1] # use the velocity as a reference to remove nan
-                    res_comb = [
-                    k[~np.isnan(refv)] for k in self.__store['vcut'][j]
-                    ]
+                    if self.results[i]['xcut'] is not None:
+                        jj, res = 0, self.__store['xcut'][j]
+                    else:
+                        jj, res = 1, self.__store['vcut'][j]
+                    res_comb = [k[~np.isnan(res[jj])] for k in res]
                 else:
-                    print ('ERROR\tsort_fitresults: No fitting results are found.')
+                    print('ERROR\tsort_fitresults: '
+                          + 'No fitting results are found.')
                     return
 
                 # arcsec --> au
@@ -750,7 +740,7 @@ class PVFit():
         elif len(xlim) == 0:
             pass
         else:
-            print ('Warning\tpvfit_vcut:'
+            print ('Warning\tpvfit_vcut: '
                    + 'Size of xlim is not correct.'
                    + 'xlim must be given as [xmin, xmax].'
                    + 'Given xlim is ignored.')
@@ -763,7 +753,7 @@ class PVFit():
         elif len(vlim) == 0:
             pass
         else:
-            print ('Warning\tpvfit_vcut:'
+            print ('Warning\tpvfit_vcut: '
                    + 'Size of vlim is not correct.'
                    + 'vlim must be given as [vmin, vmax].'
                    + 'Given vlim is ignored.')
@@ -844,7 +834,7 @@ class PVFit():
                 if pixrng:
                     # error check
                     if type(pixrng) != int:
-                        print ('ERROR\tpvfit_vcut:'
+                        print ('ERROR\tpvfit_vcut: '
                                + 'pixrng must be integer.')
                         return
 
@@ -1016,7 +1006,7 @@ class PVFit():
         elif len(xlim) == 0:
             pass
         else:
-            print ('WARNING\tpvfit_xcut:'
+            print ('WARNING\tpvfit_xcut: '
                    + 'Size of xlim is not correct.'
                    + 'xlim must be given as [xmin, xmax].'
                    + 'Given xlim is ignored.')
@@ -1029,7 +1019,7 @@ class PVFit():
         elif len(vlim) == 0:
             pass
         else:
-            print ('WARNING\tpvfit_xcut:'
+            print ('WARNING\tpvfit_xcut: '
                    + 'Size of vlim is not correct.'
                    + 'vlim must be given as [vmin, vmax].'
                    + 'Given vlim is ignored.')
@@ -1212,7 +1202,7 @@ class PVFit():
         """
         ##### please check the following transfer is consistent.
         def clipped_error(err, val, mode):
-            res = self.fitsdata.beam[0] if mode == 'x' else self.delv
+            res = self.fitsdata.beam[0] if mode == 'x' else self.fitsdata.delv
             minabs = [minabserr * res] * len(err)
             return np.max([err, minrelerr * np.abs(val), minabs], axis=0)
     
