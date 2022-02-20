@@ -562,8 +562,8 @@ class PVFit():
         # sort results
         for i in ['ridge', 'edge']:
             # tentative space
-            self.__store = {'xcut': {'red': [], 'blue': []},
-                            'vcut': {'red': [], 'blue': []}}
+            self.__store = {'xcut': {'red': None, 'blue': None},
+                            'vcut': {'red': None, 'blue': None}}
             for j in ['xcut', 'vcut']:
                 if self.results[i][j] is None:
                     continue
@@ -574,7 +574,7 @@ class PVFit():
                 vrel = results[1]
                 xrel = results[0]
                 # separate red/blue components
-                ##### need confirmation
+                ##### need confirmation. No abs now.
                 rel = vrel if j == 'xcut' else xrel
                 res_red  = [k[rel > 0] for k in results]
                 res_blue = [k[rel < 0][::-1] for k in results]
@@ -593,10 +593,10 @@ class PVFit():
                 self.__store[j]['red']  = res_red
                 self.__store[j]['blue'] = res_blue
             # combine xcut and vcut
-            res_comb = {'xcut':{'red':np.array([[], [], [], []]),
-                                'blue':np.array([[], [], [], []])},
-                        'vcut':{'red':np.array([[], [], [], []]),
-                                'blue':np.array([[], [], [], []])}}
+            res_f = {'xcut':{'red':np.array([[], [], [], []]),
+                             'blue':np.array([[], [], [], []])},
+                     'vcut':{'red':np.array([[], [], [], []]),
+                             'blue':np.array([[], [], [], []])}}
             for j in ['red', 'blue']:
                 if ((self.results[i]['xcut'] is not None) 
                     & (self.results[i]['vcut'] is not None)):
@@ -624,8 +624,12 @@ class PVFit():
                         self.__store[cut][j] \
                             = [k[~np.isnan(ref[jj])] for k in ref]
                     # combine xcut/vcut
-                    res_comb['xcut'][j] = self.__store['xcut'][j]
-                    res_comb['vcut'][j] = self.__store['vcut'][j]
+                    res_comb = np.array(
+                        [np.append(self.__store['xcut'][j][k],
+                                   self.__store['vcut'][j][k])
+                         for k in range(4)])
+                    res_f['xcut'][j] = self.__store['xcut'][j]
+                    res_f['vcut'][j] = self.__store['vcut'][j]
                 ##### need confirmation
                 elif not ((self.results[i]['xcut'] is None)
                           and (self.results[i]['vcut'] is None)):
@@ -634,26 +638,26 @@ class PVFit():
                         cut, jj, res = 'xcut', 0, self.__store['xcut'][j]
                     else:
                         cut, jj, res = 'vcut', 1, self.__store['vcut'][j]
-                    res_comb[cut][j] = [k[~np.isnan(res[jj])] for k in res]
+                    res_comb = [k[~np.isnan(res[jj])] for k in res]
+                    res_f[cut][j] = [k[~np.isnan(res[jj])] for k in res]
                 else:
                     print('ERROR\tsort_fitresults: '
                           + 'No fitting results are found.')
                     return
 
                 # arcsec --> au
+                res_comb[0] = res_comb[0]*self.dist
+                res_comb[3] = res_comb[3]*self.dist
                 for cut in ['xcut', 'vcut']:
-                    res_comb[cut][j][0] = res_comb[cut][j][0]*self.dist
-                    res_comb[cut][j][3] = res_comb[cut][j][3]*self.dist
-
+                    res_f[cut][j][0] = res_f[cut][j][0]*self.dist
+                    res_f[cut][j][3] = res_f[cut][j][3]*self.dist
                 ## sort by x
-                i_order  = np.argsort(res_comb[0])
-                res_comb = np.array([ k[i_order] for k in res_comb]).T
+                i_order  = np.argsort(np.abs(res_comb[0]))
+                res_comb = np.array([np.abs(k[i_order]) for k in res_comb]).T
                 # save
                 self.results_sorted[i][j] = res_comb
-                self.results_filtered[i] = res_filtered
-
+            self.results_filtered[i] = res_f
         del self.__store
-
 
     # pvfit
     def pvfit_vcut(self, outname, rms, thr=5., vsys=0, dist=140.,
@@ -727,7 +731,7 @@ class PVFit():
             xaxis_fit = xaxis[b]
             data_fit  = np.array([d[b] for d in data])
             xmin, xmax = np.min(xaxis_fit), np.max(xaxis_fit)
-            print(f'x range: {xmin:.2f}--{xmax:.2f} arcsec')
+            print(f'x range: {xmin:.2f} -- {xmax:.2f} arcsec')
         vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
         if len(vlim) == 1 or len(xlim) > 2:
             print('Warning\tpvfit_vcut: '
@@ -739,8 +743,7 @@ class PVFit():
             vaxis_fit = vaxis[b]
             data_fit  = np.array([d[b] for d in data.T]).T
             vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
-            print(f'v range: {vmin:.2f}--{vmax:.2f} km/s')
-        print(np.shape(data_fit))
+            print(f'v range: {vmin:.2f} -- {vmax:.2f} km/s')
         # to achieve the same sampling on two sides
         ##### need to confirm the meaning of inverse.
         if inverse:
@@ -941,7 +944,7 @@ class PVFit():
             xaxis_fit = xaxis[b]
             data_fit  = np.array([d[b] for d in data])
             xmin, xmax = np.min(xaxis_fit), np.max(xaxis_fit)
-            print(f'x range: {xmin:.2f}--{xmax:.2f} arcsec')
+            print(f'x range: {xmin:.2f} -- {xmax:.2f} arcsec')
         
         if len(vlim) == 1 or len(xlim) > 2:
             print('Warning\tpvfit_vcut: '
@@ -953,7 +956,7 @@ class PVFit():
             vaxis_fit = vaxis[b]
             data_fit  = np.array([d[b] for d in data.T]).T
             vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
-            print(f'v range: {vmin:.2f}--{vmax:.2f} km/s')
+            print(f'v range: {vmin:.2f} -- {vmax:.2f} km/s')
         # Nyquist sampling
         ##### need for xaxis fit, too?
         xaxis_fit = xaxis[::hob]
@@ -1126,27 +1129,19 @@ class PVFit():
             minabs = [minabserr * res] * len(err)
             return np.max([err, minrelerr * np.abs(val), minabs], axis=0)
     
-        result = [[], []]
+        res_org = self.results_filtered
+        Ds = [None, None]
         for i, er in enumerate(['edge', 'ridge']):
-            xvcuts = [[], []]
-            # loop for xcut and vcut
-            for j, (i0, mode) in enumerate(zip([3, 2], ['x', 'v'])):
-                cut = [[], []]
-                for k, (br, s) in enumerate(zip(['blue', 'red'], [1, -1])):
-                    a = self.results_sorted[er][br]
-                    if len(a) == 0:
-                        cut[k] = [[], [], []]
-                        continue
-                    a = [s * a[L] for L in range(len(a)) if a[L][i0] == 0]
-                    if len(a) == 0:
-                        cut[k] = [[], [], []]
-                        continue
-                    cut[k] = np.transpose(a)
-                    cut[k][2] = clipped_error(cut[k][2], cut[k][1], mode)
-                xvcuts[j] = [np.r_[cut[0][L], cut[1][L]] for L in range(3)]
-            result[i] = xvcuts[0] + xvcuts[1]
-        Es, Rs = result
-        
+            xrb = [res_org[er]['xcut'][rb] for rb in ['red', 'blue']]
+            xcut = np.concatenate(xrb, axis=1)
+            v0, x1, dx1 = xcut[1], self.xsign * xcut[0], xcut[2]
+            dx1 = clipped_error(dx1, x1, mode='x')
+            vrb = [res_org[er]['vcut'][rb] for rb in ['red', 'blue']]
+            vcut = np.concatenate(vrb, axis=1)
+            x0, v1, dv1 = self.xsign * vcut[0], vcut[1], vcut[3]
+            dv1 = clipped_error(dv1, v1, mode='v')
+            Ds[i] = [v0, x1, dx1, x0, v1, dv1]
+        Es, Rs = Ds
         
         self.include_dp = include_dp
         labels = np.array(['Rb', 'Vb', 'p_in', 'dp', 'Vsys'])

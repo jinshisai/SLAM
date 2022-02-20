@@ -25,7 +25,7 @@ def main():
 
     outname = 'test'
     rms     = 5.e-3 # Jy/beam
-    thr     = 5.     # 6 sigma
+    thr     = 6.     # 6 sigma
     dist    = 140.
     clevels = np.array([-3,3,6,9,12,15,20,25,30])*rms
     xlim    = [] # arcsec
@@ -38,11 +38,11 @@ def main():
     impv = PVFit(fitsfile, rms, vsys, dist, pa=pa)
     impv.get_edgeridge(outname, thr=thr, xlim=xlim, vlim=vlim,
                        Mlim=Mlim, mode='gauss')
-    #impv.fit_edgeridge(include_vsys=False, include_dp=False,
-    #                   include_pin=True,
-    #                   filehead='testfit', show_corner=False,
-    #                   minrelerr=0.01, minabserr=0.1)
     #print(impv.results)
+    impv.fit_edgeridge(include_vsys=False, include_dp=False,
+                       include_pin=True,
+                       filehead='testfit', show_corner=False,
+                       minrelerr=0.01, minabserr=0.1)
     impv.plotresults_pvdiagram(clevels=clevels)
     impv.plotresults_rvplane()
     #print(impv.results_sorted)
