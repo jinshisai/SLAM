@@ -42,6 +42,7 @@ def main():
                        include_pin=True,
                        filehead='testfit', show_corner=False,
                        minrelerr=0.01, minabserr=0.1)
+    print(impv.results)
     impv.plotresults_pvdiagram(clevels=clevels)
     impv.plotresults_rvplane()
     #print(impv.results_sorted)
