@@ -10,7 +10,6 @@ Latest update: 1/12/2020
 
 Yusuke's note:
 res_ridge and res_edge are stored after being transposed.
-res_ridge and res_edge now have the error bar of 0 for non-fitted axis.
 Added multipeaks option in xcut as well just in case and for symmetry.
 thrindx is not defined.
 Variables not used are commented out.
@@ -481,33 +480,29 @@ class PVFit():
 
 
         '''
-
         # remember output name
         self.outname = outname
-
         # data
         data = self.fitsdata.data
-        nxh  = self.fitsdata.nx//2
-        nvh  = self.fitsdata.nv//2
-
-        if self.fitsdata.naxis == 2:
-            pass
+        nxh  = self.fitsdata.nx // 2
+        nvh  = self.fitsdata.nv // 2
+        if not (self.fitsdata.naxis in [2, 3]):
+            print('ERROR\tget_edgeridge: n_axis must be 2 or 3.')
+            return
         elif self.fitsdata.naxis == 3:
             ##### np.squeeze()
             data = data[0,:,:] # Remove stokes I
-        else:
-            print('ERROR\tget_edgeridge: n_axis must be 2 or 3.')
-            return
 
         # check quadrant
-        quadcheck = lambda a: np.sum(a[:nvh, :nxh]) + np.sum(a[nvh:, nxh:]) \
-        - np.sum(a[:nvh, nxh:]) - np.sum(a[nvh:, :nxh])
-
+        quadcheck = lambda a: (np.sum(a[:nvh, :nxh])
+                               + np.sum(a[nvh:, nxh:])
+                               - np.sum(a[:nvh, nxh:])
+                               - np.sum(a[nvh:, :nxh]))
+        q = np.sign(quadcheck(data))
         if quadrant is None:
-            self.quadrant = '13' if (i:= quadcheck(data)) > 0 else '24'
+            self.quadrant = '13' if q > 0 else '24'
         else:
             self.quadrant = quadrant
-
         if self.quadrant == '13':
             self.xsign = 1.
         elif self.quadrant == '24':
@@ -515,18 +510,15 @@ class PVFit():
         else:
             print('ERROR\tget_edgeridge: quadrant must be 13 or 24.')
             return
-
-        if (self.xsign != np.sign(i)):
+        if self.xsign != q:
             print('WARNING\tget_edgeridge: '
-                  + f'quadrant={i:.0f} seems opposite.')
-
+                  + f'quadrant={q:.0f} seems opposite.')
         # store fitting conditions
         self.xlim = xlim
         self.vlim = vlim
         self.Mlim = Mlim
         ##### want to include self.dist to self.__unit
-        self.__unit = 1e10 * au / Ggrav / Msun / np.sin(np.radians(incl))**2
-
+        self.__unit = 1e10 * au /Ggrav/Msun/np.sin(np.radians(incl))**2
         # Get rigde/edge
         if use_position:
             self.pvfit_xcut(outname, self.rms, vsys=self.vsys,
@@ -538,14 +530,11 @@ class PVFit():
                             dist=self.dist, thr=thr, incl=incl,
                             xlim=xlim, vlim=vlim, Mlim=Mlim,
                             mode=mode, pixrng=pixrng_vcut)
-
         # sort results
         self.sort_fitresults()
-
         # plot
         self.plotresults_pvdiagram()
         self.plotresults_rvplane()
-
 
     def sort_fitresults(self):
         '''
@@ -553,12 +542,10 @@ class PVFit():
         '''
         # results are sorted?
         self.__sorted = True
-
         # to store
         self.results_sorted = {'ridge': {'red': None, 'blue': None},
                                'edge': {'red': None, 'blue': None}}
         self.results_filtered = {'ridge': None, 'edge': None}
-
         # sort results
         for i in ['ridge', 'edge']:
             # tentative space
@@ -691,7 +678,7 @@ class PVFit():
         print('pvfit along velocity axis.')
         # data
         data = self.fitsdata.data
-        if self.fitsdata.naxis > 3:
+        if not (self.fitsdata.naxis in [2, 3]):
             print('ERROR\tpvfit_vcut: n_axis must be 2 or 3.')
             return
         if self.fitsdata.naxis == 3:
@@ -840,9 +827,7 @@ class PVFit():
                 print('ERROR\tpvfit_vcut: mode must be mean or gauss.')
                 return
             # output ridge results
-            ##### dx=0 for the double-power fitting part.
-            res_ridge[i, :] = [x_i, mv, 0, mv_err]
-            #res_ridge[i, :] = [x_i, mv, posacc, mv_err]
+            res_ridge[i, :] = [x_i, mv, posacc, mv_err]
 
             # get edge values
             # fitting axis
@@ -858,9 +843,7 @@ class PVFit():
             edgesign = v_i[np.nanargmax(d_i)] - vsys
             mv, mv_err = edge(vi_interp, di_interp, rms, rms*thr,
                               goodflag=goodflag, edgesign=edgesign)
-            ##### dx=0 for the double-power fitting part.
-            res_edge[i, :] = [x_i, mv, 0, mv_err]
-            #res_edge[i, :] = [x_i, mv, posacc, mv_err]
+            res_edge[i, :] = [x_i, mv, posacc, mv_err]
             # plot
             if ~np.isnan(mv):
                 ax.vlines(mv, 0., dlim[-1], lw=1.5, color='b',
@@ -912,7 +895,7 @@ class PVFit():
 
         # data
         data = self.fitsdata.data
-        if self.fitsdata.naxis > 3:
+        if not (self.fitsdata.naxis in [2, 3]):
             print('Error\tpvfit_vcut: n_axis must be 2 or 3.')
             return
         elif self.fitsdata.naxis == 3:
@@ -1048,10 +1031,10 @@ class PVFit():
                 print('ERROR\tpvfit_vcut: mode must be mean or gauss.')
                 return
             # output ridge results
-            ##### dv=0 for the double-power fittig part.
-            res_ridge[i, :] = [mx, v_i, mx_err, 0]
             ##### what's sqrt(3)?
-            #res_ridge[i, :] = [mx, v_i, mx_err, delv/(2.*np.sqrt(3))]
+            #res_ridge[i, :] = [mx, v_i, mx_err, delv / (2. * np.sqrt(3))]
+            ##### need confirmation
+            res_ridge[i, :] = [mx, v_i, mx_err, velacc]
 
             # get edge values
             # fitting axes
@@ -1067,9 +1050,9 @@ class PVFit():
             edgesign = x_i[np.nanargmax(d_i)]
             mx, mx_err = edge(xi_interp, di_interp, rms, rms*thr,
                               goodflag=goodflag, edgesign=edgesign)
-            ##### dv=0 for the double-power fitting part.
-            res_edge[i, :] = [mx, v_i, mx_err, 0]
-            #res_edge[i, :] = [mx, v_i, mx_err, delv/(2.*np.sqrt(3))]
+            #res_edge[i, :] = [mx, v_i, mx_err, delv / (2. * np.sqrt(3))]
+            ##### for confirmation
+            res_edge[i, :] = [mx, v_i, mx_err, velacc]
             # plot            
             if ~np.isnan(mx):
                 ax.vlines(mx, 0., dlim[-1], lw=2., color='b',
