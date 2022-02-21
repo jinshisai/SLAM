@@ -37,7 +37,7 @@ def main():
     # -------- main --------
     impv = PVFit(fitsfile, rms, vsys, dist, pa=pa)
     impv.get_edgeridge(outname, thr=thr, xlim=xlim, vlim=vlim,
-                       Mlim=Mlim, mode='gauss')
+                       Mlim=Mlim, mode='gauss', incl=incl)
     #print(impv.results)
     impv.fit_edgeridge(include_vsys=False, include_dp=False,
                        include_pin=True,

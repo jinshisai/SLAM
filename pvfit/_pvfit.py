@@ -9,6 +9,7 @@ E-mail: jn.insa.sai@gmail.com
 Latest update: 1/12/2020
 
 Yusuke's note:
+rng = range(1, naxis + 1) is introduced in read_pvfits.
 res_ridge and res_edge are stored after being transposed.
 Added multipeaks option in xcut as well just in case and for symmetry.
 thrindx is not defined.
@@ -66,46 +67,36 @@ class Impvfits:
         '''
         Read fits file of pv diagram. P.A. angle of PV cut cab be given as an option.
         '''
-
         # read header
         header = self.header
-
         # number of axis
-        naxis    = header['NAXIS']
+        naxis = header['NAXIS']
         if naxis < 2:
             print('ERROR\tread_pvfits: NAXIS of fits is < 2.')
             return
         self.naxis = naxis
-
-        naxis_i  = np.array([int(header['NAXIS'+str(i+1)])
-                             for i in range(naxis)])
-        label_i  = np.array([header['CTYPE'+str(i+1)]
-                             for i in range(naxis)])
-        refpix_i = np.array([int(header['CRPIX'+str(i+1)])
-                             for i in range(naxis)])
-        refval_i = np.array([header['CRVAL'+str(i+1)]
-                             for i in range(naxis)]) # degree
+        rng = range(1, naxis + 1)
+        naxis_i  = np.array([int(header['NAXIS'+str(i)]) for i in rng])
+        label_i  = np.array([header['CTYPE'+str(i)] for i in rng])
+        refpix_i = np.array([int(header['CRPIX'+str(i)]) for i in rng])
+        refval_i = np.array([header['CRVAL'+str(i)] for i in rng]) # degree
         if 'CDELT1' in header:
-            del_i = np.array([header['CDELT'+str(i+1)]
-                              for i in range(naxis)]) # degree
+            del_i = np.array([header['CDELT'+str(i)] for i in rng]) # degree
         self.naxis_i  = naxis_i
         self.label_i  = label_i
         self.refpix_i = refpix_i
         self.refval_i = refval_i
-
         # beam size (degree)
         if 'BMAJ' in header:
-            bmaj     = header['BMAJ'] # degree
-            bmin     = header['BMIN'] # degree
-            bpa      = header['BPA']  # degree
-            self.beam = np.array([bmaj*3600., bmin*3600., bpa]) # arcsec, arcsec, deg
+            bmaj = header['BMAJ'] * 3600.  # arcsec
+            bmin = header['BMIN'] * 3600.  # arcsec
+            bpa = header['BPA']  # degree
+            self.beam = np.array([bmaj, bmin, bpa])
         else:
             self.beam = None
-
-
         # Info. of P.A.
         if pa is not None:
-            print('Input P.A.: %.1f deg'%pa)
+            print(f'Input P.A.: {pa:.1f} deg')
             self.pa = pa
         elif 'PA' in header:
             print('Read P.A. in header.')
@@ -116,22 +107,18 @@ class Impvfits:
         else:
             print('CAUTION\tread_pvfits: No PA information is given.')
             self.pa = None
-
         # Resolution along offset axis
-        self.res_off = None
-        if self.pa is not None:
+        if self.pa is None:
+            self.res_off = None
+        else:
             # an ellipse of the beam
             # (x/bmin)**2 + (y/bmaj)**2 = 1
             # y = x*tan(theta)
             # --> beam width in the direction of pv cut (P.A.=pa)
             bmaj, bmin, bpa = self.beam
-            del_pa = self.pa - bpa
-            del_pa = del_pa*np.pi/180. # radian
-            term_sin = (np.sin(del_pa)/bmin)**2.
-            term_cos = (np.cos(del_pa)/bmaj)**2.
-            res_off  = np.sqrt(1./(term_sin + term_cos))
-            self.res_off = res_off
-
+            del_pa = np.radians(self.pa - bpa)
+            term2 = np.hypot(np.sin(del_pa) / bmin, np.cos(del_pa) / bmaj)
+            self.res_off = np.sqrt(1. / term2)
         # rest frequency (Hz)
         if 'RESTFRQ' in header:
             restfreq = header['RESTFRQ']
@@ -142,61 +129,54 @@ class Impvfits:
         else:
             restfreq = None
         self.restfreq = restfreq
-
-
         # get axes
+        ##### need to confirm what's rotation, as well as Yusuke's coding.
         # rotation of pixel coordinates
         if 'PC1_1' in header:
             pc_ij = np.array([
-                [header['PC%i_%i'%(i+1,j+1)]
-                if 'PC%i_%i'%(i+1,j+1) in header else 0.
-                for j in range(naxis)] for i in range(naxis)])
-            pc_ij = pc_ij*np.array([del_i[i] for i in range(naxis)])
+                [header[f'PC{i:d}_{j:d}']
+                if f'PC{i:d}_{j:d}' in header else 0.
+                for j in rng] for i in rng])
+            pc_ij = pc_ij * np.array([del_i[i - 1] for i in rng])
         elif 'CD1_1' in header:
-            pc_ij = np.array([
-            [header['CD%i_%i'%(i+1,j+1)]
-            if 'CD%i_%i'%(i+1,j+1) in header else 0.
-            for j in range(naxis)] for i in range(naxis)])
+            pc_ij = np.array([[
+                header[f'CD{i:d}_{j:d}']
+                if f'CD{i:d}_{j:d}' in header else 0.
+                for j in rng] for i in rng])
         else:
-            print('CAUTION\tread_pvfits:'
-                  + 'No keyword PCi_j or CDi_j are found.'
+            print('CAUTION\tread_pvfits: '
+                  + 'No keyword PCi_j or CDi_j are found. '
                   + 'No rotation is assumed.')
-            pc_ij = np.array([
-                [1. if i==j else 0. for j in range(naxis)]
-                 for i in range(naxis)])
-            pc_ij = pc_ij*np.array([del_i[i] for i in range(naxis)])
-
+            pc_ij = np.array([[float(i==j) for j in rng] for i in rng])
+            pc_ij = pc_ij * np.array([del_i[i - 1] for i in rng])
         # axes
-        axes = np.array([np.dot(pc_ij, (i+1 - refpix_i))\
-         for i in range(np.max(naxis_i))]).T # +1 in i+1 comes from 0 start index in python
-
+        # +1 in i+1 comes from 0 start index in python
+        axes = np.array([np.dot(pc_ij, (i+1 - refpix_i))
+                         for i in range(np.max(naxis_i))]).T
         # x & v axes
         xaxis = axes[0]
         vaxis = axes[1]
         xaxis = xaxis[:naxis_i[0]]               # offset
         vaxis = vaxis[:naxis_i[1]] + refval_i[1] # frequency, absolute
-
         # check unit of offest
         if 'CUNIT1' in header:
-            unit_i = np.array([header['CUNIT'+str(i+1)]
-                               for i in range(naxis)]) # degree
-            if unit_i[0] == 'degree' or unit_i[0] == 'deg':
+            unit_i = np.array([header['CUNIT'+str(i)] for i in rng])
+            if unit_i[0] in ['degree', 'deg']:
                 # degree --> arcsec
-                xaxis    = xaxis*3600.
-                del_i[0] = del_i[0]*3600.
+                xaxis = xaxis * 3600.
+                del_i[0] = del_i[0] * 3600.
         else:
             print('WARNING\tread_pvfits:: '
-                  + 'No unit information in the header.'
+                  + 'No unit information in the header. '
                   + 'Assume the unit of the offset axis is arcesc.')
-
         # frequency --> velocity
-        if label_i[1] == 'VRAD' or label_i[1] == 'VELO':
-            vaxis    = vaxis*1.e-3 # m/s --> km/s
+        if label_i[1] in ['VRAD', 'VELO']:
+            vaxis    = vaxis * 1.e-3 # m/s --> km/s
         else:
             print('Convert frequency to velocity')
-            vaxis    = clight*(1.-vaxis/restfreq) # radio velocity c*(1-f/f0) [cm/s]
-            vaxis    = vaxis*1.e-5                # cm/s --> km/s
-
+            vaxis = clight * (1. - vaxis/restfreq) # radio velocity c*(1-f/f0) [cm/s]
+            vaxis = vaxis * 1.e-5                # cm/s --> km/s
+        ##### what's saxis?
         if naxis == 2:
             saxis = None
         elif naxis == 3:
@@ -204,20 +184,14 @@ class Impvfits:
             saxis = saxis[:naxis_i[2]]
         else:
             print('Error\tread_pvfits: naxis must be <= 3.')
-
-
         # get delta
-        delx = xaxis[1] - xaxis[0]
-        delv = vaxis[1] - vaxis[0]
-
         self.xaxis = xaxis
         self.vaxis = vaxis
         self.nx    = len(xaxis)
         self.nv    = len(vaxis)
         self.saxis = saxis
-        self.delx  = delx
-        self.delv  = delv
-
+        self.delx  = xaxis[1] - xaxis[0]
+        self.delv  = vaxis[1] - vaxis[0]
 
     # Draw pv diagram
     def draw_pvdiagram(self,outname,data=None,header=None,ax=None,outformat='pdf',color=True,cmap='Greys',
@@ -434,8 +408,7 @@ class Impvfits:
 
 
 class PVFit():
-
-    '''
+    """
     Perform fitting to a PV diagram.
 
     Parameters
@@ -443,43 +416,51 @@ class PVFit():
     infile(str): An input fits file.
     rms (float): rms noise level of the pv diagram.
     thr (int/float): threshold above which emission is used for fitting.
-    '''
-
-    # Initializing
+    """
     def __init__(self, infile, rms, vsys, dist, pa=None):
-        '''
-        Parameters
-        ----------
-        '''
+        """_summary_
 
+        Args:
+            infile (_type_): _description_
+            rms (_type_): _description_
+            vsys (_type_): _description_
+            dist (_type_): _description_
+            pa (_type_, optional): _description_. Defaults to None.
+        """
         # read fits file
         self.fitsdata = Impvfits(infile, pa=pa)
-
         # parameters required for analysis
         self.rms  = rms
         self.vsys = vsys
         self.dist = dist
-
-
         # initialize results
         self.results = {'ridge': {'vcut': None, 'xcut': None},
-        'edge': {'vcut': None, 'xcut': None}
-        }
+                        'edge': {'vcut': None, 'xcut': None}}
         self.__sorted = False
 
-
-    # get edge & ridge
     def get_edgeridge(self, outname, thr=5.,
         incl=90., quadrant=None, mode='mean',
         pixrng_vcut=2, pixrng_xcut=None,
         Mlim=[], xlim=[], vlim=[],
         use_velocity=True, use_position=True,
         interp_ridge=False):
-        '''
-        Get the edge/ridge at positions/velocities.
+        """Get the edge/ridge at positions/velocities.
 
-
-        '''
+        Args:
+            outname (_type_): _description_
+            thr (_type_, optional): _description_. Defaults to 5..
+            incl (_type_, optional): _description_. Defaults to 90..
+            quadrant (_type_, optional): _description_. Defaults to None.
+            mode (str, optional): _description_. Defaults to 'mean'.
+            pixrng_vcut (int, optional): _description_. Defaults to 2.
+            pixrng_xcut (_type_, optional): _description_. Defaults to None.
+            Mlim (list, optional): _description_. Defaults to [].
+            xlim (list, optional): _description_. Defaults to [].
+            vlim (list, optional): _description_. Defaults to [].
+            use_velocity (bool, optional): _description_. Defaults to True.
+            use_position (bool, optional): _description_. Defaults to True.
+            interp_ridge (bool, optional): _description_. Defaults to False.
+        """
         # remember output name
         self.outname = outname
         # data
@@ -492,7 +473,6 @@ class PVFit():
         elif self.fitsdata.naxis == 3:
             ##### np.squeeze()
             data = data[0,:,:] # Remove stokes I
-
         # check quadrant
         quadcheck = lambda a: (np.sum(a[:nvh, :nxh])
                                + np.sum(a[nvh:, nxh:])
@@ -517,8 +497,8 @@ class PVFit():
         self.xlim = xlim
         self.vlim = vlim
         self.Mlim = Mlim
-        ##### want to include self.dist to self.__unit
-        self.__unit = 1e10 * au /Ggrav/Msun/np.sin(np.radians(incl))**2
+        self.__unit = 1e10 * self.dist * au \
+                      / Ggrav / Msun / np.sin(np.radians(incl))**2
         # Get rigde/edge
         if use_position:
             self.pvfit_xcut(outname, self.rms, vsys=self.vsys,
@@ -575,10 +555,27 @@ class PVFit():
                 ##### need confirmation
                 if len(self.Mlim) == 2:
                     for a in [res_red, res_blue]:
-                        mass_est = kepler_mass(a[0]*self.dist, a[1], self.__unit)
+                        mass_est = kepler_mass(a[0], a[1], self.__unit)
                         a[jj][~between(mass_est, self.Mlim)] = np.nan
                 self.__store[j]['red']  = res_red
                 self.__store[j]['blue'] = res_blue
+            # remove low-velocity positions and inner velocities when using both positions and velocities
+            ##### need confirmation
+            for j in ['red', 'blue']:
+                x1, v0, _, _ = self.__store['xcut'][j]
+                x0, v1, _, _ = self.__store['vcut'][j]
+                xx, xv = np.meshgrid(x1, x0)
+                vx, vv = np.meshgrid(v0, v1)
+                xvd = np.hypot((xx - xv) / self.fitsdata.res_off,
+                               (vx - vv) / self.fitsdata.delv)
+                if np.any(~np.isnan(xvd)):
+                    iv, ix = np.unravel_index(np.nanargmin(xvd), np.shape(xx))
+                    x1[:ix] = np.nan
+                    v1[:iv] = np.nan
+                #xmax = np.nanmax(self.__store['xcut'][j][0])
+                #vmax = np.nanmax(self.__store['vcut'][j][1])
+                #self.__store['xcut'][j][0][self.__store['xcut'][j][1] < vmax] = np.nan
+                #self.__store['vcut'][j][1][self.__store['vcut'][j][0] < xmax] = np.nan
             # combine xcut and vcut
             res_f = {'xcut':{'red':np.array([[], [], [], []]),
                              'blue':np.array([[], [], [], []])},
@@ -587,36 +584,17 @@ class PVFit():
             for j in ['red', 'blue']:
                 if ((self.results[i]['xcut'] is not None) 
                     & (self.results[i]['vcut'] is not None)):
-                    # remove low-velocity positions and inner velocities when using both positions and velocities
-                    ##### need confirmation
-                    x1, v0, _, _ = self.__store['xcut'][j]
-                    x0, v1, _, _ = self.__store['vcut'][j]
-                    xx, xv = np.meshgrid(x1, x0)
-                    vx, vv = np.meshgrid(v0, v1)
-                    xvd = np.hypot((xx - xv) / self.fitsdata.res_off,
-                                   (vx - vv) / self.fitsdata.delv)
-                    if np.any(~np.isnan(xvd)):
-                        iv, ix = np.unravel_index(np.nanargmin(xvd),
-                                                  np.shape(xx))
-                        x1[:ix] = np.nan
-                        v1[:iv] = np.nan
-                    #xmax = np.nanmax(self.__store['xcut'][j][0])
-                    #vmax = np.nanmax(self.__store['vcut'][j][1])
-                    #self.__store['xcut'][j][0][self.__store['xcut'][j][1] < vmax] = np.nan
-                    #self.__store['vcut'][j][1][self.__store['vcut'][j][0] < xmax] = np.nan
-
                     # remove nan
                     for cut, jj in zip(['xcut', 'vcut'], [0, 1]):
                         ref = self.__store[cut][j]
-                        self.__store[cut][j] \
-                            = [k[~np.isnan(ref[jj])] for k in ref]
+                        store = [k[~np.isnan(ref[jj])] for k in ref]
+                        self.__store[cut][j] = store
+                        res_f[cut][j] = store
                     # combine xcut/vcut
                     res_comb = np.array(
                         [np.append(self.__store['xcut'][j][k],
                                    self.__store['vcut'][j][k])
                          for k in range(4)])
-                    res_f['xcut'][j] = self.__store['xcut'][j]
-                    res_f['vcut'][j] = self.__store['vcut'][j]
                 ##### need confirmation
                 elif not ((self.results[i]['xcut'] is None)
                           and (self.results[i]['vcut'] is None)):
@@ -838,7 +816,7 @@ class PVFit():
                                      (len(v_i)-1)*10 + 1) # resample with a 10 times finer sampling rate
             di_interp  = interp1d(v_i, d_i, kind='cubic')(vi_interp)           # interpolation
             # flag by mass
-            mass_est = kepler_mass(x_i*dist, vi_interp-vsys, self.__unit) # 1e5 for conversion from km/s to cm/s
+            mass_est = kepler_mass(x_i, vi_interp-vsys, self.__unit) # 1e5 for conversion from km/s to cm/s
             goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
             edgesign = v_i[np.nanargmax(d_i)] - vsys
             mv, mv_err = edge(vi_interp, di_interp, rms, rms*thr,
@@ -1045,7 +1023,7 @@ class PVFit():
                                      (len(x_i)-1)*10 + 1) # resample with a 10 times finer sampling rate
             di_interp  = interp1d(x_i, d_i, kind='cubic')(xi_interp)           # interpolation
             # flag by mass
-            mass_est = kepler_mass(xi_interp*dist, v_i - vsys, self.__unit)
+            mass_est = kepler_mass(xi_interp, v_i - vsys, self.__unit)
             goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
             edgesign = x_i[np.nanargmax(d_i)]
             mx, mx_err = edge(xi_interp, di_interp, rms, rms*thr,
