@@ -368,8 +368,8 @@ class PVFit():
         grid[(nrow*ncol - ncol)].set_ylabel('Intensity')
         # list to save final results
         ##### need confirmation
-        res_ridge = np.array([[t, np.nan, 0, np.nan] for t in xaxis_fit])
-        res_edge  = np.array([[t, np.nan, 0, np.nan] for t in xaxis_fit])
+        res_ridge = np.empty((nloop, 4))
+        res_edge  = np.empty((nloop, 4))
         #res_ridge = np.zeros((nloop, 4)) # x, v, err_x, err_v
         #res_edge  = np.zeros((nloop, 4))
         # loop for x
@@ -378,6 +378,8 @@ class PVFit():
             x_i = xaxis_fit[i]
             d_i = data_fit[:, i]
             if np.all(np.isnan(d_i)):
+                res_ridge[i, :] = [x_i, np.nan, 0, np.nan]
+                res_edge[i, :] = [x_i, np.nan, 0, np.nan]
                 continue
             # plot results
             ##### need confirmation
@@ -473,6 +475,7 @@ class PVFit():
             ax.tick_params(which='both', direction='in',bottom=True,
                            top=True, left=True, right=True, pad=9)
         # Store the result array in the shape of (4, len(x)).
+        ##### need confirmation
         self.results['ridge']['vcut'] = res_ridge.T
         self.results['edge']['vcut']  = res_edge.T
         #plt.show()
@@ -557,7 +560,7 @@ class PVFit():
             vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
             print(f'v range: {vmin:.2f} -- {vmax:.2f} km/s')
         # Nyquist sampling
-        ##### need for xaxis fit, too?
+        ##### need for xcut fit, too?
         xaxis_fit = xaxis[::hob]
         vaxis_fit = vaxis
         data_fit  = data[:,::hob]
@@ -575,8 +578,8 @@ class PVFit():
         dlim = [np.nanmin(data_fit), np.nanmax(data_fit)]
         # list to save final results
         ##### need confirmation
-        res_ridge = np.array([[t, np.nan, 0, np.nan] for t in vaxis_fit])
-        res_edge  = np.array([[t, np.nan, 0, np.nan] for t in vaxis_fit])
+        res_ridge = np.empty((nloop, 4))
+        res_edge  = np.empty((nloop, 4))
         #res_ridge = np.zeros((nloop, 4)) # x, v, err_x, err_v
         #res_edge  = np.zeros((nloop, 4))
         # loop for v
@@ -585,6 +588,8 @@ class PVFit():
             v_i = vaxis_fit[i]
             d_i  = data_fit[i, :]
             if np.all(np.isnan(d_i)):
+                res_ridge[i, :] = [np.nan, v_i, np.nan, 0]
+                res_edge[i, :] = [np.nan, v_i, np.nan, 0]
                 continue
             # plot results
             ##### need confirmation
@@ -647,7 +652,7 @@ class PVFit():
                 print('ERROR\tpvfit_vcut: mode must be mean or gauss.')
                 return
             # output ridge results
-            ##### what's sqrt(3)?
+            ##### 1/sqrt(12) comes from sqrt(int^(1/2)_(-1/2)x**2dx)?
             #res_ridge[i, :] = [mx, v_i, mx_err, delv / (2. * np.sqrt(3))]
             ##### need confirmation
             res_ridge[i, :] = [mx, v_i, mx_err, velacc]
@@ -722,7 +727,6 @@ class PVFit():
             'popt' is a list of [r_break, v_break, p_in, dp, vsys].
             'perr' is the uncertainties for popt.
         """
-        ##### please check the following transfer is consistent.
         def clipped_error(err, val, mode):
             res = self.fitsdata.beam[0] if mode == 'x' else self.fitsdata.delv
             minabs = [minabserr * res] * len(err)

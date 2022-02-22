@@ -45,6 +45,7 @@ class Impvfits:
             print('ERROR\tread_pvfits: NAXIS of fits is < 2.')
             return
         self.naxis = naxis
+        ##### need confirmation
         rng = range(1, naxis + 1)
         naxis_i  = np.array([int(header['NAXIS'+str(i)]) for i in rng])
         label_i  = np.array([header['CTYPE'+str(i)] for i in rng])
