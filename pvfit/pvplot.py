@@ -45,7 +45,7 @@ class PVPlot():
                  pa: float = None, vsys: float = 0,
                  dist: float = 1.,
                  d: list = None, x: list = None, v: list = None,
-                 xlim: list = [1, 1e10], vlim: list = [0.1, 1e10],
+                 xlim: list = [1e-10, 1e10], vlim: list = [1e-10, 1e10],
                  flipaxis: bool = False, quadrant: str = None,
                  loglog: bool = False):
         set_rcparams()
