@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from pvfit import PVFit
-
+from pvfit.pvplot import PVPlot
 
 
 def main():
@@ -37,14 +37,24 @@ def main():
     # -------- main --------
     impv = PVFit(fitsfile, rms, vsys, dist, pa=pa)
     impv.get_edgeridge(outname, thr=thr, xlim=xlim, vlim=vlim,
-                       Mlim=Mlim, mode='gauss', incl=incl)
-    #print(impv.results)
+                       Mlim=Mlim, mode='mean', incl=incl)
     impv.fit_edgeridge(include_vsys=False, include_dp=False,
                        include_pin=True,
                        filehead='testfit', show_corner=False,
                        minrelerr=0.01, minabserr=0.1)
-    impv.plotresults_pvdiagram(clevels=clevels)
-    impv.plotresults_rvplane()
+
+    for loglog, ext in zip([False, True], ['linear', 'log']):
+        pp = PVPlot(fitsimage=fitsfile, vsys=vsys, dist=dist,
+                    loglog=loglog)
+        impv.plot_edgeridge(ax=pp.ax, loglog=loglog)
+        impv.plot_model(ax=pp.ax, loglog=loglog)
+        pp.add_color()
+        pp.add_contour()
+        pp.set_axis()
+        pp.savefig(figname=outname + '.' + ext + '.png', show=True)
+   
+    #impv.plotresults_pvdiagram(clevels=clevels)
+    #impv.plotresults_rvplane()
     #print(impv.results_sorted)
     # ----------------------
 
