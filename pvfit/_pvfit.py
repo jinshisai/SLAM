@@ -25,13 +25,12 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 #import pandas as pd
-from astropy.io import fits
+#from astropy.io import fits
 from astropy import constants, units
 
 from .fitfuncs import edge, ridge_mean, gaussfit, gauss1d
 from pvfit.pvfits import Impvfits
 from pvfit.analysis_tools import doublepower_r, doublepower_v
-from pvfit.pvplot import PVPlot
 from utils import emcee_corner
 
 
