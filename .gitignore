@@ -7,3 +7,7 @@ pvfit/__pycache__/__init__.cpython-38.pyc
 pvfit/__pycache__/_pvfit.cpython-38.pyc
 pvfit/__pycache__/analysis_tools.cpython-38.pyc
 pvfit/__pycache__/fitfuncs.cpython-38.pyc
+test.linear.png
+test.log.png
+testfit.corner_e.png
+testfit.corner_r.png
