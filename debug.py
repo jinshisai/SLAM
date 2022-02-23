@@ -27,7 +27,7 @@ def main():
     rms     = 5.e-3 # Jy/beam
     thr     = 6.     # 6 sigma
     dist    = 140.
-    clevels = np.array([-3,3,6,9,12,15,20,25,30])*rms
+    clevels = np.array([-3,3,6,9,12,15,20,25,30])
     xlim    = [] # arcsec
     vlim    = []
     Mlim    = []
@@ -49,7 +49,7 @@ def main():
         impv.plot_edgeridge(ax=pp.ax, loglog=loglog)
         impv.plot_model(ax=pp.ax, loglog=loglog)
         pp.add_color()
-        pp.add_contour()
+        pp.add_contour(rms=rms, levels=clevels)
         pp.set_axis()
         pp.savefig(figname=outname + '.' + ext + '.png', show=True)
    
