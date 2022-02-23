@@ -76,7 +76,7 @@ class PVFit():
     def get_edgeridge(self, outname, thr=5.,
         incl=90., quadrant=None, mode='mean',
         pixrng_vcut=2, pixrng_xcut=None,
-        Mlim=[], xlim=[], vlim=[],
+        Mlim=[0, 1e10], xlim=[-1e10, 0, 0, 1e10], vlim=[-1e10, 0, 0, 1e10],
         use_velocity=True, use_position=True,
         interp_ridge=False):
         """Get the edge/ridge at positions/velocities.
@@ -263,7 +263,8 @@ class PVFit():
 
     # pvfit
     def pvfit_vcut(self, outname, rms, thr=5., vsys=0, dist=140.,
-                   incl=90., xlim=[], vlim=[], Mlim=[], mode='gauss',
+                   incl=90., xlim=[-1e10, 0, 0, 1e10],
+                   vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], mode='gauss',
                    pixrng=2, multipeaks=False, i_peak=0, prominence=1.5,
                    inverse=None, quadrant='13'):
         ##### self.dist and dist?
@@ -275,7 +276,7 @@ class PVFit():
          outname: output file name
          rms: rms noise level used to determine which data are used for the fitting.
          thr: Threshold for the fitting. Spectrum with the maximum intensity above thr x rms will be used for the fitting.
-         xlim, vlim: x and v ranges for the fitting. Must be given as a list, [minimum, maximum].
+         xlim, vlim: x and v ranges for the fitting. Must be given as a list, [outlimit1, inlimit1, inlimit2, outlimit2].
          pixrng: Pixel range for the fitting around the maximum intensity. Only velocity channels +/- pixrng 
                   around the channel with the maximum intensity are used for the fitting.
          multipeaks: Find multiple peaks if True. Default False, which means only the maximum peak is considered.
@@ -323,25 +324,29 @@ class PVFit():
         xaxis_fit = xaxis
         vaxis_fit = vaxis
         data_fit  = data
-        if len(xlim) == 1 or len(xlim) > 2:
+        if len(xlim) != 4:
             print('Warning\tpvfit_vcut: '
                   + 'Size of xlim is not correct. '
-                  + 'xlim must be given as [xmin, xmax]. '
+                  + 'xlim must be given as [x0, x1, x2, x3], '
+                  + 'meaning (x0, x1) and (x2, x3) are used. '
                   + 'Given xlim is ignored.')
+            xlim = (-1e10, 0, 0, 1e10)
         else:
-            b = between(xaxis, xlim)
+            b = between(xaxis, (xlim[0], xlim[3]))
             xaxis_fit = xaxis[b]
             data_fit  = np.array([d[b] for d in data])
             xmin, xmax = np.min(xaxis_fit), np.max(xaxis_fit)
             print(f'x range: {xmin:.2f} -- {xmax:.2f} arcsec')
         vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
-        if len(vlim) == 1 or len(xlim) > 2:
+        if len(vlim) != 4:
             print('Warning\tpvfit_vcut: '
                   + 'Size of vlim is not correct. '
-                  + 'vlim must be given as [vmin, vmax]. '
+                  + 'vlim must be given as [v0, v1, v2, v3], '
+                  + 'meaning (v0, v1) and (v2, v3) are used. '
                   + 'Given vlim is ignored.')
+            vlim = (-1e10, 0, 0, 1e10)
         else:
-            b = between(vaxis, vlim)
+            b = between(vaxis, (vlim[0], vlim[3]))
             vaxis_fit = vaxis[b]
             data_fit  = np.array([d[b] for d in data.T]).T
             vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
@@ -377,7 +382,7 @@ class PVFit():
             # ith data
             x_i = xaxis_fit[i]
             d_i = data_fit[:, i]
-            if np.all(np.isnan(d_i)):
+            if np.all(np.isnan(d_i)) or (xlim[1] < x_i < xlim[2]):
                 res_ridge[i, :] = [x_i, np.nan, 0, np.nan]
                 res_edge[i, :] = [x_i, np.nan, 0, np.nan]
                 continue
@@ -392,7 +397,6 @@ class PVFit():
                 c = (d_i >= thr * rms)
                 v_i, d_i = vaxis_fit[c], d_i[c]
                 mv, mv_err = ridge_mean(v_i, d_i, rms)
-
                 # plot
                 if ~np.isnan(mv):
                     ax.vlines(mv, 0., dlim[-1], lw=1.5,
@@ -440,10 +444,11 @@ class PVFit():
                             ls='-', alpha=0.8)
                     ax.vlines(mv, 0., dlim[-1], lw=1.5, color='r',
                               ls='--', alpha=0.8)
-                
             else:
                 print('ERROR\tpvfit_vcut: mode must be mean or gauss.')
                 return
+            if not (vlim[0] < mv < vlim[1] or vlim[2] < mv < vlim[3]):
+                mv, mv_err = np.nan, np.nan
             # output ridge results
             res_ridge[i, :] = [x_i, mv, posacc, mv_err]
 
@@ -456,11 +461,13 @@ class PVFit():
                                      (len(v_i)-1)*10 + 1) # resample with a 10 times finer sampling rate
             di_interp  = interp1d(v_i, d_i, kind='cubic')(vi_interp)           # interpolation
             # flag by mass
-            mass_est = kepler_mass(x_i, vi_interp-vsys, self.__unit) # 1e5 for conversion from km/s to cm/s
+            mass_est = kepler_mass(x_i, vi_interp-vsys, self.__unit)
             goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
             edgesign = v_i[np.nanargmax(d_i)] - vsys
             mv, mv_err = edge(vi_interp, di_interp, rms, rms*thr,
                               goodflag=goodflag, edgesign=edgesign)
+            if not (vlim[0] < mv < vlim[1] or vlim[2] < mv < vlim[3]):
+                mv, mv_err = np.nan, np.nan
             res_edge[i, :] = [x_i, mv, posacc, mv_err]
             # plot
             if ~np.isnan(mv):
@@ -488,7 +495,8 @@ class PVFit():
 
 
     def pvfit_xcut(self, outname, rms, thr=5., vsys=0, dist=140.,
-                   incl=90., xlim=[], vlim=[], Mlim=[], mode='mean',
+                   incl=90., xlim=[-1e10, 0, 0, 1e10],
+                   vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], mode='mean',
                    pixrng=None, multipeaks=False, i_peak=0,
                    prominence=1.5):
         '''
@@ -536,25 +544,29 @@ class PVFit():
         vaxis_fit = vaxis
         data_fit  = data
         xmin, xmax = np.min(xaxis_fit), np.max(xaxis_fit)
-        if len(xlim) == 1 or len(xlim) > 2:
+        if len(xlim) != 4:
             print('Warning\tpvfit_vcut: '
                   + 'Size of xlim is not correct. '
-                  + 'xlim must be given as [xmin, xmax]. '
+                  + 'xlim must be given as [x0, x1, x2, x3], '
+                  + 'meaning (x0, x1) and (x2, x3) are used. '
                   + 'Given xlim is ignored.')
+            xlim = (-1e10, 0, 0, 1e10)
         else:  # between can treat tlim=[] now.
-            b = between(xaxis, xlim)
+            b = between(xaxis, (xlim[0], xlim[3]))
             xaxis_fit = xaxis[b]
             data_fit  = np.array([d[b] for d in data])
             xmin, xmax = np.min(xaxis_fit), np.max(xaxis_fit)
             print(f'x range: {xmin:.2f} -- {xmax:.2f} arcsec')
         
-        if len(vlim) == 1 or len(xlim) > 2:
+        if len(vlim) != 4:
             print('Warning\tpvfit_vcut: '
                   + 'Size of vlim is not correct. '
-                  + 'vlim must be given as [vmin, vmax]. '
+                  + 'vlim must be given as [v0, v1, v2, v3], '
+                  + 'meaning (v0, v1) and (v2, v3) are used. '
                   + 'Given vlim is ignored.')
+            vlim = (-1e10, 0, 0, 1e10)
         else:
-            b = between(vaxis, vlim)
+            b = between(vaxis, (vlim[0], vlim[3]))
             vaxis_fit = vaxis[b]
             data_fit  = np.array([d[b] for d in data.T]).T
             vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
@@ -587,7 +599,7 @@ class PVFit():
             # ith data
             v_i = vaxis_fit[i]
             d_i  = data_fit[i, :]
-            if np.all(np.isnan(d_i)):
+            if np.all(np.isnan(d_i)) or (vlim[1] < v_i < vlim[2]):
                 res_ridge[i, :] = [np.nan, v_i, np.nan, 0]
                 res_edge[i, :] = [np.nan, v_i, np.nan, 0]
                 continue
@@ -652,6 +664,8 @@ class PVFit():
                 print('ERROR\tpvfit_vcut: mode must be mean or gauss.')
                 return
             # output ridge results
+            if not (xlim[0] < mx < xlim[1] or xlim[2] < mx < xlim[3]):
+                mx, mx_err = np.nan, np.nan
             ##### 1/sqrt(12) comes from sqrt(int^(1/2)_(-1/2)x**2dx)?
             #res_ridge[i, :] = [mx, v_i, mx_err, delv / (2. * np.sqrt(3))]
             ##### need confirmation
@@ -671,6 +685,8 @@ class PVFit():
             edgesign = x_i[np.nanargmax(d_i)]
             mx, mx_err = edge(xi_interp, di_interp, rms, rms*thr,
                               goodflag=goodflag, edgesign=edgesign)
+            if not (xlim[0] < mx < xlim[1] or xlim[2] < mx < xlim[3]):
+                mx, mx_err = np.nan, np.nan
             #res_edge[i, :] = [mx, v_i, mx_err, delv / (2. * np.sqrt(3))]
             ##### for confirmation
             res_edge[i, :] = [mx, v_i, mx_err, velacc]
@@ -804,7 +820,7 @@ class PVFit():
             if loglog: x, v = np.abs(x), np.abs(v)
             if flipaxis: x, v, dx, dv = v, x, dv, dx
             ax.errorbar(x, v, xerr=dx, yerr=dv, fmt=fmt[re],
-                    color=color[xv][rb], ms=5)
+                        color=color[xv][rb], ms=5)
             
     def plot_model(self, ax=None, loglog: bool = False,
                    edge_model = None, edge_popt: list = [],
@@ -833,10 +849,10 @@ class PVFit():
                 s, x = 1, np.geomspace(xmin, xmax, 100)
             else:
                 s, x = self.xsign, np.linspace(-xmax, xmax, 100)
-                x[np.argmin(np.abs(x))] = None
+                x[(-xmin < x) * (x < xmin)] = None
             x, y = x, s * model[re](x)
             if flipaxis: x, y = y, x
-            ax.plot(x, y, ls=ls[re], lw=2, color='gray')
+            ax.plot(x, y, ls=ls[re], lw=2, color='gray', zorder=3)
             
         
     def plawfit(self, outname, params_inp, mode='sp',
