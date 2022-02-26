@@ -2,11 +2,11 @@
 
 '''
 Program to perform Gaussian fitting to a PV diagram.
-Made and developed by J. Sai.
+Made and developed by Yusuke ASO & Jinshi Sai.
 
 E-mail: jn.insa.sai@gmail.com
 
-Latest update: 1/12/2020
+Latest update: 2/25/2022
 
 Yusuke's note:
 rng = range(1, naxis + 1) is introduced in read_pvfits.
@@ -17,6 +17,9 @@ Variables not used are commented out.
 The function "between" can receive tlim=[] now.
 Please search with ##### for other minor comments.
 
+Jinshi's note:
+Please search ##### to find where is edited.
+
 '''
 
 
@@ -24,13 +27,11 @@ Please search with ##### for other minor comments.
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
-#import pandas as pd
-#from astropy.io import fits
 from astropy import constants, units
 
 from .fitfuncs import edge, ridge_mean, gaussfit, gauss1d
 from pvfit.pvfits import Impvfits
-from pvfit.analysis_tools import doublepower_r, doublepower_v
+from pvfit.analysis_tools import doublepower_r, doublepower_v, doublepower_v_error, doublepower_r_error
 from utils import emcee_corner
 
 
@@ -48,19 +49,23 @@ class PVFit():
 
     Parameters
     ----------
-    infile(str): An input fits file.
+    infile (str): An input fits file.
     rms (float): rms noise level of the pv diagram.
+    vsys (float): Systemic velocity of the object (km s^-1).
+    dist (float): Distance to the object (pc).
     thr (int/float): threshold above which emission is used for fitting.
     """
     def __init__(self, infile, rms, vsys, dist, pa=None):
-        """_summary_
+        """Initialize.
 
         Args:
-            infile (_type_): _description_
-            rms (_type_): _description_
-            vsys (_type_): _description_
-            dist (_type_): _description_
-            pa (_type_, optional): _description_. Defaults to None.
+            infile (str): An input fits file.
+            rms (float): rms noise level of the pv diagram.
+            vsys (float): Systemic velocity of the object (km s^-1).
+            dist (float): Distance to the object (pc).
+            pa (float, optional): Position angle of the pv cut.
+             Will be used to calculate the spatial resolution along the pv cut
+             if it is given. Defaults to None.
         """
         # read fits file
         self.fitsdata = Impvfits(infile, pa=pa)
@@ -75,25 +80,40 @@ class PVFit():
 
     def get_edgeridge(self, outname, thr=5.,
         incl=90., quadrant=None, mode='mean',
-        pixrng_vcut=2, pixrng_xcut=None,
+        pixrng_vcut=None, pixrng_xcut=None,
         Mlim=[0, 1e10], xlim=[-1e10, 0, 0, 1e10], vlim=[-1e10, 0, 0, 1e10],
         use_velocity=True, use_position=True,
         interp_ridge=False):
         """Get the edge/ridge at positions/velocities.
 
         Args:
-            outname (_type_): _description_
-            thr (_type_, optional): _description_. Defaults to 5..
-            incl (_type_, optional): _description_. Defaults to 90..
-            quadrant (_type_, optional): _description_. Defaults to None.
-            mode (str, optional): _description_. Defaults to 'mean'.
-            pixrng_vcut (int, optional): _description_. Defaults to 2.
-            pixrng_xcut (_type_, optional): _description_. Defaults to None.
-            Mlim (list, optional): _description_. Defaults to [].
-            xlim (list, optional): _description_. Defaults to [].
-            vlim (list, optional): _description_. Defaults to [].
-            use_velocity (bool, optional): _description_. Defaults to True.
-            use_position (bool, optional): _description_. Defaults to True.
+            outname (str): Output file name.
+            thr (float, optional): Threshold above which data is used
+             to get edge/ridge. The threshold will be used as thr x rms.
+             Defaults to 5.
+            incl (float, optional): Inclination angle of the object.
+             Defaults to 90, which means no correction for estimate
+             of the protostellar mass.
+            quadrant (str, optional): Quadrant of the PV diagram where you
+             want to get edge/ridge. Defaults to None.
+            mode (str, optional): Method to derive ridge. Must be 'mean' or
+             'gauss'. Defaults to 'mean'.
+            pixrng_vcut (int, optional): Pixel range within which gaussian
+             fit is performed around the peak intensity along the v-axis.
+             Only used when mode='gauss'. Defaults to None.
+            pixrng_xcut (int, optional): Pixel range within which gaussian
+             fit is performed around the peak intensity along the x-axis.
+             Only used when mode='gauss'. Defaults to None.
+            Mlim (list, optional): Reliable mass range. Data points that do
+             not come within this range is removed. Defaults to [0, 1e10].
+            xlim (list, optional): Range of offset where edge/ridge is
+             derived. Defaults to [-1e10, 0, 0, 1e10].
+            vlim (list, optional): Range of velocity where edge/ridge is
+             derived. Defaults to [-1e10, 0, 0, 1e10].
+            use_velocity (bool, optional): Derive representative velocities
+             as a function of position. Defaults to True.
+            use_position (bool, optional): Derive representatieve positions
+             as a function of velocity. Defaults to True.
             interp_ridge (bool, optional): _description_. Defaults to False.
         """
         # remember output name
@@ -106,8 +126,7 @@ class PVFit():
             print('ERROR\tget_edgeridge: n_axis must be 2 or 3.')
             return
         elif self.fitsdata.naxis == 3:
-            ##### np.squeeze()
-            data = data[0,:,:] # Remove stokes I
+            data = np.squeeze(data) # Remove stokes I
         # check quadrant
         quadcheck = lambda a: (np.sum(a[:nvh, :nxh])
                                + np.sum(a[nvh:, nxh:])
@@ -134,15 +153,16 @@ class PVFit():
         self.Mlim = Mlim
         self.__unit = 1e10 * self.dist * au \
                       / Ggrav / Msun / np.sin(np.radians(incl))**2
+        self.__use_position = use_position
+        self.__use_velocity = use_velocity
+
         # Get rigde/edge
         if use_position:
-            self.pvfit_xcut(outname, self.rms, vsys=self.vsys,
-                            dist=self.dist, thr=thr, incl=incl,
+            self.pvfit_xcut(outname, thr=thr, incl=incl,
                             xlim=xlim, vlim=vlim, Mlim=Mlim,
                             mode=mode, pixrng=pixrng_xcut)
         if use_velocity:
-            self.pvfit_vcut(outname, self.rms, vsys=self.vsys,
-                            dist=self.dist, thr=thr, incl=incl,
+            self.pvfit_vcut(outname, thr=thr, incl=incl,
                             xlim=xlim, vlim=vlim, Mlim=Mlim,
                             mode=mode, pixrng=pixrng_vcut)
         # sort results
@@ -176,19 +196,16 @@ class PVFit():
                 vrel = results[1]
                 xrel = results[0]
                 # separate red/blue components
-                ##### need confirmation. No abs now.
                 rel = vrel if j == 'xcut' else xrel * self.xsign
                 redsign = int(self.xsign) if j == 'vcut' else 1
                 res_red  = [k[rel > 0][::redsign] for k in results]
                 res_blue = [k[rel < 0][::-redsign] for k in results]
                 ## nan after turn over
-                ##### need confirmation
                 jj = 0 if j == 'xcut' else 1
                 for a in [res_red[jj], res_blue[jj]]:
                     if np.any(~np.isnan(a)):
-                        a[:np.nanargmax(np.abs(a))] = np.nan 
+                        a[:np.nanargmax(np.abs(a))] = np.nan
                 # remove points outside Mlim
-                ##### need confirmation
                 if len(self.Mlim) == 2:
                     for a in [res_red, res_blue]:
                         mass_est = kepler_mass(a[0], a[1], self.__unit)
@@ -196,22 +213,19 @@ class PVFit():
                 self.__store[j]['red']  = res_red
                 self.__store[j]['blue'] = res_blue
             # remove low-velocity positions and inner velocities when using both positions and velocities
-            ##### need confirmation
-            for j in ['red', 'blue']:
-                x1, v0, _, _ = self.__store['xcut'][j]
-                x0, v1, _, _ = self.__store['vcut'][j]
-                xx, xv = np.meshgrid(x1, x0)
-                vx, vv = np.meshgrid(v0, v1)
-                xvd = np.hypot((xx - xv) / self.fitsdata.res_off,
-                               (vx - vv) / self.fitsdata.delv)
-                if np.any(~np.isnan(xvd)):
-                    iv, ix = np.unravel_index(np.nanargmin(xvd), np.shape(xx))
-                    x1[:ix] = np.nan
-                    v1[:iv] = np.nan
-                #xmax = np.nanmax(self.__store['xcut'][j][0])
-                #vmax = np.nanmax(self.__store['vcut'][j][1])
-                #self.__store['xcut'][j][0][self.__store['xcut'][j][1] < vmax] = np.nan
-                #self.__store['vcut'][j][1][self.__store['vcut'][j][0] < xmax] = np.nan
+            if ((self.results[i]['xcut'] is not None) 
+                & (self.results[i]['vcut'] is not None)):
+                for j in ['red', 'blue']:
+                    x1, v0, _, _ = self.__store['xcut'][j]
+                    x0, v1, _, _ = self.__store['vcut'][j]
+                    xx, xv = np.meshgrid(x1, x0)
+                    vx, vv = np.meshgrid(v0, v1)
+                    xvd = np.hypot((xx - xv) / self.fitsdata.res_off,
+                        (vx - vv) / self.fitsdata.delv)
+                    if np.any(~np.isnan(xvd)):
+                        iv, ix = np.unravel_index(np.nanargmin(xvd), np.shape(xx))
+                        x1[:ix] = np.nan
+                        v1[:iv] = np.nan
             # combine xcut and vcut
             res_f = {'xcut':{'red':np.array([[], [], [], []]),
                              'blue':np.array([[], [], [], []])},
@@ -231,23 +245,21 @@ class PVFit():
                         [np.append(self.__store['xcut'][j][k],
                                    self.__store['vcut'][j][k])
                          for k in range(4)])
-                ##### need confirmation
                 elif not ((self.results[i]['xcut'] is None)
                           and (self.results[i]['vcut'] is None)):
                     # only remove nan
                     if self.results[i]['xcut'] is not None:
-                        cut, jj, res = 'xcut', 0, self.__store['xcut'][j]
+                        cut, jj, ref = 'xcut', 0, self.__store['xcut'][j]
                     else:
-                        cut, jj, res = 'vcut', 1, self.__store['vcut'][j]
-                    res_comb = [k[~np.isnan(res[jj])] for k in res]
-                    res_f[cut][j] = [k[~np.isnan(res[jj])] for k in res]
+                        cut, jj, ref = 'vcut', 1, self.__store['vcut'][j]
+                    res_comb = [k[~np.isnan(ref[jj])] for k in ref]
+                    res_f[cut][j] = [k[~np.isnan(ref[jj])] for k in ref]
                 else:
                     print('ERROR\tsort_fitresults: '
                           + 'No fitting results are found.')
                     return
 
                 # arcsec --> au
-                ##### need confirmation. originally 0 and 3.
                 res_comb[0] = res_comb[0]*self.dist
                 res_comb[2] = res_comb[2]*self.dist
                 for cut in ['xcut', 'vcut']:
@@ -255,51 +267,55 @@ class PVFit():
                     res_f[cut][j][2] = res_f[cut][j][2]*self.dist
                 ## sort by x
                 i_order  = np.argsort(np.abs(res_comb[0]))
-                res_comb = np.array([np.abs(k[i_order]) for k in res_comb]).T
+                res_comb = np.array([np.abs(k[i_order]) for k in res_comb])
                 # save
                 self.results_sorted[i][j] = res_comb
             self.results_filtered[i] = res_f
         del self.__store
 
     # pvfit
-    def pvfit_vcut(self, outname, rms, thr=5., vsys=0, dist=140.,
-                   incl=90., xlim=[-1e10, 0, 0, 1e10],
+    def pvfit_vcut(self, outname, thr=5., incl=90., xlim=[-1e10, 0, 0, 1e10],
                    vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], mode='gauss',
-                   pixrng=2, multipeaks=False, i_peak=0, prominence=1.5,
+                   pixrng=None, multipeaks=False, i_peak=0, prominence=1.5,
                    inverse=None, quadrant='13'):
-        ##### self.dist and dist?
         '''
         Fitting along the velocity axis, i.e., fitting to the spectrum at each offset.
 
         Parameters
         ----------
-         outname: output file name
-         rms: rms noise level used to determine which data are used for the fitting.
-         thr: Threshold for the fitting. Spectrum with the maximum intensity above thr x rms will be used for the fitting.
-         xlim, vlim: x and v ranges for the fitting. Must be given as a list, [outlimit1, inlimit1, inlimit2, outlimit2].
-         pixrng: Pixel range for the fitting around the maximum intensity. Only velocity channels +/- pixrng 
-                  around the channel with the maximum intensity are used for the fitting.
-         multipeaks: Find multiple peaks if True. Default False, which means only the maximum peak is considered.
-         i_peak: Only used when multipeaks=True. Used to specify around which intensity peak you want to perform the fitting.
-         prominence: Only used when multipeaks=True. Parameter to determine multiple peaks.
-         inverse: Inverse axes. May be used to sort the sampling between fittings with different xlim or vlim.
+         outname: Output file name.
+         thr: Threshold for the fitting. Spectrum with the maximum intensity
+          above thr x rms will be used for the fitting.
+         xlim, vlim: x and v ranges for the fitting. Must be given as a list,
+          [outlimit1, inlimit1, inlimit2, outlimit2].
+         pixrng: Pixel range for the fitting around the maximum intensity.
+          Only velocity channels +/- pixrng around the channel with
+          the maximum intensity are used for the fitting.
+         multipeaks: Find multiple peaks if True. Default False, which means
+          only the maximum peak is considered.
+         i_peak: Only used when multipeaks=True. Used to specify around which
+          intensity peak you want to perform the fitting.
+         prominence: Only used when multipeaks=True. Parameter to determine
+          multiple peaks.
+         inverse: Inverse axes. May be used to sort the sampling between
+          fittings with different xlim or vlim.
         '''
         # modules
         import math
-        #from scipy import optimize
         from scipy.signal import find_peaks
         from scipy.interpolate import interp1d
         from mpl_toolkits.axes_grid1 import ImageGrid
 
-        print('pvfit along velocity axis.')
+        rms = self.rms
+
+        print('PV fit along velocity axis.')
         # data
         data = self.fitsdata.data
         if not (self.fitsdata.naxis in [2, 3]):
             print('ERROR\tpvfit_vcut: n_axis must be 2 or 3.')
             return
         if self.fitsdata.naxis == 3:
-            ##### np.squeeze()
-            data = data[0,:,:] # Select stokes I
+            data = np.squeeze(data) # Select stokes I
         # axes
         xaxis = self.fitsdata.xaxis
         vaxis = self.fitsdata.vaxis
@@ -312,10 +328,6 @@ class PVFit():
             res_off = bmin # in arcsec
         # harf of beamsize [pix]
         hob = int(np.round((res_off*0.5/self.fitsdata.delx)))
-
-        # relative velocity or LSRK
-        #xlabel = 'Offset (arcsec)'
-        #vlabel = r'LSR velocity ($\mathrm{km~s^{-1}}$)'
 
         ### calculate intensity-weighted mean positions
         # cutting at an velocity and determining the position
@@ -352,7 +364,6 @@ class PVFit():
             vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
             print(f'v range: {vmin:.2f} -- {vmax:.2f} km/s')
         # to achieve the same sampling on two sides
-        ##### need to confirm the meaning of inverse.
         if inverse:
             xaxis_fit = xaxis_fit[::-1]
             data_fit  = data_fit[:, ::-1]
@@ -405,10 +416,6 @@ class PVFit():
                 # get peak indices
                 peaks, _ = find_peaks(d_i, height=thr * rms,
                                       prominence=prominence * rms)
-                #print(peaks)
-                #if len(peaks) > 0:
-                #    snr = np.nanmax(d_i) / rms
-                #    posacc = res_off / snr
                 # determining used data range
                 if pixrng:
                     # error check
@@ -420,7 +427,7 @@ class PVFit():
                     pidx = peaks[i_peak] if multipeaks else np.argmax(d_i)
                     if ((pidx < pixrng)
                         or (pidx > len(d_i) - pixrng - 1)):
-                        # peak position is too edge
+                        # peak position is too close to edge
                         mv, mv_err = np.nan, np.nan
                     else:
                         # use pixels only around intensity peak
@@ -457,13 +464,14 @@ class PVFit():
             v_i = vaxis_fit.copy()
             d_i = data_fit[:,i]
             # interpolation
+            # resample with a 10 times finer sampling rate
             vi_interp  = np.linspace(v_i[0], v_i[-1],
-                                     (len(v_i)-1)*10 + 1) # resample with a 10 times finer sampling rate
-            di_interp  = interp1d(v_i, d_i, kind='cubic')(vi_interp)           # interpolation
+                                     (len(v_i)-1)*10 + 1)
+            di_interp  = interp1d(v_i, d_i, kind='cubic')(vi_interp)
             # flag by mass
-            mass_est = kepler_mass(x_i, vi_interp-vsys, self.__unit)
+            mass_est = kepler_mass(x_i, vi_interp-self.vsys, self.__unit)
             goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
-            edgesign = v_i[np.nanargmax(d_i)] - vsys
+            edgesign = v_i[np.nanargmax(d_i)] - self.vsys
             mv, mv_err = edge(vi_interp, di_interp, rms, rms*thr,
                               goodflag=goodflag, edgesign=edgesign)
             if not (vlim[0] < mv < vlim[1] or vlim[2] < mv < vlim[3]):
@@ -482,20 +490,14 @@ class PVFit():
             ax.tick_params(which='both', direction='in',bottom=True,
                            top=True, left=True, right=True, pad=9)
         # Store the result array in the shape of (4, len(x)).
-        ##### need confirmation
         self.results['ridge']['vcut'] = res_ridge.T
         self.results['edge']['vcut']  = res_edge.T
         #plt.show()
         fig.savefig(outname + "_pvfit_vcut.pdf", transparent=True)
         plt.close()
-        ### output results as .txt file
-        #res_hd  = 'offset[arcsec]\tvelocity[km/s]\toff_err[arcesc]\tvel_err[km/s]'
-        #res_all = np.c_[res_x, res_v, err_x, err_v]
-        #np.savetxt(outname+'_pv_vcut.txt', res_all,fmt = '%4.4f', delimiter ='\t', header = res_hd)
 
 
-    def pvfit_xcut(self, outname, rms, thr=5., vsys=0, dist=140.,
-                   incl=90., xlim=[-1e10, 0, 0, 1e10],
+    def pvfit_xcut(self, outname, thr=5., incl=90., xlim=[-1e10, 0, 0, 1e10],
                    vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], mode='mean',
                    pixrng=None, multipeaks=False, i_peak=0,
                    prominence=1.5):
@@ -504,12 +506,20 @@ class PVFit():
 
         Parameters
         ----------
-         outname: Outputname
-         rms: rms noise level used to determine which data are used for the fitting.
-         thr: Threshold for the fitting. Spectrum with the maximum intensity above thr x rms will be used for the fitting.
-         xlim, vlim: x and v ranges for the fitting. Must be given as a list, [minimum, maximum].
-         pixrng: Pixel range for the fitting around the maximum intensity. Only velocity channels +/- pixrng 
-                  around the channel with the maximum intensity are used for the fitting.
+         outname: Outputname.
+         thr: Threshold for the fitting. Spectrum with the maximum intensity
+          above thr x rms will be used for the fitting.
+         xlim, vlim: x and v ranges for the fitting. Must be given as a list,
+          [outlimit1, inlimit1, inlimit2, outlimit2].
+         pixrng: Pixel range for the fitting around the maximum intensity.
+          After Nyquist sampling, only pixels +/- pixrng around the pixel with
+          the maximum intensity are used for the fitting.
+          multipeaks: Find multiple peaks if True. Default False, which means
+          only the maximum peak is considered.
+         i_peak: Only used when multipeaks=True. Used to specify around which
+          intensity peak you want to perform the fitting.
+         prominence: Only used when multipeaks=True. Parameter to determine
+          multiple peaks.
         '''
         # modules
         import math
@@ -517,6 +527,8 @@ class PVFit():
         from scipy.signal import find_peaks
         from scipy.interpolate import interp1d
         from mpl_toolkits.axes_grid1 import ImageGrid
+
+        rms = self.rms
 
         print('pvfit along position axis.')
 
@@ -526,7 +538,7 @@ class PVFit():
             print('Error\tpvfit_vcut: n_axis must be 2 or 3.')
             return
         elif self.fitsdata.naxis == 3:
-            data = data[0,:,:] # Remove stokes I
+            data = np.squeeze(data) # Remove stokes I
         # axes
         xaxis = self.fitsdata.xaxis
         vaxis = self.fitsdata.vaxis
@@ -606,7 +618,6 @@ class PVFit():
             # plot results
             ##### need confirmation
             ax = grid[i]
-            #print('Channel #%i velocity %.2f km/s'%(i+1, v_i))
             snr = np.nanmax(d_i) / rms
             velacc = delv / snr
             # get ridge value
@@ -622,10 +633,6 @@ class PVFit():
                 # get peak indices
                 peaks, _ = find_peaks(d_i, height=thr * rms,
                                       prominence=prominence * rms)
-                #print(peaks)
-                #if len(peaks) > 0:
-                #    snr = np.nanmax(d_i)/rms
-                #    velacc = delv / snr
                 # determining used data range
                 if pixrng:
                     # error check
@@ -661,7 +668,7 @@ class PVFit():
                     ax.vlines(mx, 0., dlim[-1], lw=1.5, color='r',
                               ls='--', alpha=0.8)
             else:
-                print('ERROR\tpvfit_vcut: mode must be mean or gauss.')
+                print('ERROR\tpvfit_xcut: mode must be mean or gauss.')
                 return
             # output ridge results
             if not (xlim[0] < mx < xlim[1] or xlim[2] < mx < xlim[3]):
@@ -676,11 +683,12 @@ class PVFit():
             x_i = xaxis_fit.copy()
             d_i = data_fit[i, :]
             # interpolation
+            # resample with a 10 times finer sampling rate
             xi_interp  = np.linspace(x_i[0], x_i[-1],
-                                     (len(x_i)-1)*10 + 1) # resample with a 10 times finer sampling rate
-            di_interp  = interp1d(x_i, d_i, kind='cubic')(xi_interp)           # interpolation
+                                     (len(x_i)-1)*10 + 1)
+            di_interp  = interp1d(x_i, d_i, kind='cubic')(xi_interp)
             # flag by mass
-            mass_est = kepler_mass(xi_interp, v_i - vsys, self.__unit)
+            mass_est = kepler_mass(xi_interp, v_i - self.vsys, self.__unit)
             goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
             edgesign = x_i[np.nanargmax(d_i)]
             mx, mx_err = edge(xi_interp, di_interp, rms, rms*thr,
@@ -690,7 +698,7 @@ class PVFit():
             #res_edge[i, :] = [mx, v_i, mx_err, delv / (2. * np.sqrt(3))]
             ##### for confirmation
             res_edge[i, :] = [mx, v_i, mx_err, velacc]
-            # plot            
+            # plot
             if ~np.isnan(mx):
                 ax.vlines(mx, 0., dlim[-1], lw=2., color='b',
                           ls='--', alpha=0.8)
@@ -712,7 +720,7 @@ class PVFit():
         #res_hd  = 'offset[arcsec]\tvelocity[km/s]\toff_err[arcesc]\tvel_err[km/s]'
         #res_all = np.c_[res_x, res_v, err_x, err_v]
         #np.savetxt(outname+'_chi2_pv_xfit.txt', res_all,fmt = '%4.4f', delimiter ='\t', header = res_hd)
-    
+
     def fit_edgeridge(self, include_vsys: bool = False,
                       include_dp: bool = True,
                       include_pin: bool = False,
@@ -747,7 +755,7 @@ class PVFit():
             res = self.fitsdata.beam[0] if mode == 'x' else self.fitsdata.delv
             minabs = [minabserr * res] * len(err)
             return np.max([err, minrelerr * np.abs(val), minabs], axis=0)
-    
+
         res_org = self.results_filtered
         Ds = [None, None]
         for i, er in enumerate(['edge', 'ridge']):
@@ -761,7 +769,7 @@ class PVFit():
             dv1 = clipped_error(dv1, v1, mode='v')
             Ds[i] = [v0, x1, dx1, x0, v1, dv1]
         Es, Rs = Ds
-        
+
         self.include_dp = include_dp
         labels = np.array(['Rb', 'Vb', 'p_in', 'dp', 'Vsys'])
         include = [True, include_dp, include_pin, include_dp, include_vsys]
@@ -801,7 +809,88 @@ class PVFit():
         result = {'edge':{'popt':popt_e[0], 'perr':popt_e[1]},
                   'ridge':{'popt':popt_r[0], 'perr':popt_r[1]}}
         return result
-    
+
+    def write_edgeridge(self, filehead='pvanalysis'):
+        """
+        Write the edge/ridge positions/velocities to a text file.
+
+        Parameters
+        ----------
+        filehead : str
+            The output text file has a name of "filehead".edge.dat. and "filehead".ridge.dat The file consists of four columns of x (au), dx (au), v (km/s), and dv (km/s).
+        """
+        def clipped_error(err, val, mode, minrelerr: float = 0.01, minabserr: float = 0.1):
+            res = self.fitsdata.beam[0] if mode == 'x' else self.fitsdata.delv
+            minabs = [minabserr * res] * len(err)
+            return np.max([err, minrelerr * np.abs(val), minabs], axis=0)
+
+        res_org = self.results_filtered
+        for i, er in enumerate(['edge', 'ridge']):
+            xrb = [res_org[er]['xcut'][rb] for rb in ['red', 'blue']]
+            xcut = np.concatenate(xrb, axis=1)
+            v0, x1, dx1 = xcut[1], self.xsign * xcut[0], xcut[2]
+            dx1 = clipped_error(dx1, x1, mode='x')
+            vrb = [res_org[er]['vcut'][rb] for rb in ['red', 'blue']]
+            vcut = np.concatenate(vrb, axis=1)
+            x0, v1, dv1 = self.xsign * vcut[0], vcut[1], vcut[3]
+            dv1 = clipped_error(dv1, v1, mode='v')
+            np.savetxt(filehead + '.' + er + '.dat',
+                       np.c_[np.r_[x1, x0], np.r_[dx1, x0 * 0],
+                             np.r_[v0, v1], np.r_[v0 * 0, dv1]],
+                       header='x (au), dx (au), v (km/s), dv (km/s)')
+        print(f'- Wrote to {filehead}.edge.dat and {filehead}.ridge.dat.')
+
+
+    def output_fitresult(self):
+        """
+        Output the fitting result in the terminal.
+
+        Parameters
+        ----------
+         No parameter.
+
+        Returns
+        ----------
+         No return.
+        """
+        for i in ['edge', 'ridge']:
+            popt = self.popt[i]
+            radii, velocity = np.array([
+                np.append(self.results_sorted[i]['red'][j],self.results_sorted[i]['blue'][j])
+                for j in range(2)])
+            rin, rout = np.min(radii), np.max(radii)
+            vin, vout = velocity[np.argmin(radii)], velocity[np.argmax(radii)]
+            print('--- ' + i.title() + ' ---')
+            rb, vb, pin, dp, vsys = popt[0]
+            drb, dvb, dpin, ddp, dvsys = popt[1]
+            params = [*popt[0], *popt[1]]
+            print(f'R_b   = {rb:.2f} +/- {drb:.2f} au')
+            print(f'V_b   = {vb:.3f} +/- {dvb:.3f} km/s')
+            print(f'p_in  = {pin:.3f} +/- {dpin:.3f}')
+            print(f'dp    = {dp:.3f} +/- {ddp:.3f}')
+            print(f'v_sys = {vsys:.3f} +/- {dvsys:.3f}')
+            print(f'r     = {rin:.2f} --- {rout:.2f} au')
+            print(f'v     = {vout:.3f} --- {vin:.3f} km/s')
+            M_in = kepler_mass(rin, vin, self.__unit/self.dist)
+            M_b  = kepler_mass(rb, vb, self.__unit/self.dist)
+            M_out = kepler_mass(rout, vout, self.__unit/self.dist)
+            if self.__use_position:
+                drin = doublepower_r_error(vin, *params)
+                dM_in = M_in * drin / rin
+            else:
+                dvin = doublepower_v_error(rin, *params)
+                dM_in = 2. * M_in * dvin / vin
+            if self.__use_velocity:
+                dvout = doublepower_v_error(rout, *params)
+                dM_out = 2. * M_out * dvout / vout
+            else:
+                drout = doublepower_r_error(vout, *params)
+                dM_out = M_out * drout / rout
+            dM_b = kepler_mass_error(rb, vb, drb, dvb, self.__unit/self.dist)
+            print(f'M_in  = {M_in:.3f} +/- {dM_in:.3f} Msun')
+            print(f'M_out = {M_out:.3f} +/- {dM_out:.3f} Msun')
+            print(f'M_b   = {M_b:.3f} +/- {dM_b:.3f} Msun')
+
 
     def plot_edgeridge(self, ax=None, loglog: bool = False,
                        flipaxis: bool = False) -> None:
@@ -821,7 +910,7 @@ class PVFit():
             if flipaxis: x, v, dx, dv = v, x, dv, dx
             ax.errorbar(x, v, xerr=dx, yerr=dv, fmt=fmt[re],
                         color=color[xv][rb], ms=5)
-            
+
     def plot_model(self, ax=None, loglog: bool = False,
                    edge_model = None, edge_popt: list = [],
                    ridge_model = None, ridge_popt: list = [],
@@ -853,244 +942,6 @@ class PVFit():
             x, y = x, s * model[re](x)
             if flipaxis: x, y = y, x
             ax.plot(x, y, ls=ls[re], lw=2, color='gray', zorder=3)
-            
-        
-    def plawfit(self, outname, params_inp, mode='sp',
-     inner_threshold=None, outer_threshold=None, dist=140., vsys=0.):
-        '''
-        Fit a power-law function.
-
-        '''
-
-        # modules
-        import os
-        from scipy import optimize
-        from scipy.stats import norm, uniform
-        from matplotlib.gridspec import GridSpec
-
-        # functions
-        def splaw(r, params, r0=100.):
-            '''
-            Single power-law function.
-
-            Args:
-             - r: radius (au or any)
-             - params: [vsys, v0, p]
-             - r0: 100 (au)
-            '''
-            vsys, v0, p = params
-            vout        = v0*(r/r0)**(-p)
-            dydx        = (v0/r0)*(-p)*(r/r0)**(-p-1)
-            return vout, dydx
-
-        def chi_splaw(params, xdata, ydata, xsig, ysig):
-            '''
-            Calculate chi for chi-square for the single power-law function.
-            '''
-            vsys       = params[0]
-            vout, dydx = splaw(xdata, params)
-            #sig       = np.sqrt((xsig*dydx)*(xsig*dydx) + ysig*ysig)
-            sig        = ysig
-            chi_out    = (np.abs(ydata - vsys) - vout)/sig
-            return chi_out
-
-
-        def dplaw(radii, params):
-            '''
-            Double power-law function.
-
-            Args:
-             - r: radius (au or any)
-             - params: [vb, rb, pin, pout]
-              - vb: rotational velocity at rb [km/s]
-              - rb: break point raidus at which powers change [au]
-              - pin: power at r < rb
-              - pout: power at r >= rb
-            '''
-            vb, rb, pin, pout = params
-
-            vout = np.array([
-                vb*(r/rb)**(-pin) if r < rb else vb*(r/rb)**(-pout)
-                for r in radii
-                ])
-            dydx = np.array([
-                (vb/rb)*(-pin)*(r/rb)**(-pin-1) if r < rb else (vb/rb)*(-pout)*(r/rb)**(-pout-1)
-                for r in radii
-                ])
-
-            return vout, dydx
-
-
-        def chi_dplaw(params, xdata, ydata, xsig, ysig):
-            '''
-            Chi for chi square for the double power-law function.
-
-            Args:
-             - func: a function.
-             - params: input parameters for the function.
-             - xdata: x of data
-             - ydata: y of data
-             - xsig: sigma for x
-             - ysig: sigma for y
-            '''
-            vout, dydx = dplaw(xdata, params)
-            #sig       = np.sqrt((xsig*dydx)*(xsig*dydx) + ysig*ysig)
-            sig        = ysig
-            chi_out    = (np.abs(ydata - vout))/sig
-            return chi_out
-
-
-        def estimate_perror(params, func, x, y, xerr, yerr, niter=3000):
-            '''
-            Estimate fitting-parameter errors by Monte-Carlo method.
-
-            '''
-            nparams = len(params)
-            perrors = np.zeros((0,nparams), float)
-
-            for i in range(niter):
-                offest = norm.rvs(size = len(x), loc = x, scale = xerr)
-                velest = norm.rvs(size = len(y), loc = y, scale = yerr)
-                result = optimize.leastsq(func, params, args=(offest, velest, xerr, yerr), full_output = True)
-                perrors = np.vstack((perrors, result[0]))
-                #print param_esterr[:,0]
-
-            sigmas = np.array([
-                np.std(perrors[:,i]) for i in range(nparams)
-                ])
-            medians = np.array([
-                np.median(perrors[:,i]) for i in range(nparams)
-                ])
-
-
-            with np.printoptions(precision=4, suppress=True):
-                print ('Estimated errors (standard deviation):')
-                print (sigmas)
-                print ('Medians:')
-                print (medians)
-
-
-            # plot the Monte-Carlo results
-            fig_errest = plt.figure(figsize=(11.69,8.27), frameon = False)
-            gs         = GridSpec(nparams, 2)
-            xlabels    = [r'$V_\mathrm{sys}$', r'$V_\mathrm{100}$', r'$p$' ]
-            for i in range(nparams):
-                # histogram
-                ax1 = fig_errest.add_subplot(gs[i,0])
-                ax1.set_xlabel(xlabels[i])
-                if i == (nparams - 1):
-                    ax1.set_ylabel('Frequency')
-                ax1.hist(perrors[:,i], bins = 50, cumulative = False) # density = True
-
-                # cumulative histogram
-                ax2 = fig_errest.add_subplot(gs[i,1])
-                ax2.set_xlabel(xlabels[i])
-                if i == (nparams - 1):
-                    ax2.set_ylabel('Cumulative\n frequency')
-                ax2.hist(perrors[:,i], bins = 50, density=True, cumulative = True)
-
-            plt.subplots_adjust(wspace=0.4, hspace=0.4)
-            #plt.show()
-            fig_errest.savefig(outname + '_errest.pdf', transparent=True)
-            fig_errest.clf()
-
-            return sigmas
-
-
-
-        # ----------- !!start!! ---------
-        if len(self.results) == 0:
-            print ('No fitting result is found. Run pvfit or read_results before.')
-            return
-        else:
-            results = self.results['0']
-            for i in range(1, self.dicindx):
-                results = np.hstack([results, self.results['%i'%i]])
-
-        offset, velocity, off_err, vel_err, chi2_pvfit = results
-
-        # Prevent dtype-error
-        offset     = offset.astype('float64')
-        velocity   = velocity.astype('float64')
-        off_err    = off_err.astype('float64')
-        vel_err    = vel_err.astype('float64')
-        chi2_pvfit = chi2_pvfit.astype('float64')
-
-        # -offset --> offset
-        offset  = np.abs(offset)*dist
-        off_err = off_err*dist
-
-
-        #if inner_threshold:
-        #    indx     = np.where(np.abs(offset) >= inner_threshold)
-        #    offset   = offset[indx]
-        #    velocity = velocity[indx]
-        #    off_err  = off_err[thrindx]
-        #    vel_err  = vel_err[thrindx]
-
-        #if outer_threshold:
-        #    indx     = np.where(np.abs(offset) >= outer_threshold)
-        #    offset   = offset[indx]
-        #    velocity = velocity[indx]
-        #    off_err  = off_err[thrindx]
-        #    vel_err  = vel_err[thrindx]
-
-        if mode == 'sp':
-            func     = splaw
-            func_chi = chi_splaw
-        elif mode == 'dp':
-            func     = dplaw
-            func_chi = chi_dplaw
-            velocity = np.abs(velocity - vsys)
-        else:
-            print ('Error: mode must be sp or dp.')
-            return
-
-        # fitting
-        ndata        = len(offset)
-        nparams      = len(params_inp)
-        result       = optimize.leastsq(func_chi, params_inp, args=(offset, velocity, off_err, vel_err), full_output = True)
-        params_out   = result[0]
-        chi          = func_chi(params_out, offset, velocity, off_err, vel_err)
-        chi2         = np.sum(chi*chi)
-        dof          = ndata - nparams # -1
-        reduced_chi2 = chi2/dof
-
-        if mode == 'sp':
-            vsys = params_out[0]
-
-        # output
-        print ('Results:')
-        #print 'chi2', chi2
-        print ('')
-        with np.printoptions(precision=4, suppress=True):
-            print (params_out)
-        print ('reduced chi^2: %.2f'%reduced_chi2)
-        #print ('degree of freedum: %.f'%DOF)
-
-        # error
-        perrors = estimate_perror(params_out, func_chi, offset, velocity, off_err, vel_err, niter=3000)
-
-        self.params_out = params_out
-        self.perrors    = perrors
-
-
-        # plot results
-        ax = self.plotresults_onrvplane(vsys=vsys, au=True)
-
-        rmodel = np.logspace(0,4,128)
-        vmodel = func(rmodel, params_out)[0]
-        ax.plot(rmodel, vmodel, color='k', lw=2., alpha=0.8, ls='-')
-
-        ax.set_xlim(np.nanmin(offset)*0.9, np.nanmax(offset)*1.1)
-        ax.set_ylim(np.nanmin(np.abs(velocity-vsys))*0.9, np.nanmax(np.abs(velocity-vsys))*1.1)
-
-        ax.set_xlabel(r'Radius (au)')
-        ax.set_ylabel(r'Velocity ($\mathrm{km~s^{-1}}$)')
-
-        plt.savefig(outname + '_plawfitres.pdf', transparent=True)
-        return ax
-
 
 
     # Plot results
@@ -1109,7 +960,8 @@ class PVFit():
          outname: Output file name.
          outformat: Format of the output file. Deafult pdf.
          marker: Marker for the data points.
-         colors: Colors for the data points. Given as a list. If PVFit object has multiple results, more than one colors can be given.
+         colors: Colors for the data points. Given as a list. If PVFit object
+          has multiple results, more than one colors can be given.
          alpha: Transparency alpha for the plot.
          ax: Axis of python matplotlib.
          pvcolor: Plot PV diagram in color scale? Default True.
@@ -1119,16 +971,21 @@ class PVFit():
          contour: Plot a PV diagram with contour? Default True.
          clevels: Contour levels. Given in absolute intensity.
          pvccolor: Contour color.
-         pa: Position angle of the PV diagram. Used to calculate angular resolution along the PV slice if given.
-         vrel: Vaxis will be in the relative velocity with respect to vsys if True.
-         x_offset: xaxis will be offset axis if True. Default False, which means xaxis is velocity axis.
+         pa: Position angle of the PV diagram. Used to calculate angular
+          resolution along the PV slice if given.
+         vrel: Vaxis will be in the relative velocity with respect to vsys
+          if True.
+         x_offset: xaxis will be offset axis if True. Default False, which
+          means xaxis is velocity axis.
          ratio: Aspect ration of the plot.
          lw: Line width of the contour.
-         inmode: Data and header information can be given with parameters of data and header if inmode=data. Default fits.
-                  This option is used when you want to modify data before plot (e.g., multipy a factor to data).
+         inmode: Data and header information can be given with parameters of
+          data and header if inmode=data. Default fits. This option is used
+          when you want to modify data before plot (e.g., multipy a factor to data).
          data: Data of PV diagram. Must be given as an array.
          header: Header information. Only used when inmode=data.
-         xranges, yranges: x and y ranges for plot. Given as a list, [minimum, maximum].
+         xranges, yranges: x and y ranges for plot. Given as a list,
+          [minimum, maximum].
         '''
         # output name
         if outname:
@@ -1161,19 +1018,19 @@ class PVFit():
 
             # get them back into arcsec and LSR velocity
             for i in results:
-                results[i]['red'].T[0]  *= self.xsign/self.dist
-                results[i]['blue'].T[0] *= -self.xsign/self.dist
-                results[i]['red'].T[3]  *= self.xsign/self.dist
-                results[i]['blue'].T[3] *= -self.xsign/self.dist
+                results[i]['red'][0]  *= self.xsign/self.dist
+                results[i]['blue'][0] *= -self.xsign/self.dist
+                results[i]['red'][2]  *= self.xsign/self.dist
+                results[i]['blue'][2] *= -self.xsign/self.dist
 
-                results[i]['red'].T[1]  = self.vsys + results[i]['red'].T[1]
-                results[i]['blue'].T[1] = self.vsys - results[i]['blue'].T[1]
+                results[i]['red'][1]  = self.vsys + results[i]['red'][1]
+                results[i]['blue'][1] = self.vsys - results[i]['blue'][1]
 
                 colors = {'ridge': {'red': 'red', 'blue':'blue'},
                 'edge': {'red': 'pink', 'blue': 'skyblue'}}
 
                 for j in results[i]:
-                    ax = plotpoints(ax, *results[i][j].T, colors[i][j], x_offset)
+                    ax = plotpoints(ax, *results[i][j], colors[i][j], x_offset)
         else:
             results = self.results
 
@@ -1181,10 +1038,10 @@ class PVFit():
             for i in results:
                 #color = colors[i]
                 if self.results[i]['vcut'] is not None:
-                    ax = plotpoints(ax, *self.results[i]['vcut'].T, colors[i], x_offset)
+                    ax = plotpoints(ax, *self.results[i]['vcut'], colors[i], x_offset)
 
                 if self.results[i]['xcut'] is not None:
-                    ax = plotpoints(ax, *self.results[i]['vcut'].T, colors[i], x_offset)
+                    ax = plotpoints(ax, *self.results[i]['vcut'], colors[i], x_offset)
 
         plt.savefig(outname+'.'+outformat, transparent=True)
         plt.close()
@@ -1195,6 +1052,20 @@ class PVFit():
         xlog=True, ylog=True, au=False, marker='o',
         capsize=2, capthick=2., colors=None, xlim=[], ylim=[], fontsize=14):
         '''
+        Plot edge/ridge in a r-v plane.
+
+        Parameters
+        ----------
+        outname: Output name.
+        outformat: Output file format.
+        ax: axix object of matplotlib.
+        xlog, ylog: In log scale?
+        au: In au?
+        Others: options for plot.
+
+        Return
+        ------
+         matplotlib ax.
         '''
 
         # plot setting
@@ -1213,7 +1084,7 @@ class PVFit():
         if ax:
             pass
         else:
-            fig = plt.figure(figsize=(8.27, 8.27))
+            fig = plt.figure(figsize=(11.69, 8.27))
             ax  = fig.add_subplot(111)
 
         if colors:
@@ -1229,7 +1100,9 @@ class PVFit():
         # plot
         for i in self.results_sorted:
             for j in self.results_sorted[i]:
-                ax.errorbar(*self.results_sorted[i][j].T, color=colors[i][j],
+                #print (self.results_sorted[i][j])
+                ax.errorbar(*self.results_sorted[i][j][0:2], xerr=self.results_sorted[i][j][2],
+                    yerr=self.results_sorted[i][j][3], color=colors[i][j],
                     marker=marker, capsize=capsize, capthick=capthick, ls='')
 
         ax.tick_params(which='both', direction='in', bottom=True, top=True,
