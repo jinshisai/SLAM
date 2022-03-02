@@ -18,6 +18,7 @@ from astropy import constants, units
 
 from .fitfuncs import edge, ridge_mean, gaussfit, gauss1d
 from pvanalysis.pvfits import Impvfits
+from pvanalysis.pvplot import PVPlot
 from pvanalysis.analysis_tools import doublepower_r, doublepower_v, doublepower_v_error, doublepower_r_error
 from utils import emcee_corner
 
@@ -173,7 +174,7 @@ class PVAnalysis():
 
         # error clip
         def clipped_error(err, val, mode):
-            res    = self.fitsdata.beam[0] if mode == 'x' else self.fitsdata.delv
+            res    = self.res_off if mode == 'x' else self.delv
             minabs = [minabserr * res] * len(err)
             return np.max([err, minrelerr * np.abs(val), minabs], axis=0)
 
@@ -223,8 +224,7 @@ class PVAnalysis():
                     x0, v1, _, _ = self.__store['vcut'][j]
                     xx, xv = np.meshgrid(x1, x0)
                     vx, vv = np.meshgrid(v0, v1)
-                    xvd = np.hypot((xx - xv) / self.fitsdata.res_off,
-                        (vx - vv) / self.fitsdata.delv)
+                    xvd = np.hypot((xx-xv) / self.res_off, (vx-vv) / self.delv)
                     if np.any(~np.isnan(xvd)):
                         iv, ix = np.unravel_index(np.nanargmin(xvd), np.shape(xx))
                         x1[:ix] = np.nan
@@ -342,7 +342,9 @@ class PVAnalysis():
             res_off = self.fitsdata.res_off
         else:
             bmaj, bmin, bpa = self.fitsdata.beam
-            res_off = bmin # in arcsec
+            res_off = bmaj # in arcsec
+        self.res_off = res_off
+        self.delv = self.fitsdata.delv
         # harf of beamsize [pix]
         hob = int(np.round((res_off*0.5/self.fitsdata.delx)))
 
@@ -377,7 +379,7 @@ class PVAnalysis():
         else:
             b = between(vaxis, (vlim[0], vlim[3]))
             vaxis_fit = vaxis[b]
-            data_fit  = np.array([d[b] for d in data.T]).T
+            data_fit  = np.array([d[b] for d in data_fit.T]).T
             vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
             print(f'v range: {vmin:.2f} -- {vmax:.2f} km/s')
         # to achieve the same sampling on two sides
@@ -402,35 +404,27 @@ class PVAnalysis():
         res_ridge = np.empty((nloop, 4))
         res_edge  = np.empty((nloop, 4))
 
+        vi_interp = np.linspace(vaxis_fit[0], vaxis_fit[-1],
+                                (len(vaxis_fit) - 1) * 10 + 1)
+        v_i_raw = vaxis_fit.copy()  # for plot
         # loop for x
         for i in range(nloop):
             # ith data
-            x_i = xaxis_fit[i].copy()
+            x_i = xaxis_fit[i]
             d_i = data_fit[:, i].copy()
-            v_i = vaxis_fit.copy()
             if np.all(np.isnan(d_i)) or (xlim[1] < x_i < xlim[2]):
                 res_ridge[i, :] = [x_i, np.nan, 0, np.nan]
                 res_edge[i, :] = [x_i, np.nan, 0, np.nan]
                 continue
             # plot results
             ax  = grid[i]
-            snr = np.nanmax(d_i) / rms
-            #print('x_now: %.2f arcsec'%x_i)
-            #posacc = res_off / snr
             # get ridge value
-
             # interpolate
-            vi_interp = np.linspace(v_i[0], v_i[-1],
-                                     (len(v_i)-1)*10 + 1)
-            di_interp = interp1d(v_i, d_i, kind='cubic')(vi_interp)
-
+            v_i = vi_interp.copy() if interp_ridge else v_i_raw
+            di_interp = interp1d(v_i_raw, d_i, kind='cubic')(vi_interp)
             # if interpolate
-            v_i = vi_interp.copy() if interp_ridge else v_i
-            d_i = di_interp.copy() if interp_ridge else d_i
-            v_i_raw = v_i.copy() # for plot
             d_i_raw = d_i.copy() # for plot
-
-
+            d_i = di_interp.copy() if interp_ridge else d_i
             # ridge
             if mode == 'mean':
                 c = (d_i >= thr * rms)
@@ -483,6 +477,7 @@ class PVAnalysis():
                 return
             if not (vlim[0] < mv < vlim[1] or vlim[2] < mv < vlim[3]):
                 mv, mv_err = np.nan, np.nan
+            if interp_ridge: mv_err *= np.sqrt(10.)
             # output ridge results
             res_ridge[i, :] = [x_i, mv, 0, mv_err]
 
@@ -592,10 +587,11 @@ class PVAnalysis():
             res_off = self.fitsdata.res_off
         else:
             bmaj, bmin, bpa = self.fitsdata.beam
-            res_off = bmin  # in arcsec
+            res_off = bmaj  # in arcsec
+        self.res_off = res_off
+        self.delv = self.fitsdata.delv
         # harf of beamsize [pix]
         hob  = int(np.round((res_off*0.5/self.fitsdata.delx)))
-        delv = self.fitsdata.delv
         # x & v ranges used for calculation for fitting
         xaxis_fit = xaxis
         vaxis_fit = vaxis
@@ -625,7 +621,7 @@ class PVAnalysis():
         else:
             b = between(vaxis, (vlim[0], vlim[3]))
             vaxis_fit = vaxis[b]
-            data_fit  = np.array([d[b] for d in data.T]).T
+            data_fit  = np.array([d[b] for d in data_fit.T]).T
             vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
             print(f'v range: {vmin:.2f} -- {vmax:.2f} km/s')
         # Nyquist sampling
@@ -659,8 +655,6 @@ class PVAnalysis():
                 continue
             # plot results
             ax = grid[i]
-            snr = np.nanmax(d_i) / rms
-            #velacc = delv / snr
 
             # get ridge value
             if mode == 'mean':
@@ -712,10 +706,10 @@ class PVAnalysis():
             else:
                 print('ERROR\tpvfit_xcut: mode must be mean or gauss.')
                 return
-            # output ridge results
             if not (xlim[0] < mx < xlim[1] or xlim[2] < mx < xlim[3]):
                 mx, mx_err = np.nan, np.nan
-            #res_ridge[i, :] = [mx, v_i, mx_err, delv / (2. * np.sqrt(3))]
+            if interp_ridge: mx_err *= np.sqrt(hob)
+            # output ridge results                
             res_ridge[i, :] = [mx, v_i, mx_err, 0.]
 
             # get edge values
@@ -735,7 +729,6 @@ class PVAnalysis():
                               goodflag=goodflag, edgesign=edgesign)
             if not (xlim[0] < mx < xlim[1] or xlim[2] < mx < xlim[3]):
                 mx, mx_err = np.nan, np.nan
-            #res_edge[i, :] = [mx, v_i, mx_err, delv / (2. * np.sqrt(3))]
             res_edge[i, :] = [mx, v_i, mx_err, 0.]
             # plot
             if ~np.isnan(mx):
@@ -943,6 +936,25 @@ class PVAnalysis():
             print(f'M_out = {M_out:.3f} +/- {dM_out:.3f} Msun')
             print(f'M_b   = {M_b:.3f} +/- {dM_b:.3f} Msun')
 
+    def plot_fitresult(self, vlim: list = [0, 1e10],
+                       xlim: list = [0, 1e10],
+                       clevels: list = [3, 6],
+                       outname: str = 'pvanalysis',
+                       show: bool = True):
+        for loglog, ext in zip([False, True], ['linear', 'log']):
+            pp = PVPlot(restfrq=self.fitsdata.restfreq,
+                        beam=self.fitsdata.beam, pa=self.fitsdata.pa,
+                        vsys=self.vsys, dist=self.dist,
+                        d=self.fitsdata.data,
+                        v=self.fitsdata.vaxis, x=self.fitsdata.xaxis,
+                        loglog=loglog, vlim=vlim, xlim=xlim)
+            self.plot_edgeridge(ax=pp.ax, loglog=loglog)
+            self.plot_model(ax=pp.ax, loglog=loglog)
+            pp.add_color()
+            pp.add_contour(rms=self.rms, levels=clevels)
+            pp.set_axis()
+            pp.savefig(figname=outname + '.' + ext + '.png', show=show)
+
 
     def plot_edgeridge(self, ax=None, loglog: bool = False,
                        flipaxis: bool = False) -> None:
@@ -979,13 +991,7 @@ class PVAnalysis():
         model = {'ridge': rmodel, 'edge': emodel}
         ls = {'ridge': '-', 'edge': '--'}
         for re in ['ridge', 'edge']:
-            result = self.results_filtered[re]
-            xmax = np.max([[np.max(np.abs(result[xv][rb][0]))
-                                for xv in ['xcut', 'vcut']]
-                           for rb in ['red', 'blue']])
-            xmin = np.min([[np.min(np.abs(result[xv][rb][0]))
-                                for xv in ['xcut', 'vcut']]
-                           for rb in ['red', 'blue']])
+            xmin, xmax = self.rvlim[re][0]
             if loglog:
                 s, x = 1, np.geomspace(xmin, xmax, 100)
             else:

@@ -57,12 +57,13 @@ class PVPlot():
         if fitsimage is not None:
             fitsdata = Impvfits(fitsimage, pa=pa)
             d = fitsdata.data
-            x, v = fitsdata.xaxis * dist, fitsdata.vaxis
+            x, v = fitsdata.xaxis, fitsdata.vaxis
             if 'BUNIT' in (h := fitsdata.header):
                 self.bunit = h['BUNIT']
             restfrq = fitsdata.restfreq
             beam = fitsdata.beam
         d = np.squeeze(d)
+        x = x * dist
         v = v - vsys
         xlim[0] = max(xlim[0], np.abs(x[1] - x[0]))
         xlim[1] = min(xlim[1], -x[0], x[-1])
