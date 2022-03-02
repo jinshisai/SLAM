@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from pvfit import PVFit
-from pvfit.pvplot import PVPlot
+from pvanalysis import PVAnalysis
+from pvanalysis.pvplot import PVPlot
 
 
 def main():
@@ -35,13 +35,10 @@ def main():
 
 
     # -------- main --------
-    impv = PVFit(fitsfile, rms, vsys, dist, pa=pa)
+    impv = PVAnalysis(fitsfile, rms, vsys, dist, pa=pa)
     impv.get_edgeridge(outname, thr=thr, mode='mean', incl=incl)
     impv.plotresults_pvdiagram(clevels=clevels*rms)
     impv.plotresults_rvplane()
-    #print (impv.results_sorted['edge']['blue'].T)
-    #print (np.array(impv.results_filtered['edge']['xcut']['blue']).T)
-
 
     print ('Fitting edge/ridge..')
     impv.fit_edgeridge(include_vsys=False, include_dp=True,
