@@ -6,6 +6,7 @@ from pvanalysis.pvplot import PVPlot
 
 def main():
     # ------- input -------
+    '''
     fitsfile = 'testfits/l1489.c18o.contsub.gain01.rbp05.mlt100.cf15.pbcor.pv69d.fits'
     vsys    = 7.3
     incl    = 73.
@@ -22,41 +23,38 @@ def main():
     fitsfile = 'testfits/TMC1A_C18O_t2000klam.image.pv_invert.fits'
     vsys    = 6.4
     incl    = 48.
-    pa      = 0.
-    rms     = 1.5e-3
-    '''
+    pa      = None
+
 
     outname = 'test'
-    rms     = 5.e-3 # Jy/beam
-    thr     = 6.     # 6 sigma
+    rms     = 1.7e-3 # Jy/beam
+    thr     = 5.     # 6 sigma
     dist    = 140.
     clevels = np.array([-3,3,6,9,12,15,20,25,30])
+    Mlim = [0, 10],
+    xlim = [-200 / 140, 0, 0, 200 / 140]
+    vlim = np.array([-5, 0, 0, 5]) + vsys
     # ---------------------
 
 
     # -------- main --------
     impv = PVAnalysis(fitsfile, rms, vsys, dist, pa=pa)
-    impv.get_edgeridge(outname, thr=thr, mode='mean', incl=incl)
+    impv.get_edgeridge(outname, thr=thr, mode='mean', incl=incl,
+                       use_position=True, use_velocity=True,
+                       Mlim=Mlim, xlim=xlim, vlim=vlim,
+                       interp_ridge=False)
     impv.plotresults_pvdiagram(clevels=clevels*rms)
     impv.plotresults_rvplane()
 
-    print ('Fitting edge/ridge..')
+    print ('Fitting edge/ridge.')
     impv.fit_edgeridge(include_vsys=False, include_dp=True,
-                       include_pin=True,
+                       include_pin=False,
                        filehead='testfit', show_corner=False)
     impv.output_fitresult()
     impv.write_edgeridge()
-    #print(impv.popt)
 
-    for loglog, ext in zip([False, True], ['linear', 'log']):
-        pp = PVPlot(fitsimage=fitsfile, vsys=vsys, dist=dist,
-                    loglog=loglog)
-        impv.plot_edgeridge(ax=pp.ax, loglog=loglog)
-        impv.plot_model(ax=pp.ax, loglog=loglog)
-        pp.add_color()
-        pp.add_contour(rms=rms, levels=clevels)
-        pp.set_axis()
-        pp.savefig(figname=outname + '.' + ext + '.png', show=True)
+    impv.plot_fitresult(vlim=[6/20, 6], xlim=[200/20, 200],
+                        clevels=clevels, outname=outname, show=True)
     # ----------------------
 
 
