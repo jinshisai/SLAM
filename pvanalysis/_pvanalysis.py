@@ -156,8 +156,8 @@ class PVAnalysis():
         # sort results
         self.sort_fitresults(minrelerr=minrelerr, minabserr=minabserr)
         # plot
-        self.plotresults_pvdiagram()
-        self.plotresults_rvplane()
+        #self.plotresults_pvdiagram()
+        #self.plotresults_rvplane()
 
     def sort_fitresults(self, minrelerr=0.01, minabserr=0.1):
         """Sort fitting results.
