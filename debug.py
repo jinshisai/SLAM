@@ -1,7 +1,6 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from pvanalysis import PVAnalysis
-from pvanalysis.pvplot import PVPlot
+
 
 
 def main():
@@ -39,7 +38,7 @@ def main():
 
     # -------- main --------
     impv = PVAnalysis(fitsfile, rms, vsys, dist, pa=pa)
-    impv.get_edgeridge(outname, thr=thr, mode='mean', incl=incl,
+    impv.get_edgeridge(outname, thr=thr, ridgemode='mean', incl=incl,
                        use_position=True, use_velocity=True,
                        Mlim=Mlim, xlim=xlim, vlim=vlim,
                        interp_ridge=False)
@@ -49,12 +48,15 @@ def main():
     print ('Fitting edge/ridge.')
     impv.fit_edgeridge(include_vsys=False, include_dp=True,
                        include_pin=False,
-                       filehead='testfit', show_corner=False)
+                       outname='testfit', show_corner=False)
     impv.output_fitresult()
     impv.write_edgeridge()
 
     impv.plot_fitresult(vlim=[6/20, 6], xlim=[200/20, 200],
-                        clevels=clevels, outname=outname, show=True)
+                        clevels=clevels, outname=outname,
+                        show=True, logcolor=True, Tbcolor=True,
+                        kwargs_pcolormesh={'cmap':'viridis'},
+                        kwargs_contour={'colors':'lime'})
     # ----------------------
 
 
