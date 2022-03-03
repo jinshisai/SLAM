@@ -37,12 +37,12 @@ impv.get_edgeridge(outname, thr=thr, ridgemode='mean', incl=incl,
                    Mlim=Mlim, xlim=np.array(xlim) / dist, vlim=vlim,
                    minabserr=minabserr, minrelerr=minrelerr,
                    interp_ridge=interp_ridge)
+impv.write_edgeridge(outname=outname)
 impv.fit_edgeridge(include_vsys=include_vsys,
                    include_dp=include_dp,
                    include_pin=include_pin,
                    outname=outname, show_corner=show_corner)
 impv.output_fitresult()
-impv.write_edgeridge(outname=outname)
 impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
                     clevels=[-9,-6,-3,3,6,9], outname=outname,
                     show=show_pv, logcolor=True, Tbcolor=False,
