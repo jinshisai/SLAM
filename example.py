@@ -30,7 +30,7 @@ interp_ridge = False  # over-Nyquist sampling along velocity or
 
 
 
-'-------- HOW TO USE --------'
+'-------- HOW TO DO EACH STEP --------'
 impv = PVAnalysis(fitsfile, rms, vsys, dist, pa=None)
 impv.get_edgeridge(outname, thr=thr, ridgemode='mean', incl=incl,
                    use_position=use_position, use_velocity=use_velocity,
@@ -48,4 +48,4 @@ impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
                     show=show_pv, logcolor=True, Tbcolor=False,
                     kwargs_pcolormesh={'cmap':'viridis'},
                     kwargs_contour={'colors':'lime'})
-'----------------------------'
+'-------------------------------------'
