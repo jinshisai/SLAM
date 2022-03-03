@@ -326,7 +326,7 @@ class PVAnalysis():
 
         rms = self.rms
 
-        print('PV fit along velocity axis.')
+        print('Along velocity axis.')
         # data
         data = self.fitsdata.data
         if not (self.fitsdata.naxis in [2, 3]):
@@ -570,7 +570,7 @@ class PVAnalysis():
 
         rms = self.rms
 
-        print('pvfit along position axis.')
+        print('Along position axis.')
 
         # data
         data = self.fitsdata.data
@@ -827,7 +827,7 @@ class PVAnalysis():
             (qopt := q0 * 1)[np.isnan(q0)] = popt
             (qerr := q0 * 0)[np.isnan(q0)] = perr
             res[:] = [qopt, qerr]
-        print(f'corner plots in {outname}.corner_e.png '
+        print(f'Corner plots in {outname}.corner_e.png '
               + f'and {outname}.corner_r.png')
         self.popt = {'edge':popt_e, 'ridge':popt_r}
         self.model = doublepower_v
@@ -856,7 +856,8 @@ class PVAnalysis():
                        np.c_[np.r_[x1, x0], np.r_[dx1, dx0],
                              np.r_[v0, v1], np.r_[dv0, dv1]],
                        header='x (au), dx (au), v (km/s), dv (km/s)')
-        print(f'- Wrote to {outname}.edge.dat and {outname}.ridge.dat.')
+        print('Derived points in'
+              + f' {outname}.edge.dat and {outname}.ridge.dat.')
 
 
     def get_range(self):
