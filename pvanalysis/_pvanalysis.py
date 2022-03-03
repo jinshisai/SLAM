@@ -64,7 +64,7 @@ class PVAnalysis():
         self.__sorted = False
 
     def get_edgeridge(self, outname, thr=5.,
-        incl=90., quadrant=None, mode='mean',
+        incl=90., quadrant=None, ridgemode='mean',
         pixrng_vcut=None, pixrng_xcut=None,
         Mlim=[0, 1e10], xlim=[-1e10, 0, 0, 1e10], vlim=[-1e10, 0, 0, 1e10],
         use_velocity=True, use_position=True,
@@ -81,14 +81,14 @@ class PVAnalysis():
                of the protostellar mass.
             quadrant (str, optional): Quadrant of the PV diagram where you
                want to get edge/ridge. Defaults to None.
-            mode (str, optional): Method to derive ridge. Must be 'mean' or
-               'gauss'. Defaults to 'mean'.
+            ridgemode (str, optional): Method to derive ridge.
+               Must be 'mean' or 'gauss'. Defaults to 'mean'.
             pixrng_vcut (int, optional): Pixel range within which gaussian
                fit is performed around the peak intensity along the v-axis.
-               Only used when mode='gauss'. Defaults to None.
+               Only used when ridgemode='gauss'. Defaults to None.
             pixrng_xcut (int, optional): Pixel range within which gaussian
                fit is performed around the peak intensity along the x-axis.
-               Only used when mode='gauss'. Defaults to None.
+               Only used when ridgemode='gauss'. Defaults to None.
             Mlim (list, optional): Reliable mass range. Data points that do
                not come within this range is removed. Defaults to [0, 1e10].
             xlim (list, optional): Range of offset where edge/ridge is
@@ -145,12 +145,12 @@ class PVAnalysis():
         if use_position:
             self.get_edgeridge_xcut(outname, thr=thr, incl=incl,
                             xlim=xlim, vlim=vlim, Mlim=Mlim,
-                            mode=mode, pixrng=pixrng_xcut,
+                            ridgemode=ridgemode, pixrng=pixrng_xcut,
                             interp_ridge=interp_ridge)
         if use_velocity:
             self.get_edgeridge_vcut(outname, thr=thr, incl=incl,
                             xlim=xlim, vlim=vlim, Mlim=Mlim,
-                            mode=mode, pixrng=pixrng_vcut,
+                            ridgemode=ridgemode, pixrng=pixrng_vcut,
                             interp_ridge=interp_ridge)
 
         # sort results
@@ -277,7 +277,7 @@ class PVAnalysis():
         del self.__store
 
     def get_edgeridge_vcut(self, outname, thr=5., incl=90., xlim=[-1e10, 0, 0, 1e10],
-                   vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], mode='gauss',
+                   vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='gauss',
                    pixrng=None, multipeaks=False, i_peak=0, prominence=1.5,
                    inverse=False, interp_ridge=False):
         """Get edge/ridge along the velocity axis, i.e., determine
@@ -298,17 +298,17 @@ class PVAnalysis():
                derived. Defaults to [-1e10, 0, 0, 1e10].
             vlim (list): Range of velocity where edge/ridge is
                derived. Defaults to [-1e10, 0, 0, 1e10].
-            mode (str): Method to derive ridge. When mode='mean', ridge is
-               derived as the intensity weighted mean. When mode='gauss',
+            ridgemode (str): Method to derive ridge. When ridgemode='mean', ridge is
+               derived as the intensity weighted mean. When ridgemode='gauss',
                ridge is derived as the mean of the fitted Gaussian function.
                Defaults to 'mean'.
             pixrng (float): Pixel range for the fitting around the maximum
                intensity. Only velocity channels +/- pixrng around the channel
                with the maximum intensity are used for the fitting.
-               Only applied when mode='gauss'.
+               Only applied when ridgemode='gauss'.
             multipeaks (bool): Find multiple peaks if True. Default False,
                which means only the maximum peak is considered.
-               Only applied when mode='gauss'.
+               Only applied when ridgemode='gauss'.
             i_peak (int): Only used when multipeaks=True. Used to specify
                around which intensity peak you want to perform the fitting.
             prominence (float): Only used when multipeaks=True. Parameter to
@@ -426,7 +426,7 @@ class PVAnalysis():
             d_i_raw = d_i.copy() # for plot
             d_i = di_interp.copy() if interp_ridge else d_i
             # ridge
-            if mode == 'mean':
+            if ridgemode == 'mean':
                 c = (d_i >= thr * rms)
                 v_i, d_i = v_i[c], d_i[c]
                 mv, mv_err = ridge_mean(v_i, d_i, rms)
@@ -434,7 +434,7 @@ class PVAnalysis():
                 if ~np.isnan(mv):
                     ax.vlines(mv, 0., dlim[-1], lw=1.5,
                               color='r', ls='--', alpha=0.8)
-            elif mode == 'gauss':
+            elif ridgemode == 'gauss':
                 # get peak indices
                 peaks, _ = find_peaks(d_i, height=thr * rms,
                                       prominence=prominence * rms)
@@ -473,7 +473,7 @@ class PVAnalysis():
                     ax.vlines(mv, 0., dlim[-1], lw=1.5, color='r',
                               ls='--', alpha=0.8)
             else:
-                print('ERROR\tpvfit_vcut: mode must be mean or gauss.')
+                print('ERROR\tpvfit_vcut: ridgemode must be mean or gauss.')
                 return
             if not (vlim[0] < mv < vlim[1] or vlim[2] < mv < vlim[3]):
                 mv, mv_err = np.nan, np.nan
@@ -520,7 +520,7 @@ class PVAnalysis():
 
 
     def get_edgeridge_xcut(self, outname, thr=5., incl=90., xlim=[-1e10, 0, 0, 1e10],
-                   vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], mode='mean',
+                   vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='mean',
                    pixrng=None, multipeaks=False, i_peak=0,
                    prominence=1.5, interp_ridge=False):
         """Get edge/ridge along x-axis, i.e., determine representative
@@ -541,17 +541,17 @@ class PVAnalysis():
                derived. Defaults to [-1e10, 0, 0, 1e10].
             vlim (list): Range of velocity where edge/ridge is
                derived. Defaults to [-1e10, 0, 0, 1e10].
-            mode (str): Method to derive ridge. When mode='mean', ridge is
-               derived as the intensity weighted mean. When mode='gauss',
+            ridgemode (str): Method to derive ridge. When ridgemode='mean', ridge is
+               derived as the intensity weighted mean. When ridgemode='gauss',
                ridge is derived as the mean of the fitted Gaussian function.
                Defaults to 'mean'.
             pixrng (float): Pixel range for the fitting around the maximum
                intensity. Only pixels +/- pixrng around the (re-samped) pixel
                with the maximum intensity are used for the fitting.
-               Only applied when mode='gauss'.
+               Only applied when ridgemode='gauss'.
             multipeaks (bool): Find multiple peaks if True. Default False,
                which means only the maximum peak is considered.
-               Only applied when mode='gauss'.
+               Only applied when ridgemode='gauss'.
             i_peak (int): Only used when multipeaks=True. Used to specify
                around which intensity peak you want to perform the fitting.
             prominence (float): Only used when multipeaks=True. Parameter to
@@ -657,7 +657,7 @@ class PVAnalysis():
             ax = grid[i]
 
             # get ridge value
-            if mode == 'mean':
+            if ridgemode == 'mean':
                 c = (d_i >= thr*rms)
                 x_i, d_i = xaxis_fit[c], d_i[c]
                 mx, mx_err = ridge_mean(x_i, d_i, rms)
@@ -665,7 +665,7 @@ class PVAnalysis():
                 if ~np.isnan(mx):
                     ax.vlines(mx, 0., dlim[-1], lw=1.5, color='r',
                               ls='--', alpha=0.8)
-            elif mode == 'gauss':
+            elif ridgemode == 'gauss':
                 # get peak indices
                 peaks, _ = find_peaks(d_i, height=thr * rms,
                                       prominence=prominence * rms)
@@ -704,7 +704,7 @@ class PVAnalysis():
                     ax.vlines(mx, 0., dlim[-1], lw=1.5, color='r',
                               ls='--', alpha=0.8)
             else:
-                print('ERROR\tpvfit_xcut: mode must be mean or gauss.')
+                print('ERROR\tpvfit_xcut: ridgemode must be mean or gauss.')
                 return
             if not (xlim[0] < mx < xlim[1] or xlim[2] < mx < xlim[3]):
                 mx, mx_err = np.nan, np.nan
@@ -756,7 +756,7 @@ class PVAnalysis():
     def fit_edgeridge(self, include_vsys: bool = False,
                       include_dp: bool = True,
                       include_pin: bool = False,
-                      filehead: str = 'pvanalysis',
+                      outname: str = 'pvanalysis',
                       show_corner: bool = False):
         """Fit the derived edge/ridge positions/velocities with a double power law function by using emcee.
 
@@ -768,9 +768,9 @@ class PVAnalysis():
                False means dp is fixed at 0, i.e., single power law function.
             include_pin : bool
                False means pin is fixed at 0.5, i.e., the Keplerian law.
-            filehead : str
-               The output corner figures have names of "filehead".corner_e.png
-               and "filehead".corner_r.png.
+            outname : str
+               The output corner figures have names of "outname".corner_e.png
+               and "outname".corner_r.png.
             show_corner : bool
                True means the corner figures are shown. These figures are also
                plotted in two png files.
@@ -821,26 +821,26 @@ class PVAnalysis():
             plim = plim[:, include]
             popt, perr = emcee_corner(plim, lnprob, args=args,
                                       labels=labels,
-                                      figname=filehead+'.corner'+ext+'.png',
+                                      figname=outname+'.corner'+ext+'.png',
                                       show_corner=show_corner,
                                       ndata=len(args[0]) + len(args[3]))
             (qopt := q0 * 1)[np.isnan(q0)] = popt
             (qerr := q0 * 0)[np.isnan(q0)] = perr
             res[:] = [qopt, qerr]
-        print(f'corner plots in {filehead}.corner_e.png '
-              + f'and {filehead}.corner_r.png')
+        print(f'corner plots in {outname}.corner_e.png '
+              + f'and {outname}.corner_r.png')
         self.popt = {'edge':popt_e, 'ridge':popt_r}
         self.model = doublepower_v
         result = {'edge':{'popt':popt_e[0], 'perr':popt_e[1]},
                   'ridge':{'popt':popt_r[0], 'perr':popt_r[1]}}
         return result
 
-    def write_edgeridge(self, filehead='pvanalysis'):
+    def write_edgeridge(self, outname='pvanalysis'):
         """Write the edge/ridge positions/velocities to a text file.
 
         Args:
-            filehead (str): The output text file has a name of
-               "filehead".edge.dat. and "filehead".ridge.dat The file
+            outname (str): The output text file has a name of
+               "outname".edge.dat. and "outname".ridge.dat The file
                consists of four columns of x (au), dx (au), v (km/s),
                and dv (km/s).
         """
@@ -852,11 +852,11 @@ class PVAnalysis():
             vrb = [res_org[er]['vcut'][rb] for rb in ['red', 'blue']]
             vcut = np.concatenate(vrb, axis=1)
             x0, v1, dx0, dv1 = self.xsign * vcut[0], vcut[1], vcut[2], vcut[3]
-            np.savetxt(filehead + '.' + er + '.dat',
+            np.savetxt(outname + '.' + er + '.dat',
                        np.c_[np.r_[x1, x0], np.r_[dx1, dx0],
                              np.r_[v0, v1], np.r_[dv0, dv1]],
                        header='x (au), dx (au), v (km/s), dv (km/s)')
-        print(f'- Wrote to {filehead}.edge.dat and {filehead}.ridge.dat.')
+        print(f'- Wrote to {outname}.edge.dat and {outname}.ridge.dat.')
 
 
     def get_range(self):
@@ -940,7 +940,11 @@ class PVAnalysis():
                        xlim: list = [0, 1e10],
                        clevels: list = [3, 6],
                        outname: str = 'pvanalysis',
-                       show: bool = True):
+                       logcolor: bool = False,
+                       Tbcolor: bool = False,
+                       show: bool = True,
+                       kwargs_pcolormesh: dict = {},
+                       kwargs_contour: dict = {}):
         for loglog, ext in zip([False, True], ['linear', 'log']):
             pp = PVPlot(restfrq=self.fitsdata.restfreq,
                         beam=self.fitsdata.beam, pa=self.fitsdata.pa,
@@ -948,10 +952,14 @@ class PVAnalysis():
                         d=self.fitsdata.data,
                         v=self.fitsdata.vaxis, x=self.fitsdata.xaxis,
                         loglog=loglog, vlim=vlim, xlim=xlim)
+            cblabel = self.fitsdata.header['BUNIT']
+            if Tbcolor: cblabel = r'T$_{\rm b}$ (K)'
+            pp.add_color(log=logcolor, Tb=Tbcolor, cblabel=cblabel,
+                         **kwargs_pcolormesh)
+            pp.add_contour(rms=self.rms, levels=clevels,
+                           **kwargs_contour)
             self.plot_edgeridge(ax=pp.ax, loglog=loglog)
             self.plot_model(ax=pp.ax, loglog=loglog)
-            pp.add_color()
-            pp.add_contour(rms=self.rms, levels=clevels)
             pp.set_axis()
             pp.savefig(figname=outname + '.' + ext + '.png', show=show)
 

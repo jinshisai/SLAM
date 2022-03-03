@@ -122,20 +122,22 @@ class PVPlot():
         else:
             x, v, d = self.x, self.v, self.d
         if Tb:
-            Omega = bmaj * bmin / 3600.**2 * np.pi / 4. / np.log(2.)
+            Omega = bmaj * bmin / 3600.**2 * np.radians(1)**2 \
+                    * np.pi / 4. / np.log(2.)
             lam = constants.c.to('m/s').value / restfrq
             Jy2K = units.Jy.to('J*s**(-1)*m**(-2)*Hz**(-1)') \
                    * lam**2 / 2. / constants.k_B.to('J/K').value / Omega
-            d *= Jy2K
+            d = d * Jy2K
         if log:
             vmin = kwargs['vmin'] if 'vmin' in kwargs else np.nanstd(d)
             kwargs['vmin'] = np.log10(vmin)
             vmax = kwargs['vmax'] if 'vmax' in kwargs else np.nanmax(d)
             kwargs['vmax'] = np.log10(vmax)
+        if log: d = np.log10(d.clip(np.min(d[d > 0]), None))
         kwargs0 = dict(kwargs0, **kwargs)
         ax = self.ax
         if self.flipaxis: x, v, d = v, x, d.T
-        p = ax.pcolormesh(x, v, d, **kwargs0, shading='auto')
+        p = ax.pcolormesh(x, v, d, shading='nearest', **kwargs0)
         if self.loglog:
             ax.set_xscale('log')
             ax.set_yscale('log')
