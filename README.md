@@ -4,7 +4,7 @@ pvanalysis is a python package to perform fitting to the rotational curve using 
 
 
 ## Basic Usage
-Download the module and put it at the directory where a script to perform the PV fitting is contained, or any place added to your python path. For an easy test to check if the module works in your python environment, you can run `debug.py` first.
+Download the module and put it at the directory where you run a script to perform the fitting, or any place added to your python path. For an easy test to check if the module works in your python environment, you can run `example.py` first.
 
 The simplest way to perform the fitting is as the following.
 
