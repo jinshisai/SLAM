@@ -24,8 +24,6 @@ show_pv = True  # figures will be made regardless of this option.
 show_corner = True  # figures will be made regardless of this option.
 minabserr = 0.1  # minimum absolute errorbar in the unit of bmaj or dv.
 minrelerr = 0.01  # minimum relative errorbar.
-interp_ridge = False  # over-Nyquist sampling along velocity or
-                      # positional cuts to avoid too few points.
 '------------------------'
 
 
