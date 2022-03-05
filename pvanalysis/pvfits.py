@@ -67,16 +67,16 @@ class Impvfits:
             self.beam = None
         # Info. of P.A.
         if pa is not None:
-            print(f'Input P.A.: {pa:.1f} deg')
+            print(f'read_pvfits: Input P.A.: {pa:.1f} deg')
             self.pa = pa
         elif 'PA' in header:
-            print('Read P.A. in header.')
+            print('read_pvfits: Read P.A. in header.')
             self.pa = header['PA']
         elif 'P.A.' in header:
-            print('Read P.A. in header.')
+            print('read_pvfits: Read P.A. in header.')
             self.pa = header['P.A.']
         else:
-            print('CAUTION\tread_pvfits: No PA information is given.')
+            print('read_pvfits: No PA information is given.')
             self.pa = None
         # Resolution along offset axis
         if self.pa is None:
@@ -144,7 +144,7 @@ class Impvfits:
         if label_i[1] in ['VRAD', 'VELO']:
             vaxis    = vaxis * 1.e-3 # m/s --> km/s
         else:
-            print('Convert frequency to velocity')
+            print('read_pvfits: Convert frequency to velocity')
             vaxis = clight * (1. - vaxis/restfreq) # radio velocity c*(1-f/f0) [cm/s]
             vaxis = vaxis * 1.e-5                # cm/s --> km/s
         ##### what's saxis?
