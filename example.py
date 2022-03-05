@@ -33,8 +33,7 @@ impv = PVAnalysis(fitsfile, rms, vsys, dist, pa=None)
 impv.get_edgeridge(outname, thr=thr, ridgemode='mean', incl=incl,
                    use_position=use_position, use_velocity=use_velocity,
                    Mlim=Mlim, xlim=np.array(xlim) / dist, vlim=vlim,
-                   minabserr=minabserr, minrelerr=minrelerr,
-                   interp_ridge=interp_ridge)
+                   minabserr=minabserr, minrelerr=minrelerr)
 impv.write_edgeridge(outname=outname)
 impv.fit_edgeridge(include_vsys=include_vsys,
                    include_dp=include_dp,
