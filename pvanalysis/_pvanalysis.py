@@ -73,9 +73,8 @@ class PVAnalysis():
 
         Args:
             outname (str): Output file name.
-            thr (float, optional): Threshold above which data is used
-               to get edge/ridge. The threshold will be used as thr x rms.
-               Defaults to 5.
+            thr (float, optional): Edge level and intensity threshold for
+               ridge in the unit of 'rms' Defaults to 5.
             incl (float, optional): Inclination angle of the object.
                Defaults to 90, which means no correction for estimate
                of the protostellar mass.
@@ -285,8 +284,8 @@ class PVAnalysis():
 
         Args:
             outname (str): Output file name.
-            thr (float): Threshold for the fitting. Spectrum with the maximum
-               intensity above thr x rms will be used for the fitting.
+            thr (float): Edge level and intensity threshold for
+               ridge in the unit of 'rms' Defaults to 5.
                xlim, vlim: x and v ranges for the fitting. Must be given
                as a list, [outlimit1, inlimit1, inlimit2, outlimit2].
             incl (float): Inclination angle of the object. Defaults to 90,
@@ -317,6 +316,8 @@ class PVAnalysis():
                between fittings with different xlim or vlim.
             interp_ridge (bool): If True, vaxis is interporated with spline
                interpolation to derive ridge. Deafaults to False.
+               Do not use this option with pixrng option, or wrong results
+               will come.
         """
         # modules
         import math
@@ -529,8 +530,8 @@ class PVAnalysis():
 
         Args:
             outname (str): Output file name.
-            thr (float): Threshold for the fitting. Spectrum with the maximum
-               intensity above thr x rms will be used for the fitting.
+            thr (float): Edge level and intensity threshold for
+               ridge in the unit of 'rms' Defaults to 5.
                xlim, vlim: x and v ranges for the fitting. Must be given
                as a list, [outlimit1, inlimit1, inlimit2, outlimit2].
             incl (float): Inclination angle of the object. Defaults to 90,
@@ -559,8 +560,10 @@ class PVAnalysis():
                determine multiple peaks.
             inverse (bool): Inverse axes. May be used to sort the sampling
                between fittings with different xlim or vlim.
-            interp_ridge (bool): If True, xaxis is not sampled with the
-            Nyquist rate to derive ridge. Deafaults to False.
+            interp_ridge (bool): If True, xaxis is interporated with spline
+               interpolation to derive ridge. Deafaults to False.
+               Do not use this option with pixrng option, or wrong results
+               will come.
         """
         # modules
         import math
