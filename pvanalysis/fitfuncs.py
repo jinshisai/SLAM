@@ -102,7 +102,7 @@ def ridge_mean(xdata, ydata, yerr):
     if len(xdata) < 2:
         return np.nan, np.nan
     val = np.average(xdata, weights=ydata)
-    err = yerr * np.abs(np.sum(xdata - val)) / np.sum(ydata)
+    err = yerr * np.sqrt(np.sum((xdata - val)**2)) / np.sum(ydata)
     return val, err
 
 

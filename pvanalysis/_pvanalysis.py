@@ -352,9 +352,9 @@ class PVAnalysis():
         # cutting at an velocity and determining the position
 
         # x & v ranges used for calculation for fitting
-        xaxis_fit = xaxis
-        vaxis_fit = vaxis
-        data_fit  = data
+        xaxis_fit = xaxis.copy()
+        vaxis_fit = vaxis.copy()
+        data_fit  = data.copy()
         if len(xlim) != 4:
             print('Warning\tpvfit_vcut: '
                   + 'Size of xlim is not correct. '
@@ -396,7 +396,7 @@ class PVAnalysis():
         fig  = plt.figure(figsize=(11.69, 8.27))
         grid = ImageGrid(fig, rect=111, nrows_ncols=(nrow, ncol),
             axes_pad=0,share_all=True, aspect=False, label_mode='L')
-        dlim  = [np.nanmin(data_fit), np.nanmax(data_fit)]
+        dlim = [np.nanmin(data_fit), np.nanmax(data_fit)]
         # x & y label
         grid[(nrow*ncol - ncol)].set_xlabel(r'Velocity (km s$^{-1}$)')
         grid[(nrow*ncol - ncol)].set_ylabel('Intensity')
@@ -404,13 +404,11 @@ class PVAnalysis():
         res_ridge = np.empty((nloop, 4))
         res_edge  = np.empty((nloop, 4))
 
-        vi_interp = np.linspace(vaxis_fit[0], vaxis_fit[-1],
-                                (len(vaxis_fit) - 1) * 10 + 1)
-        v_i_raw = vaxis_fit.copy()  # for plot
         # loop for x
         for i in range(nloop):
             # ith data
             x_i = xaxis_fit[i]
+            v_i = vaxis_fit.copy()
             d_i = data_fit[:, i].copy()
             if np.all(np.isnan(d_i)) or (xlim[1] < x_i < xlim[2]):
                 res_ridge[i, :] = [x_i, np.nan, 0, np.nan]
@@ -418,14 +416,13 @@ class PVAnalysis():
                 continue
             # plot results
             ax  = grid[i]
-            # get ridge value
             # interpolate
-            v_i = vi_interp.copy() if interp_ridge else v_i_raw
-            di_interp = interp1d(v_i_raw, d_i, kind='cubic')(vi_interp)
-            # if interpolate
-            d_i_raw = d_i.copy() # for plot
-            d_i = di_interp.copy() if interp_ridge else d_i
-            # ridge
+            if interp_ridge:
+                vi_interp = np.linspace(v_i[0], v_i[-1],
+                (len(v_i) - 1) * 10 + 1) # 1/10 sampling rate
+                d_i = interp1d(v_i, d_i, kind='cubic')(vi_interp)
+                v_i = vi_interp
+            # get ridge value
             if ridgemode == 'mean':
                 c = (d_i >= thr * rms)
                 v_i, d_i = v_i[c], d_i[c]
@@ -453,8 +450,8 @@ class PVAnalysis():
                         mv, mv_err = np.nan, np.nan
                     else:
                         # use pixels only around intensity peak
-                        v0, v1 = pidx - pixrng, pidx + pixrng + 1
-                        d_i, v_i  = d_i[v0:v1], v_i[v0:v1]
+                        v0, v1   = pidx - pixrng, pidx + pixrng + 1
+                        d_i, v_i = d_i[v0:v1], v_i[v0:v1]
                         #nd_i = len(d_i)
 
                 if np.nanmax(d_i) >= thr * rms:
@@ -504,7 +501,11 @@ class PVAnalysis():
                 ax.vlines(mv, 0., dlim[-1], lw=1.5, color='b',
                           ls='--', alpha=0.8)
             # observed data
-            ax.step(v_i_raw, d_i_raw, linewidth=1.,
+            if interp_ridge:
+                ax.step(vi_interp, di_interp, linewidth=1.,
+                    color='k', where='mid')
+            else:
+                ax.step(vaxis_fit, data_fit[:,i], linewidth=1.,
                     color='k', where='mid')
             # offset label
             ax.text(0.9, 0.9, f'{x_i:03.2f}', horizontalalignment='right',
@@ -624,10 +625,7 @@ class PVAnalysis():
             data_fit  = np.array([d[b] for d in data_fit.T]).T
             vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
             print(f'v range: {vmin:.2f} -- {vmax:.2f} km/s')
-        # Nyquist sampling
-        xaxis_fit = xaxis.copy() if interp_ridge else xaxis[::hob]
-        vaxis_fit = vaxis.copy()
-        data_fit  = data.copy() if interp_ridge else data[:,::hob].copy()
+        # for loop
         nloop = len(vaxis_fit)
         ncol = int(math.ceil(np.sqrt(nloop)))
         nrow = int(math.ceil(nloop / ncol))
@@ -648,18 +646,23 @@ class PVAnalysis():
         for i in range(nloop):
             # ith data
             v_i  = vaxis_fit[i]
-            d_i  = data_fit[i, :]
+            x_i  = xaxis_fit.copy()
+            d_i  = data_fit[i, :].copy()
             if np.all(np.isnan(d_i)) or (vlim[1] < v_i < vlim[2]):
                 res_ridge[i, :] = [np.nan, v_i, np.nan, 0]
                 res_edge[i, :] = [np.nan, v_i, np.nan, 0]
                 continue
             # plot results
             ax = grid[i]
-
+            # interpolate
+            if interp_ridge:
+                xi_interp = np.linspace(x_i[0], x_i[-1], (len(x_i)-1)*10 + 1)
+                d_i = interp1d(x_i, d_i, kind='cubic')(xi_interp)
+                x_i = xi_interp
             # get ridge value
             if ridgemode == 'mean':
                 c = (d_i >= thr*rms)
-                x_i, d_i = xaxis_fit[c], d_i[c]
+                x_i, d_i = x_i[c], d_i[c]
                 mx, mx_err = ridge_mean(x_i, d_i, rms)
                 # plot
                 if ~np.isnan(mx):
@@ -708,8 +711,9 @@ class PVAnalysis():
                 return
             if not (xlim[0] < mx < xlim[1] or xlim[2] < mx < xlim[3]):
                 mx, mx_err = np.nan, np.nan
-            if interp_ridge: mx_err *= np.sqrt(hob)
-            # output ridge results                
+            mx_err *= np.sqrt(hob) # correction of sampling rate
+            if interp_ridge: mx_err *= np.sqrt(10.)
+            # output ridge results
             res_ridge[i, :] = [mx, v_i, mx_err, 0.]
 
             # get edge values
@@ -735,7 +739,11 @@ class PVAnalysis():
                 ax.vlines(mx, 0., dlim[-1], lw=2., color='b',
                           ls='--', alpha=0.8)
             # observed data
-            ax.step(xaxis_fit, data_fit[i,:], linewidth=1.,
+            if interp_ridge:
+                ax.step(xi_interp, di_interp, linewidth=1.,
+                    color='k', where='mid')
+            else:
+                ax.step(xaxis_fit, data_fit[i,:], linewidth=1.,
                     color='k', where='mid')
             # offset label
             ax.text(0.9, 0.9, f'{v_i:03.2f}', horizontalalignment='right',
