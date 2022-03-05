@@ -2,7 +2,7 @@ import numpy as np
 from pvanalysis import PVAnalysis
 
 '-------- INPUTS --------'
-fitsfile = './testfits/TMC1A_C18O_t2000klam.image.pv_invert.fits'
+fitsfile = './testfits/test.fits'
 outname = 'pvanalysis'  # file name header for outputs
 incl = 48.  # deg
 vsys = 6.4  # km/s
