@@ -220,11 +220,11 @@ class PVAnalysis():
                 for rb in ['red', 'blue']:
                     x1, v0, _, _ = store['xcut'][rb]
                     x0, v1, _, _ = store['vcut'][rb]
-                    x1, x0 = np.meshgrid(x1, x0)
-                    v0, v1 = np.meshgrid(v0, v1)
-                    xvd = np.hypot((x1-x0) / self.res_off, (v0-v1) / self.delv)
+                    X1, X0 = np.meshgrid(x1, x0)
+                    V0, V1 = np.meshgrid(v0, v1)
+                    xvd = np.hypot((X1-X0) / self.res_off, (V0-V1) / self.delv)
                     if np.any(~np.isnan(xvd)):
-                        iv, ix = np.unravel_index(np.nanargmin(xvd), np.shape(x1))
+                        iv, ix = np.unravel_index(np.nanargmin(xvd), np.shape(X1))
                         x1[:ix] = np.nan
                         v1[:iv] = np.nan
             # combine xcut and vcut
