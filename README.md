@@ -31,9 +31,11 @@ impv.plotresults_rvplane()
 
 # fitting to rotational curve
 impv.fit_edgeridge(
-	include_vsys=False,
-	include_dp=True,
-	include_pin=True,
+	include_vsys=False, # include vsys in fitting?
+	include_dp=True,    # single or double power-law fitting?
+	include_pin=True,   # include p_in in fitting?
 	show_corner=False)
 # -----------------------------
 ```
+
+More detailed usage is found in `example.py`.
