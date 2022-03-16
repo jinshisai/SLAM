@@ -240,9 +240,9 @@ class PVAnalysis():
         ### Get edge/ridge positions and velocities. ###
         def get_points(mode):
             if mode == 'x':
-                s, ds, t, slim, tlim, d_input = x, dx, v, xlim, vlim, d
+                s, t, slim, tlim, d_input = x, v, xlim, vlim, d
             elif mode == 'v':
-                s, ds, t, slim, tlim, d_input = v, dv, x, vlim, xlim, d.T
+                s, t, slim, tlim, d_input = v, x, vlim, xlim, d.T
             s_e, ds_e, s_r, ds_r = [[None] * len(t) for _ in range(4)]
             si_org = np.linspace(s[0], s[-1], (len(s) - 1) * 10 + 1)
             for i, (tt, dd) in enumerate(zip(t, d_input)):
