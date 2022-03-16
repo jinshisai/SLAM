@@ -178,54 +178,53 @@ class PVAnalysis():
             return np.max([err, minrelerr * np.abs(val), minabs], axis=0)
 
         # sort results
-        for i in ['ridge', 'edge']:
+        for re in ['ridge', 'edge']:
             # tentative space
-            self.__store = {'xcut': {'red': None, 'blue': None},
-                            'vcut': {'red': None, 'blue': None}}
-            for j in ['xcut', 'vcut']:
-                if self.results[i][j] is None:
+            store = {'xcut': {'red': None, 'blue': None},
+                     'vcut': {'red': None, 'blue': None}}
+            for xv in ['xcut', 'vcut']:
+                if self.results[re][xv] is None:
                     continue
                 # x, v, err_x, err_v
-                results     = copy.deepcopy(self.results[i][j])
+                results     = copy.deepcopy(self.results[re][xv])
                 results[1] -= self.vsys
                 # clip too small error
-                if j == 'xcut':
+                if xv == 'xcut':
                     # clip x error
-                    results[2] = clipped_error(results[2], results[0], mode='x')
+                    results[2] = clipped_error(results[2], results[0], 'x')
                 else:
                     # clip v error
-                    results[3] = clipped_error(results[3], results[1], mode='v')
+                    results[3] = clipped_error(results[3], results[1], 'v')
                 # relative velocity to separate red/blue comp.
-                vrel = results[1]
-                xrel = results[0]
+                xrel, vrel = results[0], results[1]
                 # separate red/blue components
-                rel = vrel if j == 'xcut' else xrel * self.xsign
-                redsign = int(self.xsign) if j == 'vcut' else 1
+                rel = vrel if xv == 'xcut' else xrel * self.xsign
+                redsign = int(self.xsign) if xv == 'vcut' else 1
                 res_red  = [k[rel > 0][::redsign] for k in results]
                 res_blue = [k[rel < 0][::-redsign] for k in results]
                 ## nan after turn over
-                jj = 0 if j == 'xcut' else 1
-                for a in [res_red[jj], res_blue[jj]]:
+                ival = 0 if xv == 'xcut' else 1
+                for a in [res_red[ival], res_blue[ival]]:
                     if np.any(~np.isnan(a)):
                         a[:np.nanargmax(np.abs(a))] = np.nan
                 # remove points outside Mlim
                 if len(self.Mlim) == 2:
                     for a in [res_red, res_blue]:
                         mass_est = kepler_mass(a[0], a[1], self.__unit)
-                        a[jj][~between(mass_est, self.Mlim)] = np.nan
-                self.__store[j]['red']  = res_red
-                self.__store[j]['blue'] = res_blue
+                        a[ival][~between(mass_est, self.Mlim)] = np.nan
+                store[xv]['red']  = res_red
+                store[xv]['blue'] = res_blue
             # remove low-velocity positions and inner velocities when using both positions and velocities
-            if ((self.results[i]['xcut'] is not None) 
-                & (self.results[i]['vcut'] is not None)):
-                for j in ['red', 'blue']:
-                    x1, v0, _, _ = self.__store['xcut'][j]
-                    x0, v1, _, _ = self.__store['vcut'][j]
-                    xx, xv = np.meshgrid(x1, x0)
-                    vx, vv = np.meshgrid(v0, v1)
-                    xvd = np.hypot((xx-xv) / self.res_off, (vx-vv) / self.delv)
+            if ((self.results[re]['xcut'] is not None) 
+                & (self.results[re]['vcut'] is not None)):
+                for rb in ['red', 'blue']:
+                    x1, v0, _, _ = store['xcut'][rb]
+                    x0, v1, _, _ = store['vcut'][rb]
+                    X1, X0 = np.meshgrid(x1, x0)
+                    V0, V1 = np.meshgrid(v0, v1)
+                    xvd = np.hypot((X1-X0) / self.res_off, (V0-V1) / self.delv)
                     if np.any(~np.isnan(xvd)):
-                        iv, ix = np.unravel_index(np.nanargmin(xvd), np.shape(xx))
+                        iv, ix = np.unravel_index(np.nanargmin(xvd), np.shape(X1))
                         x1[:ix] = np.nan
                         v1[:iv] = np.nan
             # combine xcut and vcut
@@ -233,29 +232,29 @@ class PVAnalysis():
                              'blue':np.array([[], [], [], []])},
                      'vcut':{'red':np.array([[], [], [], []]),
                              'blue':np.array([[], [], [], []])}}
-            for j in ['red', 'blue']:
-                if ((self.results[i]['xcut'] is not None) 
-                    & (self.results[i]['vcut'] is not None)):
+            for rb in ['red', 'blue']:
+                if ((self.results[re]['xcut'] is not None) 
+                    & (self.results[re]['vcut'] is not None)):
                     # remove nan
-                    for cut, jj in zip(['xcut', 'vcut'], [0, 1]):
-                        ref = self.__store[cut][j]
-                        store = [k[~np.isnan(ref[jj])] for k in ref]
-                        self.__store[cut][j] = store
-                        res_f[cut][j] = store
+                    for xv, ival in zip(['xcut', 'vcut'], [0, 1]):
+                        ref = store[xv][rb]
+                        s = [k[~np.isnan(ref[ival])] for k in ref]
+                        store[xv][rb] = s
+                        res_f[xv][rb] = s
                     # combine xcut/vcut
                     res_comb = np.array(
-                        [np.append(self.__store['xcut'][j][k],
-                                   self.__store['vcut'][j][k])
+                        [np.append(store['xcut'][rb][k],
+                                   store['vcut'][rb][k])
                          for k in range(4)])
-                elif not ((self.results[i]['xcut'] is None)
-                          and (self.results[i]['vcut'] is None)):
+                elif not ((self.results[re]['xcut'] is None)
+                          and (self.results[re]['vcut'] is None)):
                     # only remove nan
-                    if self.results[i]['xcut'] is not None:
-                        cut, jj, ref = 'xcut', 0, self.__store['xcut'][j]
+                    if self.results[re]['xcut'] is not None:
+                        xv, ival, ref = 'xcut', 0, store['xcut'][rb]
                     else:
-                        cut, jj, ref = 'vcut', 1, self.__store['vcut'][j]
-                    res_comb = [k[~np.isnan(ref[jj])] for k in ref]
-                    res_f[cut][j] = [k[~np.isnan(ref[jj])] for k in ref]
+                        xv, ival, ref = 'vcut', 1, store['vcut'][rb]
+                    res_comb = [k[~np.isnan(ref[ival])] for k in ref]
+                    res_f[xv][rb] = [k[~np.isnan(ref[ival])] for k in ref]
                 else:
                     print('ERROR\tsort_fitresults: '
                           + 'No fitting results are found.')
@@ -264,16 +263,15 @@ class PVAnalysis():
                 # arcsec --> au
                 res_comb[0] = res_comb[0]*self.dist
                 res_comb[2] = res_comb[2]*self.dist
-                for cut in ['xcut', 'vcut']:
-                    res_f[cut][j][0] = res_f[cut][j][0]*self.dist
-                    res_f[cut][j][2] = res_f[cut][j][2]*self.dist
+                for xv in ['xcut', 'vcut']:
+                    res_f[xv][rb][0] = res_f[xv][rb][0]*self.dist
+                    res_f[xv][rb][2] = res_f[xv][rb][2]*self.dist
                 ## sort by x
                 i_order  = np.argsort(np.abs(res_comb[0]))
                 res_comb = np.array([np.abs(k[i_order]) for k in res_comb])
                 # save
-                self.results_sorted[i][j] = res_comb
-            self.results_filtered[i] = res_f
-        del self.__store
+                self.results_sorted[re][rb] = res_comb
+            self.results_filtered[re] = res_f
 
     def get_edgeridge_vcut(self, outname, thr=5., incl=90., xlim=[-1e10, 0, 0, 1e10],
                    vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='gauss',
