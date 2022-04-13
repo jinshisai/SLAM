@@ -153,7 +153,9 @@ class PVPlot():
             if cbticklabels is not None:
                 cb.set_ticklables(cbticklabels)
             elif log:
-                cb.set_ticks(t := cb.get_ticks())
+                t = cb.get_ticks()
+                t = t[(kwargs['vmin'] < t) * (t < kwargs['vmax'])]
+                cb.set_ticks(t)
                 cb.set_ticklabels([f'{lt:.1e}' for lt in 10**t])
 
 
