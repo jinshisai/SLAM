@@ -489,7 +489,7 @@ class PVAnalysis():
             # flag by mass
             mass_est = kepler_mass(x_i, vi_interp-self.vsys, self.__unit)
             goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
-            edgesign = v_i[np.nanargmax(d_i)] - self.vsys
+            edgesign = x_i * self.xsign
             mv, mv_err = edge(vi_interp, di_interp, rms, rms*thr,
                               goodflag=goodflag, edgesign=edgesign)
             if not (vlim[0] < mv < vlim[1] or vlim[2] < mv < vlim[3]):
@@ -729,7 +729,7 @@ class PVAnalysis():
             # flag by mass
             mass_est = kepler_mass(xi_interp, v_i - self.vsys, self.__unit)
             goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
-            edgesign = x_i[np.nanargmax(d_i)]
+            edgesign = (v_i - self.vsys) * self.xsign
             mx, mx_err = edge(xi_interp, di_interp, rms, rms*thr,
                               goodflag=goodflag, edgesign=edgesign)
             if not (xlim[0] < mx < xlim[1] or xlim[2] < mx < xlim[3]):
