@@ -68,7 +68,8 @@ class PVAnalysis():
         pixrng_vcut=None, pixrng_xcut=None,
         Mlim=[0, 1e10], xlim=[-1e10, 0, 0, 1e10], vlim=[-1e10, 0, 0, 1e10],
         use_velocity=True, use_position=True,
-        interp_ridge=False, minrelerr=0.01, minabserr=0.1):
+        interp_ridge=False, minrelerr=0.01, minabserr=0.1,
+        nanbeforemax: bool = True):
         """Get the edge/ridge at positions/velocities.
 
         Args:
@@ -99,6 +100,10 @@ class PVAnalysis():
             use_position (bool, optional): Derive representatieve positions
                as a function of velocity. Defaults to True.
             interp_ridge (bool, optional): _description_. Defaults to False.
+            minrelerr, minabserr (float): Parameters to clip too small errors.
+                Defaults to 0.01 and 0.1 respectively.
+            nanbeforemax (bool): Whether poins before turn over are removed.
+                Defaults to True.
         """
         # remember output name
         self.outname = outname
@@ -153,16 +158,21 @@ class PVAnalysis():
                             interp_ridge=interp_ridge)
 
         # sort results
-        self.sort_fitresults(minrelerr=minrelerr, minabserr=minabserr)
+        self.sort_fitresults(minrelerr=minrelerr, minabserr=minabserr,
+                             nanbeforemax=nanbeforemax)
         # plot
         #self.plotresults_pvdiagram()
         #self.plotresults_rvplane()
 
-    def sort_fitresults(self, minrelerr=0.01, minabserr=0.1):
+    def sort_fitresults(self, minrelerr=0.01, minabserr=0.1,
+                        nanbeforemax: bool = True):
         """Sort fitting results.
 
         Args:
             minrelerr, minabserr (float): Parameters to clip too small errors.
+                Defaults to 0.01 and 0.1 respectively.
+            nanbeforemax (bool): Whether poins before turn over are removed.
+                Defaults to True.
         """
         # results are sorted?
         self.__sorted = True
@@ -202,11 +212,12 @@ class PVAnalysis():
                 redsign = int(self.xsign) if xv == 'vcut' else 1
                 res_red  = [k[rel > 0][::redsign] for k in results]
                 res_blue = [k[rel < 0][::-redsign] for k in results]
-                ## nan after turn over
-                ival = 0 if xv == 'xcut' else 1
-                for a in [res_red[ival], res_blue[ival]]:
-                    if np.any(~np.isnan(a)):
-                        a[:np.nanargmax(np.abs(a))] = np.nan
+                # nan before turn over
+                if nanbeforemax:
+                    ival = 0 if xv == 'xcut' else 1
+                    for a in [res_red[ival], res_blue[ival]]:
+                        if np.any(~np.isnan(a)):
+                            a[:np.nanargmax(np.abs(a))] = np.nan
                 # remove points outside Mlim
                 if len(self.Mlim) == 2:
                     for a in [res_red, res_blue]:
@@ -953,8 +964,50 @@ class PVAnalysis():
                        logcolor: bool = False,
                        Tbcolor: bool = False,
                        show: bool = True,
-                       kwargs_pcolormesh: dict = {},
-                       kwargs_contour: dict = {}):
+                       kwargs_pcolormesh: dict = {'cmap':'viridis'},
+                       kwargs_contour: dict = {'colors':'lime'},
+                       plotedgepoint: bool = True,
+                       plotridgepoint: bool = True,
+                       plotedgemodel: bool = True,
+                       plotridgemodel: bool = True,
+                       fmt: dict = {'edge':'v', 'ridge':'o'},
+                       linestyle: dict = {'edge':'--', 'ridge':'-'},
+                       flipaxis: bool = False) -> None:
+        """Make linear and loglog PV diagrams
+           with the derived points and model lines.
+
+        Args:
+            vlim (list, optional): In the unit of km/s, from Vsys.
+                The used range is [-vlim[1], -vlim[0], vlim[0], vlim[1]].
+                Defaults to [0, 1e10].
+            xlim (list, optional): In the unit of au.
+                The used range is [-xlim[1], -xlim[0], xlim[0], xlim[1]].
+                Defaults to [0, 1e10].
+            clevels (list, optional): Contour levels in the unit of sigma.
+                Defaults to [3, 6].
+            outname (str, optional): outname.linear.png and outname.log.png
+                will be made. Defaults to 'pvanalysis'.
+            logcolor (bool, optional): True means the color map in log scale.
+                Defaults to False.
+            Tbcolor (bool, optional): True means the color map shows
+                brightness temperature. Defaults to False.
+            show (bool, optional): True means showing the figures made.
+                Defaults to True.
+            kwargs_pcolormesh (dict, optional):
+                Defaults to {'cmap':'viridis'}.
+            kwargs_contour (dict, optional): 
+                Defaults to {'colors':'lime'}.
+            plotedgepoint (bool, optional): Defaults to True.
+            plotridgepoint (bool, optional): Defaults to True.
+            plotedgemodel (bool, optional): Defaults to True.
+            plotridgemodel (bool, optional): Defaults to True.
+            fmt (dict, optional): Format for plotting data points.
+                Defaults to {'edge':'v', 'ridge':'o'}.
+            linestyle (dict, optional): Linestyle for plotting model lines.
+                Defaults to {'edge':'--', 'ridge':'-'}.
+            flipaxis (bool, optional): True means x-axis is velocity and
+                y-axis is position. Defaults to False.
+        """
         for loglog, ext in zip([False, True], ['linear', 'log']):
             pp = PVPlot(restfrq=self.fitsdata.restfreq,
                         beam=self.fitsdata.beam, pa=self.fitsdata.pa,
@@ -968,56 +1021,59 @@ class PVAnalysis():
                          **kwargs_pcolormesh)
             pp.add_contour(rms=self.rms, levels=clevels,
                            **kwargs_contour)
-            self.plot_edgeridge(ax=pp.ax, loglog=loglog)
-            self.plot_model(ax=pp.ax, loglog=loglog)
+            if plotedgepoint:
+                self.plot_point(ax=pp.ax, loglog=loglog, flipaxis=flipaxis,
+                                method='edge', fmt=fmt['edge'])
+            if plotridgepoint:
+                self.plot_point(ax=pp.ax, loglog=loglog, flipaxis=flipaxis,
+                                method='ridge', fmt=fmt['ridge'])
+            if plotedgemodel:
+                self.plot_model(ax=pp.ax, loglog=loglog, flipaxis=flipaxis,
+                                method='edge', ls=linestyle['edge'])
+            if plotridgemodel:
+                self.plot_model(ax=pp.ax, loglog=loglog, flipaxis=flipaxis,
+                                method='ridge', ls=linestyle['ridge'])
             pp.set_axis()
             pp.savefig(figname=outname + '.' + ext + '.png', show=show)
 
 
-    def plot_edgeridge(self, ax=None, loglog: bool = False,
-                       flipaxis: bool = False) -> None:
-        if ax is None:
-            print('Please input ax.')
-            return -1
-        fmt = {'ridge': 'o', 'edge': 'v'}
-        color = {'xcut': {'red': 'red', 'blue': 'blue'},
-                 'vcut': {'red': 'pink', 'blue': 'cyan'}}
-        for re in ['ridge', 'edge']:
-         for xv in ['xcut', 'vcut']:
-          for rb in ['red', 'blue']:
-            x, v, dx, dv = self.results_filtered[re][xv][rb]
-            if xv == 'xcut': dv = 0
-            if xv == 'vcut': dx = 0
-            if loglog: x, v = np.abs(x), np.abs(v)
-            if flipaxis: x, v, dx, dv = v, x, dv, dx
-            ax.errorbar(x, v, xerr=dx, yerr=dv, fmt=fmt[re],
-                        color=color[xv][rb], ms=5)
-
-    def plot_model(self, ax=None, loglog: bool = False,
-                   edge_model = None, edge_popt: list = [],
-                   ridge_model = None, ridge_popt: list = [],
+    def plot_point(self, ax=None, loglog: bool = False,
+                   method: str = 'ridge', fmt: str = 'o',
                    flipaxis: bool = False) -> None:
         if ax is None:
             print('Please input ax.')
             return -1
-        if edge_model is None: edge_model = self.model
-        if ridge_model is None: ridge_model = self.model
-        if edge_popt  == []: edge_popt = self.popt['edge'][0]
-        if ridge_popt == []: ridge_popt = self.popt['ridge'][0]
-        rmodel = lambda x: ridge_model(x, *ridge_popt)
-        emodel = lambda x: edge_model(x, *edge_popt)
-        model = {'ridge': rmodel, 'edge': emodel}
-        ls = {'ridge': '-', 'edge': '--'}
-        for re in ['ridge', 'edge']:
-            xmin, xmax = self.rvlim[re][0]
-            if loglog:
-                s, x = 1, np.geomspace(xmin, xmax, 100)
-            else:
-                s, x = self.xsign, np.linspace(-xmax, xmax, 100)
-                x[(-xmin < x) * (x < xmin)] = None
-            x, y = x, s * model[re](x)
-            if flipaxis: x, y = y, x
-            ax.plot(x, y, ls=ls[re], lw=2, color='gray', zorder=3)
+        color = {'xcut': {'red': 'red', 'blue': 'blue'},
+                 'vcut': {'red': 'pink', 'blue': 'cyan'}}
+        for xv in ['xcut', 'vcut']:
+            for rb in ['red', 'blue']:
+                x, v, dx, dv = self.results_filtered[method][xv][rb]
+                if xv == 'xcut': dv = 0
+                if xv == 'vcut': dx = 0
+                if loglog: x, v = np.abs(x), np.abs(v)
+                if flipaxis and not loglog: x, v, dx, dv = v, x, dv, dx
+                ax.errorbar(x, v, xerr=dx, yerr=dv, fmt=fmt,
+                            color=color[xv][rb], ms=5)
+
+    def plot_model(self, ax=None, loglog: bool = False,
+                   model = None, popt: list = [],
+                   method: str = 'ridge', ls: str = '-',
+                   flipaxis: bool = False) -> None:
+        if ax is None:
+            print('Please input ax.')
+            return -1
+        if model is None: model = self.model
+        if popt  == []: popt = self.popt[method][0]
+        fx_model = lambda x: model(x, *popt)
+        xmin, xmax = self.rvlim[method][0]
+        if loglog:
+            s, x = 1, np.geomspace(xmin, xmax, 100)
+        else:
+            s, x = self.xsign, np.linspace(-xmax, xmax, 100)
+            x[(-xmin < x) * (x < xmin)] = None
+        y = s * fx_model(x)
+        if flipaxis and not flipaxis: x, y = y, x
+        ax.plot(x, y, ls=ls, lw=2, color='gray', zorder=3)
 
 
     # Plot results

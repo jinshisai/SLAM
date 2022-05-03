@@ -33,7 +33,8 @@ impv = PVAnalysis(fitsfile, rms, vsys, dist, pa=None)
 impv.get_edgeridge(outname, thr=thr, ridgemode='mean', incl=incl,
                    use_position=use_position, use_velocity=use_velocity,
                    Mlim=Mlim, xlim=np.array(xlim) / dist, vlim=vlim,
-                   minabserr=minabserr, minrelerr=minrelerr)
+                   minabserr=minabserr, minrelerr=minrelerr,
+                   nanbeforemax=True)
 impv.write_edgeridge(outname=outname)
 impv.fit_edgeridge(include_vsys=include_vsys,
                    include_dp=include_dp,
@@ -44,5 +45,9 @@ impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
                     clevels=[-9,-6,-3,3,6,9], outname=outname,
                     show=show_pv, logcolor=True, Tbcolor=False,
                     kwargs_pcolormesh={'cmap':'viridis'},
-                    kwargs_contour={'colors':'lime'})
+                    kwargs_contour={'colors':'lime'},
+                    fmt={'edge':'v', 'ridge':'o'},
+                    linestyle={'edge':'--', 'ridge':'-'},
+                    plotridgepoint=True, plotedgepoint=True,
+                    plotridgemodel=True, plotedgemodel=True)
 '-------------------------------------'
