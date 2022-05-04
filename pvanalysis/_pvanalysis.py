@@ -69,7 +69,8 @@ class PVAnalysis():
         Mlim=[0, 1e10], xlim=[-1e10, 0, 0, 1e10], vlim=[-1e10, 0, 0, 1e10],
         use_velocity=True, use_position=True,
         interp_ridge=False, minrelerr=0.01, minabserr=0.1,
-        nanbeforemax: bool = True):
+        nanbeforemax: bool = True, nanopposite: bool = True,
+        nanbeforecross: bool = True):
         """Get the edge/ridge at positions/velocities.
 
         Args:
@@ -102,8 +103,12 @@ class PVAnalysis():
             interp_ridge (bool, optional): _description_. Defaults to False.
             minrelerr, minabserr (float): Parameters to clip too small errors.
                 Defaults to 0.01 and 0.1 respectively.
-            nanbeforemax (bool): Whether poins before turn over are removed.
-                Defaults to True.
+            nanbeforemax (bool, optional): Whether poins before turn over
+                are removed. Defaults to True.
+            nanopposite (bool, optional): Whether points in the opposite
+                quadrant are removed. Defaults to True.
+            nanbeforecross (bool, optional): Whether points before cross
+                of xcut and vcut are removed. Defaults to True.
         """
         # remember output name
         self.outname = outname
@@ -159,20 +164,28 @@ class PVAnalysis():
 
         # sort results
         self.sort_fitresults(minrelerr=minrelerr, minabserr=minabserr,
-                             nanbeforemax=nanbeforemax)
+                             nanbeforemax=nanbeforemax,
+                             nanopposite=nanopposite,
+                             nanbeforecross=nanbeforecross)
         # plot
         #self.plotresults_pvdiagram()
         #self.plotresults_rvplane()
 
     def sort_fitresults(self, minrelerr=0.01, minabserr=0.1,
-                        nanbeforemax: bool = True):
+                        nanbeforemax: bool = True,
+                        nanopposite: bool = True,
+                        nanbeforecross: bool = True):
         """Sort fitting results.
 
         Args:
             minrelerr, minabserr (float): Parameters to clip too small errors.
                 Defaults to 0.01 and 0.1 respectively.
-            nanbeforemax (bool): Whether poins before turn over are removed.
-                Defaults to True.
+            nanbeforemax (bool, optional): Whether poins before turn over
+                are removed. Defaults to True.
+            nanopposite (bool, optional): Whether points in the opposite
+                quadrant are removed. Defaults to True.
+            nanbeforecross (bool, optional): Whether points before cross
+                of xcut and vcut are removed. Defaults to True.
         """
         # results are sorted?
         self.__sorted = True
@@ -212,12 +225,19 @@ class PVAnalysis():
                 redsign = int(self.xsign) if xv == 'vcut' else 1
                 res_red  = [k[rel > 0][::redsign] for k in results]
                 res_blue = [k[rel < 0][::-redsign] for k in results]
+                ival = 0 if xv == 'xcut' else 1
                 # nan before turn over
                 if nanbeforemax:
-                    ival = 0 if xv == 'xcut' else 1
                     for a in [res_red[ival], res_blue[ival]]:
                         if np.any(~np.isnan(a)):
                             a[:np.nanargmax(np.abs(a))] = np.nan
+                # nan in opposite quadrant
+                if nanopposite:
+                    s = self.xsign if xv == 'xcut' else 1
+                    a = res_red[ival]
+                    a[a * s < 0] = np.nan
+                    a = res_blue[ival]
+                    a[a * s > 0] = np.nan
                 # remove points outside Mlim
                 if len(self.Mlim) == 2:
                     for a in [res_red, res_blue]:
@@ -229,13 +249,16 @@ class PVAnalysis():
             if ((self.results[re]['xcut'] is not None) 
                 & (self.results[re]['vcut'] is not None)):
                 for rb in ['red', 'blue']:
+                    if not nanbeforecross: break
                     x1, v0, _, _ = store['xcut'][rb]
                     x0, v1, _, _ = store['vcut'][rb]
                     X1, X0 = np.meshgrid(x1, x0)
                     V0, V1 = np.meshgrid(v0, v1)
-                    xvd = np.hypot((X1-X0) / self.res_off, (V0-V1) / self.delv)
+                    xvd = np.hypot((X1 - X0) / self.res_off,
+                                   (V0 - V1) / self.delv)
                     if np.any(~np.isnan(xvd)):
-                        iv, ix = np.unravel_index(np.nanargmin(xvd), np.shape(X1))
+                        iv, ix = np.unravel_index(np.nanargmin(xvd),
+                                                  np.shape(X1))
                         x1[:ix] = np.nan
                         v1[:iv] = np.nan
             # combine xcut and vcut

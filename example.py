@@ -34,7 +34,7 @@ impv.get_edgeridge(outname, thr=thr, ridgemode='mean', incl=incl,
                    use_position=use_position, use_velocity=use_velocity,
                    Mlim=Mlim, xlim=np.array(xlim) / dist, vlim=vlim,
                    minabserr=minabserr, minrelerr=minrelerr,
-                   nanbeforemax=True)
+                   nanbeforemax=True, nanopposite=True, nanbeforecross=True)
 impv.write_edgeridge(outname=outname)
 impv.fit_edgeridge(include_vsys=include_vsys,
                    include_dp=include_dp,
