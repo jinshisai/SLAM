@@ -54,7 +54,7 @@ git clone https://github.com/jinshisai/PVAnalysis
 * TBD...
 
  
-## Author
+## Authors
 
 * Name: Jinshi Sai
 * Affiliation: Academia Sinica Institute of Astronomy and Astrophysics
