@@ -1,22 +1,22 @@
-# pvanalysis
-Python package to derive the rotational velocity as a function of radius and fit the profile with a power-law function. The detail of the method is presented in [Aso et al. 2015](https://ui.adsabs.harvard.edu/abs/2015ApJ...812...27A/abstract), [Sai et al. 2020](https://ui.adsabs.harvard.edu/abs/2020ApJ...893...51S/abstract) and the reference therein.
+# SLAM: Spectral Line Analysis/Modeling
+SLAM (Spectral Line Analysis/Modeling) is a python library to analyze/model spectral line data especially obtained with radio telescopes. The current main package, pvanalysis, is to derive the rotational velocity as a function of radius and fit the profile with a power-law function. The detail of the method is presented in [Aso et al. 2015](https://ui.adsabs.harvard.edu/abs/2015ApJ...812...27A/abstract), [Sai et al. 2020](https://ui.adsabs.harvard.edu/abs/2020ApJ...893...51S/abstract) and the reference therein. More analysis tools will be coming in future.
 
 
 ## Demo and Usage
  
-The file example.py will help to find how to use this package.
+The file example.py will help to find how to use pvanalysis.
 ```bash
-git clone https://github.com/jinshisai/PVAnalysis
-cd PVAnalysis
+git clone https://github.com/jinshisai/SLAM
+cd SLAM
 python example.py
 ```
-To keep the package updated, type the command below in the directory PVAnalysis, always before you use.
+To keep the package updated, type the command below in the directory SLAM, always before you use.
 ```bash
 git pull
 ```
 Also, setting the path in .bashrc (or .zshrc etc.) will be useful.
 ```bash
-export PYTHONPATH=${PYTHONPATH}:/YOUR_PATH_TO/PVAnalysis
+export PYTHONPATH=${PYTHONPATH}:/YOUR_PATH_TO/SLAM
 ```
  
 ## Features
@@ -44,9 +44,9 @@ pvanalysis can do the following things.
  
 ## Installation
  
-Download from https://github.com/jinshisai/PVAnalysis or git clone.
+Download from https://github.com/jinshisai/SLAM or git clone.
 ```bash 
-git clone https://github.com/jinshisai/PVAnalysis
+git clone https://github.com/jinshisai/SLAM
 ```
  
 ## Note
@@ -65,4 +65,4 @@ git clone https://github.com/jinshisai/PVAnalysis
  
 ## License
  
-"PVAnalysis" is under [GNU General Public License Version 3](https://www.gnu.org/licenses/gpl-3.0.html).
+"SLAM" is under [GNU General Public License Version 3](https://www.gnu.org/licenses/gpl-3.0.html).
