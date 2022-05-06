@@ -24,16 +24,33 @@ class Impvfits:
     self.header: Header info.
     '''
 
-    def __init__(self, infile, pa=None):
+    def __init__(self, infile, pa=None, multibeam=False):
         self.file = infile
-        self.data, self.header = fits.getdata(infile, header=True)
+        with fits.open(infile) as hdul:
+            # get primary
+            self.data   = hdul[0].data
+            self.header = hdul[0].header
+            # multibeam?
+            if 'CASAMBM' in self.header:
+                multibeam = self.header['CASAMBM']
+            self.multibeam = multibeam
+            if multibeam:
+                try:
+                    self.multibeamtable = hdul['BEAMS'].copy()
+                except KeyError as e:
+                    self.multibeamtable = None
+                    print('KeyError: '+e)
+                    print('Could not find a multibeam table.')
+            else:
+                self.multibeamtable = None
 
-        self.read_pvfits(pa=pa)
+
+        self.read_pvfits(pa=pa, multibeam=multibeam)
         #self.results = []
 
 
     # Read fits file of Poistion-velocity (PV) diagram
-    def read_pvfits(self, pa=None):
+    def read_pvfits(self, pa=None, multibeam=False):
         '''
         Read fits file of pv diagram. P.A. angle of PV cut cab be given as an option.
         '''
@@ -45,7 +62,6 @@ class Impvfits:
             print('ERROR\tread_pvfits: NAXIS of fits is < 2.')
             return
         self.naxis = naxis
-        ##### need confirmation
         rng = range(1, naxis + 1)
         naxis_i  = np.array([int(header['NAXIS'+str(i)]) for i in rng])
         label_i  = np.array([header['CTYPE'+str(i)] for i in rng])
@@ -58,12 +74,22 @@ class Impvfits:
         self.refpix_i = refpix_i
         self.refval_i = refval_i
         # beam size (degree)
-        if 'BMAJ' in header:
+        if multibeam:
+            #self.read_multibeamtable()
+            self.beam = self.multibeamtable.data
+            # representative beam value
+            # largest ones conservatively
+            ichan = np.nanargmax(self.beam['BMAJ'])
+            bmaj  = self.beam['BMAJ'][ichan]
+            bmin  = self.beam['BMIN'][ichan]
+            bpa   = self.beam['BPA'][ichan]
+        elif 'BMAJ' in header:
             bmaj = header['BMAJ'] * 3600.  # arcsec
             bmin = header['BMIN'] * 3600.  # arcsec
-            bpa = header['BPA']  # degree
+            bpa  = header['BPA']  # degree
             self.beam = np.array([bmaj, bmin, bpa])
         else:
+            bmaj      = None
             self.beam = None
         # Info. of P.A.
         if pa is not None:
@@ -80,16 +106,19 @@ class Impvfits:
             self.pa = None
         # Resolution along offset axis
         if self.pa is None:
-            self.res_off = None
+            self.res_off = bmaj
         else:
-            # an ellipse of the beam
-            # (x/bmin)**2 + (y/bmaj)**2 = 1
-            # y = x*tan(theta)
-            # --> beam width in the direction of pv cut (P.A.=pa)
-            bmaj, bmin, bpa = self.beam
-            del_pa = np.radians(self.pa - bpa)
-            term2 = np.hypot(np.sin(del_pa) / bmin, np.cos(del_pa) / bmaj)
-            self.res_off = np.sqrt(1. / term2)
+            if multibeam:
+                res_offs = []
+                for i in range(len(self.beam)):
+                    bmaj, bmin, bpa, _, _ = self.beam[i]
+                    res_offs.append(get_1dresolution(pa, bmaj, bmin, bpa))
+                self.res_off = np.nanmax(res_offs)
+            elif self.beam != None:
+                bmaj, bmin, bpa = self.beam
+                self.res_off = get_1dresolution(pa, bmaj, bmin, bpa)
+            else:
+                self.res_off = None
         # rest frequency (Hz)
         if 'RESTFRQ' in header:
             restfreq = header['RESTFRQ']
@@ -163,6 +192,20 @@ class Impvfits:
         self.saxis = saxis
         self.delx  = xaxis[1] - xaxis[0]
         self.delv  = vaxis[1] - vaxis[0]
+
+
+    # Read multibeam table
+    def read_multibeamtable(self):
+        # multibeam table
+        self.beam = self.multibeamtable.data
+
+        # add unit check if necessary
+        # get beam axis
+        #nbmaxis = mtb.header['TFIELDS']
+        #rng = range(1, nbmaxis + 1)
+        #ttype_i = np.array([header['TTYPE'+str(i)] for i in rng])
+        #tunit_i = np.array([int(header['TUNIT'+str(i)]) for i in rng])
+
 
     # Draw pv diagram
     def draw_pvdiagram(self,outname,data=None,header=None,ax=None,outformat='pdf',color=True,cmap='Greys',
@@ -238,16 +281,8 @@ class Impvfits:
         vaxis = self.vaxis
         delx  = self.delx
         delv  = self.delv
-        #nx    = len(xaxis)
-        #nv    = len(vaxis)
+        res_off = self.res_off
 
-        # Beam
-        bmaj, bmin, bpa = self.beam
-
-        if self.res_off:
-            res_off = self.res_off
-        else:
-            res_off = bmaj
 
         # relative velocity or LSRK
         offlabel = r'$\mathrm{Offset\ (arcsec)}$'
@@ -376,3 +411,23 @@ class Impvfits:
         plt.savefig(outname, transparent=True)
 
         return ax
+
+
+# Get one dimensional resolution
+def get_1dresolution(pa, bmaj, bmin, bpa):
+    '''Calculate one dimensional spatial resolution along a cut with P.A.=pa
+
+    An ellipse of the beam
+        (x/bmin)**2 + (y/bmaj)**2 = 1
+        y = x*tan(theta)
+        --> beam width in the direction of pv cut (P.A.=pa)
+
+    Args:
+        pa (float): Position angle of a one dimensional cut (degree).
+        bmaj (float): Major beam size.
+        bmin (float): Minor beam size.
+        bpa (float): Position angle of the beam.
+    '''
+    del_pa = np.radians(pa - bpa)
+    term2 = np.hypot(np.sin(del_pa) / bmin, np.cos(del_pa) / bmaj)
+    return (1. / term2)
