@@ -42,8 +42,8 @@ class PVPlot():
     """
     def __init__(self, fig=None, ax=None, fitsimage: str = None,
                  restfrq: float = None, beam: list = None,
-                 pa: float = None, vsys: float = 0,
-                 dist: float = 1.,
+                 pa: float = None, multibeam: bool = False,
+                 vsys: float = 0, dist: float = 1.,
                  d: list = None, x: list = None, v: list = None,
                  xlim: list = [1e-10, 1e10], vlim: list = [1e-10, 1e10],
                  flipaxis: bool = False, quadrant: str = None,
@@ -55,13 +55,14 @@ class PVPlot():
             ax = fig.add_subplot(1, 1, 1)
         self.fig, self.ax = fig, ax
         if fitsimage is not None:
-            fitsdata = Impvfits(fitsimage, pa=pa)
+            fitsdata = Impvfits(fitsimage, pa=pa, multibeam=multibeam)
             d = fitsdata.data
             x, v = fitsdata.xaxis, fitsdata.vaxis
             if 'BUNIT' in (h := fitsdata.header):
                 self.bunit = h['BUNIT']
             restfrq = fitsdata.restfreq
             beam = fitsdata.beam
+            multibeam = fitsdata.multibeam
         d = np.squeeze(d)
         x = x * dist
         v = v - vsys
@@ -77,6 +78,7 @@ class PVPlot():
         self.d, self.x, self.v = d, x, v
         self.restfrq = restfrq
         self.beam = beam
+        self.multibeam = multibeam
         self.flipaxis = flipaxis
         self.loglog = loglog
         self.xlim = xlim
@@ -103,7 +105,8 @@ class PVPlot():
         j0 = np.argmin(np.abs(vi - self.vlim[0]))
         xi, vi, d = xi[i0:], vi[j0:], d[j0:, i0:]
         self.xl, self.vl, self.dl = xi, vi, d
-        
+
+
     def add_color(self, restfrq: float = None, bmaj: float = None,
                   bmin: float = None, bpa: float = None,
                   Tb: bool = False, log: bool = False,
@@ -115,7 +118,12 @@ class PVPlot():
         if restfrq is None:
             restfrq = self.restfrq
         if bmaj is None or bmin is None or bpa is None:
-            bmaj, bmin, bpa = self.beam
+            if self.multibeam:
+                bmaj = self.beam['BMAJ']
+                bmin = self.beam['BMIN']
+                bpa  = self.beam['BPA']
+            else:
+                bmaj, bmin, bpa = self.beam
         if self.loglog:
             self.gen_loglog()
             x, v, d = self.xl, self.vl, self.dl
@@ -123,7 +131,9 @@ class PVPlot():
             x, v, d = self.x, self.v, self.d
         if Tb:
             Omega = bmaj * bmin / 3600.**2 * np.radians(1)**2 \
-                    * np.pi / 4. / np.log(2.)
+                   * np.pi / 4. / np.log(2.)
+            if type(Omega) == np.ndarray:
+                Omega = np.tile(Omega, (len(x),1)).T
             lam = constants.c.to('m/s').value / restfrq
             Jy2K = units.Jy.to('J*s**(-1)*m**(-2)*Hz**(-1)') \
                    * lam**2 / 2. / constants.k_B.to('J/K').value / Omega
@@ -168,7 +178,12 @@ class PVPlot():
         if restfrq is None:
             restfrq = self.restfrq
         if None in [bmaj, bmin, bpa]:
-            bmaj, bmin, bpa = self.beam
+            if self.multibeam:
+                bmaj = self.beam['BMAJ']
+                bmin = self.beam['BMIN']
+                bpa  = self.beam['BPA']
+            else:
+                bmaj, bmin, bpa = self.beam
         if self.loglog:
             self.gen_loglog()
             x, v, d = self.xl, self.vl, self.dl
@@ -176,6 +191,8 @@ class PVPlot():
             x, v, d = self.x, self.v, self.d
         if Tb:
             Omega = bmaj * bmin / 3600.**2 * np.pi / 4. / np.log(2.)
+            if type(Omega) == np.ndarray:
+                Omega = np.tile(Omega, (len(x),1)).T
             lam = constants.c.to('m/s').value / restfrq
             Jy2K = units.Jy.to('J*s**(-1)*m**(-2)*Hz**(-1)') \
                    * lam**2 / 2. / constants.k_B.to('J/K').value / Omega
@@ -191,8 +208,8 @@ class PVPlot():
         if self.loglog:
             ax.set_xscale('log')
             ax.set_yscale('log')
- 
-                 
+
+
     def set_axis(self, xticks: list = None, yticks: list = None,
                  xticklabels: list = None, yticklabels: list = None,
                  xlabel: str = None, ylabel: str = None) -> None:

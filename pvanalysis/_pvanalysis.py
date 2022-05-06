@@ -40,7 +40,7 @@ class PVAnalysis():
         vsys (float): Systemic velocity of the object (km s^-1).
         dist (float): Distance to the object (pc).
     """
-    def __init__(self, infile, rms, vsys, dist, pa=None):
+    def __init__(self, infile, rms, vsys, dist, pa=None, multibeam=False):
         """Initialize.
 
         Args:
@@ -53,7 +53,7 @@ class PVAnalysis():
                cut if it is given. Defaults to None.
         """
         # read fits file
-        self.fitsdata = Impvfits(infile, pa=pa)
+        self.fitsdata = Impvfits(infile, pa=pa, multibeam=multibeam)
         # parameters required for analysis
         self.rms  = rms
         self.vsys = vsys
@@ -371,11 +371,7 @@ class PVAnalysis():
         xaxis = self.fitsdata.xaxis
         vaxis = self.fitsdata.vaxis
         # resolution
-        if self.fitsdata.res_off:
-            res_off = self.fitsdata.res_off
-        else:
-            bmaj, bmin, bpa = self.fitsdata.beam
-            res_off = bmaj # in arcsec
+        res_off = self.fitsdata.res_off
         self.res_off = res_off
         self.delv = self.fitsdata.delv
         # harf of beamsize [pix]
@@ -619,11 +615,7 @@ class PVAnalysis():
         xaxis = self.fitsdata.xaxis
         vaxis = self.fitsdata.vaxis
         # resolution
-        if self.fitsdata.res_off:
-            res_off = self.fitsdata.res_off
-        else:
-            bmaj, bmin, bpa = self.fitsdata.beam
-            res_off = bmaj  # in arcsec
+        res_off = self.fitsdata.res_off
         self.res_off = res_off
         self.delv = self.fitsdata.delv
         # harf of beamsize [pix]
