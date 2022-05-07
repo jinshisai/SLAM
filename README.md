@@ -34,6 +34,7 @@ pvanalysis can do the following things.
 
 * astropy
 * copy
+* corner
 * emcee
 * math
 * matplotlib
