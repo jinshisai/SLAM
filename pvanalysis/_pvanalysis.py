@@ -1081,6 +1081,7 @@ class PVAnalysis():
         if model is None: model = self.model
         if popt  == []: popt = self.popt[method][0]
         fx_model = lambda x: model(x, *popt)
+        if not hasattr(self, 'rvlim'): self.get_range()
         xmin, xmax = self.rvlim[method][0]
         if loglog:
             s, x = 1, np.geomspace(xmin, xmax, 100)
