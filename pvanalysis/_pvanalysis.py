@@ -1029,7 +1029,8 @@ class PVAnalysis():
                         vsys=self.vsys, dist=self.dist,
                         d=self.fitsdata.data,
                         v=self.fitsdata.vaxis, x=self.fitsdata.xaxis,
-                        loglog=loglog, vlim=vlim, xlim=xlim)
+                        loglog=loglog, vlim=vlim, xlim=xlim,
+                        multibeam=self.fitsdata.multibeam)
             cblabel = self.fitsdata.header['BUNIT']
             if Tbcolor: cblabel = r'T$_{\rm b}$ (K)'
             pp.add_color(log=logcolor, Tb=Tbcolor, cblabel=cblabel,
