@@ -187,6 +187,9 @@ class PVPlot():
                 bmaj = self.beam['BMAJ']
                 bmin = self.beam['BMIN']
                 bpa  = self.beam['BPA']
+                if self.loglog:
+                    ichan = np.nanargmax(bmaj * bmin)
+                    bmaj, bmin, bpa = bmaj[ichan], bmin[ichan], bpa[ichan]
             else:
                 bmaj, bmin, bpa = self.beam
         if self.loglog:
@@ -197,7 +200,8 @@ class PVPlot():
         if Tb:
             Omega = bmaj * bmin / 3600.**2 * np.pi / 4. / np.log(2.)
             if type(Omega) == np.ndarray:
-                Omega = np.tile(Omega, (len(x),1)).T
+                j0, j1 = self.jrange
+                Omega = np.tile(Omega[j0:j1], (len(x),1)).T
             lam = constants.c.to('m/s').value / restfrq
             Jy2K = units.Jy.to('J*s**(-1)*m**(-2)*Hz**(-1)') \
                    * lam**2 / 2. / constants.k_B.to('J/K').value / Omega
