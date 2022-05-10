@@ -916,14 +916,10 @@ class PVAnalysis():
         """
         def inout(v0, x1, dx1, x0, v1, dv1, popt):
             xall, vall = np.abs(np.r_[x0, x1]), np.abs(np.r_[v0, v1])
-            if len(xall) == 0:
-                rin, rout = np.nan, np.nan
-            else:
-                rin, rout = np.min(xall), np.max(xall)
-            if len(vall) == 0:
-                vin, vout = np.nan, np.nan
-            else:
-                vin, vout = np.max(vall), np.min(vall)
+            rin, rout = np.nan, np.nan
+            if len(xall) > 0: rin, rout = np.min(xall), np.max(xall)
+            vin, vout = np.nan, np.nan
+            if len(vall) > 0: vin, vout = np.max(vall), np.min(vall)
             if self.__use_position:
                 rin  = doublepower_r(vin, *popt)
             else:
