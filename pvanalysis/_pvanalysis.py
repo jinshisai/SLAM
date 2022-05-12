@@ -830,6 +830,14 @@ class PVAnalysis():
         self.__Es = Es
         self.__Rs = Rs
         self.include_dp = include_dp
+        self.model = doublepower_v
+        if len(Es[0]) == 0 or len(Rs[0]) == 0:
+            if len(Es[0]) == 0: print('No edge point was found.')
+            if len(Rs[0]) == 0: print('No ridge point was found.')
+            print('Skip the fitting to edge/ridge points.')
+            self.popt = {'edge':[[np.nan] * 5, [np.nan] * 5],
+                         'ridge':[[np.nan] * 5, [np.nan] * 5]}
+            return -1
 
         labels = np.array(['Rb', 'Vb', 'p_in', 'dp', 'Vsys'])
         include = [True, include_dp, include_pin, include_dp, include_vsys]
@@ -865,7 +873,6 @@ class PVAnalysis():
         print(f'Corner plots in {outname}.corner_e.png '
               + f'and {outname}.corner_r.png')
         self.popt = {'edge':popt_e, 'ridge':popt_r}
-        self.model = doublepower_v
         result = {'edge':{'popt':popt_e[0], 'perr':popt_e[1]},
                   'ridge':{'popt':popt_r[0], 'perr':popt_r[1]}}
         return result
@@ -909,8 +916,10 @@ class PVAnalysis():
         """
         def inout(v0, x1, dx1, x0, v1, dv1, popt):
             xall, vall = np.abs(np.r_[x0, x1]), np.abs(np.r_[v0, v1])
-            rin, rout = np.min(xall), np.max(xall)
-            vin, vout = np.max(vall), np.min(vall)
+            rin, rout = np.nan, np.nan
+            if len(xall) > 0: rin, rout = np.min(xall), np.max(xall)
+            vin, vout = np.nan, np.nan
+            if len(vall) > 0: vin, vout = np.max(vall), np.min(vall)
             if self.__use_position:
                 rin  = doublepower_r(vin, *popt)
             else:
@@ -939,6 +948,12 @@ class PVAnalysis():
         """
         if not hasattr(self, 'rvlim'): self.get_range()
         for i in ['edge', 'ridge']:
+            if i == 'edge' and len(self.__Es[0]) == 0:
+                print('--- No edge result. ---')
+                continue
+            if i == 'ridge' and len(self.__Rs[0]) == 0:
+                print('--- No ridge result. ---')
+                continue
             rvlim, popt = self.rvlim[i], self.popt[i]
             rin, rout, vin, vout = *rvlim[0], *rvlim[1]
             print('--- ' + i.title() + ' ---')
