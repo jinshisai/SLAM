@@ -942,7 +942,8 @@ class PVAnalysis():
         if len(Rs[0]) > 0:  # use xcut (priority)
             for er in ['edge', 'ridge']:
                 for br in ['blue', 'red']:
-                    self.results_filtered[er]['vcut'][br] = [[]] * 4
+                    self.results_filtered[er]['vcut'][br] \
+                        = [np.array([])] * 4
             c, dc = f(*Rs[:3])
             ci = [c[0], c[1] * self.sini]
             dci = [dc[0], dc[1] * self.sini]
@@ -1136,11 +1137,14 @@ class PVAnalysis():
             flipaxis (bool, optional): True means x-axis is velocity and
                 y-axis is position. Defaults to False.
         """
-        self.avevsys = (self.popt['edge'][0][4]
-                        + self.popt['ridge'][0][4]) / 2.
-        self.vsys += self.avevsys
-        self.popt['edge'][0][4] -= self.avevsys
-        self.popt['ridge'][0][4] -= self.avevsys
+        if len(self.popt['ridge'][0]) == 5:
+            self.avevsys = (self.popt['edge'][0][4]
+                            + self.popt['ridge'][0][4]) / 2.
+            self.vsys += self.avevsys
+            self.popt['edge'][0][4] -= self.avevsys
+            self.popt['ridge'][0][4] -= self.avevsys
+        else:
+            self.avevsys = 0
         for loglog, ext in zip([False, True], ['linear', 'log']):
             pp = PVPlot(restfrq=self.fitsdata.restfreq,
                         beam=self.fitsdata.beam, pa=self.fitsdata.pa,
@@ -1208,7 +1212,8 @@ class PVAnalysis():
         else:
             x = np.linspace(-xmax, xmax, 100)
             x[(-xmin < x) * (x < xmin)] = None
-            y = self.xsign * (fx_model(x) - popt[4]) + popt[4]
+            vsys = popt[4] if len(popt) == 5 else 0
+            y = self.xsign * (fx_model(x) - vsys) + vsys
         if flipaxis and not loglog: x, y = y, x
         ax.plot(x, y, ls=ls, lw=2, color='gray', zorder=3)
 
