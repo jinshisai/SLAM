@@ -1212,8 +1212,7 @@ class PVAnalysis():
         else:
             x = np.linspace(-xmax, xmax, 100)
             x[(-xmin < x) * (x < xmin)] = None
-            vsys = popt[4] if len(popt) == 5 else 0
-            y = self.xsign * (fx_model(x) - vsys) + vsys
+            y = fx_model(self.xsign * x)
         if flipaxis and not loglog: x, y = y, x
         ax.plot(x, y, ls=ls, lw=2, color='gray', zorder=3)
 
