@@ -831,9 +831,12 @@ class PVAnalysis():
         self.__Rs = Rs
         self.include_dp = include_dp
         self.model = doublepower_v
-        if len(Es[0]) == 0 or len(Rs[0]) == 0:
-            if len(Es[0]) == 0: print('No edge point was found.')
-            if len(Rs[0]) == 0: print('No ridge point was found.')
+        if (len(Es[0]) == 0 and len(Es[3]) == 0) \
+            or (len(Rs[0]) == 0 and len(Rs[3]) == 0):
+            if len(Es[0]) == 0 and len(Es[3]) == 0:
+                print('No edge point was found.')
+            if len(Rs[0]) == 0 and len(Es[3]) == 0:
+                print('No ridge point was found.')
             print('Skip the fitting to edge/ridge points.')
             self.popt = {'edge':[[np.nan] * 5, [np.nan] * 5],
                          'ridge':[[np.nan] * 5, [np.nan] * 5]}
