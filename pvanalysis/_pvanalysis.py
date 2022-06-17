@@ -988,6 +988,11 @@ class PVAnalysis():
                        fmt: dict = {'edge':'v', 'ridge':'o'},
                        linestyle: dict = {'edge':'--', 'ridge':'-'},
                        flipaxis: bool = False) -> None:
+        self.avevsys = (self.popt['edge'][0][4]
+                        + self.popt['ridge'][0][4]) / 2.
+        self.vsys += self.avevsys
+        self.popt['edge'][0][4] -= self.avevsys
+        self.popt['ridge'][0][4] -= self.avevsys
         """Make linear and loglog PV diagrams
            with the derived points and model lines.
 
@@ -1064,6 +1069,7 @@ class PVAnalysis():
         for xv in ['xcut', 'vcut']:
             for rb in ['red', 'blue']:
                 x, v, dx, dv = self.results_filtered[method][xv][rb]
+                v = v - self.avevsys
                 if xv == 'xcut': dv = 0
                 if xv == 'vcut': dx = 0
                 if loglog: x, v = np.abs(x), np.abs(v)
@@ -1084,12 +1090,13 @@ class PVAnalysis():
         if not hasattr(self, 'rvlim'): self.get_range()
         xmin, xmax = self.rvlim[method][0]
         if loglog:
-            s, x = 1, np.geomspace(xmin, xmax, 100)
+            x = np.geomspace(xmin, xmax, 100)
+            y = (fx_model(x) - fx_model(-x)) / 2.
         else:
-            s, x = self.xsign, np.linspace(-xmax, xmax, 100)
+            x = np.linspace(-xmax, xmax, 100)
             x[(-xmin < x) * (x < xmin)] = None
-        y = s * fx_model(x)
-        if flipaxis and not flipaxis: x, y = y, x
+            y = self.xsign * (fx_model(x) - popt[4]) + popt[4]
+        if flipaxis and not loglog: x, y = y, x
         ax.plot(x, y, ls=ls, lw=2, color='gray', zorder=3)
 
 
