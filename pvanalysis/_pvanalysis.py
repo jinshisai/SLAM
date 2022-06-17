@@ -19,7 +19,10 @@ from astropy import constants, units
 from .fitfuncs import edge, ridge_mean, gaussfit, gauss1d
 from pvanalysis.pvfits import Impvfits
 from pvanalysis.pvplot import PVPlot
-from pvanalysis.analysis_tools import doublepower_r, doublepower_v, doublepower_v_error, doublepower_r_error
+from pvanalysis.analysis_tools import (doublepower_r,
+                                       doublepower_v,
+                                       doublepower_v_error,
+                                       doublepower_r_error)
 from utils import emcee_corner
 
 
@@ -145,8 +148,8 @@ class PVAnalysis():
         self.xlim = xlim
         self.vlim = vlim
         self.Mlim = Mlim
-        self.__unit = 1e10 * self.dist * au \
-                      / Ggrav / Msun / np.sin(np.radians(incl))**2
+        self.sini = np.sin(np.radians(incl))
+        self.__unit = 1e10 * self.dist * au / Ggrav / Msun / self.sini**2
         self.__use_position = use_position
         self.__use_velocity = use_velocity
 
@@ -830,9 +833,12 @@ class PVAnalysis():
         self.__Es = Es
         self.__Rs = Rs
         self.model = doublepower_v
-        if len(Es[0]) == 0 or len(Rs[0]) == 0:
-            if len(Es[0]) == 0: print('No edge point was found.')
-            if len(Rs[0]) == 0: print('No ridge point was found.')
+        if (len(Es[0]) == 0 and len(Es[3]) == 0) \
+            or (len(Rs[0]) == 0 and len(Rs[3]) == 0):
+            if len(Es[0]) == 0 and len(Es[3]) == 0:
+                print('No edge point was found.')
+            if len(Rs[0]) == 0 and len(Es[3]) == 0:
+                print('No ridge point was found.')
             print('Skip the fitting to edge/ridge points.')
             self.popt = {'edge':[[np.nan] * 5, [np.nan] * 5],
                          'ridge':[[np.nan] * 5, [np.nan] * 5]}
@@ -909,13 +915,13 @@ class PVAnalysis():
         Es, Rs = Ds
         self.__Es = Es
         self.__Rs = Rs
-        self.model = doublepower_v
-        if len(Es[0]) == 0 or len(Rs[0]) == 0:
-            if len(Es[0]) == 0: print('No edge point was found.')
-            if len(Rs[0]) == 0: print('No ridge point was found.')
-            print('Skip the fitting to edge/ridge points.')
-            self.popt = {'edge':[[np.nan] * 5, [np.nan] * 5],
-                         'ridge':[[np.nan] * 5, [np.nan] * 5]}
+        self.model = lambda x, c0, c1: c0 + c1 * x
+        if (len(Es[0]) == 0 and len(Es[3]) == 0) \
+            or (len(Rs[0]) == 0 and len(Rs[3]) == 0):
+            if len(Es[0]) == 0 and len(Es[3]) == 0:
+                print('No edge point was found.')
+            if len(Rs[0]) == 0 and len(Es[3]) == 0:
+                print('No ridge point was found.')
             return -1
 
         def linfit(x, y, dy):
@@ -933,23 +939,37 @@ class PVAnalysis():
             return c, dc
 
         f = linfit if include_intercept else grafit
-        if len(Rs[0]) == 0:  # use vcut
-            c, dc = f(*Rs[3:])
-            xlim = np.array([np.min(Rs[3]), np.max(Rs[3])])
-            vlim = np.sort(c[0] + c[1] * xlim)
-        else:  # use xcut (priority)
+        if len(Rs[0]) > 0:  # use xcut (priority)
+            self.results_filtered['ridge']['vcut']['red'] = [[]] * 4
+            self.results_filtered['ridge']['vcut']['blue'] = [[]] * 4
             c, dc = f(*Rs[:3])
+            ci = [c[0], c[1] * self.sini]
+            dci = [dc[0], dc[1] * self.sini]
             vlim = np.array([np.min(Rs[0]), np.max(Rs[0])])
             xlim = np.sort(c[0] + c[1] * vlim)
-            dc = [dc[0]**2 / c[1]**2 + dc[1]**2 * c[0]**2 / c[1]**4,
-                  dc[1]**2 / c[1]**4]
-            dc = list(np.sqrt(dc))
-            c = [-c[0] / c[1], 1. / c[1]]
-        print('--- Ridge linear ---')
-        print(f'v(0) = {c[0]:+.3f} +/- {dc[0]:.3f} km/s')
-        print(f'grad = {c[1]:+.4f} +/- {dc[1]:.4f} km/s/au')
+            def gradinv(c, dc):
+                err = [dc[0]**2 / c[1]**2 + dc[1]**2 * c[0]**2 / c[1]**4,
+                       dc[1]**2 / c[1]**4]
+                err = np.sqrt(err)
+                val = np.array([-c[0] / c[1], 1. / c[1]])
+                return val, err
+            c, dc = gradinv(c, dc)
+            ci, dci = gradinv(ci, dci)
+        else:  # use vcut
+            c, dc = f(*Rs[3:])
+            ci, dci = c / self.sini, dc / self.sini
+            xlim = np.array([np.min(Rs[3]), np.max(Rs[3])])
+            vlim = np.sort(c[0] + c[1] * xlim)
+        print('--- Ridge linear (incl. corrected) ---')
+        print(f'v(0) = {ci[0]:+.3f} +/- {dci[0]:.3f} km/s')
+        print(f'grad = {ci[1]:+.4f} +/- {dci[1]:.4f} km/s/au')
         print(f'x    = {xlim[0]:.2f} --- {xlim[1]:.2f} au')
         print(f'v    = {vlim[0]:.3f} --- {vlim[1]:.3f} km/s')
+        self.rvlim = {'edge':[[0.01, 0], [0, 0]],
+                      'ridge':[[0.01, np.max(np.abs(xlim))],
+                               [0.01, np.max(np.abs(vlim))]]}
+        self.popt = {'edge':[[np.nan, np.nan], [np.nan, np.nan]],
+                     'ridge':[c, dc]}
         result = {'edge':{'popt':[np.nan, np.nan], 'perr':[np.nan, np.nan]},
                   'ridge':{'popt':c, 'perr':dc}}
         return result
