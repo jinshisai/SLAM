@@ -940,8 +940,9 @@ class PVAnalysis():
 
         f = linfit if include_intercept else grafit
         if len(Rs[0]) > 0:  # use xcut (priority)
-            self.results_filtered['ridge']['vcut']['red'] = [[]] * 4
-            self.results_filtered['ridge']['vcut']['blue'] = [[]] * 4
+            for er in ['edge', 'ridge']:
+                for br in ['blue', 'red']:
+                    self.results_filtered[er]['vcut'][br] = [[]] * 4
             c, dc = f(*Rs[:3])
             ci = [c[0], c[1] * self.sini]
             dci = [dc[0], dc[1] * self.sini]
@@ -965,7 +966,7 @@ class PVAnalysis():
         print(f'grad = {ci[1]:+.4f} +/- {dci[1]:.4f} km/s/au')
         print(f'x    = {xlim[0]:.2f} --- {xlim[1]:.2f} au')
         print(f'v    = {vlim[0]:.3f} --- {vlim[1]:.3f} km/s')
-        self.rvlim = {'edge':[[0.01, 0], [0, 0]],
+        self.rvlim = {'edge':[[1e-10, 1e-10], [1e-10, 1e-10]],
                       'ridge':[[0.01, np.max(np.abs(xlim))],
                                [0.01, np.max(np.abs(vlim))]]}
         self.popt = {'edge':[[np.nan, np.nan], [np.nan, np.nan]],
@@ -1135,6 +1136,11 @@ class PVAnalysis():
             flipaxis (bool, optional): True means x-axis is velocity and
                 y-axis is position. Defaults to False.
         """
+        self.avevsys = (self.popt['edge'][0][4]
+                        + self.popt['ridge'][0][4]) / 2.
+        self.vsys += self.avevsys
+        self.popt['edge'][0][4] -= self.avevsys
+        self.popt['ridge'][0][4] -= self.avevsys
         for loglog, ext in zip([False, True], ['linear', 'log']):
             pp = PVPlot(restfrq=self.fitsdata.restfreq,
                         beam=self.fitsdata.beam, pa=self.fitsdata.pa,
@@ -1176,6 +1182,7 @@ class PVAnalysis():
         for xv in ['xcut', 'vcut']:
             for rb in ['red', 'blue']:
                 x, v, dx, dv = self.results_filtered[method][xv][rb]
+                v = v - self.avevsys
                 if xv == 'xcut': dv = 0
                 if xv == 'vcut': dx = 0
                 if loglog: x, v = np.abs(x), np.abs(v)
@@ -1196,12 +1203,13 @@ class PVAnalysis():
         if not hasattr(self, 'rvlim'): self.get_range()
         xmin, xmax = self.rvlim[method][0]
         if loglog:
-            s, x = 1, np.geomspace(xmin, xmax, 100)
+            x = np.geomspace(xmin, xmax, 100)
+            y = (fx_model(x) - fx_model(-x)) / 2.
         else:
-            s, x = self.xsign, np.linspace(-xmax, xmax, 100)
+            x = np.linspace(-xmax, xmax, 100)
             x[(-xmin < x) * (x < xmin)] = None
-        y = s * fx_model(x)
-        if flipaxis and not flipaxis: x, y = y, x
+            y = self.xsign * (fx_model(x) - popt[4]) + popt[4]
+        if flipaxis and not loglog: x, y = y, x
         ax.plot(x, y, ls=ls, lw=2, color='gray', zorder=3)
 
 

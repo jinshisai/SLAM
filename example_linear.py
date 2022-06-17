@@ -17,7 +17,7 @@ xlim_plot = [200. / 20., 200.]  # au; [inlim, outlim]
 vlim_plot = [6. / 20., 6.]  # km/s
 use_velocity = True  # cuts along the velocity direction
 use_position = True  # cuts along the positional direction
-include_intercept = False  # False means v(x=0) is fixed at 0.
+include_intercept = True  # False means v(x=0) is fixed at 0.
 show_pv = True  # figures will be made regardless of this option.
 minabserr = 0.1  # minimum absolute errorbar in the unit of bmaj or dv.
 minrelerr = 0.01  # minimum relative errorbar.
@@ -33,7 +33,7 @@ impv.get_edgeridge(outname, thr=thr, ridgemode=ridgemode, incl=incl,
                    minabserr=minabserr, minrelerr=minrelerr,
                    nanbeforemax=False, nanopposite=False, nanbeforecross=False)
 impv.write_edgeridge(outname=outname)
-impv.fit_linear(include_intercept=True)
+impv.fit_linear(include_intercept=include_intercept)
 impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
                     clevels=[-9,-6,-3,3,6,9], outname=outname,
                     show=show_pv, logcolor=True, Tbcolor=False,
@@ -42,5 +42,5 @@ impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
                     fmt={'edge':'v', 'ridge':'o'},
                     linestyle={'edge':'--', 'ridge':'-'},
                     plotridgepoint=True, plotedgepoint=False,
-                    plotridgemodel=True, plotedgemodel=False)
+                    plotridgemodel=True, plotedgemodel=True)
 '-------------------------------------'
