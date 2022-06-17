@@ -30,7 +30,7 @@ minrelerr = 0.01  # minimum relative errorbar.
 
 '-------- HOW TO DO EACH STEP --------'
 impv = PVAnalysis(fitsfile, rms, vsys, dist, pa=None)
-impv.get_edgeridge(outname, thr=thr, ridgemode='mean', incl=incl,
+impv.get_edgeridge(outname, thr=thr, ridgemode=ridgemode, incl=incl,
                    use_position=use_position, use_velocity=use_velocity,
                    Mlim=Mlim, xlim=np.array(xlim) / dist, vlim=vlim,
                    minabserr=minabserr, minrelerr=minrelerr,
