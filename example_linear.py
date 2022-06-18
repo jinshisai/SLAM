@@ -10,11 +10,11 @@ dist = 139.  # pc
 rms = 2.4e-3  # Jy/beam
 thr = 5.  # rms
 ridgemode = 'mean'  # 'mean' or 'gauss'
-xlim = [-50, 0, 0, 50]  # au; [-outlim, -inlim, inlim, outlim]
-vlim = np.array([-1, 0, 0, 1]) + vsys  # km/s
+xlim = [-70, 0, 0, 70]  # au; [-outlim, -inlim, inlim, outlim]
+vlim = np.array([-1.4, 0, 0, 1.4]) + vsys  # km/s
 Mlim = [0, 10]  # M_sun; to exclude unreasonable points
-xlim_plot = [200. / 20., 200.]  # au; [inlim, outlim]
-vlim_plot = [6. / 20., 6.]  # km/s
+xlim_plot = [100. / 20., 100.]  # au; [inlim, outlim]
+vlim_plot = [3. / 20., 3.]  # km/s
 use_velocity = True  # cuts along the velocity direction
 use_position = True  # cuts along the positional direction
 include_intercept = True  # False means v(x=0) is fixed at 0.

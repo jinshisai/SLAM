@@ -882,7 +882,7 @@ class PVAnalysis():
                   'ridge':{'popt':popt_r[0], 'perr':popt_r[1]}}
         return result
 
-    def fit_linear(self, include_intercept: bool = False) -> dict:
+    def fit_linear(self, include_intercept: bool = True) -> dict:
         """Fit the derived edge/ridge positions/velocities with a linear function analytically.
 
 
