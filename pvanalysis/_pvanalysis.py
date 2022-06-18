@@ -795,6 +795,7 @@ class PVAnalysis():
                       include_dp: bool = True,
                       include_pin: bool = False,
                       outname: str = 'pvanalysis',
+                      rangelevel: float = 0.8,
                       show_corner: bool = False) -> dict:
         """Fit the derived edge/ridge positions/velocities with a double power law function by using emcee.
 
@@ -809,6 +810,8 @@ class PVAnalysis():
             outname : str
                The output corner figures have names of "outname".corner_e.png
                and "outname".corner_r.png.
+            rangelevel : float
+               Fraction of points included in the corner plot. Defaults to 0.8.
             show_corner : bool
                True means the corner figures are shown. These figures are also
                plotted in two png files.
@@ -868,7 +871,7 @@ class PVAnalysis():
                 return -0.5 * chi2
             plim = plim[:, include]
             popt, perr = emcee_corner(plim, lnprob, args=args,
-                                      labels=labels,
+                                      labels=labels, rangelevel=rangelevel,
                                       figname=outname+'.corner'+ext+'.png',
                                       show_corner=show_corner,
                                       ndata=len(args[0]) + len(args[3]))

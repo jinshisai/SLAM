@@ -11,7 +11,8 @@ def gauss1d(x, amp, mean, fwhm):
 
 def emcee_corner(bounds, log_prob_fn, args=None, nwalkers_per_ndim=16,
                  nburnin=2000, nsteps=1000, gr_check=False, ndata=1000,
-                 labels=None, figname=None, show_corner=False, ncore=1):
+                 labels=None, rangelevel=0.8, figname=None,
+                 show_corner=False, ncore=1):
     ndim = len(bounds[0])
     nwalkers = ndim * nwalkers_per_ndim
     plim = np.array(bounds)
@@ -64,7 +65,7 @@ def emcee_corner(bounds, log_prob_fn, args=None, nwalkers_per_ndim=16,
     if show_corner or (not figname is None):
         corner.corner(samples, truths=popt,
                       quantiles=[0.16, 0.5, 0.84], show_titles=True,
-                      range=[0.8] * ndim, labels=labels),
+                      range=[rangelevel] * ndim, labels=labels),
         if not figname is None: plt.savefig(figname)
         if show_corner: plt.show()
         plt.close()
