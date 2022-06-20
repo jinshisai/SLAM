@@ -143,7 +143,7 @@ class PVAnalysis():
             return
         if self.xsign != q:
             print('WARNING\tget_edgeridge: '
-                  + f'quadrant={q:.0f} seems opposite.')
+                  + f'quadrant={quadrant} seems opposite.')
         # store fitting conditions
         self.xlim = xlim
         self.vlim = vlim
