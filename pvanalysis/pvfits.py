@@ -194,17 +194,113 @@ class Impvfits:
         self.delv  = vaxis[1] - vaxis[0]
 
 
-    # Read multibeam table
-    def read_multibeamtable(self):
-        # multibeam table
-        self.beam = self.multibeamtable.data
+    # beam deconvolution
+    def beam_deconvolution(self, sigmacut=None, highcut=1.):
+        # modules for FFT
+        from scipy.fft import fftshift
+        from scipy.fft import ifftn
+        from scipy.fft import fftn
+        from scipy.fft import fftfreq
+        # 1D Gaussian function
+        from .fitfuncs import gauss1d #(x,amp,mean,sig):
+        # to find positions
+        from scipy.signal import argrelmin #, argrelmax
 
-        # add unit check if necessary
-        # get beam axis
-        #nbmaxis = mtb.header['TFIELDS']
-        #rng = range(1, nbmaxis + 1)
-        #ttype_i = np.array([header['TTYPE'+str(i)] for i in rng])
-        #tunit_i = np.array([int(header['TUNIT'+str(i)]) for i in rng])
+        # data
+        data = np.squeeze(self.data.copy())
+        if sigmacut:
+            data[data < sigmacut] = 0.
+
+        # beam array
+        nv, nx = self.nv, self.nx
+        if self.multibeam:
+            beam = np.empty((nv,nx))
+            for i in range(len(self.beam)):
+                bmaj, bmin, bpa, _, _ = self.beam[i]
+                if self.pa != None:
+                    res_off = get_1dresolution(self.pa, bmaj, bmin, bpa)
+                else:
+                    res_off = bmaj
+                beam[i, :] = gauss1d(self.xaxis, 1., 0., res_off)
+                beam[i, :] /= np.sum(beam[i, :]) # normalize
+        elif self.res_off != None:
+            _beam = gauss1d(self.xaxis, 1., 0., self.res_off)
+            _beam /= np.sum(_beam) # normalize
+            beam = np.tile(_beam, (nv,1))
+        else:
+            print('ERROR\tbeam_deconvolution: angular resolution is not given correctly.')
+            print('ERROR\tbeam_deconvolution: check the header of the input fits file.')
+            return -1
+
+        # check axis
+        if self.naxis == 2:
+            shape = (nv, nx)
+        if self.naxis == 3:
+            shape = (1, nv, nx)
+        else:
+            print('ERROR\tbeam_deconvolution: number of fits axes must be 2 or 3.')
+            return -1
+
+        # FFT
+        freq_x   = fftshift(fftfreq(nx, self.delx))
+        freq_v   = fftshift(fftfreq(nv, self.delv))
+        ffx, ffv = np.meshgrid(freq_x, freq_v)
+        beam_fft = fftshift(fftn(beam, axes=(1,)), axes=(1,))
+        data_fft = fftshift(fftn(data, axes=(1,)), axes=(1,))
+
+        # deconvolution
+        sigma_beam_fft = 1./(self.res_off*np.pi)
+        #print(sigma_beam_fft)
+        d_deconv_fft = data_fft/beam_fft
+
+        # fillter
+        # based on null
+        #for i in range(nv):
+        #    d_fft_1d   = data_fft[i,:][nx//2+1:]
+        #    first_null = argrelmin(d_fft_1d)[0][0]\
+        #     if len(argrelmin(d_fft_1d)[0]) > 0 else -1
+        #    fx_null    = freq_x[nx//2+1:][first_null]
+        #    d_deconv_fft[np.abs(ffx) > fx_null] = 0.+0.j # drop highfreq. components
+        if highcut != None:
+            d_deconv_fft[np.abs(ffx) > sigma_beam_fft*highcut] = 0.+0.j # drop highfreq. components
+
+        # IFFT
+        d_deconv = np.abs(fftshift(ifftn(d_deconv_fft, axes=(1,)), axes=(1,)))
+        self.data_deconv = d_deconv.reshape(shape)
+
+        # debug
+        fig, axes = plt.subplots(1,3, figsize=(11.69, 8.27))
+        for ax, d_i, title in zip(
+            axes, [np.abs(data_fft), np.abs(d_deconv_fft), np.abs(beam_fft)],
+            ['data(inp)', 'data(deconv)', 'beam']):
+            #ffx, ffv = np.meshgrid(freq_x, freq_v)
+            #ax.plot(self.xaxis, data[0,nv//4,:], color='k', lw=2., ls='-')
+            ax.plot(freq_x, d_i[nv//4,:], color='k', lw=2., ls='-')
+
+            if title == 'beam':
+                ax.vlines(sigma_beam_fft, np.nanmin(d_i[nv//4,:]), np.nanmax(d_i[nv//4,:]),
+                 color='k', lw=1., ls='--')
+                ax.vlines(-sigma_beam_fft, np.nanmin(d_i[nv//4,:]), np.nanmax(d_i[nv//4,:]),
+                 color='k', lw=1., ls='--')
+            ax.set_title(title)
+
+            fig.subplots_adjust(wspace=0.4)
+
+        fig2, axes2 = plt.subplots(1,3, figsize=(11.69, 8.27))
+        for ax, d_i, title in zip(
+            axes2, [data, d_deconv, beam],
+            ['data(inp)', 'data(deconv)', 'beam']):
+            #ffx, ffv = np.meshgrid(freq_x, freq_v)
+            #ax.plot(self.xaxis, data[0,nv//4,:], color='k', lw=2., ls='-')
+            ax.plot(self.xaxis, d_i[nv//4,:], color='k', lw=2., ls='-')
+            ax.hlines(sigmacut, -2, 2)
+            ax.set_title(title)
+            ax.set_xlim(-2,2)
+
+            fig2.subplots_adjust(wspace=0.4)
+        plt.show()
+
+        return d_deconv
 
 
     # Draw pv diagram
