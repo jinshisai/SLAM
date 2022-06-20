@@ -34,36 +34,41 @@ minrelerr = 0.01  # minimum relative errorbar.
 '-------- HOW TO DO EACH STEP --------'
 impv = PVAnalysis(fitsfile, rms, vsys, dist, pa=None)
 #print(impv.fitsdata.naxis, impv.fitsdata.data.shape, impv.fitsdata.beam)
-impv.fitsdata.beam_deconvolution(sigmacut=rms*3., highcut=1.) # highcut=5.
-#impv.fitsdata.beam_deconvolution(highcut=1.) # highcut=5.
+#impv.fitsdata.beam_deconvolution(sigmacut=rms*3., highfcut=1., cutfilter='null') # highfcut=5.
+#impv.fitsdata.beam_deconvolution(highfcut=1.) # highfcut=5.
 
+
+'''
 xx, vv = np.meshgrid(impv.fitsdata.xaxis, impv.fitsdata.vaxis)
 fig, axes = plt.subplots(1, 2, figsize=(11.69, 8.27))
 for ax, data in zip(axes, [impv.fitsdata.data, impv.fitsdata.data_deconv]):
     divider = make_axes_locatable(ax)
     cax = divider.append_axes('right', size='3%', pad=0.05)
 
-    pltcol = ax.pcolor(xx, vv, data[0,:,:], shading='auto')
+    pltcol  = ax.pcolor(xx, vv, data[0,:,:], shading='auto')
+    pltcont = ax.contour(xx, vv, data[0,:,:], levels=np.array([-6,-3,3,6,9,12,15])*rms)
     fig.colorbar(pltcol, cax=cax)
     ax.set_aspect(1.)
 
     fig.subplots_adjust(wspace=0.4)
 
 plt.show()
-
-
 '''
+
+
 impv.get_edgeridge(outname, thr=thr, ridgemode=ridgemode, incl=incl,
                    use_position=use_position, use_velocity=use_velocity,
                    Mlim=Mlim, xlim=np.array(xlim) / dist, vlim=vlim,
                    minabserr=minabserr, minrelerr=minrelerr,
-                   nanbeforemax=True, nanopposite=True, nanbeforecross=True)
+                   nanbeforemax=True, nanopposite=True, nanbeforecross=True,
+                   deconvolution=True)
 impv.write_edgeridge(outname=outname)
 impv.fit_edgeridge(include_vsys=include_vsys,
                    include_dp=include_dp,
                    include_pin=include_pin,
                    outname=outname, show_corner=show_corner)
 impv.output_fitresult()
+impv.fitsdata.data = impv.fitsdata.data_deconv
 impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
                     clevels=[-9,-6,-3,3,6,9], outname=outname,
                     show=show_pv, logcolor=True, Tbcolor=False,
@@ -73,5 +78,4 @@ impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
                     linestyle={'edge':'--', 'ridge':'-'},
                     plotridgepoint=True, plotedgepoint=True,
                     plotridgemodel=True, plotedgemodel=True)
-'''
 '-------------------------------------'

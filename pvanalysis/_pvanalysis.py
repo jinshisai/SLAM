@@ -74,7 +74,7 @@ class PVAnalysis():
         interp_ridge=False, minrelerr=0.01, minabserr=0.1,
         nanbeforemax: bool = True, nanopposite: bool = True,
         nanbeforecross: bool = True, deconvolution=False,
-        param_deconv={'sigmacut': None, 'highcut': 1.}):
+        param_deconv={'sigmacut': 3., 'highfcut': 1., 'cutfilter':'null'}):
         """Get the edge/ridge at positions/velocities.
 
         Args:
@@ -159,12 +159,14 @@ class PVAnalysis():
             self.get_edgeridge_xcut(outname, thr=thr, incl=incl,
                             xlim=xlim, vlim=vlim, Mlim=Mlim,
                             ridgemode=ridgemode, pixrng=pixrng_xcut,
-                            interp_ridge=interp_ridge)
+                            interp_ridge=interp_ridge, deconvolution=deconvolution,
+                            param_deconv=param_deconv)
         if use_velocity:
             self.get_edgeridge_vcut(outname, thr=thr, incl=incl,
                             xlim=xlim, vlim=vlim, Mlim=Mlim,
                             ridgemode=ridgemode, pixrng=pixrng_vcut,
-                            interp_ridge=interp_ridge)
+                            interp_ridge=interp_ridge, deconvolution=deconvolution,
+                            param_deconv=param_deconv)
 
         # sort results
         self.sort_fitresults(minrelerr=minrelerr, minabserr=minabserr,
@@ -315,7 +317,7 @@ class PVAnalysis():
                    vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='gauss',
                    pixrng=None, multipeaks=False, i_peak=0, prominence=1.5,
                    inverse=False, interp_ridge=False, deconvolution=False, 
-                   param_deconv={'sigmacut': None, 'highcut': 1.}):
+                   param_deconv={'sigmacut': 3., 'highfcut': 1., 'cutfilter':'null'}):
         """Get edge/ridge along the velocity axis, i.e., determine
            representative velocity at each offset.
 
@@ -366,7 +368,14 @@ class PVAnalysis():
 
         print('Along velocity axis.')
         # data
-        data = self.fitsdata.data
+        if deconvolution:
+            data = self.fitsdata.beam_deconvolution(
+                param_deconv['sigmacut']*self.rms,
+                param_deconv['highfcut'],
+                param_deconv['cutfilter'],
+                )
+        else:
+            data = self.fitsdata.data
         if not (self.fitsdata.naxis in [2, 3]):
             print('ERROR\tpvfit_vcut: n_axis must be 2 or 3.')
             return
@@ -558,7 +567,7 @@ class PVAnalysis():
                    vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='mean',
                    pixrng=None, multipeaks=False, i_peak=0,
                    prominence=1.5, interp_ridge=False, deconvolution=False,
-                   param_deconv={'sigmacut': None, 'highcut': 1.}):
+                   param_deconv={'sigmacut': None, 'highfcut': 1., 'cutfilter':'null'}):
         """Get edge/ridge along x-axis, i.e., determine representative
            position at each velocity.
 
@@ -611,7 +620,14 @@ class PVAnalysis():
         print('Along position axis.')
 
         # data
-        data = self.fitsdata.data
+        if deconvolution:
+            data = self.fitsdata.beam_deconvolution(
+                param_deconv['sigmacut']*self.rms,
+                param_deconv['highfcut'],
+                param_deconv['cutfilter'],
+                )
+        else:
+            data = self.fitsdata.data
         if not (self.fitsdata.naxis in [2, 3]):
             print('Error\tpvfit_vcut: n_axis must be 2 or 3.')
             return
