@@ -34,11 +34,13 @@ minrelerr = 0.01  # minimum relative errorbar.
 '-------- HOW TO DO EACH STEP --------'
 impv = PVAnalysis(fitsfile, rms, vsys, dist, pa=None)
 #print(impv.fitsdata.naxis, impv.fitsdata.data.shape, impv.fitsdata.beam)
-#impv.fitsdata.beam_deconvolution(sigmacut=rms*3., highfcut=1., cutfilter='null') # highfcut=5.
+#impv.fitsdata.beam_deconvolution(sigmacut=rms*3., highfcut=2., solmode='nullcut') # highfcut=5.
+impv.fitsdata.beam_deconvolution(sigmacut=rms*3., highfcut=2., solmode='gauss') # highfcut=5.
 #impv.fitsdata.beam_deconvolution(highfcut=1.) # highfcut=5.
 
+#plt.imshow(impv.fitsdata.data_deconv[0,:,:], origin='lower')
+#plt.show()
 
-'''
 xx, vv = np.meshgrid(impv.fitsdata.xaxis, impv.fitsdata.vaxis)
 fig, axes = plt.subplots(1, 2, figsize=(11.69, 8.27))
 for ax, data in zip(axes, [impv.fitsdata.data, impv.fitsdata.data_deconv]):
@@ -78,4 +80,5 @@ impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
                     linestyle={'edge':'--', 'ridge':'-'},
                     plotridgepoint=True, plotedgepoint=True,
                     plotridgemodel=True, plotedgemodel=True)
+'''
 '-------------------------------------'

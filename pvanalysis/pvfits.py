@@ -195,9 +195,16 @@ class Impvfits:
 
 
     # beam deconvolution
-    def beam_deconvolution(self, sigmacut=None, highfcut=3., cutfilter='null'):
+    def beam_deconvolution(self, sigmacut=None, highfcut=2., solmode='nullcut'):
         '''
         Deconvolve PV diagram with beam.
+
+        Args
+        ----
+        sigmacut (float): Noise cut threshold given by absolute value.
+        highfcut (float): Threshold to cut high-frequency component when slomode='nullcut'.
+        solmode (str): Type of solution for the deconvolution. Must be either of 
+         'nullcut', 'highfcut', 'gauss', 'goal' and 'spm'.
         '''
         # modules for FFT
         from scipy.fft import fftshift
@@ -205,7 +212,7 @@ class Impvfits:
         from scipy.fft import fftn
         from scipy.fft import fftfreq
         # 1D Gaussian function
-        from .fitfuncs import gauss1d #(x,amp,mean,sig):
+        from .fitfuncs import gauss1d, gaussfit, complexgauss1d, complexgaussfit
         # to find positions
         from scipy.signal import argrelmin #, argrelmax
 
@@ -245,48 +252,86 @@ class Impvfits:
             return -1
 
         # FFT
-        freq_x   = fftshift(fftfreq(nx, self.delx))
-        freq_v   = fftshift(fftfreq(nv, self.delv))
-        ffx, ffv = np.meshgrid(freq_x, freq_v)
+        kx   = fftshift(fftfreq(nx, self.delx))
+        kv   = fftshift(fftfreq(nv, self.delv))
+        kkx, kkv = np.meshgrid(kx, kv)
         beam_fft = fftshift(fftn(beam, axes=(1,)), axes=(1,))
         data_fft = fftshift(fftn(data, axes=(1,)), axes=(1,))
 
         # deconvolution
-        sigma_beam_fft = (2.*np.sqrt(2.*np.log(2.)))/(self.res_off*np.pi)
+        sigma_beam_fft = (2.*np.sqrt(2.*np.log(2.)))/(self.res_off*np.pi*2.)
         #print(sigma_beam_fft)
         d_deconv_fft = data_fft/beam_fft
 
         # fillter
-        if cutfilter == 'null':
+        if solmode == 'nullcut':
             # based on null
             for i in range(nv):
                 d_fft_1d   = np.abs(data_fft[i,:][nx//2:])
                 first_null = argrelmin(d_fft_1d)[0][0]\
                  if len(argrelmin(d_fft_1d)[0]) > 0 else -1
-                fx_null    = freq_x[nx//2:][first_null]
-                d_deconv_fft[i, (np.abs(ffx) > fx_null)[1]] = 0.+0.j # drop highfreq. components
+                fx_null    = kx[nx//2:][first_null]
+                d_deconv_fft[i, (np.abs(kkx) > fx_null)[1]] = 0.+0.j # drop highfreq. components
 
                 if highfcut != None:
                     if fx_null > sigma_beam_fft*highfcut:
-                        d_deconv_fft[i, (np.abs(ffx) >\
+                        d_deconv_fft[i, (np.abs(kkx) >\
                          sigma_beam_fft*highfcut)[1]] = 0.+0.j # drop highfreq. components
+        elif solmode == 'highfcut':
+            if highfcut == None:
+                print('ERROR\tbeam_deconvolution: Give valid highfcut when solmode=highfcut.')
+                return -1
+            # drop highfreq. components
+            d_deconv_fft[(np.abs(kkx) > sigma_beam_fft*highfcut)] = 0.+0.j
+        elif solmode == 'gauss':
+            # relative weight
+            w = 1./np.append(np.sqrt(np.arange(nx//2, nx+1, 1)),
+                np.sqrt(np.arange(nx, nx//2+1, -1))) if nx %2 == 0\
+            else 1./np.append(
+                np.sqrt(np.arange(nx//2, nx, 1)),
+                np.sqrt(np.arange(nx, nx//2+1, -1)))
+            # deconvolution
+            for i in range(nv):
+                #plt.plot(kx, np.abs(d_deconv_fft[i,:]), 'k')
+                # if flux is zero (all emission was cut off)
+                if (np.abs(d_deconv_fft[i,nx//2-1:nx//2+2]) == 0.).all():
+                    d_deconv_fft[i,:] = complexgauss1d(kx, 0., 0., 1., 0.)
+                else:
+                    phase = np.arctan2(d_deconv_fft[i,np.nanargmin(np.abs(kx))].real,
+                     d_deconv_fft[i,np.nanargmin(np.abs(kx))].imag)
+                    pini = [
+                    np.abs(d_deconv_fft[i,nx//2]), 
+                    0., 
+                    np.nansum(np.abs(d_deconv_fft[i,nx//2-5:nx//2+6])*( kx[nx//2-5:nx//2+6] - 0.)**2. )/np.nansum(np.abs(d_deconv_fft[i,nx//2-5:nx//2+6])),
+                    phase]
+                    #print(np.nansum(np.abs(d_deconv_fft[i,nx//2-2:nx//2+3])*( kx[nx//2-2:nx//2+3] - 0.)**2. )/np.nansum(np.abs(d_deconv_fft[i,nx//2-2:nx//2+3])))
+                    param_opt, param_err = complexgaussfit(kx, d_deconv_fft[i,:], w/beam_fft[i,:], pini=pini)
+                    if np.isnan(param_opt).any() == True:
+                        d_deconv_fft[i,:] = complexgauss1d(kx, 0., 0., 1., 0.)
+                    else:
+                        d_deconv_fft[i,:] = complexgauss1d(kx, *param_opt) # replace
+
+                # replace
+                #plt.plot(kx, np.abs(d_deconv_fft[i,:]), color='salmon')
+                #plt.plot(kx, w/np.abs(beam_fft[i,:]))
+                #plt.ylim(-0.1,1.1)
+                #plt.show()
         else:
-            if highfcut != None:
-                d_deconv_fft[(np.abs(ffx) >\
-                 sigma_beam_fft*highfcut)] = 0.+0.j # drop highfreq. components
+            print('WARNING\tbeam_deconvolution: Given solmode parameter is not valid.')
+            print('WARNING\tbeam_deconvolution: Adopt no processing.')
+            return -1
 
         # IFFT
         d_deconv = np.abs(fftshift(ifftn(d_deconv_fft, axes=(1,)), axes=(1,)))
 
         # debug
-        '''
         fig, axes = plt.subplots(1,3, figsize=(11.69, 8.27))
         for ax, d_i, title in zip(
             axes, [np.abs(data_fft), np.abs(d_deconv_fft), np.abs(beam_fft)],
             ['data(inp)', 'data(deconv)', 'beam']):
-            #ffx, ffv = np.meshgrid(freq_x, freq_v)
+            #kkx, kkv = np.meshgrid(kx, kv)
             #ax.plot(self.xaxis, data[0,nv//4,:], color='k', lw=2., ls='-')
-            ax.plot(freq_x, d_i[nv//4,:], color='k', lw=2., ls='-')
+            ax.plot(kx, d_i[nv//4,:], color='k', lw=2., ls='-')
 
             if title == 'beam':
                 ax.vlines(sigma_beam_fft, np.nanmin(d_i[nv//4,:]), np.nanmax(d_i[nv//4,:]),
@@ -301,7 +346,7 @@ class Impvfits:
         for ax, d_i, title in zip(
             axes2, [data, d_deconv, beam],
             ['data(inp)', 'data(deconv)', 'beam']):
-            #ffx, ffv = np.meshgrid(freq_x, freq_v)
+            #kkx, kkv = np.meshgrid(kx, kv)
             #ax.plot(self.xaxis, data[0,nv//4,:], color='k', lw=2., ls='-')
             ax.plot(self.xaxis, d_i[nv//4,:], color='k', lw=2., ls='-')
             if sigmacut:
@@ -311,11 +356,11 @@ class Impvfits:
 
             fig2.subplots_adjust(wspace=0.4)
         plt.show()
-        '''
 
         d_deconv = d_deconv.reshape(shape)
+
         self.data_deconv = d_deconv
-        return d_deconv
+        #return d_deconv
 
 
     # Draw pv diagram

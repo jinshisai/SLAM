@@ -49,22 +49,25 @@ def ridge_gauss(xdata, ydata, yerr):
     return [val, err]
 '''
 
-def gaussfit(xdata, ydata, yerr):
+def gaussfit(xdata, ydata, yerr, pini=[]):
 	'''
 	Gaussian fit through chi-square fit.
 	'''
 
 	# Get estimate of the initial parameters
-	indx_pini = ydata >= 3.*yerr
-	mx    = np.nansum(ydata[indx_pini]*xdata[indx_pini])/np.nansum(ydata[indx_pini]) # weighted mean
-	sigx  = np.sqrt(np.nansum(ydata[indx_pini]*(xdata[indx_pini] - mx)**2.)/np.nansum(ydata[indx_pini])) # standerd deviation
+	if len(pini) == 3:
+		pinp = pini
+	else:
+		indx_pini = ydata >= 3.*yerr
+		mx    = np.nansum(ydata[indx_pini]*xdata[indx_pini])/np.nansum(ydata[indx_pini]) # weighted mean
+		sigx  = np.sqrt(np.nansum(ydata[indx_pini]*(xdata[indx_pini] - mx)**2.)/np.nansum(ydata[indx_pini])) # standerd deviation
 
-	# if sigx is too small
-	if sigx <= 1e-6:
-		sigx = np.abs(xdata[1] - xdata[0])/len(xdata)
+		# if sigx is too small
+		if sigx <= 1e-6:
+			sigx = np.abs(xdata[1] - xdata[0])/len(xdata)
 
-	amp  = np.nanmax(ydata)
-	pinp = [amp, mx, sigx]
+		amp  = np.nanmax(ydata)
+		pinp = [amp, mx, sigx]
 
 	if len(xdata) < 3:
 		param_out = np.full(3, np.nan)
@@ -87,6 +90,67 @@ def gaussfit(xdata, ydata, yerr):
 	else:
 		param_err = np.full(3, np.nan)
 		param_out = np.full(3, np.nan) if (param_out == pinp).all else param_out
+
+	# print results
+	#print ('Chi2: ', reduced_chi2)
+	#print ('Fitting results: amp   mean   sigma')
+	#print (amp_fit, mx_fit, sigx_fit)
+	#print ('Errors')
+	#print (amp_fit_err, mx_fit_err, sigx_fit_err)
+
+	return param_out, param_err
+
+def complexgauss1d(k, peak, k0, sig, phase):
+	return peak * np.exp(-(k-k0)*(k-k0)/(2.0*sig*sig)) * np.exp(-1.j*phase*k*2.*np.pi)
+
+def chi_complexgauss1d(param, xdata, ydata, ysig):
+	ymodel = complexgauss1d(xdata, *param)
+	complex_chi2 = ((ydata.real - ymodel.real)**2.\
+	 + (ydata.imag - ymodel.imag)**2.)/np.abs(ysig)**2.
+	return np.sqrt(complex_chi2)
+
+def complexgaussfit(xdata, ydata, yerr, pini=[]):
+	'''
+	Gaussian fit through chi-square fit.
+	'''
+
+	# Get estimate of the initial parameters
+	if len(pini) == 4:
+		pinp = pini
+	else:
+		indx_pini = ydata >= 3.*yerr
+		mx    = np.nansum(ydata[indx_pini]*xdata[indx_pini])/np.nansum(ydata[indx_pini]) # weighted mean
+		sigx  = np.sqrt(np.nansum(ydata[indx_pini]*(xdata[indx_pini] - mx)**2.)/np.nansum(ydata[indx_pini])) # standerd deviation
+
+		# if sigx is too small
+		if sigx <= 1e-6:
+			sigx = np.abs(xdata[1] - xdata[0])/len(xdata)
+
+		amp   = np.nanmax(ydata)
+		phase = np.arctan2(ydata.real[np.nanargmin(np.abs(xdata))], ydata.imag[np.nanargmin(np.abs(xdata))])
+		pinp  = [amp, mx, sigx, phase]
+
+	if len(xdata) < 4:
+		param_out = np.full(4, np.nan)
+		param_err = np.full(4, np.nan)
+		return param_out, param_err
+
+	# fitting
+	results   = optimize.leastsq(chi_complexgauss1d, pinp, args=(xdata, ydata, yerr), full_output=True)
+	param_out = results[0]
+	param_cov = results[1]
+	#print(results)
+	#print(param_out, param_cov)
+	# Do not multiply covariance by reduced chi^2 to obtain absolute errors
+
+	# parameter error estimates
+	if param_cov is not None:
+		param_err = np.array([
+			np.abs(param_cov[j][j])**0.5 for j in range(len(pinp))
+			])
+	else:
+		param_err = np.full(4, np.nan)
+		param_out = np.full(4, np.nan) if (param_out == pinp).all else param_out
 
 	# print results
 	#print ('Chi2: ', reduced_chi2)
