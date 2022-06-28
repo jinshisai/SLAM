@@ -114,7 +114,7 @@ class Impvfits:
                     bmaj, bmin, bpa, _, _ = self.beam[i]
                     res_offs.append(get_1dresolution(pa, bmaj, bmin, bpa))
                 self.res_off = np.nanmax(res_offs)
-            elif self.beam != None:
+            elif self.beam is not None:
                 bmaj, bmin, bpa = self.beam
                 self.res_off = get_1dresolution(pa, bmaj, bmin, bpa)
             else:
