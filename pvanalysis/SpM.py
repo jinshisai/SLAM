@@ -5,16 +5,17 @@ from scipy.optimize import differential_evolution as difevo
 from pvanalysis.pvfits import Impvfits
 
 
-infile = './testfits/test.fits'
-pa = 75
-rms = 1.7e-3
-fitsdata = Impvfits(infile, pa=pa)
+rms = 1.e-3
+pa = 0
+fitsdata = Impvfits('./testfits/answer.fits', pa=pa)
+answer = np.squeeze(fitsdata.data)
+fitsdata = Impvfits('./testfits/question.fits', pa=pa)
+data = np.squeeze(fitsdata.data)
 bmaj, bmin, bpa = fitsdata.beam
 phi = np.arctan(bmin / bmaj)
 dpa = np.abs(np.radians(bpa - pa))
 r = np.cos(2*phi) * np.sin(2*dpa) / (1 - np.cos(2*phi) * np.cos(2*dpa))
 print(f'cross term ratio: {r:.2f}')
-dataorg = np.squeeze(fitsdata.data)
 xaxis = fitsdata.xaxis
 vaxis = fitsdata.vaxis
 res_off = fitsdata.res_off
@@ -24,17 +25,13 @@ i0 = np.argmin(np.abs(xaxis + 210 / 140))
 i1 = np.argmin(np.abs(xaxis - 210 / 140)) + 1
 j0 = np.argmin(np.abs(vaxis - 6.4 + 5))
 j1 = np.argmin(np.abs(vaxis - 6.4 - 5)) + 1
-xaxis, vaxis, dataorg = xaxis[i0:i1], vaxis[j0:j1], dataorg[j0:j1, i0:i1]
-#rmsvis = rms * np.sqrt(len(xaxis))
+xaxis, vaxis = xaxis[i0:i1], vaxis[j0:j1]
+data, answer = data[j0:j1, i0:i1], answer[j0:j1, i0:i1]
 gbeam = np.exp2(-4 * (xaxis / res_off)**2)
-gbeam = gbeam / np.sum(gbeam)
-#w = np.abs(np.fft.fft(gbeam))
-data = np.array([np.convolve(p, gbeam, mode='same') for p in dataorg])
-rms /= np.sqrt(np.sqrt(2))
+beamarea = np.sum(gbeam)
 
 ngroup = 10
 def chisq(p, obs, l1, l2, i_cve, mode=''):
-    #c0 = (np.fft.fft(p) * w - obs) / rmsvis
     c0 = (np.convolve(p, gbeam, mode='same') - obs) / rms
     nmax = len(obs) // ngroup
     if mode == 'pre':
@@ -50,19 +47,11 @@ def chisq(p, obs, l1, l2, i_cve, mode=''):
     c = (c0 + c1 + c2) / (1 + l1 + l2)
     return c
 
-
-max = np.max(np.abs(data)) * 10
+max = np.max(np.abs(data))
 bounds = [[-max, max]] * len(xaxis)
 
 deconv = []
 l1, l2 = 0.1, 0.1
-#ffty = np.fft.fft(y)
-#ngrid = 1
-#eval = np.empty((ngrid, ngrid))
-#lamlist = np.geomspace(1, 10, ngrid)
-#for il, jl in np.ndindex((ngrid, ngrid)):
-#    print(il, jl)
-#    l1, l2 = lamlist[il], lamlist[jl]
 print(len(xaxis), 'pixels')
 for v, y in zip(vaxis, data):
     print(f'{v:.3f} km/s')
@@ -76,7 +65,7 @@ for v, y in zip(vaxis, data):
         for i in range(15):
             noise = np.convolve(np.random.randn(len(y)), gbeam, mode='same')
             noise = noise / np.std(noise) * rms
-            init[i] = y + noise
+            init[i] = (y + noise) / beamarea
         res = difevo(chisq, bounds=bounds, args=[y, l1, l2, i_cve, 'pre'],
                      init=init, workers=1) #, updating='deferred')
         chi2 = res.fun
@@ -90,26 +79,21 @@ for v, y in zip(vaxis, data):
     meancve = np.mean(cvelist)
     print(f'root mean chi2 = {np.sqrt(meanchi2):.3f} sigma')
     print(f'root mean cve  = {np.sqrt(meancve):.3f} sigma')
-    #eval[il, jl] = meancve < meanchi2
-    #print(eval)
     for i in range(15):
         noise = np.convolve(np.random.randn(len(y)), gbeam, mode='same')
         noise = noise / np.std(noise) * rms
-        init[i] = y + noise
+        init[i] = (y + noise) / beamarea
     res = difevo(chisq, bounds=bounds, args=[y, l1, l2, i_cve, ''],
                  init=init, workers=1) #, updating='deferred')
     p = res.x
     deconv.append(p)
 deconv = np.array(deconv)
 
-#pg = np.array([np.convolve(p, gbeam, mode='same') for p in deconv])
-levels = np.array([-12,-9,-6,-3,3,6,9,12,15,18,21,24,27,30]) * rms
-#levels = np.array([-10,-8,-6,-4,-2,2,4,6,8,10]) * rms
+levels = np.array([-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10]) * 0.026
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
-ax.contour(xaxis, vaxis, dataorg, colors='k', levels=levels)
+ax.contour(xaxis, vaxis, answer, colors='k', levels=levels)
 ax.contour(xaxis, vaxis, deconv, colors='r', levels=levels)
-#ax.pcolormesh(xaxis, vaxis, dataorg - deconv, vmin=-rms * 2, vmax=rms * 2, cmap='jet')
 ax.set_xlabel('Position (arcsec)')
 ax.set_ylabel('Velocity (km/s)')
 plt.show()
