@@ -17,19 +17,20 @@ print(f'cross term ratio: {r:.2f}')
 dataorg = np.squeeze(fitsdata.data)
 xaxis = fitsdata.xaxis
 vaxis = fitsdata.vaxis
-res_off = fitsdata.res_off * 3
+res_off = fitsdata.res_off
 print(f'res_off = {res_off / (xaxis[1] - xaxis[0]):.1f} pixels')
 
 i0 = np.argmin(np.abs(xaxis + 210 / 140))
 i1 = np.argmin(np.abs(xaxis - 210 / 140)) + 1
 j0 = np.argmin(np.abs(vaxis - 6.4 + 5))
 j1 = np.argmin(np.abs(vaxis - 6.4 - 5)) + 1
-xaxis, vaxis, data = xaxis[i0:i1], vaxis[j0:j1], dataorg[j0:j1, i0:i1]
-rmsvis = rms * np.sqrt(len(xaxis))
+xaxis, vaxis, dataorg = xaxis[i0:i1], vaxis[j0:j1], dataorg[j0:j1, i0:i1]
+#rmsvis = rms * np.sqrt(len(xaxis))
 gbeam = np.exp2(-4 * (xaxis / res_off)**2)
 gbeam = gbeam / np.sum(gbeam)
 #w = np.abs(np.fft.fft(gbeam))
 data = np.array([np.convolve(p, gbeam, mode='same') for p in dataorg])
+rms /= np.sqrt(np.sqrt(2))
 
 ngroup = 10
 def chisq(p, obs, l1, l2, i_cve, mode=''):
@@ -99,15 +100,16 @@ for v, y in zip(vaxis, data):
                  init=init, workers=1) #, updating='deferred')
     p = res.x
     deconv.append(p)
+deconv = np.array(deconv)
 
 #pg = np.array([np.convolve(p, gbeam, mode='same') for p in deconv])
-#levels = np.array([-12,-9,-6,-3,3,6,9,12,15,18,21,24,27,30]) * rms
-levels = [-10,-8,-6,-4,-2,2,4,6,8,10]
+levels = np.array([-12,-9,-6,-3,3,6,9,12,15,18,21,24,27,30]) * rms
+#levels = np.array([-10,-8,-6,-4,-2,2,4,6,8,10]) * rms
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
-#ax.contour(xaxis, vaxis, data, colors='k', levels=levels)
-#ax.contour(xaxis, vaxis, data - pg, colors='r', levels=levels)
-ax.pcolormesh(xaxis, vaxis, dataorg - p, vmin=-rms * 2, vmax=rms * 2, cmap='jet')
+ax.contour(xaxis, vaxis, dataorg, colors='k', levels=levels)
+ax.contour(xaxis, vaxis, deconv, colors='r', levels=levels)
+#ax.pcolormesh(xaxis, vaxis, dataorg - deconv, vmin=-rms * 2, vmax=rms * 2, cmap='jet')
 ax.set_xlabel('Position (arcsec)')
 ax.set_ylabel('Velocity (km/s)')
 plt.show()
