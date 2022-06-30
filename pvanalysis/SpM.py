@@ -5,12 +5,12 @@ from scipy.optimize import differential_evolution as difevo
 from pvanalysis.pvfits import Impvfits
 
 
-rms = 1.e-3
+rms = 0.01
 pa = 0
 fitsdata = Impvfits('./testfits/answer.fits', pa=pa)
 answer = np.squeeze(fitsdata.data)
 fitsdata = Impvfits('./testfits/question.fits', pa=pa)
-data = np.squeeze(fitsdata.data)
+question = np.squeeze(fitsdata.data)
 bmaj, bmin, bpa = fitsdata.beam
 phi = np.arctan(bmin / bmaj)
 dpa = np.abs(np.radians(bpa - pa))
@@ -21,18 +21,20 @@ vaxis = fitsdata.vaxis
 res_off = fitsdata.res_off
 print(f'res_off = {res_off / (xaxis[1] - xaxis[0]):.1f} pixels')
 
-i0 = np.argmin(np.abs(xaxis + 210 / 140))
-i1 = np.argmin(np.abs(xaxis - 210 / 140)) + 1
-j0 = np.argmin(np.abs(vaxis - 6.4 + 5))
-j1 = np.argmin(np.abs(vaxis - 6.4 - 5)) + 1
+i0 = np.argmin(np.abs(xaxis + 0.6))
+i1 = np.argmin(np.abs(xaxis - 0.6)) + 1
+j0 = np.argmin(np.abs(vaxis - 6.4 + 4))
+j1 = np.argmin(np.abs(vaxis - 6.4 - 4)) + 1
 xaxis, vaxis = xaxis[i0:i1], vaxis[j0:j1]
-data, answer = data[j0:j1, i0:i1], answer[j0:j1, i0:i1]
+question, answer = question[j0:j1, i0:i1], answer[j0:j1, i0:i1]
 gbeam = np.exp2(-4 * (xaxis / res_off)**2)
 beamarea = np.sum(gbeam)
+beampix = res_off / (xaxis[1] - xaxis[0])
 
 ngroup = 10
-def chisq(p, obs, l1, l2, i_cve, mode=''):
-    c0 = (np.convolve(p, gbeam, mode='same') - obs) / rms
+def chisq(p, obs, l1, l2, l3, i_cve, mode=''):
+    q = np.where(obs > 3 * rms, obs, obs * 0)
+    c0 = (np.convolve(p, gbeam, mode='same') - q) / rms
     nmax = len(obs) // ngroup
     if mode == 'pre':
         r = list(range(ngroup))
@@ -44,81 +46,77 @@ def chisq(p, obs, l1, l2, i_cve, mode=''):
         c0 = np.mean(np.abs(c0)**2)
     c1 = l1 * np.sum(np.abs(p)) / l1_org
     c2 = l2 * np.sum(np.abs(p[:-1] - p[1:])**2) / l2_org
-    c = (c0 + c1 + c2) / (1 + l1 + l2)
+    c3 = l3 * np.sum(p) / np.max(p) / l3_org
+    c = (c0 + c1 + c2 + c3) / (1 + l1 + l2 + l3)
     return c
 
-max = np.max(np.abs(data))
-bounds = [[-max, max]] * len(xaxis)
+max = np.max(np.abs(question))
+bounds = [[0, max]] * len(xaxis)
 
 deconv = []
-l1, l2 = 0.1, 0.1
+l1, l2, l3 = 0, 0.1, 0.6
 print(len(xaxis), 'pixels')
-for v, y in zip(vaxis, data):
+for v, y, p in zip(vaxis, question, answer):
     print(f'{v:.3f} km/s')
-    l1_org = np.sum(np.abs(y))
-    l2_org = np.sum(np.abs(y[:-1] - y[1:])**2)
-    cvelist = [None] * ngroup
-    chilist = [None] * ngroup
-    for i_cve in range(ngroup):
-        #print('i_cve =', i_cve)
-        init = [None] * 15
-        for i in range(15):
-            noise = np.convolve(np.random.randn(len(y)), gbeam, mode='same')
-            noise = noise / np.std(noise) * rms
-            init[i] = (y + noise) / beamarea
-        res = difevo(chisq, bounds=bounds, args=[y, l1, l2, i_cve, 'pre'],
-                     init=init, workers=1) #, updating='deferred')
-        chi2 = res.fun
-        #print(f'root chi2 = {np.sqrt(chi2):.3f} sigma')
-        chilist[i_cve] = chi2    
-        p = res.x
-        cve = chisq(p, y, l1, l2, i_cve, 'cve')
-        #print(f'root cve  = {np.sqrt(cve):.3f} sigma')
-        cvelist[i_cve] = cve
-    meanchi2 = np.mean(chilist)
-    meancve = np.mean(cvelist)
-    print(f'root mean chi2 = {np.sqrt(meanchi2):.3f} sigma')
-    print(f'root mean cve  = {np.sqrt(meancve):.3f} sigma')
+    obsarea = np.sum(np.where(y > 3 * rms, y, y * 0))
+    l1_org = obsarea / beamarea
+    l2_org = np.sum(np.abs(y[:-1] - y[1:])**2) / beamarea**2
+    l3_org = (obsarea / np.max(y))**2 - beampix**2
+    if l1_org <= 0 or l2_org <= 0 or l3_org <= 0:
+        deconv.append(y * 0)
+        continue
+    l3_org = np.sqrt(l3_org).clip(1, None)
+    init = [None] * 15
     for i in range(15):
         noise = np.convolve(np.random.randn(len(y)), gbeam, mode='same')
         noise = noise / np.std(noise) * rms
         init[i] = (y + noise) / beamarea
-    res = difevo(chisq, bounds=bounds, args=[y, l1, l2, i_cve, ''],
+    res = difevo(chisq, bounds=bounds, args=[y, l1, l2, l3, 0, ''],
                  init=init, workers=1) #, updating='deferred')
-    p = res.x
-    deconv.append(p)
+    c = chisq(p, y, l1, l2, l3, 0, '')
+    print(f'{res.fun:.3f} {c:.3f}')
+    deconv.append(res.x)
 deconv = np.array(deconv)
-
-levels = np.array([-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10]) * 0.026
+conv = np.array([np.convolve(d, gbeam, mode='same') for d in deconv])
+'''
+xaxis = xaxis / res_off
+levels = np.array([-15,-10,-5,5,10,15,20,25,30,35,40,45,50,55,60]) * rms
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
-ax.contour(xaxis, vaxis, answer, colors='k', levels=levels)
-ax.contour(xaxis, vaxis, deconv, colors='r', levels=levels)
-ax.set_xlabel('Position (arcsec)')
+ax.contour(xaxis, vaxis, question, colors='k',
+           levels=levels, linewidths=5)
+ax.contour(xaxis, vaxis, conv, colors='r',
+           levels=levels, linewidths=0.8)
+ax.set_xlabel('Position (beam)')
 ax.set_ylabel('Velocity (km/s)')
 plt.show()
-'''        
+'''
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
-ax.plot(xaxis, y, '-o', label='y')
-ax.plot(xaxis, p, '-o', label='p')
-ax.plot(xaxis, np.convolve(p, gbeam, mode='same'), '-o', label='p*b')
-ax.plot(xaxis, gbeam / gbeam.max() * y.max(), '-o', label='b')
-ax.plot(xaxis, xaxis * 0 + rms, '--k')
-ax.plot(xaxis, xaxis * 0 - rms, '--k')
-ax.plot(xaxis, xaxis * 0)
-ax.legend()
+#levels = np.array([1,2,3,4,5,6,7,8,9,10]) * 5e-3 / 5.
+#ax.contour(xaxis, vaxis, question, colors='b',
+#           levels=levels, linewidths=1.2)
+levels = np.arange(1, 11) / 10. * 0.52
+ax.contour(xaxis, vaxis, answer, colors='k',
+           levels=levels, linewidths=1.2)
+ax.contour(xaxis, vaxis, deconv, colors='r',
+           levels=levels, linewidths=1.2)
+ax.set_xlabel('Position (beam)')
+ax.set_ylabel('Velocity (km/s)')
 plt.show()
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
-#ax.plot(xaxis, y, '-o', label='y')
-#ax.plot(xaxis, p, '-o', label='p')
-ax.plot(xaxis, np.convolve(p, gbeam, mode='same') - y, '-o', label='p*b')
-#ax.plot(xaxis, gbeam / gbeam.max() * y.max(), '-o', label='b')
-ax.plot(xaxis, xaxis * 0 + rms, '--k')
-ax.plot(xaxis, xaxis * 0 - rms, '--k')
-ax.plot(xaxis, xaxis * 0)
-ax.legend()
+m = ax.pcolormesh(xaxis, vaxis, (deconv - answer) / answer,
+                  shading='nearest', cmap='jet',
+                  vmin=-0.5, vmax=0.5,
+                  )
+fig.colorbar(m, ax=ax)
+ax.set_xlabel('Position (beam)')
+ax.set_ylabel('Velocity (km/s)')
 plt.show()
-'''
+
+for a, d in zip(answer, deconv):
+    wa, wd = np.sum(a) / np.max(a) / 6, np.sum(d) / np.max(d) / 6
+    if not np.isnan(wa):
+        print(f'{wa:.2f} {wd:.2f} {wd/wa:.2f}')
