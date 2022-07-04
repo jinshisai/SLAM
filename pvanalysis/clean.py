@@ -5,8 +5,8 @@ from scipy.optimize import differential_evolution as difevo
 from pvanalysis.pvfits import Impvfits
 
 
-rms = 1 / 6.
-thre = 2
+rms = 0.1
+thre = -10000
 pa = 0
 fitsdata = Impvfits('./testfits/answer.fits', pa=pa)
 answer = np.squeeze(fitsdata.data)
@@ -27,11 +27,15 @@ i1 = np.argmin(np.abs(xaxis - 0.6)) + 1
 j0 = np.argmin(np.abs(vaxis - 6.4 + 3.5))
 j1 = np.argmin(np.abs(vaxis - 6.4 - 3.5)) + 1
 xaxis, vaxis = xaxis[i0:i1], vaxis[j0:j1]
-dx = xaxis[1] - xaxis[0]
 question, answer = question[j0:j1, i0:i1], answer[j0:j1, i0:i1]
 gbeam = np.exp2(-4 * (xaxis / res_off)**2)
 beamarea = np.sum(gbeam)
-beampix = res_off / dx
+beampix = res_off / (xaxis[1] - xaxis[0])
+
+def clean():
+
+
+
 
 ngroup = 10
 def chisq(p, obs, l1, l2, l3, i_cve, mode=''):
@@ -64,7 +68,7 @@ b = np.min(question) * 2
 bounds = [[b, a]] * len(xaxis)
         
 deconv = []
-l1, l2, l3 = 0, 0.1 * 0.2, 0.6 * 0.01
+l1, l2, l3 = 0, 0.1 * 2, 0.6
 print(len(xaxis), 'pixels')
 for v, y, p in zip(vaxis, question, answer):
     print(f'{v:.3f} km/s')
