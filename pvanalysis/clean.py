@@ -5,8 +5,8 @@ from scipy.optimize import differential_evolution as difevo
 from pvanalysis.pvfits import Impvfits
 
 
-rms = 0.1
-thre = -10000
+rms = 1 / 100.
+thre = 3.0
 pa = 0
 fitsdata = Impvfits('./testfits/answer.fits', pa=pa)
 answer = np.squeeze(fitsdata.data)
@@ -15,7 +15,7 @@ question = np.squeeze(fitsdata.data)
 bmaj, bmin, bpa = fitsdata.beam
 phi = np.arctan(bmin / bmaj)
 dpa = np.abs(np.radians(bpa - pa))
-r = np.cos(2*phi) * np.sin(2*dpa) / (1 - np.cos(2*phi) * np.cos(2*dpa))
+r = np.cos(2 * phi) * np.sin(2 * dpa) / 2.
 print(f'cross term ratio: {r:.2f}')
 xaxis = fitsdata.xaxis
 vaxis = fitsdata.vaxis
@@ -32,61 +32,27 @@ gbeam = np.exp2(-4 * (xaxis / res_off)**2)
 beamarea = np.sum(gbeam)
 beampix = res_off / (xaxis[1] - xaxis[0])
 
-def clean():
+def clean(obs, threshold, gain=0.1):
+    residual = obs.copy()
+    clncmp = np.zeros_like(residual)
+    while (peak := np.max(np.abs(residual))) > threshold:
+        imax = np.argmax(np.abs(residual))
+        cctmp = np.zeros_like(residual)
+        cctmp[imax] = peak * gain
+        residual -= np.convolve(cctmp, gbeam, mode='same')
+        clncmp += cctmp
+    return clncmp
 
-
-
-
-ngroup = 10
-def chisq(p, obs, l1, l2, l3, i_cve, mode=''):
-    if np.all(obs < thre * rms):
-        return 100
-    obsarea = np.sum(np.where(obs > thre * rms, obs, obs * 0))
-    l1_org = obsarea / beamarea
-    l2_org = np.sum(np.abs(obs[:-1] - obs[1:])**2) / beamarea**2
-    l3_org = (obsarea / np.max(obs))**2 - beampix**2
-    l3_org = np.sqrt(l3_org.clip(1, None))
-    q = np.where(obs > thre * rms, obs, obs * 0)
-    c0 = (np.convolve(p, gbeam, mode='same') - q) / rms
-    nmax = len(obs) // ngroup
-    if mode == 'pre':
-        r = list(range(ngroup))
-        r.remove(i_cve)
-        c0 = np.mean([np.abs(c0[j:nmax*ngroup:ngroup])**2 for j in r])             / (ngroup - 1) / nmax
-    elif mode == 'cve':
-        c0 = np.mean(np.abs(c0[i_cve:nmax*ngroup:ngroup])**2)
-    else:
-        c0 = np.mean(np.abs(c0)**2)
-    c1 = l1 * np.sum(np.abs(p)) / l1_org
-    c2 = l2 * np.sum(np.abs(p[:-1] - p[1:])**2) / l2_org
-    c3 = l3 * np.sum(p) / np.max(p).clip(1e-10, None) / l3_org
-    c = (c0 + c1 + c2 + c3) / (1 + l1 + l2 + l3)
-    return c
-
-a = np.max(question) * 2
-b = np.min(question) * 2
-bounds = [[b, a]] * len(xaxis)
-        
-deconv = []
-l1, l2, l3 = 0, 0.1 * 2, 0.6
 print(len(xaxis), 'pixels')
+deconv = []
 for v, y, p in zip(vaxis, question, answer):
     print(f'{v:.3f} km/s')
-    if np.all(y < thre * rms):
-        deconv.append(y * 0)
-        continue
-    init = [y / beamarea] * 60
-    res = difevo(chisq, bounds=bounds, args=[y, l1, l2, l3, 0, ''],
-                 maxiter=int(1e6), tol=1e-6, popsize=60,
-                 init=init, workers=1) #, updating='deferred')
-    c = chisq(p, y, l1, l2, l3, 0, '')
-    print(f'{res.fun:.3f} {c:.3f}')
-    deconv.append(res.x)
+    deconv.append(clean(y, threshold=thre * rms))
 deconv = np.array(deconv)
 conv = np.array([np.convolve(d, gbeam, mode='same') for d in deconv])
-'''
+
 xaxis = xaxis / res_off
-levels = np.array([-15,-10,-5,5,10,15,20,25,30,35,40,45,50,55,60]) * rms
+levels = np.array([-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10])
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
 ax.contour(xaxis, vaxis, question, colors='k',
@@ -96,16 +62,16 @@ ax.contour(xaxis, vaxis, conv, colors='r',
 ax.set_xlabel('Position (beam)')
 ax.set_ylabel('Velocity (km/s)')
 plt.show()
-'''
+
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
 #levels = np.array([1,2,3,4,5,6,7,8,9,10]) * 5e-3 / 5.
 #ax.contour(xaxis, vaxis, question, colors='b',
 #           levels=levels, linewidths=1.2)
 levels = np.arange(1, 11) / 10. * 0.52
-ax.contour(xaxis / res_off, vaxis, answer, colors='k',
+ax.contour(xaxis, vaxis, answer, colors='k',
            levels=levels, linewidths=1.2)
-ax.contour(xaxis / res_off, vaxis, deconv, colors='r',
+ax.contour(xaxis, vaxis, deconv, colors='r',
            levels=levels, linewidths=1.2)
 ax.plot(vaxis * 0 + 0.5, vaxis, '--k')
 ax.plot(vaxis * 0 - 0.5, vaxis, '--k')
@@ -115,7 +81,7 @@ plt.show()
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
-m = ax.pcolormesh(xaxis / res_off, vaxis, (deconv - answer) / answer,
+m = ax.pcolormesh(xaxis, vaxis, (deconv - answer) / answer,
                   shading='nearest', cmap='jet',
                   vmin=-0.5, vmax=0.5,
                   )
