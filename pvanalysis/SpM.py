@@ -5,7 +5,7 @@ from scipy.optimize import differential_evolution as difevo
 from pvanalysis.pvfits import Impvfits
 
 
-rms = 1 / 6.
+rms = 1 / 100.
 thre = 2
 pa = 0
 fitsdata = Impvfits('./testfits/answer.fits', pa=pa)
@@ -68,8 +68,8 @@ b = np.min(question) * 2
 bounds = [[b, a]] * len(xaxis)
         
 deconv = []
-l1, l2, l3 = 0.5, 0.0, 0.5
-#l1, l2, l3 = 0, 0.1, 0.6
+#l1, l2, l3 = 0.5, 0.0, 0.5
+l1, l2, l3 = 0, 0.1, 0.6
 popsize = 15
 print(len(xaxis), 'pixels')
 for v, y, p in zip(vaxis, question, answer):
@@ -86,9 +86,10 @@ for v, y, p in zip(vaxis, question, answer):
     deconv.append(res.x)
 deconv = np.array(deconv)
 conv = np.array([np.convolve(d, gbeam, mode='same') for d in deconv])
-'''
+
 xaxis = xaxis / res_off
-levels = np.array([-15,-10,-5,5,10,15,20,25,30,35,40,45,50,55,60]) * rms
+levels = np.arange(1, 11) * 0.1
+levels = np.sort(np.r_[-levels, levels])
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
 ax.contour(xaxis, vaxis, question, colors='k',
@@ -98,17 +99,17 @@ ax.contour(xaxis, vaxis, conv, colors='r',
 ax.set_xlabel('Position (beam)')
 ax.set_ylabel('Velocity (km/s)')
 plt.show()
-'''
+
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
-ax.pcolormesh(xaxis / res_off, vaxis, deconv, cmap='jet', vmin=0, vmax=0.52)
+ax.pcolormesh(xaxis, vaxis, deconv, cmap='jet', vmin=0, vmax=0.52)
 #levels = np.array([1,2,3,4,5,6,7,8,9,10]) * 5e-3 / 5.
 #ax.contour(xaxis, vaxis, question, colors='b',
 #           levels=levels, linewidths=1.2)
 levels = np.arange(1, 11) / 10. * 0.52
-ax.contour(xaxis / res_off, vaxis, answer, colors='k',
+ax.contour(xaxis, vaxis, answer, colors='k',
            levels=levels, linewidths=1.2)
-ax.contour(xaxis / res_off, vaxis, deconv, colors='r',
+ax.contour(xaxis, vaxis, deconv, colors='r',
            levels=levels, linewidths=1.2)
 ax.plot(vaxis * 0 + 0.5, vaxis, '--k')
 ax.plot(vaxis * 0 - 0.5, vaxis, '--k')
@@ -118,7 +119,7 @@ plt.show()
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
-m = ax.pcolormesh(xaxis / res_off, vaxis, (deconv - answer) / answer,
+m = ax.pcolormesh(xaxis, vaxis, (deconv - answer) / answer,
                   shading='nearest', cmap='jet',
                   vmin=-0.5, vmax=0.5,
                   )

@@ -6,7 +6,7 @@ from pvanalysis.pvfits import Impvfits
 
 
 rms = 1 / 100.
-thre = 3.0
+thre = 2.0
 pa = 0
 fitsdata = Impvfits('./testfits/answer.fits', pa=pa)
 answer = np.squeeze(fitsdata.data)
@@ -31,28 +31,39 @@ question, answer = question[j0:j1, i0:i1], answer[j0:j1, i0:i1]
 gbeam = np.exp2(-4 * (xaxis / res_off)**2)
 beamarea = np.sum(gbeam)
 beampix = res_off / (xaxis[1] - xaxis[0])
+icent = np.argmax(gbeam)
 
 def clean(obs, threshold, gain=0.1):
     residual = obs.copy()
     clncmp = np.zeros_like(residual)
-    while (peak := np.max(np.abs(residual))) > threshold:
-        imax = np.argmax(np.abs(residual))
+    prevpeak = 1000
+    while (peak := np.max(residual)) > threshold \
+          and peak < prevpeak:
+        prevpeak = peak
+        imax = np.argmax(residual)
         cctmp = np.zeros_like(residual)
         cctmp[imax] = peak * gain
-        residual -= np.convolve(cctmp, gbeam, mode='same')
+        #conv = np.convolve(cctmp, gbeam, mode='same')
+        conv = np.roll(gbeam, imax - icent) * peak * gain
+        residual -= conv
         clncmp += cctmp
-    return clncmp
+    return clncmp, residual
 
 print(len(xaxis), 'pixels')
-deconv = []
+deconv, clnres = [], []
 for v, y, p in zip(vaxis, question, answer):
     print(f'{v:.3f} km/s')
-    deconv.append(clean(y, threshold=thre * rms))
+    clncmp, residual = clean(y, threshold=thre * rms)
+    deconv.append(clncmp)
+    clnres.append(residual)
 deconv = np.array(deconv)
 conv = np.array([np.convolve(d, gbeam, mode='same') for d in deconv])
+conv += np.array(clnres)
+#deconv += np.array(clnres) / beamarea
 
 xaxis = xaxis / res_off
-levels = np.array([-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,1,2,3,4,5,6,7,8,9,10])
+levels = np.arange(3, 100, 1) / 6
+levels = np.sort(np.r_[-levels, levels])
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
 ax.contour(xaxis, vaxis, question, colors='k',
@@ -93,6 +104,9 @@ ax.set_ylabel('Velocity (km/s)')
 plt.show()
 
 for a, d in zip(answer, deconv):
-    wa, wd = np.sum(a) / np.max(a) / 6, np.sum(d) / np.max(d) / 6
+    wa = np.sum(a) / np.max(a) / beampix
+    #md = np.average(xaxis, weights=d) if np.any(d > 0) else 0
+    #wd = (np.sqrt(np.average((xaxis - md)**2, weights=d)) / beampix if np.any(d > 0) else 0) * np.sqrt(6)
+    wd = np.sum(d) / np.max(d) / beampix
     if not np.isnan(wa):
         print(f'{wa:.2f} {wd:.2f} {wd/wa:.2f}')
