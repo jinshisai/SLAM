@@ -72,6 +72,7 @@ ax.contour(xaxis, vaxis, conv, colors='r',
            levels=levels, linewidths=0.8)
 ax.set_xlabel('Position (beam)')
 ax.set_ylabel('Velocity (km/s)')
+fig.savefig('qvsc.png')
 plt.show()
 
 fig = plt.figure()
@@ -88,6 +89,7 @@ ax.plot(vaxis * 0 + 0.5, vaxis, '--k')
 ax.plot(vaxis * 0 - 0.5, vaxis, '--k')
 ax.set_xlabel('Position (beam)')
 ax.set_ylabel('Velocity (km/s)')
+fig.savefig('avsd.png')
 plt.show()
 
 fig = plt.figure()
