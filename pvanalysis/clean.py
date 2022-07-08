@@ -5,7 +5,7 @@ from scipy.optimize import differential_evolution as difevo
 from pvanalysis.pvfits import Impvfits
 
 
-rms = 1 / 100.
+rms = 1 / 10.
 thre = 2.0
 pa = 0
 fitsdata = Impvfits('./testfits/answer.fits', pa=pa)
