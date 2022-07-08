@@ -5,11 +5,13 @@ from scipy.optimize import differential_evolution as difevo
 from pvanalysis.pvfits import Impvfits
 
 
-rms = 1 / 6
+rms = 1 / 100
 thre = 2
 pa = 0
 fitsdata = Impvfits('./testfits/answer.fits', pa=pa)
 answer = np.squeeze(fitsdata.data)
+fitsdata = Impvfits('./testfits/question.fits', pa=pa)
+question = np.squeeze(fitsdata.data)
 bmaj, bmin, bpa = fitsdata.beam
 phi = np.arctan(bmin / bmaj)
 dpa = np.abs(np.radians(bpa - pa))
@@ -20,20 +22,15 @@ vaxis = fitsdata.vaxis
 dv = vaxis[1] - vaxis[0]
 dx = xaxis[1] - xaxis[0]
 res_off = fitsdata.res_off
-print(f'res_off = {res_off / (xaxis[1] - xaxis[0]):.1f} pixels')
 gbeam = np.exp2(-4 * (xaxis / res_off)**2)
-beamarea = np.sum(gbeam)
 beampix = res_off / dx
-
-#fitsdata = Impvfits('./testfits/question.fits', pa=pa)
-#question = np.squeeze(fitsdata.data)
+print(f'res_off = {beampix:.1f} pixels')
 
 noise = np.random.randn(*np.shape(answer))
 noise = np.array([np.convolve(n, gbeam, mode='same') for n in noise])
-noise = noise / np.std(noise) / 6.
+noise = noise / np.std(noise) / 100.
 question = np.array([np.convolve(a, gbeam, mode='same') for a in answer])
-question = question + noise
-print(np.shape(answer), np.shape(question))
+question = question #+ noise
 
 i0 = np.argmin(np.abs(xaxis + 0.6))
 i1 = np.argmin(np.abs(xaxis - 0.6)) + 1
@@ -41,6 +38,9 @@ j0 = np.argmin(np.abs(vaxis - 6.3 + 3.5))
 j1 = np.argmin(np.abs(vaxis - 6.3 - 3.5)) + 1
 xaxis, vaxis = xaxis[i0:i1], vaxis[j0:j1] - 6.3
 question, answer = question[j0:j1, i0:i1], answer[j0:j1, i0:i1]
+gbeam = np.exp2(-4 * (xaxis / res_off)**2)
+beamarea = np.sum(gbeam)
+
 
 ngroup = 10
 def chisq(p, obs, l1, l2, l3, i_cve, mode=''):
