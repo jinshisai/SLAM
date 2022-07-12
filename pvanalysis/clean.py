@@ -6,13 +6,11 @@ from scipy.interpolate import interp1d
 from pvanalysis.pvfits import Impvfits
 
 
-rms = 1 / 5
+rms = 1 / 10
 thre = 3
 pa = 0
-fitsdata = Impvfits('./testfits/answer.fits', pa=pa)
+fitsdata = Impvfits('./testfits/triangle.fits', pa=pa)
 answer = np.squeeze(fitsdata.data)
-fitsdata = Impvfits('./testfits/question.fits', pa=pa)
-question = np.squeeze(fitsdata.data)
 bmaj, bmin, bpa = fitsdata.beam
 phi = np.arctan(bmin / bmaj)
 dpa = np.abs(np.radians(bpa - pa))
@@ -34,6 +32,10 @@ question = np.array([np.convolve(a, gbeam, mode='same') for a in answer])
 question = question + noise
 
 vsys = 6.3 - 0.5 * dv
+#i0 = np.argmin(np.abs(xaxis + 1.4))
+#i1 = np.argmin(np.abs(xaxis - 1.4)) + 1
+#j0 = np.argmin(np.abs(vaxis - vsys + 5))
+#j1 = np.argmin(np.abs(vaxis - vsys - 5)) + 1
 i0 = np.argmin(np.abs(xaxis + 0.6))
 i1 = np.argmin(np.abs(xaxis - 0.6)) + 1
 j0 = np.argmin(np.abs(vaxis - vsys + 4))
@@ -42,7 +44,7 @@ xaxis, vaxis = xaxis[i0:i1], vaxis[j0:j1] - vsys
 question, answer = question[j0:j1, i0:i1], answer[j0:j1, i0:i1]
 gbeam = np.exp2(-4 * (xaxis / res_off)**2)
 beamarea = np.sum(gbeam)
-cmpthre = 3 * rms / beamarea
+cmpthre = thre * rms / beamarea
 icent = np.argmax(gbeam)
 
 def clean(obs, threshold, gain=0.01):
@@ -76,54 +78,92 @@ deconv = np.array(deconv)
 conv = np.array([np.convolve(d, gbeam, mode='same') for d in deconv])
 
 xaxis = xaxis / res_off
-'''
 levels = np.arange(1, 10) * 3 * rms
 levels = np.sort(np.r_[-levels, levels])
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
-ax.pcolormesh(xaxis, vaxis, question - conv, shading='nearest',
-              cmap='jet', vmin=-3 * rms, vmax=3 * rms)
-ax.contour(xaxis, vaxis, question, colors='k',
+c = ax.pcolormesh(xaxis, vaxis, question, shading='nearest',
+                  cmap='jet', vmin=0 * rms, vmax=10 * rms)
+fig.colorbar(c, ax=ax, label='Jy/beam')
+ax.contour(xaxis, vaxis, question, colors='w',
            levels=levels, linewidths=1)
-#ax.contour(xaxis, vaxis, conv, colors='r',
-#           levels=levels, linewidths=0.8)
+ax.set_xlabel('Position (beam)')
+ax.set_ylabel('Velocity (km/s)')
+fig.savefig('q_clean.png')
+#plt.show()
+
+levels = np.arange(1, 10) * 3 * rms
+levels = np.sort(np.r_[-levels, levels])
+fig = plt.figure()
+ax = fig.add_subplot(1, 1, 1)
+c = ax.pcolormesh(xaxis, vaxis, conv, shading='nearest',
+                  cmap='jet', vmin=0 * rms, vmax=10 * rms)
+fig.colorbar(c, ax=ax, label='Jy/beam')
+ax.contour(xaxis, vaxis, conv, colors='w',
+           levels=levels, linewidths=1)
+ax.set_xlabel('Position (beam)')
+ax.set_ylabel('Velocity (km/s)')
+fig.savefig('c_clean.png')
+#plt.show()
+
+levels = np.arange(1, 10) * 3 * rms
+levels = np.sort(np.r_[-levels, levels])
+fig = plt.figure()
+ax = fig.add_subplot(1, 1, 1)
+c = ax.pcolormesh(xaxis, vaxis, question - conv, shading='nearest',
+                  cmap='jet', vmin=-3 * rms, vmax=3 * rms)
+fig.colorbar(c, ax=ax, label='Jy/beam')
+ax.contour(xaxis, vaxis, question - conv, colors='w',
+           levels=levels, linewidths=1)
 ax.set_xlabel('Position (beam)')
 ax.set_ylabel('Velocity (km/s)')
 fig.savefig('qvsc_clean.png')
 #plt.show()
 
-conv += np.array(clnres)
+fig = plt.figure()
+ax = fig.add_subplot(1, 1, 1)
+c = ax.pcolormesh(xaxis, vaxis, answer, shading='nearest',
+                  cmap='jet', vmin=0, vmax=0.68)
+fig.colorbar(c, ax=ax, label='Jy/pixel')
+levels = 2**np.arange(10) * cmpthre
+levels = np.sort(np.r_[-levels, levels])
+ax.contour(xaxis, vaxis, answer, colors='w',
+           levels=levels, linewidths=1)
+ax.plot(vaxis * 0 - 1, vaxis, '--w')
+ax.set_xlabel('Position (beam)')
+ax.set_ylabel('Velocity (km/s)')
+fig.savefig('a_clean.png')
+#plt.show()
 
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
-ax.pcolormesh(xaxis, vaxis, deconv, shading='nearest',
-              cmap='jet', vmin=0, vmax=0.68)
-#ax.contour(xaxis, vaxis, question, colors='b',
-#           levels=levels, linewidths=1.2)
+c = ax.pcolormesh(xaxis, vaxis, deconv, shading='nearest',
+                  cmap='jet', vmin=0, vmax=0.68)
+fig.colorbar(c, ax=ax, label='Jy/pixel')
 levels = 2**np.arange(10) * cmpthre
 levels = np.sort(np.r_[-levels, levels])
-ax.contour(xaxis, vaxis, answer, colors='k',
-           levels=levels, linewidths=1.2)
-ax.contour(xaxis, vaxis, deconv, colors='r',
-           levels=levels, linewidths=1.2)
-ax.plot(vaxis * 0 - 1, vaxis, '--k')
+ax.contour(xaxis, vaxis, deconv, colors='w',
+           levels=levels, linewidths=1)
+ax.plot(vaxis * 0 - 1, vaxis, '--w')
+ax.set_xlabel('Position (beam)')
+ax.set_ylabel('Velocity (km/s)')
+fig.savefig('d_clean.png')
+#plt.show()
+
+fig = plt.figure()
+ax = fig.add_subplot(1, 1, 1)
+c = ax.pcolormesh(xaxis, vaxis, answer - deconv, shading='nearest',
+                  cmap='jet', vmin=-0.68, vmax=0.68)
+fig.colorbar(c, ax=ax, label='Jy/pixel')
+levels = 2**np.arange(10) * cmpthre
+levels = np.sort(np.r_[-levels, levels])
+ax.contour(xaxis, vaxis, answer - deconv, colors='w',
+           levels=levels, linewidths=1)
+ax.plot(vaxis * 0 - 1, vaxis, '--w')
 ax.set_xlabel('Position (beam)')
 ax.set_ylabel('Velocity (km/s)')
 fig.savefig('avsd_clean.png')
 #plt.show()
-
-fig = plt.figure()
-ax = fig.add_subplot(1, 1, 1)
-m = ax.pcolormesh(xaxis, vaxis, (deconv - answer) / answer,
-                  shading='nearest', cmap='jet',
-                  vmin=-0.5, vmax=0.5,
-                  )
-fig.colorbar(m, ax=ax)
-ax.plot(vaxis * 0 - 1, vaxis, '--k')
-ax.set_xlabel('Position (beam)')
-ax.set_ylabel('Velocity (km/s)')
-#plt.show()
-'''
 
 xnew = np.linspace(xaxis[0], xaxis[-1], (len(xaxis) - 1) * 10 + 1)
 result = []
