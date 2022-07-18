@@ -19,7 +19,10 @@ from astropy import constants, units
 from .fitfuncs import edge, ridge_mean, gaussfit, gauss1d
 from pvanalysis.pvfits import Impvfits
 from pvanalysis.pvplot import PVPlot
-from pvanalysis.analysis_tools import doublepower_r, doublepower_v, doublepower_v_error, doublepower_r_error
+from pvanalysis.analysis_tools import (doublepower_r,
+                                       doublepower_v,
+                                       doublepower_v_error,
+                                       doublepower_r_error)
 from utils import emcee_corner
 
 
@@ -145,8 +148,8 @@ class PVAnalysis():
         self.xlim = xlim
         self.vlim = vlim
         self.Mlim = Mlim
-        self.__unit = 1e10 * self.dist * au \
-                      / Ggrav / Msun / np.sin(np.radians(incl))**2
+        self.sini = np.sin(np.radians(incl))
+        self.__unit = 1e10 * self.dist * au / Ggrav / Msun / self.sini**2
         self.__use_position = use_position
         self.__use_velocity = use_velocity
 
@@ -792,7 +795,8 @@ class PVAnalysis():
                       include_dp: bool = True,
                       include_pin: bool = False,
                       outname: str = 'pvanalysis',
-                      show_corner: bool = False):
+                      rangelevel: float = 0.8,
+                      show_corner: bool = False) -> dict:
         """Fit the derived edge/ridge positions/velocities with a double power law function by using emcee.
 
 
@@ -806,12 +810,14 @@ class PVAnalysis():
             outname : str
                The output corner figures have names of "outname".corner_e.png
                and "outname".corner_r.png.
+            rangelevel : float
+               Fraction of points included in the corner plot. Defaults to 0.8.
             show_corner : bool
                True means the corner figures are shown. These figures are also
                plotted in two png files.
 
         Returns:
-            fitsdata : dict
+            result : dict
                 {'edge':{'popt':[...], 'perr':[...]}, 'ridge':{...}}
                 'popt' is a list of [r_break, v_break, p_in, dp, vsys].
                 'perr' is the uncertainties for popt.
@@ -829,7 +835,6 @@ class PVAnalysis():
         Es, Rs = Ds
         self.__Es = Es
         self.__Rs = Rs
-        self.include_dp = include_dp
         self.model = doublepower_v
         if (len(Es[0]) == 0 and len(Es[3]) == 0) \
             or (len(Rs[0]) == 0 and len(Rs[3]) == 0):
@@ -866,7 +871,7 @@ class PVAnalysis():
                 return -0.5 * chi2
             plim = plim[:, include]
             popt, perr = emcee_corner(plim, lnprob, args=args,
-                                      labels=labels,
+                                      labels=labels, rangelevel=rangelevel,
                                       figname=outname+'.corner'+ext+'.png',
                                       show_corner=show_corner,
                                       ndata=len(args[0]) + len(args[3]))
@@ -878,6 +883,100 @@ class PVAnalysis():
         self.popt = {'edge':popt_e, 'ridge':popt_r}
         result = {'edge':{'popt':popt_e[0], 'perr':popt_e[1]},
                   'ridge':{'popt':popt_r[0], 'perr':popt_r[1]}}
+        return result
+
+    def fit_linear(self, include_intercept: bool = True) -> dict:
+        """Fit the derived edge/ridge positions/velocities with a linear function analytically.
+
+
+        Args:
+            include_intercept : bool
+               False means that the model line passes (0, 0).
+            outname : str
+               The output corner figures have names of "outname".corner_e.png
+               and "outname".corner_r.png.
+            show_corner : bool
+               True means the corner figures are shown. These figures are also
+               plotted in two png files.
+
+        Returns:
+            result : dict
+                {'edge':{'popt':[...], 'perr':[...]}, 'ridge':{...}}
+                'popt' is a list of [r_break, v_break, p_in, dp, vsys].
+                'perr' is the uncertainties for popt.
+        """
+        res_org = self.results_filtered
+        Ds = [None, None]
+        for i, er in enumerate(['edge', 'ridge']):
+            xrb  = [res_org[er]['xcut'][rb] for rb in ['red', 'blue']]
+            xcut = np.concatenate(xrb, axis=1)
+            v0, x1, dx1 = xcut[1], self.xsign * xcut[0], xcut[2]
+            vrb  = [res_org[er]['vcut'][rb] for rb in ['red', 'blue']]
+            vcut = np.concatenate(vrb, axis=1)
+            x0, v1, dv1 = self.xsign * vcut[0], vcut[1], vcut[3]
+            Ds[i] = [v0, x1, dx1, x0, v1, dv1]
+        Es, Rs = Ds
+        self.__Es = Es
+        self.__Rs = Rs
+        self.model = lambda x, c0, c1: c0 + c1 * x
+        if (len(Es[0]) == 0 and len(Es[3]) == 0) \
+            or (len(Rs[0]) == 0 and len(Rs[3]) == 0):
+            if len(Es[0]) == 0 and len(Es[3]) == 0:
+                print('No edge point was found.')
+            if len(Rs[0]) == 0 and len(Es[3]) == 0:
+                print('No ridge point was found.')
+            return -1
+
+        def linfit(x, y, dy):
+            wsum = lambda a: np.sum(a / dy**2)
+            b = np.array([wsum(y), wsum(y * x)])
+            A = np.array([[wsum(1), wsum(x)],
+                          [wsum(x), wsum(x**2)]])
+            c = np.dot(Ainv := np.linalg.inv(A), b)
+            dc = np.sqrt([Ainv[0, 0], Ainv[1, 1]])
+            return c, dc
+        def grafit(x, y, dy):
+            wsum = lambda a: np.sum(a / dy**2)
+            c = np.array([0, wsum(x * y) / wsum(x**2)])
+            dc = np.array([0, 1. / np.sqrt(wsum(x**2))])
+            return c, dc
+
+        f = linfit if include_intercept else grafit
+        if len(Rs[0]) > 0:  # use xcut (priority)
+            for er in ['edge', 'ridge']:
+                for br in ['blue', 'red']:
+                    self.results_filtered[er]['vcut'][br] \
+                        = [np.array([])] * 4
+            c, dc = f(*Rs[:3])
+            ci = [c[0], c[1] * self.sini]
+            dci = [dc[0], dc[1] * self.sini]
+            vlim = np.array([np.min(Rs[0]), np.max(Rs[0])])
+            xlim = np.sort(c[0] + c[1] * vlim)
+            def gradinv(c, dc):
+                err = [dc[0]**2 / c[1]**2 + dc[1]**2 * c[0]**2 / c[1]**4,
+                       dc[1]**2 / c[1]**4]
+                err = np.sqrt(err)
+                val = np.array([-c[0] / c[1], 1. / c[1]])
+                return val, err
+            c, dc = gradinv(c, dc)
+            ci, dci = gradinv(ci, dci)
+        else:  # use vcut
+            c, dc = f(*Rs[3:])
+            ci, dci = c / self.sini, dc / self.sini
+            xlim = np.array([np.min(Rs[3]), np.max(Rs[3])])
+            vlim = np.sort(c[0] + c[1] * xlim)
+        print('--- Ridge linear (incl. corrected) ---')
+        print(f'v(0) = {ci[0]:+.3f} +/- {dci[0]:.3f} km/s')
+        print(f'grad = {ci[1]:+.4f} +/- {dci[1]:.4f} km/s/au')
+        print(f'x    = {xlim[0]:.2f} --- {xlim[1]:.2f} au')
+        print(f'v    = {vlim[0]:.3f} --- {vlim[1]:.3f} km/s')
+        self.rvlim = {'edge':[[1e-10, 1e-10], [1e-10, 1e-10]],
+                      'ridge':[[0.01, np.max(np.abs(xlim))],
+                               [0.01, np.max(np.abs(vlim))]]}
+        self.popt = {'edge':[[np.nan, np.nan], [np.nan, np.nan]],
+                     'ridge':[c, dc]}
+        result = {'edge':{'popt':[np.nan, np.nan], 'perr':[np.nan, np.nan]},
+                  'ridge':{'popt':c, 'perr':dc}}
         return result
 
     def write_edgeridge(self, outname='pvanalysis'):
@@ -1046,6 +1145,14 @@ class PVAnalysis():
             flipaxis (bool, optional): True means x-axis is velocity and
                 y-axis is position. Defaults to False.
         """
+        if len(self.popt['ridge'][0]) == 5:
+            self.avevsys = (self.popt['edge'][0][4]
+                            + self.popt['ridge'][0][4]) / 2.
+            self.vsys += self.avevsys
+            self.popt['edge'][0][4] -= self.avevsys
+            self.popt['ridge'][0][4] -= self.avevsys
+        else:
+            self.avevsys = 0
         for loglog, ext in zip([False, True], ['linear', 'log']):
             pp = PVPlot(restfrq=self.fitsdata.restfreq,
                         beam=self.fitsdata.beam, pa=self.fitsdata.pa,

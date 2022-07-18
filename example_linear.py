@@ -2,26 +2,23 @@ import numpy as np
 from pvanalysis import PVAnalysis
 
 '-------- INPUTS --------'
-fitsfile = './testfits/test.fits'
-outname = 'pvanalysis'  # file name header for outputs
-incl = 48.  # deg
-vsys = 6.4  # km/s
-dist = 140.  # pc
-rms = 1.7e-3  # Jy/beam
+fitsfile = './testfits/testlinear.fits'
+outname = 'linear'  # file name header for outputs
+incl = 65.  # deg
+vsys = 4.0  # km/s
+dist = 139.  # pc
+rms = 2.4e-3  # Jy/beam
 thr = 5.  # rms
 ridgemode = 'mean'  # 'mean' or 'gauss'
-xlim = [-200, 0, 0, 200]  # au; [-outlim, -inlim, inlim, outlim]
-vlim = np.array([-5, 0, 0, 5]) + vsys  # km/s
+xlim = [-70, 0, 0, 70]  # au; [-outlim, -inlim, inlim, outlim]
+vlim = np.array([-1.4, 0, 0, 1.4]) + vsys  # km/s
 Mlim = [0, 10]  # M_sun; to exclude unreasonable points
-xlim_plot = [200. / 20., 200.]  # au; [inlim, outlim]
-vlim_plot = [6. / 20., 6.]  # km/s
+xlim_plot = [100. / 20., 100.]  # au; [inlim, outlim]
+vlim_plot = [3. / 20., 3.]  # km/s
 use_velocity = True  # cuts along the velocity direction
 use_position = True  # cuts along the positional direction
-include_vsys = False  # vsys offset. False means vsys=0.
-include_dp = True  # False means a single power
-include_pin = False  # False means pin=0.5 (Keplerian).
+include_intercept = True  # False means v(x=0) is fixed at 0.
 show_pv = True  # figures will be made regardless of this option.
-show_corner = True  # figures will be made regardless of this option.
 minabserr = 0.1  # minimum absolute errorbar in the unit of bmaj or dv.
 minrelerr = 0.01  # minimum relative errorbar.
 '------------------------'
@@ -34,14 +31,9 @@ impv.get_edgeridge(outname, thr=thr, ridgemode=ridgemode, incl=incl,
                    use_position=use_position, use_velocity=use_velocity,
                    Mlim=Mlim, xlim=np.array(xlim) / dist, vlim=vlim,
                    minabserr=minabserr, minrelerr=minrelerr,
-                   nanbeforemax=True, nanopposite=True, nanbeforecross=True)
+                   nanbeforemax=False, nanopposite=False, nanbeforecross=False)
 impv.write_edgeridge(outname=outname)
-impv.fit_edgeridge(include_vsys=include_vsys,
-                   include_dp=include_dp,
-                   include_pin=include_pin,
-                   outname=outname, rangelevel=0.8,
-                   show_corner=show_corner)
-impv.output_fitresult()
+impv.fit_linear(include_intercept=include_intercept)
 impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
                     clevels=[-9,-6,-3,3,6,9], outname=outname,
                     show=show_pv, logcolor=True, Tbcolor=False,
@@ -49,6 +41,6 @@ impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
                     kwargs_contour={'colors':'lime'},
                     fmt={'edge':'v', 'ridge':'o'},
                     linestyle={'edge':'--', 'ridge':'-'},
-                    plotridgepoint=True, plotedgepoint=True,
+                    plotridgepoint=True, plotedgepoint=False,
                     plotridgemodel=True, plotedgemodel=True)
 '-------------------------------------'
