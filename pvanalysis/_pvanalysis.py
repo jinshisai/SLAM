@@ -1111,8 +1111,9 @@ class PVAnalysis():
         else:
             self.avevsys = 0
         self.vsys += self.avevsys
-        self.popt['edge'][0][4] -= self.avevsys
-        self.popt['ridge'][0][4] -= self.avevsys
+        if len(self.popt['ridge'][0]) == 5:
+            self.popt['edge'][0][4] -= self.avevsys
+            self.popt['ridge'][0][4] -= self.avevsys
         """Make linear and loglog PV diagrams
            with the derived points and model lines.
 
