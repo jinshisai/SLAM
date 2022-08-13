@@ -1105,8 +1105,11 @@ class PVAnalysis():
                        fmt: dict = {'edge':'v', 'ridge':'o'},
                        linestyle: dict = {'edge':'--', 'ridge':'-'},
                        flipaxis: bool = False) -> None:
-        self.avevsys = (self.popt['edge'][0][4]
-                        + self.popt['ridge'][0][4]) / 2.
+        if len(self.popt['ridge'][0]) == 5:
+            self.avevsys = (self.popt['edge'][0][4]
+                            + self.popt['ridge'][0][4]) / 2.
+        else:
+            self.avevsys = 0
         self.vsys += self.avevsys
         self.popt['edge'][0][4] -= self.avevsys
         self.popt['ridge'][0][4] -= self.avevsys
