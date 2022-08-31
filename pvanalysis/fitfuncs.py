@@ -115,7 +115,8 @@ def complexgaussfit(xdata, ydata, yerr, pini=[]):
 	'''
 
 	# Get estimate of the initial parameters
-	if len(pini) == 4:
+	nparams = 4
+	if len(pini) == nparams:
 		pinp = pini
 	else:
 		indx_pini = ydata >= 3.*yerr
@@ -130,9 +131,9 @@ def complexgaussfit(xdata, ydata, yerr, pini=[]):
 		phase = np.arctan2(ydata.real[np.nanargmin(np.abs(xdata))], ydata.imag[np.nanargmin(np.abs(xdata))])
 		pinp  = [amp, mx, sigx, phase]
 
-	if len(xdata) < 4:
-		param_out = np.full(4, np.nan)
-		param_err = np.full(4, np.nan)
+	if len(xdata) < nparams:
+		param_out = np.full(nparams, np.nan)
+		param_err = np.full(nparams, np.nan)
 		return param_out, param_err
 
 	# fitting
@@ -149,8 +150,8 @@ def complexgaussfit(xdata, ydata, yerr, pini=[]):
 			np.abs(param_cov[j][j])**0.5 for j in range(len(pinp))
 			])
 	else:
-		param_err = np.full(4, np.nan)
-		param_out = np.full(4, np.nan) if (param_out == pinp).all else param_out
+		param_err = np.full(nparams, np.nan)
+		param_out = np.full(nparams, np.nan) if (param_out == pinp).all else param_out
 
 	# print results
 	#print ('Chi2: ', reduced_chi2)
