@@ -114,7 +114,7 @@ class Impvfits:
                     bmaj, bmin, bpa, _, _ = self.beam[i]
                     res_offs.append(get_1dresolution(pa, bmaj, bmin, bpa))
                 self.res_off = np.nanmax(res_offs)
-            elif self.beam != None:
+            elif self.beam is not None:
                 bmaj, bmin, bpa = self.beam
                 self.res_off = get_1dresolution(pa, bmaj, bmin, bpa)
             else:
@@ -195,7 +195,7 @@ class Impvfits:
 
 
     # beam deconvolution
-    def beam_deconvolution(self, sigmacut=None, highfcut=2., solmode='nullcut'):
+    def beam_deconvolution(self, sigmacut=None, highfcut=2., solmode='gauss'):
         '''
         Deconvolve PV diagram with beam.
 
@@ -204,164 +204,227 @@ class Impvfits:
         sigmacut (float): Noise cut threshold given by absolute value.
         highfcut (float): Threshold to cut high-frequency component when slomode='nullcut'.
         solmode (str): Type of solution for the deconvolution. Must be either of 
-         'nullcut', 'highfcut', 'gauss', 'goal' and 'spm'.
+         'nullcut', 'highfcut', 'gauss', 'taper' and 'spm'.
         '''
+        # modules
         # modules for FFT
-        from scipy.fft import fftshift
-        from scipy.fft import ifftn
-        from scipy.fft import fftn
-        from scipy.fft import fftfreq
+        from scipy.fft import fftshift, ifftn, fftn, fftfreq
         # 1D Gaussian function
         from .fitfuncs import gauss1d, gaussfit, complexgauss1d, complexgaussfit
         # to find positions
         from scipy.signal import argrelmin #, argrelmax
 
-        # data
-        data = np.squeeze(self.data.copy())
-        if sigmacut:
-            data[data < sigmacut] = 0.
-
-        # beam array
-        nv, nx = self.nv, self.nx
-        if self.multibeam:
-            beam = np.empty((nv,nx))
-            for i in range(len(self.beam)):
-                bmaj, bmin, bpa, _, _ = self.beam[i]
-                if self.pa != None:
-                    res_off = get_1dresolution(self.pa, bmaj, bmin, bpa)
+        # solutions
+        def get_gaussiansolution_fc(nx, kx, d_deconv_fft, beam_fft):
+            '''
+            Get solution for deconvolution assuming that the solution is a Gaussian function.
+            '''
+            if (np.abs(d_deconv_fft[nx//2-1:nx//2+2]) == 0.).all():
+                # if total flux is zeros
+                return complexgauss1d(kx, 0., 0., 1., 0.,)
+            else:
+                # complex Gaussian fitting
+                # initial estimate
+                pini = [
+                    np.abs(d_deconv_fft[nx//2]), # amp
+                    0., # mean
+                    np.nansum(np.abs(d_deconv_fft[nx//2-5:nx//2+6])*( kx[nx//2-5:nx//2+6] - 0.)**2. )\
+                    /np.nansum(np.abs(d_deconv_fft[nx//2-5:nx//2+6])), # sigma
+                    np.arctan2(d_deconv_fft[np.nanargmin(np.abs(kx))].real,
+                    d_deconv_fft[np.nanargmin(np.abs(kx))].imag), # phase
+                    ]
+                param_opt, param_err = complexgaussfit(kx, d_deconv_fft, 1./beam_fft, pini=pini)
+                if np.isnan(param_opt).any() == True:
+                    return complexgauss1d(kx, 0., 0., 1., 0.,)
                 else:
-                    res_off = bmaj
-                beam[i, :] = gauss1d(self.xaxis, 1., 0., res_off/(2.*np.sqrt(2.*np.log(2.))))
-                beam[i, :] /= np.sum(beam[i, :]) # normalize
-        elif self.res_off != None:
-            _beam = gauss1d(self.xaxis, 1., 0., self.res_off/(2.*np.sqrt(2.*np.log(2.))))
-            _beam /= np.sum(_beam) # normalize
-            beam = np.tile(_beam, (nv,1))
-        else:
-            print('ERROR\tbeam_deconvolution: angular resolution is not given correctly.')
-            print('ERROR\tbeam_deconvolution: check the header of the input fits file.')
-            return -1
+                    return complexgauss1d(kx, *param_opt)
+
+        def get_gaussiansolution(_xin, _din, get_params=False):
+            # exclude nan from the fitting
+            _x = _xin[~np.isnan(_din)]
+            _d = _din[~np.isnan(_din)]
+            # if all zero
+            if (_d == 0).all():
+                if get_params:
+                    return [0,0,0]
+                else:
+                    return np.zeros(len(_x))
+            else:
+                pout, _ = gaussfit(_x, _d, 1., [np.nanmax(_d), 
+                    np.nansum(_d*_x)/np.nansum(_d), 
+                    np.sqrt( np.nansum(_d*(np.nansum(_d*_x)/np.nansum(_d) - _x)**2)/np.nansum(_d) )])
+                # return best-fit parameters
+                if get_params:
+                    return pout
+                # or return gaussian
+                if np.isnan(pout).any():
+                    return np.zeros(len(_x))
+                else:
+                    return gauss1d(_x, *pout)
+
+        def get_pointsolution(_x, _x0, _f):
+            _indx = np.argmin(np.abs(_x - _x0))
+            _pt = np.zeros(len(_x))
+            _pt[_indx] = _f
+            return _pt
+
+        def zero_division(_a, _b):
+            ans = np.empty(_a.shape)
+            ans[_b != 0.] = _a[_b != 0.]/_b[_b != 0.]
+            ans[ (_b == 0.) * (_a < 0.)] = - np.infty
+            ans[ (_b == 0.) * (_a >= 0.)] = np.infty
+            return ans
 
         # check axis
         if self.naxis == 2:
-            shape = (nv, nx)
-        if self.naxis == 3:
-            shape = (1, nv, nx)
+            shape = (self.nv, self.nx)
+        elif self.naxis == 3:
+            shape = (1, self.nv, self.nx)
         else:
             print('ERROR\tbeam_deconvolution: number of fits axes must be 2 or 3.')
             return -1
 
-        # FFT
-        kx   = fftshift(fftfreq(nx, self.delx))
-        kv   = fftshift(fftfreq(nv, self.delv))
-        kkx, kkv = np.meshgrid(kx, kv)
-        beam_fft = fftshift(fftn(beam, axes=(1,)), axes=(1,))
-        data_fft = fftshift(fftn(data, axes=(1,)), axes=(1,))
+        # data
+        data = np.squeeze(self.data.copy())
 
-        # deconvolution
-        sigma_beam_fft = (2.*np.sqrt(2.*np.log(2.)))/(self.res_off*np.pi*2.)
-        #print(sigma_beam_fft)
-        d_deconv_fft = data_fft/beam_fft
+        # cut data less than given threshold
+        if sigmacut:
+            data[data < sigmacut] = 0.
 
-        # fillter
-        if solmode == 'nullcut':
-            # based on null
-            for i in range(nv):
-                d_fft_1d   = np.abs(data_fft[i,:][nx//2:])
-                first_null = argrelmin(d_fft_1d)[0][0]\
-                 if len(argrelmin(d_fft_1d)[0]) > 0 else -1
-                fx_null    = kx[nx//2:][first_null]
-                d_deconv_fft[i, (np.abs(kkx) > fx_null)[1]] = 0.+0.j # drop highfreq. components
-
-                if highfcut != None:
-                    if fx_null > sigma_beam_fft*highfcut:
-                        d_deconv_fft[i, (np.abs(kkx) >\
-                         sigma_beam_fft*highfcut)[1]] = 0.+0.j # drop highfreq. components
-        elif solmode == 'highfcut':
-            if highfcut == None:
-                print('ERROR\tbeam_deconvolution: Give valid highfcut when solmode=highfcut.')
-                return -1
-            # drop highfreq. components
-            d_deconv_fft[(np.abs(kkx) > sigma_beam_fft*highfcut)] = 0.+0.j
-        elif solmode == 'gauss':
-            # relative weight
-            w = 1./np.append(np.sqrt(np.arange(nx//2, nx+1, 1)),
-                np.sqrt(np.arange(nx, nx//2+1, -1))) if nx %2 == 0\
-            else 1./np.append(
-                np.sqrt(np.arange(nx//2, nx, 1)),
-                np.sqrt(np.arange(nx, nx//2+1, -1)))
-            # deconvolution
-            for i in range(nv):
-                #plt.plot(kx, np.abs(d_deconv_fft[i,:]), 'k')
-                # if flux is zero (all emission was cut off)
-                if (np.abs(d_deconv_fft[i,nx//2-1:nx//2+2]) == 0.).all():
-                    d_deconv_fft[i,:] = complexgauss1d(kx, 0., 0., 1., 0.)
-                else:
-                    phase = np.arctan2(d_deconv_fft[i,np.nanargmin(np.abs(kx))].real,
-                     d_deconv_fft[i,np.nanargmin(np.abs(kx))].imag)
-                    pini = [
-                    np.abs(d_deconv_fft[i,nx//2]), 
-                    0., 
-                    np.nansum(np.abs(d_deconv_fft[i,nx//2-5:nx//2+6])*( kx[nx//2-5:nx//2+6] - 0.)**2. )/np.nansum(np.abs(d_deconv_fft[i,nx//2-5:nx//2+6])),
-                    phase]
-                    #print(np.nansum(np.abs(d_deconv_fft[i,nx//2-2:nx//2+3])*( kx[nx//2-2:nx//2+3] - 0.)**2. )/np.nansum(np.abs(d_deconv_fft[i,nx//2-2:nx//2+3])))
-                    param_opt, param_err = complexgaussfit(kx, d_deconv_fft[i,:], w/beam_fft[i,:], pini=pini)
-                    if np.isnan(param_opt).any() == True:
-                        d_deconv_fft[i,:] = complexgauss1d(kx, 0., 0., 1., 0.)
-                    else:
-                        d_deconv_fft[i,:] = complexgauss1d(kx, *param_opt) # replace
-
-                # replace
-                #plt.plot(kx, np.abs(d_deconv_fft[i,:]), color='salmon')
-                #plt.plot(kx, w/np.abs(beam_fft[i,:]))
-                #plt.ylim(-0.1,1.1)
-                #plt.show()
+        # get one dimensional beam size for deconvolution
+        if self.multibeam:
+            if self.pa is not None:
+                res_off = np.array([
+                    get_1dresolution(
+                        self.pa, self.beam[i][0], 
+                        self.beam[i][1], self.beam[i][2])
+                    for i in range(self.nv)
+                    ])
+            else:
+                res_off = self.beam[:,0] # get bmaj
         else:
-            print('WARNING\tbeam_deconvolution: Given solmode parameter is not valid.')
-            print('WARNING\tbeam_deconvolution: Adopt no processing.')
-            return -1
+            res_off = self.res_off
+        sigma_beam_fft = (2.*np.sqrt(2.*np.log(2.)))/(res_off*np.pi*2.)
 
-        # IFFT
-        d_deconv = np.abs(fftshift(ifftn(d_deconv_fft, axes=(1,)), axes=(1,)))
+        # analytical solution
+        if solmode == 'gauss':
+            # get Gaussian solution in real space
+            g_ = np.array([
+                get_gaussiansolution(self.xaxis, d_i, get_params=True) 
+                if np.nanmax(d_i) >= sigmacut
+                else [0., 0., 0.]
+                for d_i in data
+                ])
+            g_a   = g_[:,0]
+            g_mn  = g_[:,1]
+            g_sig = g_[:,2]
 
-        # debug
-        fig, axes = plt.subplots(1,3, figsize=(11.69, 8.27))
-        for ax, d_i, title in zip(
-            axes, [np.abs(data_fft), np.abs(d_deconv_fft), np.abs(beam_fft)],
-            ['data(inp)', 'data(deconv)', 'beam']):
-            #kkx, kkv = np.meshgrid(kx, kv)
-            #ax.plot(self.xaxis, data[0,nv//4,:], color='k', lw=2., ls='-')
-            ax.plot(kx, d_i[nv//4,:], color='k', lw=2., ls='-')
+            # replace negative amplitude and cases that the fitting fails with zero
+            for gi in g_.T:
+                gi[ (g_a < 0.) | (np.isnan(gi)) ] = 0.
 
-            if title == 'beam':
-                ax.vlines(sigma_beam_fft, np.nanmin(d_i[nv//4,:]), np.nanmax(d_i[nv//4,:]),
-                 color='k', lw=1., ls='--')
-                ax.vlines(-sigma_beam_fft, np.nanmin(d_i[nv//4,:]), np.nanmax(d_i[nv//4,:]),
-                 color='k', lw=1., ls='--')
-            ax.set_title(title)
+            # deconvolution
+            g_deconv_sig2 = (2.*np.pi*g_sig)**2 - (1./sigma_beam_fft)**2 # 2 pi is necessary as FT of x is k (not omega)
+            g_deconv_sig2[g_deconv_sig2 < 0.] = 0. # diverge
+            g_deconv_sig = np.sqrt(g_deconv_sig2)/(2.*np.pi)
+            g_deconv_a  = zero_division(g_a*g_sig, g_deconv_sig)
+            g_deconv_mn = g_mn
+            #print ([g_deconv_a, g_deconv_mn, g_deconv_sig])
 
-            fig.subplots_adjust(wspace=0.4)
+            d_deconv = np.array([
+                gauss1d(self.xaxis, g_deconv_a[i], g_deconv_mn[i], g_deconv_sig[i]) 
+                if g_deconv_sig[i] != 0.
+                else get_pointsolution(self.xaxis, g_deconv_mn[i], 
+                    g_a[i]*np.sqrt(2.*np.pi)*g_deconv_sig[i])
+                for i in range(self.nv)
+                ])
+            self.data_deconv = d_deconv.reshape(shape)
+        else:
+            # numerical solutions
+            # beam array
+            nv, nx = self.nv, self.nx
+            if self.multibeam:
+                beam = np.empty((nv,nx))
+                for i in range(len(self.beam)):
+                    bmaj, bmin, bpa, _, _ = self.beam[i]
+                    if self.pa != None:
+                        res_off = get_1dresolution(self.pa, bmaj, bmin, bpa)
+                    else:
+                        res_off = bmaj
+                    beam[i, :] = gauss1d(self.xaxis, 1., 0., res_off/(2.*np.sqrt(2.*np.log(2.))))
+                    beam[i, :] /= np.sum(beam[i, :]) # normalize
+            elif self.res_off != None:
+                _beam = gauss1d(self.xaxis, 1., 0., self.res_off/(2.*np.sqrt(2.*np.log(2.))))
+                #_beam = np.r_[_beam, np.zeros(_beam.shape[0]-1)] # zero-padding
+                _beam /= np.sum(_beam) # normalize
+                beam = np.tile(_beam, (nv,1))
+            else:
+                print('ERROR\tbeam_deconvolution: angular resolution is not given correctly.')
+                print('ERROR\tbeam_deconvolution: check the header of the input fits file.')
+                return -1
 
-        fig2, axes2 = plt.subplots(1,3, figsize=(11.69, 8.27))
-        for ax, d_i, title in zip(
-            axes2, [data, d_deconv, beam],
-            ['data(inp)', 'data(deconv)', 'beam']):
-            #kkx, kkv = np.meshgrid(kx, kv)
-            #ax.plot(self.xaxis, data[0,nv//4,:], color='k', lw=2., ls='-')
-            ax.plot(self.xaxis, d_i[nv//4,:], color='k', lw=2., ls='-')
-            if sigmacut:
-                ax.hlines(sigmacut, -2, 2)
-            ax.set_title(title)
-            ax.set_xlim(-2,2)
+            # FFT
+            #nx_fft = nx*2 - 1 # take into account zero-padding
+            kx   = fftshift(fftfreq(nx, self.delx))
+            kv   = fftshift(fftfreq(nv, self.delv))
+            kkx, kkv = np.meshgrid(kx, kv)
+            beam_fft = fftshift(fftn(beam, axes=(1,)), axes=(1,))
+            data_fft = fftshift(fftn(data, axes=(1,)), axes=(1,))
 
-            fig2.subplots_adjust(wspace=0.4)
-        plt.show()
+            d_deconv_fft = data_fft/beam_fft
 
-        d_deconv = d_deconv.reshape(shape)
+            # fillter
+            if solmode == 'nullcut':
+                # based on null
+                for i in range(nv):
+                    d_fft_1d   = np.abs(data_fft[i,:][nx//2:])
+                    first_null = argrelmin(d_fft_1d)[0][0]\
+                     if len(argrelmin(d_fft_1d)[0]) > 0 else -1
+                    fx_null    = kx[nx//2:][first_null]
+                    d_deconv_fft[i, (np.abs(kkx) > fx_null)[1]] = 0.+0.j # drop highfreq. components
 
-        self.data_deconv = d_deconv
-        #return d_deconv
+                    if highfcut != None:
+                        if fx_null > sigma_beam_fft*highfcut:
+                            d_deconv_fft[i, (np.abs(kkx) >\
+                             sigma_beam_fft*highfcut)[1]] = 0.+0.j # drop highfreq. components
+            elif solmode == 'highfcut':
+                if highfcut == None:
+                    print('ERROR\tbeam_deconvolution: Give valid highfcut when solmode=highfcut.')
+                    return -1
+                # drop highfreq. components
+                d_deconv_fft[(np.abs(kkx) > sigma_beam_fft*highfcut)] = 0.+0.j
+            elif solmode == 'gauss-fc':
+                # deconvolution
+                d_deconv_fft = np.array([
+                        get_gaussiansolution_fc(nx, kx, d_deconv_fft[i,:], beam_fft[i,:]) 
+                        for i in range(nv)])
+                #elif solmode == 'gauss':
+                # Numerical solution
+                #g_ = np.array([
+                #    get_gaussiansolution(self.xaxis, d_i) for d_i in data
+                #    ]) # get Gaussian solution in real space
+                #g_fft = fftshift(fftn(g_, axes=(1,)), axes=(1,))
+                #d_deconv_fft = g_fft/beam_fft
+                #d_deconv_fft = np.array([
+                #    i if np.abs(i[nx//2]) >= np.abs(i[(3*nx)//4]) else np.full(len(self.xaxis), i[nx//2])
+                #    for i in d_deconv_fft
+                #    ]) # force to be flat
+            elif solmode == 'taper':
+                if highfcut == None:
+                    print('ERROR\tbeam_deconvolution: Give valid highfcut when solmode=taper.')
+                    return -1
+                _taper_beam = gauss1d(kx, 1., 0., sigma_beam_fft*highfcut)
+                #_taper_beam /= np.sum(_taper_beam) # normalize
+                taper_beam = np.tile(_taper_beam, (nv,1))
+                d_deconv_fft *= taper_beam
+            else:
+                print('WARNING\tbeam_deconvolution: Given solmode parameter is not valid.')
+                return 0
 
+            # IFFT
+            d_deconv = np.abs(fftshift(ifftn(d_deconv_fft, axes=(1,)), axes=(1,)))
+            d_deconv = d_deconv.reshape(shape)
+            self.data_deconv = d_deconv
 
     # Draw pv diagram
     def draw_pvdiagram(self,outname,data=None,header=None,ax=None,outformat='pdf',color=True,cmap='Greys',
