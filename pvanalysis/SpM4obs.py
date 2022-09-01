@@ -7,14 +7,15 @@ from astropy import wcs
 from pvanalysis.pvfits import Impvfits
 
 
-rms = 1.4e-3
-thre = 3
-pa = 113
-dist = 139
-vsys = 4
-xmax = 70
-vmax = 6
+rms = 1.4e-3  # Jy/beam
+thre = 3  # sigma
+pa = 113  # deg
+dist = 139  # pc
+vsys = 4  # km/s
+xmax = 70  # au
+vmax = 6  # km/s
 fitsfile = '/Users/yusukeaso/Desktop/IRAS16253_SBLB_12COh_robust_0.5.pvmajor.fits'
+
 fitsdata = Impvfits(fitsfile, pa=pa)
 question = np.squeeze(fitsdata.data)
 xaxis = fitsdata.xaxis * dist
