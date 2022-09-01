@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import differential_evolution as difevo
 from astropy.io import fits
 from astropy import wcs
 
