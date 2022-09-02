@@ -970,9 +970,9 @@ class PVAnalysis():
             print(f'v_sys = {vsys:.3f} +/- {dvsys:.3f}')
             print(f'r     = {rin:.2f} --- {rout:.2f} au')
             print(f'v     = {vout:.3f} --- {vin:.3f} km/s')
-            M_in = kepler_mass(rin, vin, self.__unit/self.dist)
+            M_in = kepler_mass(rin, vin - vsys, self.__unit/self.dist)
             M_b  = kepler_mass(rb, vb, self.__unit/self.dist)
-            M_out = kepler_mass(rout, vout, self.__unit/self.dist)
+            M_out = kepler_mass(rout, vout - vsys, self.__unit/self.dist)
             if self.__use_position:
                 drin = doublepower_r_error(vin, *params)
                 dM_in = M_in * drin / rin
