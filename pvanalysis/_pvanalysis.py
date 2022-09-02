@@ -951,10 +951,10 @@ class PVAnalysis():
         """
         if not hasattr(self, 'rvlim'): self.get_range()
         for i in ['edge', 'ridge']:
-            if i == 'edge' and len(self.__Es[0]) == 0:
+            if i == 'edge' and len(self.__Es[0]) == 0 and len(self.__Es[3]) == 0:
                 print('--- No edge result. ---')
                 continue
-            if i == 'ridge' and len(self.__Rs[0]) == 0:
+            if i == 'ridge' and len(self.__Rs[0]) == 0 and len(self.__Rs[3]) == 0:
                 print('--- No ridge result. ---')
                 continue
             rvlim, popt = self.rvlim[i], self.popt[i]
