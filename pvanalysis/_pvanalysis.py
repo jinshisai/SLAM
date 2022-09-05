@@ -143,7 +143,7 @@ class PVAnalysis():
             return
         if self.xsign != q:
             print('WARNING\tget_edgeridge: '
-                  + f'quadrant={q:.0f} seems opposite.')
+                  + f'quadrant={quadrant} seems opposite.')
         # store fitting conditions
         self.xlim = xlim
         self.vlim = vlim
@@ -1047,10 +1047,10 @@ class PVAnalysis():
         """
         if not hasattr(self, 'rvlim'): self.get_range()
         for i in ['edge', 'ridge']:
-            if i == 'edge' and len(self.__Es[0]) == 0:
+            if i == 'edge' and len(self.__Es[0]) == 0 and len(self.__Es[3]) == 0:
                 print('--- No edge result. ---')
                 continue
-            if i == 'ridge' and len(self.__Rs[0]) == 0:
+            if i == 'ridge' and len(self.__Rs[0]) == 0 and len(self.__Rs[3]) == 0:
                 print('--- No ridge result. ---')
                 continue
             rvlim, popt = self.rvlim[i], self.popt[i]
@@ -1066,9 +1066,9 @@ class PVAnalysis():
             print(f'v_sys = {vsys:.3f} +/- {dvsys:.3f}')
             print(f'r     = {rin:.2f} --- {rout:.2f} au')
             print(f'v     = {vout:.3f} --- {vin:.3f} km/s')
-            M_in = kepler_mass(rin, vin, self.__unit/self.dist)
+            M_in = kepler_mass(rin, vin - vsys, self.__unit/self.dist)
             M_b  = kepler_mass(rb, vb, self.__unit/self.dist)
-            M_out = kepler_mass(rout, vout, self.__unit/self.dist)
+            M_out = kepler_mass(rout, vout - vsys, self.__unit/self.dist)
             if self.__use_position:
                 drin = doublepower_r_error(vin, *params)
                 dM_in = M_in * drin / rin
@@ -1102,6 +1102,11 @@ class PVAnalysis():
                        fmt: dict = {'edge':'v', 'ridge':'o'},
                        linestyle: dict = {'edge':'--', 'ridge':'-'},
                        flipaxis: bool = False) -> None:
+        self.avevsys = (self.popt['edge'][0][4]
+                        + self.popt['ridge'][0][4]) / 2.
+        self.vsys += self.avevsys
+        self.popt['edge'][0][4] -= self.avevsys
+        self.popt['ridge'][0][4] -= self.avevsys
         """Make linear and loglog PV diagrams
            with the derived points and model lines.
 
@@ -1212,8 +1217,7 @@ class PVAnalysis():
         else:
             x = np.linspace(-xmax, xmax, 100)
             x[(-xmin < x) * (x < xmin)] = None
-            vsys = popt[4] if len(popt) == 5 else 0
-            y = self.xsign * (fx_model(x) - vsys) + vsys
+            y = fx_model(self.xsign * x)
         if flipaxis and not loglog: x, y = y, x
         ax.plot(x, y, ls=ls, lw=2, color='gray', zorder=3)
 
