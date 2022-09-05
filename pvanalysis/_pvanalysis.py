@@ -1050,10 +1050,10 @@ class PVAnalysis():
         """
         if not hasattr(self, 'rvlim'): self.get_range()
         for i in ['edge', 'ridge']:
-            if i == 'edge' and len(self.__Es[0]) == 0:
+            if i == 'edge' and len(self.__Es[0]) == 0 and len(self.__Es[3]) == 0:
                 print('--- No edge result. ---')
                 continue
-            if i == 'ridge' and len(self.__Rs[0]) == 0:
+            if i == 'ridge' and len(self.__Rs[0]) == 0 and len(self.__Rs[3]) == 0:
                 print('--- No ridge result. ---')
                 continue
             rvlim, popt = self.rvlim[i], self.popt[i]
@@ -1069,9 +1069,9 @@ class PVAnalysis():
             print(f'v_sys = {vsys:.3f} +/- {dvsys:.3f}')
             print(f'r     = {rin:.2f} --- {rout:.2f} au')
             print(f'v     = {vout:.3f} --- {vin:.3f} km/s')
-            M_in = kepler_mass(rin, vin, self.__unit/self.dist)
+            M_in = kepler_mass(rin, vin - vsys, self.__unit/self.dist)
             M_b  = kepler_mass(rb, vb, self.__unit/self.dist)
-            M_out = kepler_mass(rout, vout, self.__unit/self.dist)
+            M_out = kepler_mass(rout, vout - vsys, self.__unit/self.dist)
             if self.__use_position:
                 drin = doublepower_r_error(vin, *params)
                 dM_in = M_in * drin / rin
