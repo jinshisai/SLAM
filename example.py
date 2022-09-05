@@ -39,7 +39,8 @@ impv.write_edgeridge(outname=outname)
 impv.fit_edgeridge(include_vsys=include_vsys,
                    include_dp=include_dp,
                    include_pin=include_pin,
-                   outname=outname, show_corner=show_corner)
+                   outname=outname, rangelevel=0.8,
+                   show_corner=show_corner)
 impv.output_fitresult()
 impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
                     clevels=[-9,-6,-3,3,6,9], outname=outname,
