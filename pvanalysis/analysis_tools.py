@@ -85,9 +85,9 @@ def doublepower_r_error(v, r_break, v_break, p_in, dp, vsys,
 
 
 # read file
-def read_pvfitres(fname, inner_threshold=None, outer_threshold=None, toau=True, dist=140.):
+def read_pvfitres(fname, inner_threshold=None, outer_threshold=None, toau=False, dist=140.):
 	# read files
-	offset, velocity, offerr, velerr = np.genfromtxt(fname, comments='#', unpack = True)
+	offset, offerr, velocity, velerr = np.genfromtxt(fname, comments='#', unpack = True)
 
 	# offset threshold of used data point
 	if inner_threshold:
@@ -109,4 +109,4 @@ def read_pvfitres(fname, inner_threshold=None, outer_threshold=None, toau=True, 
 		offset = offset*dist
 		offerr = offerr*dist
 
-	return offset, velocity, offerr, velerr
+	return offset, offerr, velocity, velerr
