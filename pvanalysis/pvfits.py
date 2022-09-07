@@ -195,7 +195,8 @@ class Impvfits:
 
 
     # beam deconvolution
-    def beam_deconvolution(self, sigmacut=None, highfcut=2., solmode='gauss'):
+    def beam_deconvolution(self, sigmacut=None, 
+        highfcut=2., solmode='gauss', fit_xlim=[], fit_vlim=[]):
         '''
         Deconvolve PV diagram with beam.
 
@@ -286,6 +287,12 @@ class Impvfits:
 
         # data
         data = np.squeeze(self.data.copy())
+        xaxis = self.xaxis.copy()
+        if len(fit_xlim) == 2:
+            indx = np.nonzero((xaxis >= fit_xlim[0]) * (xaxis < fit_xlim[1]))[0]
+            i_min, i_max = indx[0], indx[-1]
+            data = data[:,i_min:i_max+1]
+            xaxis = xaxis[indx]
 
         # cut data less than given threshold
         if sigmacut:
@@ -310,7 +317,7 @@ class Impvfits:
         if solmode == 'gauss':
             # get Gaussian solution in real space
             g_ = np.array([
-                get_gaussiansolution(self.xaxis, d_i, get_params=True) 
+                get_gaussiansolution(xaxis, d_i, get_params=True) 
                 if np.nanmax(d_i) >= sigmacut
                 else [0., 0., 0.]
                 for d_i in data
@@ -338,6 +345,12 @@ class Impvfits:
                     g_a[i]*np.sqrt(2.*np.pi)*g_deconv_sig[i])
                 for i in range(self.nv)
                 ])
+            # Jy/beam --> Jy/pixel
+            beam_area = np.sqrt(2.*np.pi)*res_off/(2.*np.sqrt(2*np.log(2))) # 1D beam area
+            if self.multibeam:
+                d_deconv /= np.tile(beam_area, (self.nv, 1))/self.delx
+            else:
+                d_deconv /= beam_area/self.delx
             self.data_deconv = d_deconv.reshape(shape)
         else:
             # numerical solutions
