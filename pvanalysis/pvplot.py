@@ -225,6 +225,9 @@ class PVPlot():
         (xmin, xmax), (vmin, vmax) = self.xlim, self.vlim
         rlabel, vlabel = 'Radius (au)', r'Velocity (km s$^{-1}$)'
         ax = self.ax
+        if self.flipaxis:
+            xmin, xmax, vmin, vmax = vmin, vmax, xmin, xmax
+            rlabel, vlabel = vlabel, rlabel
         if self.loglog:
             ax.set_xticks(xticks := nice_ticks(ax.get_xticks(), (xmin, xmax)))
             ax.set_yticks(yticks := nice_ticks(ax.get_yticks(), (vmin, vmax)))
@@ -234,13 +237,8 @@ class PVPlot():
             ax.set_xlim(xmin * 0.999, xmax * 1.001)
             ax.set_ylim(vmin * 0.999, vmax * 1.001)
         else:
-            if self.flipaxis:
-                x0, x1, y0, y1 = -vmax, vmax, -xmax, xmax
-                rlabel, vlabel = vlabel, rlabel
-            else:
-                x0, x1, y0, y1 = -xmax, xmax, -vmax, vmax
-            ax.set_xlim(x0, x1)
-            ax.set_ylim(y0, y1)
+            ax.set_xlim(-xmax, xmax)
+            ax.set_ylim(-vmax, vmax)
         ax.set_xlabel(rlabel if xlabel is None else xlabel)
         ax.set_ylabel(vlabel if ylabel is None else ylabel)
         if xticklabels: ax.set_xticklabels(xticklabels)
