@@ -1105,15 +1105,6 @@ class PVAnalysis():
                        fmt: dict = {'edge':'v', 'ridge':'o'},
                        linestyle: dict = {'edge':'--', 'ridge':'-'},
                        flipaxis: bool = False) -> None:
-        if len(self.popt['ridge'][0]) == 5:
-            self.avevsys = (self.popt['edge'][0][4]
-                            + self.popt['ridge'][0][4]) / 2.
-        else:
-            self.avevsys = 0
-        self.vsys += self.avevsys
-        if len(self.popt['ridge'][0]) == 5:
-            self.popt['edge'][0][4] -= self.avevsys
-            self.popt['ridge'][0][4] -= self.avevsys
         """Make linear and loglog PV diagrams
            with the derived points and model lines.
 
