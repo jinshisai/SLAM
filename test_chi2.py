@@ -1,3 +1,4 @@
+
 import numpy as np
 from pvanalysis import PVAnalysis
 from pvanalysis.analysis_tools import (doublepower_r,
@@ -44,14 +45,36 @@ impv.fit_edgeridge(include_vsys=include_vsys,
                    include_dp=include_dp,
                    include_pin=include_pin,
                    outname=outname, show_corner=show_corner)
-impv.output_fitresult()
-impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
-                    clevels=[-9,-6,-3,3,6,9], outname=outname,
-                    show=show_pv, logcolor=True, Tbcolor=False,
-                    kwargs_pcolormesh={'cmap':'viridis'},
-                    kwargs_contour={'colors':'lime'},
-                    fmt={'edge':'v', 'ridge':'o'},
-                    linestyle={'edge':'--', 'ridge':'-'},
-                    plotridgepoint=True, plotedgepoint=True,
-                    plotridgemodel=True, plotedgemodel=True)
 '-------------------------------------'
+
+
+
+include = [True, include_dp, include_pin, include_dp, include_vsys]
+minabs = lambda a, i, j: np.min(np.abs(np.r_[a[i], a[j]]))
+maxabs = lambda a, i, j: np.max(np.abs(np.r_[a[i], a[j]]))
+for args, ext, in zip([impv._PVAnalysis__Es, impv._PVAnalysis__Rs], 
+    ['edge', 'ridge'], ):
+    popt, popt_err = impv.popt[ext]
+    popt = popt[include]
+    plim = np.array([
+        [minabs(args, 1, 3), minabs(args, 0, 4), 0.01, 0, -1],
+        [maxabs(args, 1, 3), maxabs(args, 0, 4), 10.0, 10, 1]])
+    q0 = np.array([0, np.sqrt(plim[0][1] * plim[1][1]), 0.5, 0, 0])
+    q0 = np.where(include, np.nan, q0)
+    def wpow_r_custom(v, *p):
+        (q := q0 * 1)[np.isnan(q0)] = p
+        return doublepower_r(v, *q)
+    def wpow_v_custom(r, *p):
+        (q := q0 * 1)[np.isnan(q0)] = p
+        return doublepower_v(r, *q)
+    def lnprob(p, v0, x1, dx1, x0, v1, dv1):
+        chi2 = np.sum(((x1 - wpow_r_custom(v0, *p)) / dx1)**2) \
+               + np.sum(((v1 - wpow_v_custom(x0, *p)) / dv1)**2)
+        return -0.5 * chi2
+    def reduced_chi2(p, v0, x1, dx1, x0, v1, dv1):
+        chi2 = np.sum(((x1 - wpow_r_custom(v0, *p)) / dx1)**2) \
+        + np.sum(((v1 - wpow_v_custom(x0, *p)) / dv1)**2)
+        print(len(p))
+        return chi2/(len(v0) - len(p) -1 )
+    logp = reduced_chi2(popt, *args)
+    print(logp)

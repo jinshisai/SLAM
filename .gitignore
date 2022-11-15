@@ -14,3 +14,9 @@ pvanalysis/__pycache__/analysis_tools.cpython-39.pyc
 pvanalysis/__pycache__/fitfuncs.cpython-39.pyc
 pvanalysis/__pycache__/pvfits.cpython-39.pyc
 pvanalysis/__pycache__/*
+pvanalysis/__pycache__/__init__.cpython-38.pyc
+pvanalysis/__pycache__/_pvanalysis.cpython-38.pyc
+pvanalysis/__pycache__/analysis_tools.cpython-38.pyc
+pvanalysis/__pycache__/fitfuncs.cpython-38.pyc
+pvanalysis/__pycache__/pvfits.cpython-38.pyc
+pvanalysis/__pycache__/pvplot.cpython-38.pyc
