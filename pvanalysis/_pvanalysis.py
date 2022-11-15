@@ -1152,7 +1152,7 @@ class PVAnalysis():
             pp = PVPlot(restfrq=self.fitsdata.restfreq,
                         beam=self.fitsdata.beam, pa=self.fitsdata.pa,
                         vsys=self.vsys, dist=self.dist,
-                        d=self.fitsdata.data,
+                        d=self.fitsdata.data, flipaxis=flipaxis,
                         v=self.fitsdata.vaxis, x=self.fitsdata.xaxis,
                         loglog=loglog, vlim=vlim, xlim=xlim,
                         multibeam=self.fitsdata.multibeam)
@@ -1193,7 +1193,7 @@ class PVAnalysis():
                 if xv == 'xcut': dv = 0
                 if xv == 'vcut': dx = 0
                 if loglog: x, v = np.abs(x), np.abs(v)
-                if flipaxis and not loglog: x, v, dx, dv = v, x, dv, dx
+                if flipaxis: x, v, dx, dv = v, x, dv, dx
                 ax.errorbar(x, v, xerr=dx, yerr=dv, fmt=fmt,
                             color=color[xv][rb], ms=5)
 
@@ -1216,7 +1216,7 @@ class PVAnalysis():
             x = np.linspace(-xmax, xmax, 100)
             x[(-xmin < x) * (x < xmin)] = None
             y = fx_model(self.xsign * x)
-        if flipaxis and not loglog: x, y = y, x
+        if flipaxis: x, y = y, x
         ax.plot(x, y, ls=ls, lw=2, color='gray', zorder=3)
 
 

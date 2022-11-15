@@ -42,7 +42,7 @@ impv.fit_edgeridge(include_vsys=include_vsys,
                    outname=outname, rangelevel=0.8,
                    show_corner=show_corner)
 impv.output_fitresult()
-impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
+impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot, flipaxis=False,
                     clevels=[-9,-6,-3,3,6,9], outname=outname,
                     show=show_pv, logcolor=True, Tbcolor=False,
                     kwargs_pcolormesh={'cmap':'viridis'},
