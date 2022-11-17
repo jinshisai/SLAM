@@ -1145,6 +1145,7 @@ class PVAnalysis():
                             + self.popt['ridge'][0][4]) / 2.
             self.vsys_opt = self.vsys + self.avevsys
         else:
+            self.vsys_opt = self.vsys
             self.avevsys = 0
         for loglog, ext in zip([False, True], ['linear', 'log']):
             pp = PVPlot(restfrq=self.fitsdata.restfreq,

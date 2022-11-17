@@ -17,7 +17,7 @@ xlim_plot = [200. / 20., 200.]  # au; [inlim, outlim]
 vlim_plot = [6. / 20., 6.]  # km/s
 use_velocity = True  # cuts along the velocity direction
 use_position = True  # cuts along the positional direction
-include_vsys = True  # vsys offset. False means vsys=0.
+include_vsys = False  # vsys offset. False means vsys=0.
 include_dp = True  # False means a single power
 include_pin = False  # False means pin=0.5 (Keplerian).
 show_pv = True  # figures will be made regardless of this option.
