@@ -548,7 +548,7 @@ class PVAnalysis():
         self.results['ridge']['vcut'] = res_ridge.T
         self.results['edge']['vcut']  = res_edge.T
         #plt.show()
-        fig.savefig(outname + "_pvfit_vcut.pdf", transparent=True)
+        fig.savefig(outname + ".pvfit.vcut.png")
         plt.close()
 
 
@@ -784,7 +784,7 @@ class PVAnalysis():
         self.results['ridge']['xcut'] = res_ridge.T
         self.results['edge']['xcut']  = res_edge.T
         #plt.show()
-        fig.savefig(outname+"_pvfit_xcut.pdf", transparent=True)
+        fig.savefig(outname+".pvfit.xcut.png")
         plt.close()
         # output results as .txt file
         #res_hd  = 'offset[arcsec]\tvelocity[km/s]\toff_err[arcesc]\tvel_err[km/s]'
@@ -1066,7 +1066,7 @@ class PVAnalysis():
             print(f'V_b   = {vb:.3f} +/- {dvb:.3f} km/s')
             print(f'p_in  = {pin:.3f} +/- {dpin:.3f}')
             print(f'dp    = {dp:.3f} +/- {ddp:.3f}')
-            print(f'v_sys = {vsys:.3f} +/- {dvsys:.3f}')
+            print(f'v_sys = {self.vsys + vsys:.3f} +/- {dvsys:.3f}')
             print(f'r     = {rin:.2f} --- {rout:.2f} au')
             print(f'v     = {vout:.3f} --- {vin:.3f} km/s')
             M_in = kepler_mass(rin, vin - vsys, self.__unit/self.dist)
@@ -1105,15 +1105,6 @@ class PVAnalysis():
                        fmt: dict = {'edge':'v', 'ridge':'o'},
                        linestyle: dict = {'edge':'--', 'ridge':'-'},
                        flipaxis: bool = False) -> None:
-        if len(self.popt['ridge'][0]) == 5:
-            self.avevsys = (self.popt['edge'][0][4]
-                            + self.popt['ridge'][0][4]) / 2.
-        else:
-            self.avevsys = 0
-        self.vsys += self.avevsys
-        if len(self.popt['ridge'][0]) == 5:
-            self.popt['edge'][0][4] -= self.avevsys
-            self.popt['ridge'][0][4] -= self.avevsys
         """Make linear and loglog PV diagrams
            with the derived points and model lines.
 
@@ -1152,15 +1143,13 @@ class PVAnalysis():
         if len(self.popt['ridge'][0]) == 5:
             self.avevsys = (self.popt['edge'][0][4]
                             + self.popt['ridge'][0][4]) / 2.
-            self.vsys += self.avevsys
-            self.popt['edge'][0][4] -= self.avevsys
-            self.popt['ridge'][0][4] -= self.avevsys
+            self.vsys_opt = self.vsys + self.avevsys
         else:
             self.avevsys = 0
         for loglog, ext in zip([False, True], ['linear', 'log']):
             pp = PVPlot(restfrq=self.fitsdata.restfreq,
                         beam=self.fitsdata.beam, pa=self.fitsdata.pa,
-                        vsys=self.vsys, dist=self.dist,
+                        vsys=self.vsys_opt, dist=self.dist,
                         d=self.fitsdata.data, flipaxis=flipaxis,
                         v=self.fitsdata.vaxis, x=self.fitsdata.xaxis,
                         loglog=loglog, vlim=vlim, xlim=xlim,
@@ -1214,7 +1203,9 @@ class PVAnalysis():
             print('Please input ax.')
             return -1
         if model is None: model = self.model
-        if popt  == []: popt = self.popt[method][0]
+        if popt  == []:
+            popt = self.popt[method][0].copy()
+            popt[4] -= self.avevsys
         fx_model = lambda x: model(x, *popt)
         if not hasattr(self, 'rvlim'): self.get_range()
         xmin, xmax = self.rvlim[method][0]
