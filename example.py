@@ -21,7 +21,7 @@ include_vsys = False  # vsys offset. False means vsys=0.
 include_dp = True  # False means a single power
 include_pin = False  # False means pin=0.5 (Keplerian).
 show_pv = True  # figures will be made regardless of this option.
-show_corner = False  # figures will be made regardless of this option.
+show_corner = True  # figures will be made regardless of this option.
 minabserr = 0.1  # minimum absolute errorbar in the unit of bmaj or dv.
 minrelerr = 0.01  # minimum relative errorbar.
 '------------------------'
