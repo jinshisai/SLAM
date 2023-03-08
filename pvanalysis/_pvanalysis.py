@@ -794,8 +794,8 @@ class PVAnalysis():
     def fit_edgeridge(self, include_vsys: bool = False,
                       include_dp: bool = True,
                       include_pin: bool = False,
-                      fix_pin: float = 0.5,
-                      fix_dp: float = 0,
+                      fixed_pin: float = 0.5,
+                      fixed_dp: float = 0,
                       outname: str = 'pvanalysis',
                       rangelevel: float = 0.8,
                       show_corner: bool = False) -> dict:
@@ -806,13 +806,13 @@ class PVAnalysis():
             include_vsys : bool
                False means vsys is fixed at 0.
             include_dp : bool
-               False means dp is fixed at fix_dp.
+               False means dp is fixed at fixed_dp.
             include_pin : bool
-               False means pin is fixed at fix_pin.
-            fix_pin : float
-               pin = fix_pin if include_pix is False. pin = 0.5 means the Keplerian law.
-            fix_dp : float
-               dp = fix_dp if include_dp is False. dp = 0 means a single-power fitting.
+               False means pin is fixed at fixed_pin.
+            fixed_pin : float
+               pin = fixed_pin if include_pix is False. pin = 0.5 means the Keplerian law.
+            fixed_dp : float
+               dp = fixed_dp if include_dp is False. dp = 0 means a single-power fitting.
             outname : str
                The output corner figures have names of "outname".corner_e.png
                and "outname".corner_r.png.
@@ -854,7 +854,7 @@ class PVAnalysis():
             return -1
 
         labels = np.array(['Rb', 'Vb', 'p_in', 'dp', 'Vsys'])
-        include = [True, include_dp or (fix_dp != 0), include_pin,
+        include = [True, include_dp or (fixed_dp != 0), include_pin,
                    include_dp, include_vsys]
         labels = labels[include]
         popt_e, popt_r = [np.empty(5), np.empty(5)], [np.empty(5), np.empty(5)]
@@ -865,7 +865,7 @@ class PVAnalysis():
                    [minabs(args, 1, 3), minabs(args, 0, 4), 0.01, 0, -1],
                    [maxabs(args, 1, 3), maxabs(args, 0, 4), 10.0, 10, 1]])
             q0 = np.array([0, np.sqrt(plim[0][1] * plim[1][1]),
-                           fix_pin, fix_dp, 0])
+                           fixed_pin, fixed_dp, 0])
             q0 = np.where(include, np.nan, q0)
             def wpow_r_custom(v, *p):
                 (q := q0 * 1)[np.isnan(q0)] = p
