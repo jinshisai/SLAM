@@ -20,6 +20,8 @@ use_position = True  # cuts along the positional direction
 include_vsys = False  # vsys offset. False means vsys=0.
 include_dp = True  # False means a single power
 include_pin = False  # False means pin=0.5 (Keplerian).
+fix_pin = 0.5  # Fix pin when include_pin is False.
+fix_dp = 0.0  # Fix dp when include_dp is False.
 show_pv = True  # figures will be made regardless of this option.
 show_corner = True  # figures will be made regardless of this option.
 minabserr = 0.1  # minimum absolute errorbar in the unit of bmaj or dv.
@@ -39,6 +41,7 @@ impv.write_edgeridge(outname=outname)
 impv.fit_edgeridge(include_vsys=include_vsys,
                    include_dp=include_dp,
                    include_pin=include_pin,
+                   fix_pin=fix_pin, fix_dp=fix_dp,
                    outname=outname, rangelevel=0.8,
                    show_corner=show_corner)
 impv.output_fitresult()
