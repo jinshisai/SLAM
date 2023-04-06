@@ -204,7 +204,7 @@ class ChannelFit():
         gaussbeam = np.exp(-(yb**2 + xb**2))
         self.pixperbeam = np.sum(gaussbeam)
         gaussbeam = gaussbeam / self.pixperbeam
-        self.pixperchan = len(np.ravel(self.data[0]))
+        self.pixel_valid = len(self.x) * len(self.y) * len(self.v_valid)
                 
         def cubemodel(Mstar: float, Rc: float, cs: float):
             #cs = self.mom2
@@ -320,16 +320,17 @@ class ChannelFit():
         def lnprob(p):
             q = 10**p
             model = self.cubemodel(*q)[0]
-            chi2 = np.nansum((self.data - model)**2) / self.sigma**2 / self.pixperbeam
-            chi2r = chi2 * self.pixperbeam / self.pixperchan
-            print([f'{q[i]:.3f}' for i in (0,1,2)], f'{chi2r:.3f}')
+            chi2 = np.nansum((self.data_valid - model)**2) / self.sigma**2
+            chi2r = chi2 / self.pixel_valid
+            chi2 = chi2 / self.pixperbeam
+            print([f'{q[0]:05.3f}', f'{q[1]:07.3f}', f'{q[2]:05.3f}'], f'{chi2r:05.2f}')
             return -0.5 * chi2
         plim = np.log10([Mstar_range, Rc_range, cs_range]).T
         popt, perr = emcee_corner(plim, lnprob, args=[],
                                   nwalkers_per_ndim=16,
-                                  nburnin=100, nsteps=500,
+                                  nburnin=200, nsteps=200,
                                   labels=['log Mstar', 'log Rc', 'log cs'],
-                                  rangelevel=0.8,
+                                  rangelevel=None,
                                   figname=figname+'.corner.png',
                                   show_corner=True, ncore=1)
         popt = 10**popt
@@ -377,13 +378,12 @@ if __name__ == '__main__':
     chan.gridondisk(cubefits=cubefits, center=center, pa=pa, incl=incl,
                  vsys=vsys, dist=dist, sigma=sigma,
                  rmax=rmax, vlim=vlim)
-    #chan.fitting(Mstar_range=[0.01, 10.0], Rc_range=[5, 500], cs_range=[0.2, 2],
-    #             figname=filehead)
-    #popt = chan.popt
-    #chan.modeltofits(filehead=filehead)
-    chan.plotmodelmom(0.0825, 573.635, 1.0429, pa=113,
-                      filename=filehead+'.modelmom01.png')
-    chan.plotobsmom(pa=113, filename=filehead+'.obsmom01.png')
-    chan.plotresidualmom(0.0825, 573.635, 1.0429, pa=113,
-                         filename=filehead+'.residualmom01.png')
+    chan.fitting(Mstar_range=[0.01, 10.0], Rc_range=[5, 500], cs_range=[0.2, 2],
+                 figname=filehead)
+    chan.modeltofits(filehead=filehead)
+    #chan.plotmodelmom(0.0825, 573.635, 1.0429, pa=113,
+    #                  filename=filehead+'.modelmom01.png')
+    #chan.plotobsmom(pa=113, filename=filehead+'.obsmom01.png')
+    #chan.plotresidualmom(0.0825, 573.635, 1.0429, pa=113,
+    #                     filename=filehead+'.residualmom01.png')
     #chan.modeltofits(0.0825, 573.635, 1.0429, filehead=filehead)

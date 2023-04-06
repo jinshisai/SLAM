@@ -255,14 +255,14 @@ class PVSilhouette():
             minorvel = np.transpose(minorvel)
             chi2 = np.sum((majormap - majorvel)**2) + np.sum((minormap - minorvel)**2)
             chi2r = chi2 / allpix
-            print([f'{q[i]:.3f}' for i in (0,1)], f'{chi2r:.3f}')
+            print([f'{q[0]:05.3f}', f'{q[1]:07.3f}'], f'{chi2r:05.3f}')
             return -0.5 * chi2
         plim = np.log10([Mstar_range, Rc_range]).T
         popt, perr = emcee_corner(plim, lnprob, args=[],
                                   nwalkers_per_ndim=16,
-                                  nburnin=100, nsteps=400,
+                                  nburnin=200, nsteps=200,
                                   labels=['log Mstar', 'log Rc'],
-                                  rangelevel=0.8,
+                                  rangelevel=0.9,
                                   figname=figname+'.corner.png',
                                   show_corner=True)
         popt = 10**popt
@@ -304,7 +304,4 @@ if __name__ == '__main__':
                  sigma=sigma)
     pvsil.fitting(incl=incl, Mstar_range=[0.01, 10.0], Rc_range=[5, 500],
                   cutoff=5, show=True, figname=filehead, vmask=vmask)
-    #chan.get_mstar(incl=incl)
-    #if write_point: chan.write_2Dcenter(filehead)
-    #chan.plot_center(filehead=filehead, xmax=xmax_plot, ymax=ymax_plot,
-    #                 vmax=vmax_plot, vmin=vmin_plot, show_figs=True, )
+    

@@ -62,10 +62,11 @@ def emcee_corner(bounds, log_prob_fn, args=None, nwalkers_per_ndim=16,
     pmid = np.percentile(samples, 50, axis=0)
     phigh = np.percentile(samples, 84, axis=0)
     perr = (phigh - plow) / 2.
+    cornerrange = [rangelevel] * ndim if rangelevel is not None else np.transpose(bounds)
     if show_corner or (not figname is None):
         corner.corner(samples, truths=popt,
                       quantiles=[0.16, 0.5, 0.84], show_titles=True,
-                      range=[rangelevel] * ndim, labels=labels),
+                      range=cornerrange, labels=labels),
         if not figname is None: plt.savefig(figname)
         if show_corner: plt.show()
         plt.close()
