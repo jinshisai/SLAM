@@ -187,7 +187,8 @@ class ChannelFit():
         def modelvlos(Mstar: float, Rc: float):
             vkep = vunit * np.sqrt(Mstar / self.rdisk)
             vjrot = vunit * np.sqrt(Mstar * Rc) / self.rdisk
-            vr = -vunit * np.sqrt(Mstar / self.rdisk) * np.sqrt((2 - Rc / self.rdisk).clip(0, None))
+            vr = -vunit * np.sqrt(Mstar / self.rdisk) * np.sqrt(2 - Rc / self.rdisk)
+            vr[self.rdisk < Rc] = 0
             vrot = np.where(self.rdisk < Rc, vkep, vjrot)
             vlos = (vrot * self.dmaj + vr * self.dmin) / self.rdisk \
                    * np.sin(np.radians(incl))
