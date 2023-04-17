@@ -23,7 +23,8 @@ sigma = 2e-3  # Jy/beam; None means automatic calculation.
 cutoff = 5.0  # sigma
 rmax = 1 * dist  # au
 ymax = rmax  # au
-vlim = (-2.5, -1.2, 1.2, 2.5)  # km/s
+#vlim = (-2.52, -1.4, 1.4, 2.52)  # km/s
+vlim = (-2.52, -0.9, 0.9, 2.52)  # km/s
 xmax_plot = rmax  # au
 ymax_plot = xmax_plot  # au
 vmax_plot = 0  # au
@@ -237,8 +238,8 @@ class ChannelFit():
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
-                          vmin=np.nanmin(mom1),
-                          vmax=np.nanmax(mom1))
+                          vmin=np.nanmin(self.mom1),
+                          vmax=np.nanmax(self.mom1))
         fig.colorbar(m, ax=ax, label='km/s')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         if pa is not None:
@@ -288,7 +289,7 @@ class ChannelFit():
         d = self.cubemodel(Mstar, Rc, cs)[0]
         m = makemom01(d, self.v_valid, self.sigma)
         mom0 = m['mom0']
-        mom1 = m['mom1'] - self.mom1
+        mom1 = self.mom1 - m['mom1']
         sigma_mom0 = m['sigma_mom0']
         levels = np.arange(1, 20) * 3 * sigma_mom0
         levels = levels[::2]
@@ -296,8 +297,8 @@ class ChannelFit():
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
-                          vmin=np.nanmin(mom1),
-                          vmax=np.nanmax(mom1))
+                          vmin=np.nanmin(self.mom1),
+                          vmax=np.nanmax(self.mom1))
         fig.colorbar(m, ax=ax, label='km/s')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         if pa is not None:
@@ -379,12 +380,13 @@ if __name__ == '__main__':
     chan.gridondisk(cubefits=cubefits, center=center, pa=pa, incl=incl,
                  vsys=vsys, dist=dist, sigma=sigma,
                  rmax=rmax, vlim=vlim)
-    chan.fitting(Mstar_range=[0.01, 10.0], Rc_range=[5, 500], cs_range=[0.2, 2],
-                 figname=filehead)
-    chan.modeltofits(filehead=filehead)
-    #chan.plotmodelmom(0.0825, 573.635, 1.0429, pa=113,
-    #                  filename=filehead+'.modelmom01.png')
-    #chan.plotobsmom(pa=113, filename=filehead+'.obsmom01.png')
-    #chan.plotresidualmom(0.0825, 573.635, 1.0429, pa=113,
-    #                     filename=filehead+'.residualmom01.png')
+    #chan.fitting(Mstar_range=[0.01, 10.0], Rc_range=[5, 500], cs_range=[0.2, 2],
+    #             figname=filehead)
+    #chan.modeltofits(filehead=filehead)
+    #chan.popt
+    #p = [0.08329, 283.34, 1.113]
+    p = [0.04834, 345.02, 0.9338]
+    chan.plotmodelmom(*p, pa=113, filename=filehead+'.modelmom01.png')
+    chan.plotobsmom(pa=113, filename=filehead+'.obsmom01.png')
+    chan.plotresidualmom(*p, pa=113, filename=filehead+'.residualmom01.png')
     #chan.modeltofits(0.0825, 573.635, 1.0429, filehead=filehead)

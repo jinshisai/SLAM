@@ -46,7 +46,7 @@ from scipy.optimize import curve_fit
 import warnings
 
 from utils import emcee_corner
-from UlrichEnvelope import velmax
+from UlrichEnvelope import velmax, thinpv
 
 warnings.simplefilter('ignore', RuntimeWarning)
 
@@ -262,7 +262,7 @@ class PVSilhouette():
                                   nwalkers_per_ndim=16,
                                   nburnin=200, nsteps=200,
                                   labels=['log Mstar', 'log Rc'],
-                                  rangelevel=0.9,
+                                  rangelevel=0.93,
                                   figname=figname+'.corner.png',
                                   show_corner=True)
         popt = 10**popt
@@ -291,6 +291,67 @@ class PVSilhouette():
             fig.savefig(figname + '.model.png')
             plt.show()
 
+    def fitting2(self, incl: float, Mstar_range: list = [0, 10],
+                 Rc_range: list = [0, 1000], cutoff: float = 5,
+                 vmask: list = [0, 0],
+                 show: bool = False, figname: str = 'PVsilhouette'):
+        
+        majormap = self.dpvmajor
+        minormap = self.dpvminor
+        #majormap = np.where(self.dpvmajor > cutoff * self.sigma, 1, 0)
+        #minormap = np.where(self.dpvminor > cutoff * self.sigma, 1, 0)
+        allpix = len(np.ravel(majormap)) + len(np.ravel(minormap))
+        def lnprob(p):
+            q = 10**p
+            a = thinpv(self.r, self.v, Mstar=q[0], Rc=q[1], incl=incl,
+                       beam=self.bmaj)
+            majormodel, minormodel = a['major'], a['minor']
+            majormodel *= np.median(majormap)
+            minormodel *= np.median(minormap)
+            #majormodel = np.where(majormodel > cutoff * self.sigma, 1, 0)
+            #minormodel = np.where(minormodel > cutoff * self.sigma, 1, 0)
+            chi2 = np.sum((majormap - majormodel)**2) + np.sum((minormap - minormodel)**2)
+            chi2 /= self.sigma**2
+            chi2r = chi2 / allpix
+            print([f'{q[0]:05.3f}', f'{q[1]:07.3f}'], f'{chi2r:05.3f}')
+            return -0.5 * chi2
+        plim = np.log10([Mstar_range, Rc_range]).T
+        popt, perr = emcee_corner(plim, lnprob, args=[],
+                                  nwalkers_per_ndim=8,
+                                  nburnin=100, nsteps=100,
+                                  labels=['log Mstar', 'log Rc'],
+                                  rangelevel=0.93,
+                                  figname=figname+'.corner.png',
+                                  show_corner=True)
+        popt = 10**popt
+        perr = popt * np.log(10) * perr
+        self.popt = popt
+        self.perr = perr
+        print(popt)
+        if show:
+            a = thinpv(self.r, self.v, Mstar=popt[0], Rc=popt[1], incl=incl,
+                       beam=self.bmaj)
+            majormodel, minormodel = a['major'], a['minor']
+            majormodel *= np.mean(majormap)
+            minormodel *= np.mean(minormap)
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 2, 1)
+            ax.contour(self.r, self.v, self.dpvmajor,
+                       levels=np.arange(1, 10) * 6 * sigma, colors='k')
+            ax.contour(self.r, self.v, majormodel,
+                       levels=np.arange(1, 10) * 6 * sigma, colors='r')
+            ax.set_xlabel('offset (au)')
+            ax.set_ylabel('velocity (km/s)')
+            ax.set_ylim(self.v.min(), self.v.max())
+            ax = fig.add_subplot(1, 2, 2)
+            ax.contour(self.r, self.v, self.dpvminor,
+                       levels=np.arange(1, 10) * 6 * sigma, colors='k')
+            ax.contour(self.r, self.v, minormodel,
+                       levels=np.arange(1, 10) * 6 * sigma, colors='r')
+            ax.set_xlabel('offset (au)')
+            ax.set_ylim(self.v.min(), self.v.max())
+            fig.savefig(figname + '.model.png')
+            plt.show()
 
 #####################################################################
 if __name__ == '__main__':
@@ -302,6 +363,6 @@ if __name__ == '__main__':
     pvsil.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
                  dist=dist, vsys=vsys, rmax=rmax, vmin=vlim[0], vmax=vlim[1],
                  sigma=sigma)
-    pvsil.fitting(incl=incl, Mstar_range=[0.01, 10.0], Rc_range=[5, 500],
+    pvsil.fitting2(incl=incl, Mstar_range=[0.01, 1], Rc_range=[5, 50],
                   cutoff=5, show=True, figname=filehead, vmask=vmask)
     

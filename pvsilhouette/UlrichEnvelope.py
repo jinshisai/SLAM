@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy import constants, units
+from scipy.signal import convolve
+
 
 au = units.au.to('m')
 GG = constants.G.si.value
@@ -97,22 +99,69 @@ def losvel(elos, r, t, p, kepler=False):
 def velmax(r: np.ndarray, Mstar: float, Rc: float, incl: float):
     irad = np.radians(incl)
     vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
-    X = r / Rc
-    Z = r / Rc
-    X, Z = np.meshgrid(X, Z)  # X is inner, second axis
-    Y = np.zeros_like(X)
-    R = np.hypot(X, Z)
-    X[R < 1] = np.nan
-    Y[R < 1] = np.nan
-    Z[R < 1] = np.nan
+    X, Z = np.meshgrid(r / Rc, r / Rc)  # X is inner, second axis
+    zero = np.zeros_like(X)
     elos = [0, -np.sin(irad), np.cos(irad)]
     a = {}
-    vlos = losvel(elos, *xyz2rtp(*XYZ2xyz(irad, 0, X, Y, Z))) * vunit
+    x, y, z = XYZ2xyz(irad, 0, X, zero, Z)
+    r, t, p = xyz2rtp(x, y, z)
+    vlos = losvel(elos, r, t, p)
+    vlos[np.hypot(x, y) < 1] = np.nan  # remove non envelope part
     vlosmax = np.nanmax(vlos, axis=0)
     vlosmin = np.nanmin(vlos, axis=0)
-    a['major'] = {'vlosmax':vlosmax, 'vlosmin':vlosmin}
-    vlos = losvel(elos, *xyz2rtp(*XYZ2xyz(irad, 0, Y, X, Z))) * vunit
+    a['major'] = {'vlosmax':vlosmax * vunit, 'vlosmin':vlosmin * vunit}
+    x, y, z = XYZ2xyz(irad, 0, zero, X, Z)
+    r, t, p = xyz2rtp(x, y, z)
+    vlos = losvel(elos, r, t, p)
+    vlos[np.hypot(x, y) < 1] = np.nan  # remove non envelope part
     vlosmax = np.nanmax(vlos, axis=0)
     vlosmin = np.nanmin(vlos, axis=0)
-    a['minor'] = {'vlosmax':vlosmax, 'vlosmin':vlosmin}
+    a['minor'] = {'vlosmax':vlosmax * vunit, 'vlosmin':vlosmin * vunit}
+    return a
+
+def thinpv(r: np.ndarray, v: np.ndarray,
+           Mstar: float, Rc: float, incl: float,
+           beam: float):
+    irad = np.radians(incl)
+    vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
+    gauss = np.zeros((len(v) // 2 * 2 + 1, len(r)))
+    gauss[len(v) // 2, :] = np.exp2(-(4 * (r / beam)**2))
+    X, Z = np.meshgrid(r / Rc, r / Rc)  # X is inner, second axis
+    zero = np.zeros_like(X)
+    elos = [0, -np.sin(irad), np.cos(irad)]
+    w = v / vunit
+    dw = (w[1] - w[0]) / 2
+    a = {}
+    x, y, z = XYZ2xyz(irad, 0, X, zero, Z)
+    r, t, p = xyz2rtp(x, y, z)
+    vlos = losvel(elos, r, t, p)
+    #vlos[np.hypot(x, y) < 1] = np.nan  # remove non envelope part
+    _, _, _, rho = velrho(r, t)
+    pv = [None] * len(w)
+    for i in range(len(w)):
+        drhodv = rho * 1
+        drhodv[(vlos < w[i] - dw) + (w[i] + dw < vlos)] = 0
+        drhodv[np.isnan(vlos)] = 0
+        drhodv = convolve(drhodv, gauss, mode='same')
+        pv[i]= np.sum(drhodv, axis=0)
+    pv = np.array(pv)
+    #pv[np.isnan(pv)] = 0
+    pv = pv / np.median(pv)
+    a['major'] = pv
+    x, y, z = XYZ2xyz(irad, 0, zero, X, Z)
+    r, t, p = xyz2rtp(x, y, z)
+    vlos = losvel(elos, r, t, p)
+    vlos[np.hypot(x, y) < 1] = np.nan  # remove non envelope part
+    _, _, _, rho = velrho(r, t)
+    pv = [None] * len(w)
+    for i in range(len(w)):
+        drhodv = rho * 1
+        drhodv[(vlos < w[i] - dw) + (w[i] + dw < vlos)] = 0
+        drhodv[np.isnan(vlos)] = 0
+        drhodv = convolve(drhodv, gauss, mode='same')
+        pv[i]= np.sum(drhodv, axis=0) 
+    pv = np.array(pv)
+    #pv[np.isnan(pv)] = 0
+    pv = pv / np.median(pv)
+    a['minor'] = pv
     return a
