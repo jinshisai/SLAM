@@ -1214,7 +1214,8 @@ class PVAnalysis():
         if model is None: model = self.model
         if popt  == []:
             popt = self.popt[method][0].copy()
-            popt[4] -= self.avevsys
+            if len(popt) == 5:
+                popt[4] -= self.avevsys
         fx_model = lambda x: model(x, *popt)
         if not hasattr(self, 'rvlim'): self.get_range()
         xmin, xmax = self.rvlim[method][0]
