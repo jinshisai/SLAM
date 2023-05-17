@@ -10,7 +10,15 @@ M_sun = constants.M_sun.si.value
 deg = units.deg.to('radian')
 
 
-def velrho(radius, theta):
+def kepvel(radius, theta):
+    radius = radius.clip(1e-10, None)
+    R = radius * np.sin(theta)
+    vr = np.zeros_like(radius)
+    vt = np.zeros_like(radius)
+    vp = 1 / np.sqrt(radius) * R / radius
+    return vr, vt, vp
+
+def velrho(radius, theta, withkepler: bool = True):
     radius = radius.clip(1e-10, None)
     parity = np.sign(mu := np.cos(theta))
     mu = np.abs(mu).clip(1e-10, 1)
@@ -38,14 +46,14 @@ def velrho(radius, theta):
     vt = parity * np.sqrt(1 + mm) * (mu0 - mu) / np.sin(theta) / np.sqrt(radius)
     vp = np.sqrt(1 - mm) / np.sqrt(radius)
     rho = radius**(-3/2) / np.sqrt(1 + mm) / (2 / radius * mu0**2 + mm)
+    
+    if withkepler:
+        R = radius * np.sin(theta)
+        vkep = kepvel(radius, theta)
+        vr[R < 1] = vkep[0][R < 1]
+        vt[R < 1] = vkep[1][R < 1]
+        vp[R < 1] = vkep[2][R < 1]
     return vr, vt, vp, rho
-
-def kepvel(radius, theta):
-    r = radius.clip(1e-10, None) * np.sin(theta)
-    vr = np.zeros_like(r)
-    vt = np.zeros_like(r)
-    vp = 1 / np.sqrt(r)
-    return vr, vt, vp
 
 def xyz2rtp(x, y, z):
     r = np.sqrt(x**2 + y**2 + z**2).clip(1e-10, None)
@@ -106,14 +114,14 @@ def velmax(r: np.ndarray, Mstar: float, Rc: float, incl: float):
     x, y, z = XYZ2xyz(irad, 0, X, zero, Z)
     r, t, p = xyz2rtp(x, y, z)
     vlos = losvel(elos, r, t, p)
-    vlos[np.hypot(x, y) < 1] = np.nan  # remove non envelope part
+    #vlos[np.hypot(x, y) < 1] = np.nan  # remove non envelope part
     vlosmax = np.nanmax(vlos, axis=0)
     vlosmin = np.nanmin(vlos, axis=0)
     a['major'] = {'vlosmax':vlosmax * vunit, 'vlosmin':vlosmin * vunit}
     x, y, z = XYZ2xyz(irad, 0, zero, X, Z)
     r, t, p = xyz2rtp(x, y, z)
     vlos = losvel(elos, r, t, p)
-    vlos[np.hypot(x, y) < 1] = np.nan  # remove non envelope part
+    #vlos[np.hypot(x, y) < 1] = np.nan  # remove non envelope part
     vlosmax = np.nanmax(vlos, axis=0)
     vlosmin = np.nanmin(vlos, axis=0)
     a['minor'] = {'vlosmax':vlosmax * vunit, 'vlosmin':vlosmin * vunit}

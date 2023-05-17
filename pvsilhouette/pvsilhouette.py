@@ -363,6 +363,6 @@ if __name__ == '__main__':
     pvsil.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
                  dist=dist, vsys=vsys, rmax=rmax, vmin=vlim[0], vmax=vlim[1],
                  sigma=sigma)
-    pvsil.fitting2(incl=incl, Mstar_range=[0.01, 1], Rc_range=[5, 50],
+    pvsil.fitting(incl=incl, Mstar_range=[0.01, 1], Rc_range=[10, 100],
                   cutoff=5, show=True, figname=filehead, vmask=vmask)
     
