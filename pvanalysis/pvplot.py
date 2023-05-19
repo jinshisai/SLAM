@@ -115,7 +115,7 @@ class PVPlot():
                   cblabel: str = None, cbformat: float = '%.1e',
                   cbticks: list = None, cbticklabels: list = None,
                   **kwargs) -> None:
-        kwargs0 = {'cmap': 'viridis', 'zorder': 1}
+        kwargs0 = {'cmap':'viridis', 'zorder':1, 'shading':'nearest'}
         if restfrq is None:
             restfrq = self.restfrq
         if bmaj is None or bmin is None or bpa is None:
@@ -152,7 +152,7 @@ class PVPlot():
         kwargs0 = dict(kwargs0, **kwargs)
         ax = self.ax
         if self.flipaxis: x, v, d = v, x, d.T
-        p = ax.pcolormesh(x, v, d, shading='nearest', **kwargs0)
+        p = ax.pcolormesh(x, v, d, **kwargs0)
         if self.loglog:
             ax.set_xscale('log')
             ax.set_yscale('log')
