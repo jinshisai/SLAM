@@ -29,7 +29,7 @@ The latest, stable version is v1.0.0.
 
 To use the stable version, go to the SLAM directory and type
 
-```bash
-git tag -l # list tags (versions)  
-git checkout tags/v1.0.0 # choose v1.0.0
-```
+
+.. code-block:: bash
+   git tag -l # list tags (versions)
+   git checkout tags/v1.0.0 # choose v1.0.0
