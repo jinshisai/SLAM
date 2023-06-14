@@ -42,8 +42,11 @@ class PVAnalysis():
         rms (float): RMS noise level of the pv diagram.
         vsys (float): Systemic velocity of the object (km s^-1).
         dist (float): Distance to the object (pc).
+        incl (float, optional): Inclination angle of the object.
+               Defaults to 90, which means no correction for estimate
+               of the protostellar mass.
     """
-    def __init__(self, infile, rms, vsys, dist, pa=None, multibeam=False):
+    def __init__(self, infile, rms, vsys, dist, incl=90., pa=None, multibeam=False):
         """Initialize.
 
         Args:
@@ -51,6 +54,9 @@ class PVAnalysis():
             rms (float): rms noise level of the pv diagram.
             vsys (float): Systemic velocity of the object (km s^-1).
             dist (float): Distance to the object (pc).
+            incl (float, optional): Inclination angle of the object.
+               Defaults to 90, which means no correction for estimate
+               of the protostellar mass.
             pa (float, optional): Position angle of the pv cut.
                Will be used to calculate the spatial resolution along the pv
                cut if it is given. Defaults to None.
@@ -61,13 +67,15 @@ class PVAnalysis():
         self.rms  = rms
         self.vsys = vsys
         self.dist = dist
+        self.incl = incl
+        self.sini = np.sin(np.radians(incl))
         # initialize results
         self.results = {'ridge': {'vcut': None, 'xcut': None},
                         'edge': {'vcut': None, 'xcut': None}}
         self.__sorted = False
 
     def get_edgeridge(self, outname, thr=5.,
-        incl=90., quadrant=None, ridgemode='mean',
+        incl=None, quadrant=None, ridgemode='mean',
         pixrng_vcut=None, pixrng_xcut=None,
         Mlim=[0, 1e10], xlim=[-1e10, 0, 0, 1e10], vlim=[-1e10, 0, 0, 1e10],
         use_velocity=True, use_position=True,
@@ -148,7 +156,9 @@ class PVAnalysis():
         self.xlim = xlim
         self.vlim = vlim
         self.Mlim = Mlim
-        self.sini = np.sin(np.radians(incl))
+        if incl is not None:
+            self.incl = incl # update incl
+            self.sini = np.sin(np.radians(incl)) # update sini
         self.__unit = 1e10 * self.dist * au / Ggrav / Msun / self.sini**2
         self.__use_position = use_position
         self.__use_velocity = use_velocity
