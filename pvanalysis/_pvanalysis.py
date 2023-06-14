@@ -42,6 +42,9 @@ class PVAnalysis():
         rms (float): RMS noise level of the pv diagram.
         vsys (float): Systemic velocity of the object (km s^-1).
         dist (float): Distance to the object (pc).
+        incl (float, optional): Inclination angle of the object.
+               Defaults to 90, which means no correction for estimate
+               of the protostellar mass.
     """
     def __init__(self, infile, rms, vsys, dist, incl=90., pa=None, multibeam=False):
         """Initialize.
@@ -51,6 +54,9 @@ class PVAnalysis():
             rms (float): rms noise level of the pv diagram.
             vsys (float): Systemic velocity of the object (km s^-1).
             dist (float): Distance to the object (pc).
+            incl (float, optional): Inclination angle of the object.
+               Defaults to 90, which means no correction for estimate
+               of the protostellar mass.
             pa (float, optional): Position angle of the pv cut.
                Will be used to calculate the spatial resolution along the pv
                cut if it is given. Defaults to None.
