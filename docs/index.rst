@@ -31,5 +31,7 @@ To use the stable version, go to the SLAM directory and type
 
 
 .. code-block:: bash
-       git tag -l # list tags (versions)
-       git checkout tags/v1.0.0 # choose v1.0.0
+
+   git tag -l # list tags (versions)
+
+   git checkout tags/v1.0.0 # choose v1.0.0
