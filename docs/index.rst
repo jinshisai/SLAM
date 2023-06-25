@@ -40,7 +40,7 @@ To use the stable version, go to the SLAM directory and type
    git checkout tags/v1.0.0 # choose v1.0.0
 
 
-Tutorials
+Contents
 =================
 
 .. toctree::
