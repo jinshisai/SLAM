@@ -9,15 +9,6 @@ SLAM: Spectral Line Analysis/Modeling
 SLAM (Spectral Line Analysis/Modeling) is a python library to analyze/model spectral line data especially obtained with radio telescopes. The current main package, pvanalysis, is to derive the rotational velocity as a function of radius and fit the profile with a power-law function. The detail of the method is presented in Aso et al. (2015), Sai et al. (2020) and the reference therein. More analysis tools will be coming in future.
 
 
-Contents
-==================
-
-Will be coming soon.
-
-* :ref:`genindex`
-* :ref:`search`
-
-
 Installation
 ==================
 
