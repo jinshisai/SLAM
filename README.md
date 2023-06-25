@@ -63,12 +63,12 @@ git clone https://github.com/jinshisai/SLAM
  
 ## Authors
 
-* Name: Jinshi Sai
-* Affiliation: Academia Sinica Institute of Astronomy and Astrophysics
-* E-mail: jsai@asiaa.sinica.edu.tw
-* Name: Yusuke Aso
-* Affiliation: Korea Astronomy and Space Science Institute
-* E-mail: yaso@kasi.re.kr
+* Jinshi Sai
+    * Affiliation: Academia Sinica Institute of Astronomy and Astrophysics
+    * E-mail: jsai@asiaa.sinica.edu.tw
+* Yusuke Aso
+    * Affiliation: Korea Astronomy and Space Science Institute
+    * E-mail: yaso@kasi.re.kr
  
 ## License
  
