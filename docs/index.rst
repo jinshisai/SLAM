@@ -54,6 +54,6 @@ Tutorials
 
 .. toctree::
    :maxdepth: 2
-   :caption: Tutorials:
+   :caption: Tutorials
 
    tutorials/example_pvanalysis
