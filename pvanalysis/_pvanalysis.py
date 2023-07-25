@@ -15,7 +15,6 @@ import copy
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy import constants, units
-from dynesty import DynamicNestedSampler as DNS
 
 from .fitfuncs import edge, ridge_mean, gaussfit, gauss1d
 from pvanalysis.pvfits import Impvfits
@@ -894,14 +893,8 @@ class PVAnalysis():
                                       figname=outname+'.corner'+ext+'.png',
                                       show_corner=show_corner,
                                       ndata=len(args[0]) + len(args[3]))
-            def ptform(u):
-                return plim[0, :] + (plim[1, :] - plim[0, :]) * u
-            sampler = DNS(loglikelihood=lnprob, logl_args=args,
-                          prior_transform=ptform, ndim=len(plim[0]))
-            sampler.run_nested(print_progress=False)
-            evidence = np.exp(sampler.results.logz[-1])
             e = 'edge' if ext == '_e' else 'ridge'
-            print(f'Evidence: {evidence:.2e} [{e}]')
+            print(f'\033[1A\033[18C [{e}]')
             (qopt := q0 * 1)[np.isnan(q0)] = popt
             (qerr := q0 * 0)[np.isnan(q0)] = perr
             res[:] = [qopt, qerr]
