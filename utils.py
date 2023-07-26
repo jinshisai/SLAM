@@ -12,7 +12,7 @@ def gauss1d(x, amp, mean, fwhm):
 def emcee_corner(bounds, log_prob_fn, args=None, nwalkers_per_ndim=16,
                  nburnin=2000, nsteps=1000, gr_check=False, ndata=1000,
                  labels=None, rangelevel=0.8, figname=None,
-                 show_corner=False, ncore=1, calc_evidence=True):
+                 show_corner=False, ncore=1, calc_evidence=False):
     ndim = len(bounds[0])
     nwalkers = ndim * nwalkers_per_ndim
     plim = np.array(bounds)
