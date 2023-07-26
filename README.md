@@ -38,6 +38,7 @@ pvanalysis can do the following things.
 * copy
 * corner
 * emcee
+* dynesty
 * math
 * matplotlib
 * mpl_toolkits
