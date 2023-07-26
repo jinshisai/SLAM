@@ -76,6 +76,8 @@ def emcee_corner(bounds, log_prob_fn, args=None, nwalkers_per_ndim=16,
         sampler = DNS(loglikelihood=log_prob_fn, logl_args=args,
                       prior_transform=ptform, ndim=ndim)
         sampler.run_nested(print_progress=False)
-        evidence = np.exp(sampler.results.logz[-1])
-        print(f'Evidence: {evidence:.2e}')
+        results = sampler.results
+        evidence = np.exp(results.logz[-1])
+        evid_err = evidence * results.logzerr[-1]
+        print(f'Evidence: {evidence:.2e} +/- {evid_err:.2e}')
     return [pmid, perr]

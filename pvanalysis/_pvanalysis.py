@@ -895,7 +895,7 @@ class PVAnalysis():
                                       ndata=len(args[0]) + len(args[3]),
                                       calc_evidence=True)
             e = 'edge' if ext == '_e' else 'ridge'
-            print(f'\033[1A\033[18C [{e}]')
+            print(f'\033[1A\033[33C[{e}]')
             (qopt := q0 * 1)[np.isnan(q0)] = popt
             (qerr := q0 * 0)[np.isnan(q0)] = perr
             res[:] = [qopt, qerr]
