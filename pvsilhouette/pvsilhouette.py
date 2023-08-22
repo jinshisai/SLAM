@@ -283,8 +283,10 @@ class PVSilhouette():
             print('No model is better than the all-0 or all-1 models.')
         popt, plow, phigh = 10**popt, 10**plow, 10**phigh
         self.popt = popt
+        self.plow = plow
+        self.phigh = phigh
         print(f'M* = {plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} Msun')
-        print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.2f} au')
+        print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
 
         majmod, minmod, a = makemodel(*popt, outputvel=True)
         fig = plt.figure()
@@ -308,11 +310,9 @@ class PVSilhouette():
         ax.set_xlabel('minor offset (au)')
         ax.set_ylim(self.v.min(), self.v.max())
         ax.set_title(r'$M_{*}=$'\
-            +f'{self.plow[0]:.2f}, {self.popt[0]:.2f}, {self.phigh[0]:.2f}'\
-            +r' $M_{\odot}$\n'\
+            +f'{plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} '+r'$M_{\odot}$\n'\
             +r'$R_{c}=$'\
-            +f'{self.plow[1]:.0f}, {self.popt[1]:.0f}, {self.phigh[1]:.0f}'\
-            +' au')
+            +f'{plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
         fig.savefig(figname + '.model.png')
         if show: plt.show()
 
