@@ -82,10 +82,10 @@ class ChannelFit():
         ----------
         cubefits : str
             Name of the input FITS file including the extension.
-        dist : float
-            Distance of the target, used to convert arcsec to au.
         center : str
             Coordinates of the target: e.g., "01h23m45.6s 01d23m45.6s".
+        dist : float
+            Distance of the target, used to convert arcsec to au.
         vsys : float
             Systemic velocity of the target.
         xmax : float
