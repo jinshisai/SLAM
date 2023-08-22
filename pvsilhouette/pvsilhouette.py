@@ -273,21 +273,18 @@ class PVSilhouette():
             return -np.inf if chi2 > chi2max else -0.5 * chi2
         
         plim = np.log10([Mstar_range, Rc_range]).T
-        popt, perr = emcee_corner(plim, lnprob, args=[],
-                                  nwalkers_per_ndim=16,
-                                  nburnin=200, nsteps=200,
-                                  labels=['log Mstar', 'log Rc'],
-                                  rangelevel=0.95,
-                                  figname=figname+'.corner.png',
-                                  show_corner=show)
+        mcmc = emcee_corner(plim, lnprob,
+                            nwalkers_per_ndim=16, nburnin=200, nsteps=200,
+                            labels=['log Mstar', 'log Rc'],
+                            rangelevel=0.95, figname=figname+'.corner.png',
+                            show_corner=show, simpleoutput=False)
+        popt, plow, _, phigh = mcmc
         if np.isinf(lnprob(popt)):
             print('No model is better than the all-0 or all-1 models.')
-        popt = 10**popt
-        perr = popt * np.log(10) * perr
+        popt, plow, phigh = 10**popt, 10**plow, 10**phigh
         self.popt = popt
-        self.perr = perr
-        print(f'M* = {popt[0]:.2f} +/- {perr[0]:.2f} Msun')
-        print(f'Rc = {popt[1]:.0f} +/- {perr[1]:.0f} au')
+        print(f'M* = {plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} Msun')
+        print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.2f} au')
 
         majmod, minmod, a = makemodel(*popt, outputvel=True)
         fig = plt.figure()
@@ -310,10 +307,12 @@ class PVSilhouette():
         ax.plot(self.x, a['minor']['vlosmin'], '-r')
         ax.set_xlabel('minor offset (au)')
         ax.set_ylim(self.v.min(), self.v.max())
-        ax.set_title(r'$M_{*}=$'+f'{self.popt[0]:.2f}'\
-                     +r'$\pm$'+f'{self.perr[0]:.2f} '+r'$M_{\odot}$\n'\
-                     +r'$R_{c}=$'+f'{self.popt[1]:.0f}'\
-                     +r'$\pm$'+f'{self.perr[1]:.0f} au')
+        ax.set_title(r'$M_{*}=$'\
+            +f'{self.plow[0]:.2f}, {self.popt[0]:.2f}, {self.phigh[0]:.2f}'\
+            +r' $M_{\odot}$\n'\
+            +r'$R_{c}=$'\
+            +f'{self.plow[1]:.0f}, {self.popt[1]:.0f}, {self.phigh[1]:.0f}'\
+            +' au')
         fig.savefig(figname + '.model.png')
         if show: plt.show()
 
