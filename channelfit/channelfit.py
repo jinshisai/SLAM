@@ -15,37 +15,25 @@ Note. FITS files with multiple beams are not supported. The dynamic range for xl
 cubefits = './channelfit/IRAS16253_SBLB_C18O_robust_2.0.imsub.fits'
 center = '16h28m21.61526785s -24d36m24.32538414s'
 pa = 113 - 180  # deg; pa is redshift rotation, pa + 90 is blueshifted infall
-width = 5  # pixel
 incl = 65  # deg
 vsys = 4  # km/s
 dist = 139  # pc
 sigma = 2e-3  # Jy/beam; None means automatic calculation.
 cutoff = 5.0  # sigma
 rmax = 1 * dist  # au
-ymax = rmax  # au
 #vlim = (-2.52, -1.4, 1.4, 2.52)  # km/s
 vlim = (-2.52, -0.9, 0.9, 2.52)  # km/s
-xmax_plot = rmax  # au
-ymax_plot = xmax_plot  # au
-vmax_plot = 0  # au
-vmin_plot = vmax_plot / 50  # au
 show_figs = True
-minrelerr = 0.01
-minabserr = 0.1
-method = 'gauss'  # mean or gauss
-write_point = False  # True: write the 2D centers to a text file.
 ################################
 
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
 from astropy.io import fits
 from astropy import constants, units, wcs
 from astropy.coordinates import SkyCoord
 from scipy.interpolate import RegularGridInterpolator as RGI
 from scipy.signal import convolve
-from scipy.optimize import curve_fit
 import warnings
 from utils import emcee_corner
 
@@ -55,12 +43,6 @@ GG = constants.G.si.value
 M_sun = constants.M_sun.si.value
 au = units.au.to('m')
 vunit = np.sqrt(GG * M_sun / au) * 1e-3
-        
-def gauss2d(xy, peak, cx, cy, wx, wy, pa):
-    x, y = xy
-    z = ((y - cy) + 1j * (x - cx)) / np.exp(1j * pa)
-    t, s = np.real(z), np.imag(z)
-    return np.ravel(peak * np.exp2(-s**2 / wx**2 - t**2 / wy**2))
 
 def rot(x, y, pa):
     s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
