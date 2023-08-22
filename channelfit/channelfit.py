@@ -19,7 +19,6 @@ incl = 65  # deg
 vsys = 4  # km/s
 dist = 139  # pc
 sigma = 2e-3  # Jy/beam; None means automatic calculation.
-cutoff = 5.0  # sigma
 rmax = 1 * dist  # au
 #vlim = (-2.52, -1.4, 1.4, 2.52)  # km/s
 vlim = (-2.52, -0.9, 0.9, 2.52)  # km/s
@@ -60,7 +59,7 @@ def makemom01(d, v, sigma):
     sigma_mom0 = sigma * dv * np.sqrt(len(d))
     vv = np.broadcast_to(v, np.shape(d)[::-1])
     vv = np.moveaxis(vv, 2, 0)
-    dmask = d.copy()
+    dmask = d * 1
     dmask[dmask < 3 * sigma] = np.nan
     mom1 = np.nansum(d * vv, axis=0) / np.nansum(d, axis=0)
     mom1[mom0 < 3 * sigma_mom0] = np.nan
@@ -71,8 +70,11 @@ class ChannelFit():
 
 #    def __init__(self):
 
-    def read_cubefits(self, cubefits, dist, center, vsys=0, xmax=1e4, ymax=1e4,
-                      vmin=-100, vmax=100, sigma=None):
+    def read_cubefits(self, cubefits: str, center: str = None,
+                      dist: float = 1, vsys: float = 0,
+                      xmax: float = 1e4, ymax: float = 1e4,
+                      vmin: float = -100, vmax: float = 100,
+                      sigma: float = None) -> dict:
         """
         Read a position-velocity diagram in the FITS format.
 
@@ -103,23 +105,26 @@ class ChannelFit():
             x (1D array), v (1D array), data (2D array), header, and sigma.
         """
         cc = constants.c.si.value
-        coord = SkyCoord(center, frame='icrs')
-        cx, cy = coord.ra.degree, coord.dec.degree
         f = fits.open(cubefits)[0]
         d, h = np.squeeze(f.data), f.header
+        if center is None:
+            cx, cy = 0, 0
+        else:
+            coord = SkyCoord(center, frame='icrs')
+            cx = coord.ra.degree - h['CRVAL1']
+            cy = coord.dec.degree - h['CRVAL2']
         if sigma is None:
             sigma = np.mean([np.nanstd(d[:2]), np.std(d[-2:])])
             print(f'sigma = {sigma:.3e}')
-        x = (np.arange(h['NAXIS1'])-h['CRPIX1']+1)*h['CDELT1']+h['CRVAL1']
-        y = (np.arange(h['NAXIS2'])-h['CRPIX2']+1)*h['CDELT2']+h['CRVAL2']
-        v = (np.arange(h['NAXIS3'])-h['CRPIX3']+1)*h['CDELT3']+h['CRVAL3']
+        x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
+        y = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
+        v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
         x = (x - cx) * 3600. * dist  # au
         y = (y - cy) * 3600. * dist  # au
         v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
         i0, i1 = np.argmin(np.abs(x - xmax)), np.argmin(np.abs(x + xmax))
         j0, j1 = np.argmin(np.abs(y + ymax)), np.argmin(np.abs(y - ymax))
         k0, k1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
-        self.offpix = (i0, j0, k0)
         x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[k0:k1 + 1],
         d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
         dx, dy, dv = x[1] - x[0], y[1] - y[0], v[1] - v[0]
@@ -195,8 +200,8 @@ class ChannelFit():
             v = self.v_valid
             m = [None] * len(v)
             for i in range(len(v)):
-                m[i] = 1 / np.sqrt(2 * np.pi) / cs \
-                       * np.exp(-(v[i] - modelvlos(Mstar, Rc))**2 / 2 / cs**2)
+                m[i] = np.exp(-(v[i] - modelvlos(Mstar, Rc))**2 / 2 / cs**2) \
+                       / np.sqrt(2 * np.pi) / cs
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
             mom0 = np.nansum(m, axis=0) * self.dv
@@ -305,18 +310,16 @@ class ChannelFit():
             q = 10**p
             model = self.cubemodel(*q)[0]
             chi2 = np.nansum((self.data_valid - model)**2) / self.sigma**2
-            chi2r = chi2 / self.pixel_valid
             chi2 = chi2 / self.pixperbeam
-            print([f'{q[0]:05.3f}', f'{q[1]:07.3f}', f'{q[2]:05.3f}'], f'{chi2r:05.2f}')
             return -0.5 * chi2
         plim = np.log10([Mstar_range, Rc_range, cs_range]).T
-        popt, perr = emcee_corner(plim, lnprob, args=[],
+        popt, perr = emcee_corner(plim, lnprob,
                                   nwalkers_per_ndim=16,
                                   nburnin=200, nsteps=200,
                                   labels=['log Mstar', 'log Rc', 'log cs'],
-                                  rangelevel=None,
+                                  rangelevel=95,
                                   figname=figname+'.corner.png',
-                                  show_corner=True, ncore=1)
+                                  show_corner=False)
         popt = 10**popt
         perr = popt * np.log(10) * perr
         self.popt = popt
