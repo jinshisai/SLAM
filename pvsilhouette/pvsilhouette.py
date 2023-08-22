@@ -22,57 +22,36 @@ vsys = 4  # km/s
 dist = 139  # pc
 sigma = 1.9e-3  # Jy/beam; None means automatic calculation.
 cutoff = 5.0  # sigma
-rmax = 1 * dist  # au
-vlim = (-2.5, 2.5)
-vmask = (-0.1, 0.2)
-xmax_plot = rmax  # au
-ymax_plot = xmax_plot  # au
+rmax = 200  # au
+vlim = (-6, 6)
+vmask = (-0.5, 0.5)
 show_figs = True
-minrelerr = 0.01
-minabserr = 0.1
-method = 'gauss'  # mean or gauss
-write_point = False  # True: write the 2D centers to a text file.
 ################################
 
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
 from astropy.io import fits
-from astropy import constants, units
+from astropy import constants
 from astropy.coordinates import SkyCoord
 from scipy.interpolate import RegularGridInterpolator as RGI
-from scipy.optimize import curve_fit
 import warnings
 
 from utils import emcee_corner
-from UlrichEnvelope import velmax, thinpv
+from UlrichEnvelope import velmax
 
 warnings.simplefilter('ignore', RuntimeWarning)
-
-def gauss2d(xy, peak, cx, cy, wx, wy, pa):
-    x, y = xy
-    z = ((y - cy) + 1j * (x - cx)) / np.exp(1j * pa)
-    t, s = np.real(z), np.imag(z)
-    return np.ravel(peak * np.exp2(-s**2 / wx**2 - t**2 / wy**2))
-
-def rot(x, y, pa):
-    s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
-    t = x * np.sin(pa) + y * np.cos(pa)  # along major axis
-    return np.array([s, t])
-
-def irot(s, t, pa):
-    x =  s * np.cos(pa) + t * np.sin(pa)  # along R.A. axis
-    y = -s * np.sin(pa) + t * np.cos(pa)  # along Dec. axis
-    return np.array([x, y])
 
 
 class PVSilhouette():
 
 #    def __init__(self):
 
-    def read_cubefits(self, cubefits, dist, center, vsys=0, xmax=1e4, ymax=1e4,
-                      vmin=-100, vmax=100, sigma=None):
+    def read_cubefits(self, cubefits: str, center: str = None,
+                      dist: float = 1, vsys: float = 0,
+                      xmax: float = 1e4, ymax: float = 1e4,
+                      vmin: float = -100, vmax: float = 100,
+                      sigma: float = None) -> dict:
         """
         Read a position-velocity diagram in the FITS format.
 
@@ -103,16 +82,20 @@ class PVSilhouette():
             x (1D array), v (1D array), data (2D array), header, and sigma.
         """
         cc = constants.c.si.value
-        coord = SkyCoord(center, frame='icrs')
-        cx, cy = coord.ra.degree, coord.dec.degree
         f = fits.open(cubefits)[0]
         d, h = np.squeeze(f.data), f.header
+        if center is None:
+            cx, cy = 0, 0
+        else:
+            coord = SkyCoord(center, frame='icrs')
+            cx = coord.ra.degree - h['CRVAL1']
+            cy = coord.dec.degree - h['CRVAL2']
         if sigma is None:
             sigma = np.mean([np.nanstd(d[:2]), np.std(d[-2:])])
             print(f'sigma = {sigma:.3e}')
-        x = (np.arange(h['NAXIS1'])-h['CRPIX1']+1)*h['CDELT1']+h['CRVAL1']
-        y = (np.arange(h['NAXIS2'])-h['CRPIX2']+1)*h['CDELT2']+h['CRVAL2']
-        v = (np.arange(h['NAXIS3'])-h['CRPIX3']+1)*h['CDELT3']+h['CRVAL3']
+        x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
+        y = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
+        v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
         x = (x - cx) * 3600. * dist  # au
         y = (y - cy) * 3600. * dist  # au
         v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
@@ -137,8 +120,11 @@ class PVSilhouette():
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
-    def read_pvfits(self, pvfits, dist, vsys=0, xmax=1e4,
-                    vmin=-100, vmax=100, sigma=None):
+    def read_pvfits(self, pvfits: str,
+                    dist: float = 1, vsys: float = 0,
+                    xmax: float = 1e4,
+                    vmin: float = -100, vmax: float = 100,
+                    sigma: float = None) -> dict:
         """
         Read a position-velocity diagram in the FITS format.
 
@@ -191,14 +177,18 @@ class PVSilhouette():
         self.pvfits, self.dist, self.vsys = pvfits, dist, vsys
         return {'x':x, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
-    def get_PV(self, cubefits=None, pa=0, dist=None, center=None, vsys=None,
-               rmax=1e4, vmin=-100, vmax=100, sigma=None, show=False):
+    def get_PV(self, cubefits: str = None,
+               pa: float = 0, center: str = None,
+               dist: float = 1, vsys: float = 0,
+               xmax: float = 1e4,
+               vmin: float = -100, vmax: float = 100,
+               sigma: float = None):
         if not (cubefits is None):
-            self.read_cubefits(cubefits, dist, center, vsys,
-                               rmax, rmax, vmin, vmax, sigma)
+            self.read_cubefits(cubefits, center, dist, vsys,
+                               xmax, xmax, vmin, vmax, sigma)
         x, y, v = self.x, self.y, self.v
         sigma, d = self.sigma, self.data
-        n = np.floor(rmax / self.dy)
+        n = np.floor(xmax / self.dy)
         r = (np.arange(2 * n + 1) - n) * self.dy
         ry = r * np.cos(np.radians(pa))
         rx = r * np.sin(np.radians(pa))
@@ -210,149 +200,124 @@ class PVSilhouette():
             dpvminor[i] = interp((ry, rx))
         self.dpvmajor = np.array(dpvmajor)
         self.dpvminor = np.array(dpvminor)
-        self.r = r
-        if show:
-            fig = plt.figure()
-            ax = fig.add_subplot(1, 2, 1)
-            ax.contour(self.r, self.v, self.dpvmajor,
-                       levels=np.arange(1, 10) * 6 * sigma, colors='k')
-            ax.set_xlabel('offset (au)')
-            ax.set_ylabel('velocity (km/s)')
-            ax = fig.add_subplot(1, 2, 2)
-            ax.contour(self.r, self.v, self.dpvminor,
-                       levels=np.arange(1, 10) * 6 * sigma, colors='k')
-            ax.set_xlabel('offset (au)')
-            plt.show()
+        self.x = r
     
-    def put_PV(self, pvmajorfits: str, pvminorfits: str, dist: float,
-               vsys: float, rmax: float, vmin: float, vmax: float, sigma: float):
+    def put_PV(self, pvmajorfits: str, pvminorfits: str,
+               dist: float, vsys: float,
+               rmax: float, vmin: float, vmax: float, sigma: float):
         self.read_pvfits(pvmajorfits, dist, vsys, rmax, vmin, vmax, sigma)
         self.dpvmajor = self.data
         self.read_pvfits(pvminorfits, dist, vsys, rmax, vmin, vmax, sigma)
         self.dpvminor = self.data
-        self.r = self.x
-        
-    def fitting(self, incl: float, Mstar_range: list = [0, 10],
-                Rc_range: list = [0, 1000], cutoff: float = 5,
-                vmask: list = [0, 0],
+
+    def fitting(self, incl: float = 90,
+                Mstar_range: list = [0, 10], Rc_range: list = [0, 1000],
+                cutoff: float = 5, vmask: list = [0, 0],
                 show: bool = False, figname: str = 'PVsilhouette'):
+        majobs = np.where(self.dpvmajor > cutoff * self.sigma, 1, 0)
+        minobs = np.where(self.dpvminor > cutoff * self.sigma, 1, 0)
+        x, v = np.meshgrid(self.x, self.v)
+        def minmax(a: np.ndarray, b: np.ndarray, s: str, m: np.ndarray):
+            rng = a[(b >= 0 if s == '+' else b < 0) * (m > 0.5)]
+            if len(rng) == 0:
+                return 0, 0
+            else:
+                return np.min(rng), np.max(rng)
+        rng = np.array([[[minmax(a, b, s, m)
+                          for m in [majobs, minobs]]
+                         for s in ['-', '+']]
+                        for a, b in zip([x, v], [v, x])])
+        def combine(r: np.ndarray):
+            return np.min(r[:, 0]), np.max(r[:, 1])
+        rng = [[combine(r) for r in rr] for rr in rng]
+        mask = [[(s * a > 0) * ((b < r[0]) + (r[1] < b))
+                 for s, r in zip([-1, 1], rr)]
+                for a, b, rr in zip([v, x], [x, v], rng)]
+        mask = np.sum(mask, axis=(0, 1)) + (vmask[0] < v) * (v < vmask[1])
+        majobs = np.where(mask, np.nan, majobs)
+        minobs = np.where(mask, np.nan, minobs)
+        majsig = 1
+        minsig = 1
+        def calcchi2(majmod: np.ndarray, minmod: np.ndarray):
+            chi2 =   np.nansum((majobs - majmod)**2 / majsig**2) \
+                   + np.nansum((minobs - minmod)**2 / minsig**2)
+            return chi2
         
-        majormap = np.where(self.dpvmajor > cutoff * self.sigma, 1, 0)
-        minormap = np.where(self.dpvminor > cutoff * self.sigma, 1, 0)
-        majormap[(vmask[0] < self.v) * (self.v < vmask[1])] = 1
-        minormap[(vmask[0] < self.v) * (self.v < vmask[1])] = 1
-        allpix = len(np.ravel(majormap)) + len(np.ravel(minormap))
+        chi2max1 = calcchi2(np.ones_like(majobs), np.ones_like(minobs))
+        chi2max0 = calcchi2(np.zeros_like(majobs), np.zeros_like(minobs))
+        chi2max = np.min([chi2max0, chi2max1])
+        nv, nx = np.shape(self.dpvmajor)
+        quadrant =   np.sum(self.dpvmajor[:nv//2, :nx//2]) \
+                   + np.sum(self.dpvmajor[nv//2:, nx//2:]) \
+                   - np.sum(self.dpvmajor[nv//2:, :nx//2]) \
+                   - np.sum(self.dpvmajor[:nv//2, nx//2:])
+        quadrant = int(np.sign(quadrant))
+        def makemodel(Mstar, Rc, outputvel=False):
+            a = velmax(self.x, Mstar=Mstar, Rc=Rc, incl=incl)
+            major = []
+            for min, max in zip(a['major']['vlosmin'], a['major']['vlosmax']):
+                major.append(np.where((min < self.v) * (self.v < max), 1, 0))
+            major = np.transpose(major)[:, ::quadrant]
+            minor = []
+            for min, max in zip(a['minor']['vlosmin'], a['minor']['vlosmax']):
+                minor.append(np.where((min < self.v) * (self.v < max), 1, 0))
+            minor = np.transpose(minor)
+            if outputvel:
+                return major, minor, a
+            else:
+                return major, minor
+
         def lnprob(p):
             q = 10**p
-            a = velmax(self.r, Mstar=q[0], Rc=q[1], incl=incl)
-            majorvel = []
-            for min, max in zip(a['major']['vlosmin'], a['major']['vlosmax']):
-                majorvel.append(np.where((min < self.v) * (self.v < max), 1, 0))
-            majorvel = np.transpose(majorvel)
-            minorvel = []
-            for min, max in zip(a['minor']['vlosmin'], a['minor']['vlosmax']):
-                minorvel.append(np.where((min < self.v) * (self.v < max), 1, 0))
-            minorvel = np.transpose(minorvel)
-            chi2 = np.sum((majormap - majorvel)**2) + np.sum((minormap - minorvel)**2)
-            chi2r = chi2 / allpix
-            print([f'{q[0]:05.3f}', f'{q[1]:07.3f}'], f'{chi2r:05.3f}')
-            return -0.5 * chi2
+            chi2 = calcchi2(*makemodel(*q))
+            return -np.inf if chi2 > chi2max else -0.5 * chi2
+        
         plim = np.log10([Mstar_range, Rc_range]).T
         popt, perr = emcee_corner(plim, lnprob, args=[],
                                   nwalkers_per_ndim=16,
                                   nburnin=200, nsteps=200,
                                   labels=['log Mstar', 'log Rc'],
-                                  rangelevel=0.93,
+                                  rangelevel=0.95,
                                   figname=figname+'.corner.png',
-                                  show_corner=True)
+                                  show_corner=show)
+        if np.isinf(lnprob(popt)):
+            print('No model is better than the all-0 or all-1 models.')
         popt = 10**popt
         perr = popt * np.log(10) * perr
         self.popt = popt
         self.perr = perr
-        print(popt)
-        if show:
-            a = velmax(self.r, Mstar=popt[0], Rc=popt[1], incl=incl)
-            fig = plt.figure()
-            ax = fig.add_subplot(1, 2, 1)
-            ax.contour(self.r, self.v, self.dpvmajor,
-                       levels=np.arange(1, 10) * 6 * sigma, colors='k')
-            ax.plot(self.r, a['major']['vlosmax'], '-r')
-            ax.plot(self.r, a['major']['vlosmin'], '-r')
-            ax.set_xlabel('offset (au)')
-            ax.set_ylabel('velocity (km/s)')
-            ax.set_ylim(self.v.min(), self.v.max())
-            ax = fig.add_subplot(1, 2, 2)
-            ax.contour(self.r, self.v, self.dpvminor,
-                       levels=np.arange(1, 10) * 6 * sigma, colors='k')
-            ax.plot(self.r, a['minor']['vlosmax'], '-r')
-            ax.plot(self.r, a['minor']['vlosmin'], '-r')
-            ax.set_xlabel('offset (au)')
-            ax.set_ylim(self.v.min(), self.v.max())
-            fig.savefig(figname + '.model.png')
-            plt.show()
+        print(f'M* = {popt[0]:.2f} +/- {perr[0]:.2f} Msun')
+        print(f'Rc = {popt[1]:.0f} +/- {perr[1]:.0f} au')
 
-    def fitting2(self, incl: float, Mstar_range: list = [0, 10],
-                 Rc_range: list = [0, 1000], cutoff: float = 5,
-                 vmask: list = [0, 0],
-                 show: bool = False, figname: str = 'PVsilhouette'):
-        
-        majormap = self.dpvmajor
-        minormap = self.dpvminor
-        #majormap = np.where(self.dpvmajor > cutoff * self.sigma, 1, 0)
-        #minormap = np.where(self.dpvminor > cutoff * self.sigma, 1, 0)
-        allpix = len(np.ravel(majormap)) + len(np.ravel(minormap))
-        def lnprob(p):
-            q = 10**p
-            a = thinpv(self.r, self.v, Mstar=q[0], Rc=q[1], incl=incl,
-                       beam=self.bmaj)
-            majormodel, minormodel = a['major'], a['minor']
-            majormodel *= np.median(majormap)
-            minormodel *= np.median(minormap)
-            #majormodel = np.where(majormodel > cutoff * self.sigma, 1, 0)
-            #minormodel = np.where(minormodel > cutoff * self.sigma, 1, 0)
-            chi2 = np.sum((majormap - majormodel)**2) + np.sum((minormap - minormodel)**2)
-            chi2 /= self.sigma**2
-            chi2r = chi2 / allpix
-            print([f'{q[0]:05.3f}', f'{q[1]:07.3f}'], f'{chi2r:05.3f}')
-            return -0.5 * chi2
-        plim = np.log10([Mstar_range, Rc_range]).T
-        popt, perr = emcee_corner(plim, lnprob, args=[],
-                                  nwalkers_per_ndim=8,
-                                  nburnin=100, nsteps=100,
-                                  labels=['log Mstar', 'log Rc'],
-                                  rangelevel=0.93,
-                                  figname=figname+'.corner.png',
-                                  show_corner=True)
-        popt = 10**popt
-        perr = popt * np.log(10) * perr
-        self.popt = popt
-        self.perr = perr
-        print(popt)
-        if show:
-            a = thinpv(self.r, self.v, Mstar=popt[0], Rc=popt[1], incl=incl,
-                       beam=self.bmaj)
-            majormodel, minormodel = a['major'], a['minor']
-            majormodel *= np.mean(majormap)
-            minormodel *= np.mean(minormap)
-            fig = plt.figure()
-            ax = fig.add_subplot(1, 2, 1)
-            ax.contour(self.r, self.v, self.dpvmajor,
-                       levels=np.arange(1, 10) * 6 * sigma, colors='k')
-            ax.contour(self.r, self.v, majormodel,
-                       levels=np.arange(1, 10) * 6 * sigma, colors='r')
-            ax.set_xlabel('offset (au)')
-            ax.set_ylabel('velocity (km/s)')
-            ax.set_ylim(self.v.min(), self.v.max())
-            ax = fig.add_subplot(1, 2, 2)
-            ax.contour(self.r, self.v, self.dpvminor,
-                       levels=np.arange(1, 10) * 6 * sigma, colors='k')
-            ax.contour(self.r, self.v, minormodel,
-                       levels=np.arange(1, 10) * 6 * sigma, colors='r')
-            ax.set_xlabel('offset (au)')
-            ax.set_ylim(self.v.min(), self.v.max())
-            fig.savefig(figname + '.model.png')
-            plt.show()
+        majmod, minmod, a = makemodel(*popt, outputvel=True)
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 2, 1)
+        z = np.where(mask, -(mask.astype('int')), (majobs - majmod)**2)
+        ax.pcolormesh(self.x, self.v, z, cmap='bwr', vmin=-1, vmax=1, alpha=0.1)
+        ax.contour(self.x, self.v, self.dpvmajor,
+                   levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
+        ax.plot(self.x * quadrant, a['major']['vlosmax'], '-r')
+        ax.plot(self.x * quadrant, a['major']['vlosmin'], '-r')
+        ax.set_xlabel('major offset (au)')
+        ax.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
+        ax.set_ylim(np.min(self.v), np.max(self.v))
+        ax = fig.add_subplot(1, 2, 2)
+        z = np.where(mask, -(mask.astype('int')), (minobs - minmod)**2)
+        ax.pcolormesh(self.x, self.v, z, cmap='bwr', vmin=-1, vmax=1, alpha=0.1)
+        ax.contour(self.x, self.v, self.dpvminor,
+                   levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
+        ax.plot(self.x, a['minor']['vlosmax'], '-r')
+        ax.plot(self.x, a['minor']['vlosmin'], '-r')
+        ax.set_xlabel('minor offset (au)')
+        ax.set_ylim(self.v.min(), self.v.max())
+        ax.set_title(r'$M_{*}=$'+f'{self.popt[0]:.2f}'\
+                     +r'$\pm$'+f'{self.perr[0]:.2f} '+r'$M_{\odot}$\n'\
+                     +r'$R_{c}=$'+f'{self.popt[1]:.0f}'\
+                     +r'$\pm$'+f'{self.perr[1]:.0f} au')
+        fig.savefig(figname + '.model.png')
+        if show: plt.show()
 
+    
 #####################################################################
 if __name__ == '__main__':
     filehead = cubefits.replace('.fits', '')
@@ -363,6 +328,5 @@ if __name__ == '__main__':
     pvsil.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
                  dist=dist, vsys=vsys, rmax=rmax, vmin=vlim[0], vmax=vlim[1],
                  sigma=sigma)
-    pvsil.fitting(incl=incl, Mstar_range=[0.01, 1], Rc_range=[10, 100],
-                  cutoff=5, show=True, figname=filehead, vmask=vmask)
-    
+    pvsil.fitting(incl=incl, Mstar_range=[0.01, 10], Rc_range=[1, 1000],
+                  cutoff=5, show=show_figs, figname=filehead, vmask=vmask)
