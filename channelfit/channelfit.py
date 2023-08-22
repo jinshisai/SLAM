@@ -364,13 +364,12 @@ if __name__ == '__main__':
     chan.gridondisk(cubefits=cubefits, center=center, pa=pa, incl=incl,
                  vsys=vsys, dist=dist, sigma=sigma,
                  rmax=rmax, vlim=vlim)
-    #chan.fitting(Mstar_range=[0.01, 10.0], Rc_range=[5, 500], cs_range=[0.2, 2],
-    #             figname=filehead)
-    #chan.modeltofits(filehead=filehead)
-    #chan.popt
-    #p = [0.08329, 283.34, 1.113]
-    p = [0.04834, 345.02, 0.9338]
-    chan.plotmodelmom(*p, pa=113, filename=filehead+'.modelmom01.png')
-    chan.plotobsmom(pa=113, filename=filehead+'.obsmom01.png')
-    chan.plotresidualmom(*p, pa=113, filename=filehead+'.residualmom01.png')
-    #chan.modeltofits(0.0825, 573.635, 1.0429, filehead=filehead)
+    chan.fitting(Mstar_range=[0.01, 10.0],
+                 Rc_range=[5, 500],
+                 cs_range=[0.2, 2],
+                 figname=filehead)
+    chan.modeltofits(filehead=filehead)
+    #p = chan.popt
+    #chan.plotmodelmom(*p, pa=pa, filename=filehead+'.modelmom01.png')
+    #chan.plotobsmom(pa=pa, filename=filehead+'.obsmom01.png')
+    #chan.plotresidualmom(*p, pa=pa, filename=filehead+'.residualmom01.png')
