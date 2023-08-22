@@ -362,8 +362,8 @@ if __name__ == '__main__':
     filehead = cubefits.replace('.fits', '')
     chan = ChannelFit()
     chan.gridondisk(cubefits=cubefits, center=center, pa=pa, incl=incl,
-                 vsys=vsys, dist=dist, sigma=sigma,
-                 rmax=rmax, vlim=vlim)
+                    vsys=vsys, dist=dist, sigma=sigma,
+                    rmax=rmax, vlim=vlim)
     chan.fitting(Mstar_range=[0.01, 10.0],
                  Rc_range=[5, 500],
                  cs_range=[0.2, 2],
