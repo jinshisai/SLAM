@@ -310,8 +310,8 @@ class PVSilhouette():
         ax.set_xlabel('minor offset (au)')
         ax.set_ylim(self.v.min(), self.v.max())
         ax.set_title(r'$M_{*}=$'\
-            +f'{plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} '+r'$M_{\odot}$\n'\
-            +r'$R_{c}=$'\
+            +f'{plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} '+r'$M_{\odot}$'\
+            +'\n'+r'$R_{c}=$'\
             +f'{plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
         fig.savefig(figname + '.model.png')
         if show: plt.show()
