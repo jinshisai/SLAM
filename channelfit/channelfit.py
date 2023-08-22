@@ -305,13 +305,12 @@ class ChannelFit():
         plt.close()
     
     def fitting(self, Mstar_range: list, Rc_range: list, cs_range: list,
-                figname: str):
-
+                figname: str, show_corner: bool = False):
         def lnprob(p):
             q = 10**p
             m = self.cubemodel(*q)
             chi2 = np.nansum((self.data_valid - m)**2) / self.sigma**2
-            chi2 = chi2 / self.pixperbeam
+            chi2 /= self.pixperbeam
             return -0.5 * chi2
         plim = np.log10([Mstar_range, Rc_range, cs_range]).T
         mcmc = emcee_corner(plim, lnprob,
@@ -319,7 +318,7 @@ class ChannelFit():
                             labels=['log Mstar', 'log Rc', 'log cs'],
                             rangelevel=95,
                             figname=figname+'.corner.png',
-                            show_corner=False)
+                            show_corner=show_corner)
         popt, perr = mcmc
         popt = 10**popt
         perr = popt * np.log(10) * perr
