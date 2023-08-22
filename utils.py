@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import emcee, corner
 from multiprocessing import Pool
+from dynesty import DynamicNestedSampler as DNS
 
 
 def gauss1d(x, amp, mean, fwhm):
@@ -11,7 +12,7 @@ def gauss1d(x, amp, mean, fwhm):
 def emcee_corner(bounds, log_prob_fn, args=None, nwalkers_per_ndim=16,
                  nburnin=2000, nsteps=1000, gr_check=False, ndata=1000,
                  labels=None, rangelevel=0.8, figname=None,
-                 show_corner=False, ncore=1):
+                 show_corner=False, ncore=1, calc_evidence=False):
     ndim = len(bounds[0])
     nwalkers = ndim * nwalkers_per_ndim
     plim = np.array(bounds)
@@ -21,7 +22,10 @@ def emcee_corner(bounds, log_prob_fn, args=None, nwalkers_per_ndim=16,
             return log_prob_fn(p, *args)
         else:
             return -np.inf
-        
+    
+    def ptform(u):
+        return plim[0] + (plim[1] - plim[0]) * u
+                
     def gelman_rubin(samples):
         nsteps = len(samples[0])
         B = np.std(np.mean(samples, axis=1), axis=0)
@@ -69,4 +73,12 @@ def emcee_corner(bounds, log_prob_fn, args=None, nwalkers_per_ndim=16,
         if not figname is None: plt.savefig(figname)
         if show_corner: plt.show()
         plt.close()
+    if calc_evidence:
+        sampler = DNS(loglikelihood=log_prob_fn, logl_args=args,
+                      prior_transform=ptform, ndim=ndim)
+        sampler.run_nested(print_progress=False)
+        results = sampler.results
+        evidence = np.exp(results.logz[-1])
+        evid_err = evidence * results.logzerr[-1]
+        print(f'Evidence: {evidence:.2e} +/- {evid_err:.2e}')
     return [pmid, perr]
