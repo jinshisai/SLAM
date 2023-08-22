@@ -9,10 +9,15 @@ def gauss1d(x, amp, mean, fwhm):
     return amp * np.exp2(-4. * ((x - mean) / fwhm)**2)
 
 
-def emcee_corner(bounds, log_prob_fn, args=None, nwalkers_per_ndim=16,
-                 nburnin=2000, nsteps=1000, gr_check=False, ndata=1000,
-                 labels=None, rangelevel=0.8, figname=None,
-                 show_corner=False, ncore=1, calc_evidence=False):
+def emcee_corner(bounds, log_prob_fn, args: list = [],
+                 nwalkers_per_ndim: int = 16,
+                 nburnin: int = 2000, nsteps: int = 1000,
+                 gr_check: bool = False, ndata: int = 1000,
+                 labels: list = None, rangelevel: float = 0.8,
+                 figname: str = None, show_corner: bool = False,
+                 ncore: int = 1,
+                 calc_evidence: bool = False,
+                 simpleoutput: bool = True):
     ndim = len(bounds[0])
     nwalkers = ndim * nwalkers_per_ndim
     plim = np.array(bounds)
@@ -81,4 +86,7 @@ def emcee_corner(bounds, log_prob_fn, args=None, nwalkers_per_ndim=16,
         evidence = np.exp(results.logz[-1])
         evid_err = evidence * results.logzerr[-1]
         print(f'Evidence: {evidence:.2e} +/- {evid_err:.2e}')
-    return [pmid, perr]
+    if simpleoutput:
+        return [pmid, perr]
+    else:
+        return [popt, plow, pmid, phigh]
