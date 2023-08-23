@@ -59,10 +59,10 @@ class PVSilhouette():
         ----------
         cubefits : str
             Name of the input FITS file including the extension.
-        dist : float
-            Distance of the target, used to convert arcsec to au.
         center : str
             Coordinates of the target: e.g., "01h23m45.6s 01d23m45.6s".
+        dist : float
+            Distance of the target, used to convert arcsec to au.
         vsys : float
             Systemic velocity of the target.
         xmax : float
@@ -102,6 +102,7 @@ class PVSilhouette():
         i0, i1 = np.argmin(np.abs(x - xmax)), np.argmin(np.abs(x + xmax))
         j0, j1 = np.argmin(np.abs(y + ymax)), np.argmin(np.abs(y - ymax))
         k0, k1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
+        self.offpix = (i0, j0, k0)
         x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[k0:k1 + 1],
         d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
         dx, dy, dv = x[1] - x[0], y[1] - y[0], v[1] - v[0]

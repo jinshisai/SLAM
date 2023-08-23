@@ -19,7 +19,6 @@ incl = 65  # deg
 vsys = 4  # km/s
 dist = 139  # pc
 sigma = 2e-3  # Jy/beam; None means automatic calculation.
-cutoff = 5.0  # sigma
 rmax = 1 * dist  # au
 #vlim = (-2.52, -1.4, 1.4, 2.52)  # km/s
 vlim = (-2.52, -0.9, 0.9, 2.52)  # km/s
@@ -60,8 +59,8 @@ def makemom01(d, v, sigma):
     sigma_mom0 = sigma * dv * np.sqrt(len(d))
     vv = np.broadcast_to(v, np.shape(d)[::-1])
     vv = np.moveaxis(vv, 2, 0)
-    dmask = d.copy()
-    dmask[dmask < 3 * sigma] = np.nan
+    dmasked = d * 1
+    dmasked[dmasked < 3 * sigma] = np.nan
     mom1 = np.nansum(d * vv, axis=0) / np.nansum(d, axis=0)
     mom1[mom0 < 3 * sigma_mom0] = np.nan
     return {'mom0':mom0, 'mom1':mom1, 'sigma_mom0':sigma_mom0}
@@ -71,8 +70,11 @@ class ChannelFit():
 
 #    def __init__(self):
 
-    def read_cubefits(self, cubefits, dist, center, vsys=0, xmax=1e4, ymax=1e4,
-                      vmin=-100, vmax=100, sigma=None):
+    def read_cubefits(self, cubefits: str, center: str = None,
+                      dist: float = 1, vsys: float = 0,
+                      xmax: float = 1e4, ymax: float = 1e4,
+                      vmin: float = -100, vmax: float = 100,
+                      sigma: float = None) -> dict:
         """
         Read a position-velocity diagram in the FITS format.
 
@@ -80,10 +82,10 @@ class ChannelFit():
         ----------
         cubefits : str
             Name of the input FITS file including the extension.
-        dist : float
-            Distance of the target, used to convert arcsec to au.
         center : str
             Coordinates of the target: e.g., "01h23m45.6s 01d23m45.6s".
+        dist : float
+            Distance of the target, used to convert arcsec to au.
         vsys : float
             Systemic velocity of the target.
         xmax : float
@@ -103,16 +105,20 @@ class ChannelFit():
             x (1D array), v (1D array), data (2D array), header, and sigma.
         """
         cc = constants.c.si.value
-        coord = SkyCoord(center, frame='icrs')
-        cx, cy = coord.ra.degree, coord.dec.degree
         f = fits.open(cubefits)[0]
         d, h = np.squeeze(f.data), f.header
+        if center is None:
+            cx, cy = 0, 0
+        else:
+            coord = SkyCoord(center, frame='icrs')
+            cx = coord.ra.degree - h['CRVAL1']
+            cy = coord.dec.degree - h['CRVAL2']
         if sigma is None:
             sigma = np.mean([np.nanstd(d[:2]), np.std(d[-2:])])
             print(f'sigma = {sigma:.3e}')
-        x = (np.arange(h['NAXIS1'])-h['CRPIX1']+1)*h['CDELT1']+h['CRVAL1']
-        y = (np.arange(h['NAXIS2'])-h['CRPIX2']+1)*h['CDELT2']+h['CRVAL2']
-        v = (np.arange(h['NAXIS3'])-h['CRPIX3']+1)*h['CDELT3']+h['CRVAL3']
+        x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
+        y = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
+        v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
         x = (x - cx) * 3600. * dist  # au
         y = (y - cy) * 3600. * dist  # au
         v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
@@ -138,11 +144,13 @@ class ChannelFit():
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
-    def gridondisk(self, cubefits=None, pa=0, incl=0, dist=None,
-                   center=None, vsys=None,
-                   rmax=1e4, vlim=(-100,0,0,100), sigma=None):
+    def gridondisk(self, cubefits: str = None,
+                   pa: float = 0, incl: float = 0, dist: float = 1,
+                   center: str = None, vsys: float = 0,
+                   rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
+                   sigma: float = None):
         if not (cubefits is None):
-            self.read_cubefits(cubefits, dist, center, vsys,
+            self.read_cubefits(cubefits, center, dist, vsys,
                                rmax, rmax, vlim[0], vlim[3], sigma)
             self.fitsname = cubefits
         x, y, v = self.x, self.y, self.v
@@ -153,9 +161,9 @@ class ChannelFit():
         self.dmin = s
         self.rdisk = np.hypot(s, t)
         
-        self.v_blue = self.v[v <= vlim[1]]
-        self.v_red = self.v[vlim[2] <= v]
-        self.v_mid = self.v[(vlim[1] < v) * (v < vlim[2])]
+        self.v_blue = v[v <= vlim[1]]
+        self.v_red = v[vlim[2] <= v]
+        self.v_mid = v[(vlim[1] < v) * (v < vlim[2])]
         self.v_valid = np.r_[self.v_blue, self.v_red]
         self.data_blue = self.data[v <= vlim[1]]
         self.data_red = self.data[vlim[2] <= v]
@@ -173,8 +181,8 @@ class ChannelFit():
             vr = -vunit * np.sqrt(Mstar / self.rdisk) * np.sqrt(2 - Rc / self.rdisk)
             vr[self.rdisk < Rc] = 0
             vrot = np.where(self.rdisk < Rc, vkep, vjrot)
-            vlos = (vrot * self.dmaj + vr * self.dmin) / self.rdisk \
-                   * np.sin(np.radians(incl))
+            vlos = (vrot * self.dmaj + vr * self.dmin) / self.rdisk
+            vlos = vlos * np.sin(np.radians(incl))
             return vlos
         self.modelvlos = modelvlos
 
@@ -195,21 +203,19 @@ class ChannelFit():
             v = self.v_valid
             m = [None] * len(v)
             for i in range(len(v)):
-                m[i] = 1 / np.sqrt(2 * np.pi) / cs \
-                       * np.exp(-(v[i] - modelvlos(Mstar, Rc))**2 / 2 / cs**2)
+                m[i] = np.exp(-(v[i] - modelvlos(Mstar, Rc))**2 / 2 / cs**2) \
+                       / np.sqrt(2 * np.pi) / cs
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
             mom0 = np.nansum(m, axis=0) * self.dv
             m = m * np.broadcast_to(self.mom0 / mom0, np.shape(m))
             m[np.isnan(m)] = 0
-            m_blue = m[v < self.v_red.min()]
-            m_red = m[self.v_blue.max() < v]
-            return m, m_blue, m_red    
+            return m
         self.cubemodel = cubemodel
     
     def plotmodelmom(self, Mstar: float, Rc: float, cs: float,
                      filename: str = 'modelmom01.png', pa: float = None):
-        d = self.cubemodel(Mstar, Rc, cs)[0]
+        d = self.cubemodel(Mstar, Rc, cs)
         m = makemom01(d, self.v_valid, self.sigma)
         mom0 = m['mom0']
         mom1 = m['mom1']
@@ -268,7 +274,7 @@ class ChannelFit():
     def plotresidualmom(self, Mstar: float, Rc: float, cs: float,
                         filename: str = 'residualmom01.png',
                         pa: float = None):
-        d = self.cubemodel(Mstar, Rc, cs)[0]
+        d = self.cubemodel(Mstar, Rc, cs)
         m = makemom01(d, self.v_valid, self.sigma)
         mom0 = m['mom0']
         mom1 = self.mom1 - m['mom1']
@@ -299,24 +305,21 @@ class ChannelFit():
         plt.close()
     
     def fitting(self, Mstar_range: list, Rc_range: list, cs_range: list,
-                figname: str):
-
+                figname: str, show_corner: bool = False):
         def lnprob(p):
             q = 10**p
-            model = self.cubemodel(*q)[0]
-            chi2 = np.nansum((self.data_valid - model)**2) / self.sigma**2
-            chi2r = chi2 / self.pixel_valid
-            chi2 = chi2 / self.pixperbeam
-            print([f'{q[0]:05.3f}', f'{q[1]:07.3f}', f'{q[2]:05.3f}'], f'{chi2r:05.2f}')
+            m = self.cubemodel(*q)
+            chi2 = np.nansum((self.data_valid - m)**2) / self.sigma**2
+            chi2 /= self.pixperbeam
             return -0.5 * chi2
         plim = np.log10([Mstar_range, Rc_range, cs_range]).T
-        popt, perr = emcee_corner(plim, lnprob, args=[],
-                                  nwalkers_per_ndim=16,
-                                  nburnin=200, nsteps=200,
-                                  labels=['log Mstar', 'log Rc', 'log cs'],
-                                  rangelevel=None,
-                                  figname=figname+'.corner.png',
-                                  show_corner=True, ncore=1)
+        mcmc = emcee_corner(plim, lnprob,
+                            nwalkers_per_ndim=16, nburnin=200, nsteps=200,
+                            labels=['log Mstar', 'log Rc', 'log cs'],
+                            rangelevel=95,
+                            figname=figname+'.corner.png',
+                            show_corner=show_corner)
+        popt, perr = mcmc
         popt = 10**popt
         perr = popt * np.log(10) * perr
         self.popt = popt
@@ -327,8 +330,11 @@ class ChannelFit():
                     cs: float = None, filehead: str = 'best'):
         if Mstar is None or Rc is None or cs is None:
             Mstar, Rc, cs = self.popt
-        _, m_blue, m_red = self.cubemodel(Mstar, Rc, cs)
-        model = np.append(m_blue, np.full_like(self.data_mid, np.nan), axis=0)
+        m = self.cubemodel(Mstar, Rc, cs)
+        m_red = m[np.max(self.v_blue) < self.v]
+        m_blue = m[self.v < np.min(self.v_red)]
+        model = np.full_like(self.data_mid, np.nan)
+        model = np.append(m_blue, model, axis=0)
         model = np.append(model, m_red, axis=0)
         
         w = wcs.WCS(naxis=3)
@@ -339,20 +345,16 @@ class ChannelFit():
         h['CRPIX1'] = h['CRPIX1'] - self.offpix[0]
         h['CRPIX2'] = h['CRPIX2'] - self.offpix[1]
         h['CRPIX3'] = h['CRPIX3'] - self.offpix[2]
-        header = w.to_header()
-        hdu = fits.PrimaryHDU(model, header=header)
-        for k in h.keys():
-            if not ('COMMENT' in k or 'HISTORY' in k):
-                hdu.header[k]=h[k]
-        hdu = fits.HDUList([hdu])
-        hdu.writeto(filehead + '.model.fits', overwrite=True)
-        header = w.to_header()
-        hdu = fits.PrimaryHDU(self.data - model, header=header)
-        for k in h.keys():
-            if not ('COMMENT' in k or 'HISTORY' in k):
-                hdu.header[k]=h[k]
-        hdu = fits.HDUList([hdu])
-        hdu.writeto(filehead + '.residual.fits', overwrite=True)
+        def tofits(d: np.ndarray, ext: str):
+            header = w.to_header()
+            hdu = fits.PrimaryHDU(d, header=header)
+            for k in h.keys():
+                if not ('COMMENT' in k or 'HISTORY' in k):
+                    hdu.header[k]=h[k]
+            hdu = fits.HDUList([hdu])
+            hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
+        tofits(model, 'model')
+        tofits(self.data - model, 'residual')
         
 
 #####################################################################
@@ -360,15 +362,14 @@ if __name__ == '__main__':
     filehead = cubefits.replace('.fits', '')
     chan = ChannelFit()
     chan.gridondisk(cubefits=cubefits, center=center, pa=pa, incl=incl,
-                 vsys=vsys, dist=dist, sigma=sigma,
-                 rmax=rmax, vlim=vlim)
-    #chan.fitting(Mstar_range=[0.01, 10.0], Rc_range=[5, 500], cs_range=[0.2, 2],
-    #             figname=filehead)
-    #chan.modeltofits(filehead=filehead)
-    #chan.popt
-    #p = [0.08329, 283.34, 1.113]
-    p = [0.04834, 345.02, 0.9338]
-    chan.plotmodelmom(*p, pa=113, filename=filehead+'.modelmom01.png')
-    chan.plotobsmom(pa=113, filename=filehead+'.obsmom01.png')
-    chan.plotresidualmom(*p, pa=113, filename=filehead+'.residualmom01.png')
-    #chan.modeltofits(0.0825, 573.635, 1.0429, filehead=filehead)
+                    vsys=vsys, dist=dist, sigma=sigma,
+                    rmax=rmax, vlim=vlim)
+    chan.fitting(Mstar_range=[0.01, 10.0],
+                 Rc_range=[5, 500],
+                 cs_range=[0.2, 2],
+                 figname=filehead)
+    chan.modeltofits(filehead=filehead)
+    #p = chan.popt
+    #chan.plotmodelmom(*p, pa=pa, filename=filehead+'.modelmom01.png')
+    #chan.plotobsmom(pa=pa, filename=filehead+'.obsmom01.png')
+    #chan.plotresidualmom(*p, pa=pa, filename=filehead+'.residualmom01.png')
