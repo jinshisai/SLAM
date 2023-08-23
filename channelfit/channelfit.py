@@ -175,8 +175,8 @@ class ChannelFit():
         self.mom0 = m['mom0']
         self.mom1 = m['mom1']
         self.sigma_mom0 = m['sigma_mom0']
-        self.dmaj = self.dmaj * np.sign(np.sum(self.mom1*self.dmaj))
-        self.dmin = self.dmin * np.sign(np.sum(self.mom1*self.dmin)) * (-1)
+        self.dmaj = self.dmaj * np.sign(np.nansum(self.mom1 * self.dmaj))
+        self.dmin = self.dmin * np.sign(np.nansum(self.mom1 * self.dmin)) * (-1)
 
         def modelvlos(Mstar: float, Rc: float):
             vkep = vunit * np.sqrt(Mstar / self.rdisk)
