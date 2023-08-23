@@ -253,8 +253,8 @@ class PVSilhouette():
             q =   np.sum(m[:nv//2, :nx//2]) + np.sum(m[nv//2:, nx//2:]) \
                 - np.sum(m[nv//2:, :nx//2]) - np.sum(m[:nv//2, nx//2:])
             return int(np.sign(q))
-        majquad =  getquad(self.dpvmajor)
-        minquad =  getquad(self.dpvminor)
+        majquad = getquad(self.dpvmajor)
+        minquad = getquad(self.dpvminor) * (-1)
         def makemodel(Mstar, Rc, outputvel=False):
             a = velmax(self.x, Mstar=Mstar, Rc=Rc, incl=incl)
             major = []
