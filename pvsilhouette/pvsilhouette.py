@@ -246,22 +246,23 @@ class PVSilhouette():
         chi2max1 = calcchi2(np.ones_like(majobs), np.ones_like(minobs))
         chi2max0 = calcchi2(np.zeros_like(majobs), np.zeros_like(minobs))
         chi2max = np.min([chi2max0, chi2max1])
-        nv, nx = np.shape(self.dpvmajor)
-        quadrant =   np.sum(self.dpvmajor[:nv//2, :nx//2]) \
-                   + np.sum(self.dpvmajor[nv//2:, nx//2:]) \
-                   - np.sum(self.dpvmajor[nv//2:, :nx//2]) \
-                   - np.sum(self.dpvmajor[:nv//2, nx//2:])
-        quadrant = int(np.sign(quadrant))
+        def getquad(m):
+            nv, nx = np.shape(m)
+            q =   np.sum(m[:nv//2, :nx//2]) + np.sum(m[nv//2:, nx//2:]) \
+                - np.sum(m[nv//2:, :nx//2]) - np.sum(m[:nv//2, nx//2:])
+            return int(np.sign(q))
+        majquad =  getquad(self.dpvmajor)
+        minquad =  getquad(self.dpvminor)
         def makemodel(Mstar, Rc, outputvel=False):
             a = velmax(self.x, Mstar=Mstar, Rc=Rc, incl=incl)
             major = []
             for min, max in zip(a['major']['vlosmin'], a['major']['vlosmax']):
                 major.append(np.where((min < self.v) * (self.v < max), 1, 0))
-            major = np.transpose(major)[:, ::quadrant]
+            major = np.transpose(major)[:, ::majquad]
             minor = []
             for min, max in zip(a['minor']['vlosmin'], a['minor']['vlosmax']):
                 minor.append(np.where((min < self.v) * (self.v < max), 1, 0))
-            minor = np.transpose(minor)
+            minor = np.transpose(minor)[:, ::minquad]
             if outputvel:
                 return major, minor, a
             else:
@@ -295,8 +296,8 @@ class PVSilhouette():
         ax.pcolormesh(self.x, self.v, z, cmap='bwr', vmin=-1, vmax=1, alpha=0.1)
         ax.contour(self.x, self.v, self.dpvmajor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x * quadrant, a['major']['vlosmax'], '-r')
-        ax.plot(self.x * quadrant, a['major']['vlosmin'], '-r')
+        ax.plot(self.x * majquad, a['major']['vlosmax'], '-r')
+        ax.plot(self.x * majquad, a['major']['vlosmin'], '-r')
         ax.set_xlabel('major offset (au)')
         ax.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
         ax.set_ylim(np.min(self.v), np.max(self.v))
@@ -305,8 +306,8 @@ class PVSilhouette():
         ax.pcolormesh(self.x, self.v, z, cmap='bwr', vmin=-1, vmax=1, alpha=0.1)
         ax.contour(self.x, self.v, self.dpvminor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x, a['minor']['vlosmax'], '-r')
-        ax.plot(self.x, a['minor']['vlosmin'], '-r')
+        ax.plot(self.x * minquad, a['minor']['vlosmax'], '-r')
+        ax.plot(self.x * minquad, a['minor']['vlosmin'], '-r')
         ax.set_xlabel('minor offset (au)')
         ax.set_ylim(self.v.min(), self.v.max())
         ax.set_title(r'$M_{*}=$'\
