@@ -119,6 +119,7 @@ class ChannelFit():
         x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
         y = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
         v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
+        v = v + h['CRVAL3']
         x = (x - cx) * 3600. * dist  # au
         y = (y - cy) * 3600. * dist  # au
         v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
