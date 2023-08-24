@@ -59,7 +59,6 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
             if GR > 1.25:
                 converge = False
         p0 = samples[:, -1, :]
-        nsteps *= 2  # (nsteps - nsteps_min) steps are burned in.
     if not converge:
         print('\nWARNING: emcee did not converge (Gelman-Rubin > 1.25).\n')
     #lnp = sampler.get_log_prob()  # emcee 3.1.1
