@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy import constants, units
-from scipy.signal import convolve
 
 
 au = units.au.to('m')
