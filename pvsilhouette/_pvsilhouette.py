@@ -11,24 +11,6 @@ The main class PVSilhouette can be imported to do each steps separately.
 Note. FITS files with multiple beams are not supported. The dynamic range for xlim_plot and vlim_plot should be >10 for nice tick labels.
 """
 
-############ INPUTS ############
-cubefits = './pvsilhouette/IRAS16253_SBLB_C18O_robust_2.0.imsub.fits'
-pvmajorfits = './pvsilhouette/IRAS16253_SBLB_C18O_robust_2.0.pvmajor.fits'
-pvminorfits = './pvsilhouette/IRAS16253_SBLB_C18O_robust_2.0.pvminor.fits'
-center = '16h28m21.61526785s -24d36m24.32538414s'
-pa = 113 - 180  # deg
-incl = 65  # deg
-vsys = 4  # km/s
-dist = 139  # pc
-sigma = 1.9e-3  # Jy/beam; None means automatic calculation.
-cutoff = 5.0  # sigma
-rmax = 200  # au
-vlim = (-6, 6)
-vmask = (-0.5, 0.5)
-show_figs = True
-################################
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
@@ -38,7 +20,7 @@ from scipy.interpolate import RegularGridInterpolator as RGI
 import warnings
 
 from utils import emcee_corner
-from UlrichEnvelope import velmax
+from pvsilhouette.ulrichenvelope import velmax
 
 warnings.simplefilter('ignore', RuntimeWarning)
 
@@ -213,7 +195,9 @@ class PVSilhouette():
         self.dpvminor = self.data
 
     def fitting(self, incl: float = 90,
-                Mstar_range: list = [0, 10], Rc_range: list = [0, 1000],
+                Mstar_range: list = [0.01, 10],
+                Rc_range: list = [1, 1000],
+                alphainfall_range: list = [0.01, 1],
                 cutoff: float = 5, vmask: list = [0, 0],
                 show: bool = False, figname: str = 'PVsilhouette'):
         majobs = np.where(self.dpvmajor > cutoff * self.sigma, 1, 0)
@@ -255,8 +239,9 @@ class PVSilhouette():
             return int(np.sign(q))
         majquad = getquad(self.dpvmajor)
         minquad = getquad(self.dpvminor) * (-1)
-        def makemodel(Mstar, Rc, outputvel=False):
-            a = velmax(self.x, Mstar=Mstar, Rc=Rc, incl=incl)
+        def makemodel(Mstar, Rc, alphainfall, outputvel=False):
+            a = velmax(self.x, Mstar=Mstar, Rc=Rc,
+                       alphainfall=alphainfall, incl=incl)
             major = []
             for min, max in zip(a['major']['vlosmin'], a['major']['vlosmax']):
                 major.append(np.where((min < self.v) * (self.v < max), 1, 0))
@@ -275,10 +260,10 @@ class PVSilhouette():
             chi2 = calcchi2(*makemodel(*q))
             return -np.inf if chi2 > chi2max else -0.5 * chi2
         
-        plim = np.log10([Mstar_range, Rc_range]).T
+        plim = np.log10([Mstar_range, Rc_range, alphainfall_range]).T
         mcmc = emcee_corner(plim, lnprob,
                             nwalkers_per_ndim=16, nburnin=200, nsteps=200,
-                            labels=['log Mstar', 'log Rc'],
+                            labels=['log Mstar', 'log Rc', r'log $\alpha$'],
                             rangelevel=0.95, figname=figname+'.corner.png',
                             show_corner=show, simpleoutput=False)
         popt, plow, _, phigh = mcmc
@@ -290,6 +275,7 @@ class PVSilhouette():
         self.phigh = phigh
         print(f'M* = {plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} Msun')
         print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
+        print(f'alpha = {plow[2]:.2f}, {popt[2]:.2f}, {phigh[2]:.2f}')
 
         majmod, minmod, a = makemodel(*popt, outputvel=True)
         fig = plt.figure()
@@ -315,20 +301,8 @@ class PVSilhouette():
         ax.set_title(r'$M_{*}=$'\
             +f'{plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} '+r'$M_{\odot}$'\
             +'\n'+r'$R_{c}=$'\
-            +f'{plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
+            +f'{plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au'\
+            +'\n'+r'$\alpha=$'\
+            +f'{plow[2]:.2f}, {popt[2]:.2f}, {phigh[2]:.2f}')
         fig.savefig(figname + '.model.png')
         if show: plt.show()
-
-    
-#####################################################################
-if __name__ == '__main__':
-    filehead = cubefits.replace('.fits', '')
-    pvsil = PVSilhouette()
-    #pvsil.get_PV(cubefits=cubefits, center=center, pa=pa,
-    #             vsys=vsys, dist=dist, sigma=sigma,
-    #             rmax=rmax, vmax=vmax, show=False)
-    pvsil.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
-                 dist=dist, vsys=vsys, rmax=rmax, vmin=vlim[0], vmax=vlim[1],
-                 sigma=sigma)
-    pvsil.fitting(incl=incl, Mstar_range=[0.01, 10], Rc_range=[1, 1000],
-                  cutoff=5, show=show_figs, figname=filehead, vmask=vmask)

@@ -18,7 +18,7 @@ def kepvel(radius, theta):
     vp = 1 / np.sqrt(radius) * R / radius
     return vr, vt, vp
 
-def velrho(radius, theta, withkepler: bool = True):
+def velrho(radius, theta, alphainfall: float = 1, withkepler: bool = True):
     radius = radius.clip(1e-10, None)
     parity = np.sign(mu := np.cos(theta))
     mu = np.abs(mu).clip(1e-10, 1)
@@ -42,7 +42,7 @@ def velrho(radius, theta, withkepler: bool = True):
              * np.cos(np.arccos(q[c] * p_minus[c]**(-3/2)) / 3.)
     
     mm = mu / mu0
-    vr = -np.sqrt(1 + mm) / np.sqrt(radius)
+    vr = -np.sqrt(1 + mm) / np.sqrt(radius) * alphainfall
     vt = parity * np.sqrt(1 + mm) * (mu0 - mu) / np.sin(theta) / np.sqrt(radius)
     vp = np.sqrt(1 - mm) / np.sqrt(radius)
     rho = radius**(-3/2) / np.sqrt(1 + mm) / (2 / radius * mu0**2 + mm)
@@ -88,7 +88,7 @@ def XYZ2xyz(incl, phi, X, Y, Z):
     #z[r2D < 1] = np.nan
     return x, y, z
 
-def losvel(elos, r, t, p, kepler=False):
+def losvel(elos, r, t, p, alphainfall: float = 1, kepler: bool = False):
     """Line-of-sight velocity with a given vector, elos,
        which points to the observer in the envelople coordinate.
     """
@@ -96,7 +96,7 @@ def losvel(elos, r, t, p, kepler=False):
     if kepler:
         vr, vt, vp = kepvel(r.ravel(), t.ravel())
     else:
-        vr, vt, vp, _ = velrho(r.ravel(), t.ravel())
+        vr, vt, vp, _ = velrho(r.ravel(), t.ravel(), alphainfall)
     er, et, ep = rotbase(t.ravel(), p.ravel())
     e = np.moveaxis(np.full((len(r.ravel()), 3), elos), -1, 0)
     vlos = -vr * np.sum(er * e, axis=0) \
@@ -104,7 +104,8 @@ def losvel(elos, r, t, p, kepler=False):
            -vp * np.sum(ep * e, axis=0)
     return np.reshape(vlos, shape)
 
-def velmax(r: np.ndarray, Mstar: float, Rc: float, incl: float):
+def velmax(r: np.ndarray, Mstar: float, Rc: float,
+           alphainfall: float = 1, incl: float = 90):
     irad = np.radians(incl)
     vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
     X, Z = np.meshgrid(r / Rc, r / Rc)  # X is inner, second axis
@@ -113,63 +114,16 @@ def velmax(r: np.ndarray, Mstar: float, Rc: float, incl: float):
     a = {}
     x, y, z = XYZ2xyz(irad, 0, X, zero, Z)
     r, t, p = xyz2rtp(x, y, z)
-    vlos = losvel(elos, r, t, p)
+    vlos = losvel(elos, r, t, p, alphainfall)
     vlos[(t < np.pi / 4 ) + (np.pi * 3 / 4 < t)] = 0  # remove outflow cavity
     vlosmax = np.nanmax(vlos, axis=0)
     vlosmin = np.nanmin(vlos, axis=0)
     a['major'] = {'vlosmax':vlosmax * vunit, 'vlosmin':vlosmin * vunit}
     x, y, z = XYZ2xyz(irad, 0, zero, X, Z)
     r, t, p = xyz2rtp(x, y, z)
-    vlos = losvel(elos, r, t, p)
+    vlos = losvel(elos, r, t, p, alphainfall)
     vlos[(t < np.pi / 4 ) + (np.pi * 3 / 4 < t)] = 0  # remove outflow cavity
     vlosmax = np.nanmax(vlos, axis=0)
     vlosmin = np.nanmin(vlos, axis=0)
     a['minor'] = {'vlosmax':vlosmax * vunit, 'vlosmin':vlosmin * vunit}
-    return a
-
-def thinpv(r: np.ndarray, v: np.ndarray,
-           Mstar: float, Rc: float, incl: float,
-           beam: float):
-    irad = np.radians(incl)
-    vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
-    gauss = np.zeros((len(v) // 2 * 2 + 1, len(r)))
-    gauss[len(v) // 2, :] = np.exp2(-(4 * (r / beam)**2))
-    X, Z = np.meshgrid(r / Rc, r / Rc)  # X is inner, second axis
-    zero = np.zeros_like(X)
-    elos = [0, -np.sin(irad), np.cos(irad)]
-    w = v / vunit
-    dw = (w[1] - w[0]) / 2
-    a = {}
-    x, y, z = XYZ2xyz(irad, 0, X, zero, Z)
-    r, t, p = xyz2rtp(x, y, z)
-    vlos = losvel(elos, r, t, p)
-    #vlos[np.hypot(x, y) < 1] = np.nan  # remove non envelope part
-    _, _, _, rho = velrho(r, t)
-    pv = [None] * len(w)
-    for i in range(len(w)):
-        drhodv = rho * 1
-        drhodv[(vlos < w[i] - dw) + (w[i] + dw < vlos)] = 0
-        drhodv[np.isnan(vlos)] = 0
-        drhodv = convolve(drhodv, gauss, mode='same')
-        pv[i]= np.sum(drhodv, axis=0)
-    pv = np.array(pv)
-    #pv[np.isnan(pv)] = 0
-    pv = pv / np.median(pv)
-    a['major'] = pv
-    x, y, z = XYZ2xyz(irad, 0, zero, X, Z)
-    r, t, p = xyz2rtp(x, y, z)
-    vlos = losvel(elos, r, t, p)
-    vlos[np.hypot(x, y) < 1] = np.nan  # remove non envelope part
-    _, _, _, rho = velrho(r, t)
-    pv = [None] * len(w)
-    for i in range(len(w)):
-        drhodv = rho * 1
-        drhodv[(vlos < w[i] - dw) + (w[i] + dw < vlos)] = 0
-        drhodv[np.isnan(vlos)] = 0
-        drhodv = convolve(drhodv, gauss, mode='same')
-        pv[i]= np.sum(drhodv, axis=0) 
-    pv = np.array(pv)
-    #pv[np.isnan(pv)] = 0
-    pv = pv / np.median(pv)
-    a['minor'] = pv
     return a
