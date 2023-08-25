@@ -310,13 +310,19 @@ class ChannelFit():
                             labels=['log Mstar', 'log Rc', 'log cs'],
                             rangelevel=0.95,
                             figname=figname+'.corner.png',
-                            show_corner=show_corner)
-        popt, perr = mcmc
+                            show_corner=show_corner,
+                            simpleoutput=False)
+        popt, plow, pmid, phigh = mcmc
         popt = 10**popt
-        perr = popt * np.log(10) * perr
-        self.popt = popt
-        self.perr = perr
-        print(popt)
+        plow = 10**plow
+        pmid = 10**pmid
+        phigh = 10**phigh
+        print('plow:', plow)
+        print('pmid:', pmid)
+        print('phigh:', phigh)
+        print('------------------------')
+        print('popt:', popt)
+        print('------------------------')
    
     def modeltofits(self, Mstar: float = None, Rc: float = None,
                     cs: float = None, filehead: str = 'best'):
