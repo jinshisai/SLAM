@@ -54,14 +54,15 @@ def irot(s, t, pa):
     return np.array([x, y])
 
 def makemom01(d, v, sigma):
+    dmasked = d * 1
+    dmasked[dmasked < 3 * sigma] = 0
+    dmasked[np.isnan(dmasked)] = 0
     dv = np.min(v[1:] - v[:-1])
-    mom0 = np.nansum(d, axis=0) * dv
+    mom0 = np.sum(d, axis=0) * dv
     sigma_mom0 = sigma * dv * np.sqrt(len(d))
     vv = np.broadcast_to(v, np.shape(d)[::-1])
     vv = np.moveaxis(vv, 2, 0)
-    dmasked = d * 1
-    dmasked[dmasked < 3 * sigma] = np.nan
-    mom1 = np.nansum(d * vv, axis=0) / np.nansum(d, axis=0)
+    mom1 = np.sum(d * vv, axis=0) / np.sum(d, axis=0)
     mom1[mom0 < 3 * sigma_mom0] = np.nan
     return {'mom0':mom0, 'mom1':mom1, 'sigma_mom0':sigma_mom0}
     
