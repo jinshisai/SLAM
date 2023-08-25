@@ -16,3 +16,6 @@ pvanalysis/__pycache__/pvfits.cpython-39.pyc
 __pycache__/utils.cpython-310.pyc
 channelfit/__pycache__/__init__.cpython-310.pyc
 channelfit/__pycache__/_channelfit.cpython-310.pyc
+pvsilhouette/__pycache__/_pvsilhouette.cpython-310.pyc
+pvsilhouette/__pycache__/__init__.cpython-310.pyc
+pvsilhouette/__pycache__/ulrichenvelope.cpython-310.pyc
