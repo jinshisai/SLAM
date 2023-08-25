@@ -18,6 +18,7 @@ from astropy import constants, units, wcs
 from astropy.coordinates import SkyCoord
 from scipy.signal import convolve
 import warnings
+from tqdm import tqdm
 from utils import emcee_corner
 
 warnings.simplefilter('ignore', RuntimeWarning)
@@ -294,7 +295,10 @@ class ChannelFit():
     
     def fitting(self, Mstar_range: list, Rc_range: list, cs_range: list,
                 figname: str, show_corner: bool = False):
+        bar = tqdm(total=(8 * 3 * (100 + 1 + 100 + 1)))
+        bar.set_description('Within the ranges')
         def lnprob(p):
+            bar.update(1)
             q = 10**p
             m = self.cubemodel(*q)
             chi2 = np.nansum((self.data_valid - m)**2) / self.sigma**2
@@ -302,9 +306,9 @@ class ChannelFit():
             return -0.5 * chi2
         plim = np.log10([Mstar_range, Rc_range, cs_range]).T
         mcmc = emcee_corner(plim, lnprob,
-                            nwalkers_per_ndim=16, nburnin=200, nsteps=200,
+                            nwalkers_per_ndim=8, nburnin=100, nsteps=100,
                             labels=['log Mstar', 'log Rc', 'log cs'],
-                            rangelevel=95,
+                            rangelevel=0.95,
                             figname=figname+'.corner.png',
                             show_corner=show_corner)
         popt, perr = mcmc
@@ -319,8 +323,8 @@ class ChannelFit():
         if Mstar is None or Rc is None or cs is None:
             Mstar, Rc, cs = self.popt
         m = self.cubemodel(Mstar, Rc, cs)
-        m_red = m[np.max(self.v_blue) < self.v]
-        m_blue = m[self.v < np.min(self.v_red)]
+        m_red = m[np.max(self.v_blue) < self.v_valid]
+        m_blue = m[self.v_valid < np.min(self.v_red)]
         model = np.full_like(self.data_mid, np.nan)
         model = np.append(m_blue, model, axis=0)
         model = np.append(model, m_red, axis=0)

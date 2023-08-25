@@ -17,6 +17,7 @@ from astropy.io import fits
 from astropy import constants
 from astropy.coordinates import SkyCoord
 from scipy.interpolate import RegularGridInterpolator as RGI
+from tqdm import tqdm
 import warnings
 
 from utils import emcee_corner
@@ -254,15 +255,18 @@ class PVSilhouette():
                 return major, minor, a
             else:
                 return major, minor
-
+        
+        bar = tqdm(total=(8 * 3 * (100 + 1 + 200 + 1)))
+        bar.set_description('Within the ranges')
         def lnprob(p):
+            bar.update(1)
             q = 10**p
             chi2 = calcchi2(*makemodel(*q))
             return -np.inf if chi2 > chi2max else -0.5 * chi2
         
         plim = np.log10([Mstar_range, Rc_range, alphainfall_range]).T
         mcmc = emcee_corner(plim, lnprob,
-                            nwalkers_per_ndim=16, nburnin=200, nsteps=200,
+                            nwalkers_per_ndim=8, nburnin=100, nsteps=200,
                             labels=['log Mstar', 'log Rc', r'log $\alpha$'],
                             rangelevel=0.95, figname=figname+'.corner.png',
                             show_corner=show, simpleoutput=False)
