@@ -313,10 +313,10 @@ class ChannelFit():
                             show_corner=show_corner,
                             simpleoutput=False)
         popt, plow, pmid, phigh = mcmc
-        popt = 10**popt
-        plow = 10**plow
-        pmid = 10**pmid
-        phigh = 10**phigh
+        self.popt = popt = 10**popt
+        self.plot = plow = 10**plow
+        self.pmid = pmid = 10**pmid
+        self.phigh = phigh = 10**phigh
         print('plow:', plow)
         print('pmid:', pmid)
         print('phigh:', phigh)
