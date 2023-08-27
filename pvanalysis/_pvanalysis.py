@@ -1084,7 +1084,11 @@ class PVAnalysis():
             drb, dvb, dpin, ddp, dvsys = popt[1]
             params = [*popt[0], *popt[1]]
             print(f'R_b   = {rb:.2f} +/- {drb:.2f} au')
+            if ddp == 0:
+                print('!!! Rb is NOT a break (disk) radius in the single-power fitting. !!!')
             print(f'V_b   = {vb:.3f} +/- {dvb:.3f} km/s')
+            if ddp == 0:
+                print('!!! Vb is a middle velocity in the single-power fitting. !!!')
             print(f'p_in  = {pin:.3f} +/- {dpin:.3f}')
             print(f'dp    = {dp:.3f} +/- {ddp:.3f}')
             print(f'v_sys = {self.vsys + vsys:.3f} +/- {dvsys:.3f}')
