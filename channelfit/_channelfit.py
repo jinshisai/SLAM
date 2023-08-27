@@ -49,7 +49,7 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     vv = np.moveaxis(vv, 2, 0)
     mom1 = np.sum(d * vv, axis=0) / np.sum(d, axis=0)
     mom1[mom0 < 3 * sigma_mom0] = np.nan
-    mom1[mom0 < 2 * sigma_mom0] = 0
+    mom0[mom0 < 2 * sigma_mom0] = 0
     return {'mom0':mom0, 'mom1':mom1, 'sigma_mom0':sigma_mom0}
     
 
