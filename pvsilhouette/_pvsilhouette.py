@@ -302,11 +302,10 @@ class PVSilhouette():
         ax.plot(self.x * minquad, a['minor']['vlosmin'], '-r')
         ax.set_xlabel('minor offset (au)')
         ax.set_ylim(self.v.min(), self.v.max())
-        ax.set_title(r'$M_{*}=$'\
-            +f'{plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} '+r'$M_{\odot}$'\
-            +'\n'+r'$R_{c}=$'\
-            +f'{plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au'\
-            +'\n'+r'$\alpha=$'\
-            +f'{plow[2]:.2f}, {popt[2]:.2f}, {phigh[2]:.2f}')
+        ax.set_title(r'$M_{*}$'+f'={popt[0]:.2f}'+r'$M_{\odot}$'
+            +', '+r'$R_{c}$'+f'={popt[1]:.0f} au'
+            +'\n'+r'$\alpha$'+f'={popt[2]:.2f}'
+            +', '+r'$\alpha ^{2} M_{*}$'+f'={popt[0] * popt[2]**2:.2}')
+        fig.tight_layout()
         fig.savefig(figname + '.model.png')
         if show: plt.show()
