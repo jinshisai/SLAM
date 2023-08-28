@@ -40,16 +40,15 @@ def irot(s, t, pa):
 
 def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     dmasked = d * 1
-    dmasked[dmasked < 3 * sigma] = 0
     dmasked[np.isnan(dmasked)] = 0
     dv = np.min(v[1:] - v[:-1])
     mom0 = np.sum(d, axis=0) * dv
     sigma_mom0 = sigma * dv * np.sqrt(len(d))
     vv = np.broadcast_to(v, np.shape(d)[::-1])
     vv = np.moveaxis(vv, 2, 0)
+    dmasked[dmasked < 3 * sigma] = 0
     mom1 = np.sum(d * vv, axis=0) / np.sum(d, axis=0)
     mom1[mom0 < 3 * sigma_mom0] = np.nan
-    mom0[mom0 < 2 * sigma_mom0] = 0
     return {'mom0':mom0, 'mom1':mom1, 'sigma_mom0':sigma_mom0}
     
 
@@ -198,8 +197,8 @@ class ChannelFit():
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
             mom0 = np.nansum(m, axis=0) * self.dv
-            m = m * np.broadcast_to(self.mom0 / mom0, np.shape(m))
-            m[np.isnan(m)] = 0
+            m = np.where(self.mom0 < self.sigma_mom0, 0,
+                         m * np.broadcast_to(self.mom0 / mom0, np.shape(m)))
             return m
         self.cubemodel = cubemodel
 
