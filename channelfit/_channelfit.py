@@ -202,6 +202,17 @@ class ChannelFit():
             m[np.isnan(m)] = 0
             return m
         self.cubemodel = cubemodel
+
+        def cubemodel_nobeam(Mstar: float, Rc: float, cs: float):
+            #cs = self.mom2
+            v = self.v_valid
+            m = [None] * len(v)
+            for i in range(len(v)):
+                m[i] = np.exp(-(v[i] - modelvlos(Mstar, Rc))**2 / 2 / cs**2) \
+                       / np.sqrt(2 * np.pi) / cs
+            m = np.array(m)
+            return m
+        self.cubemodel_nobeam = cubemodel_nobeam
     
     def plotmodelmom(self, Mstar: float, Rc: float, cs: float,
                      filename: str = 'modelmom01.png', pa: float = None):
@@ -232,7 +243,6 @@ class ChannelFit():
         ax.set_ylim(self.y.min(), self.y.max())
         ax.set_aspect(1)
         fig.savefig(filename)
-        plt.show()
         plt.close()
 
     def plotobsmom(self, filename: str = 'obsmom01.png', pa: float = None):
@@ -258,7 +268,6 @@ class ChannelFit():
         ax.set_ylim(self.y.min(), self.y.max())
         ax.set_aspect(1)
         fig.savefig(filename)
-        plt.show()
         plt.close()
 
     def plotresidualmom(self, Mstar: float, Rc: float, cs: float,
@@ -291,7 +300,6 @@ class ChannelFit():
         ax.set_ylim(self.y.min(), self.y.max())
         ax.set_aspect(1)
         fig.savefig(filename)
-        plt.show()
         plt.close()
     
     def fitting(self, Mstar_range: list, Rc_range: list, cs_range: list,
@@ -336,6 +344,13 @@ class ChannelFit():
         model = np.append(m_blue, model, axis=0)
         model = np.append(model, m_red, axis=0)
         
+        m = self.cubemodel_nobeam(Mstar, Rc, cs)
+        m_red = m[np.max(self.v_blue) < self.v_valid]
+        m_blue = m[self.v_valid < np.min(self.v_red)]
+        model0 = np.full_like(self.data_mid, np.nan)
+        model0 = np.append(m_blue, model0, axis=0)
+        model0 = np.append(model0, m_red, axis=0)
+        
         w = wcs.WCS(naxis=3)
         h = fits.open(self.fitsname)[0].header
         h['NAXIS1'] = len(self.x)
@@ -352,5 +367,6 @@ class ChannelFit():
                     hdu.header[k]=h[k]
             hdu = fits.HDUList([hdu])
             hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
+        tofits(model0, 'modelnobeam')
         tofits(model, 'model')
         tofits(self.data - model, 'residual')
