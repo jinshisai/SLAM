@@ -260,7 +260,8 @@ class PVSilhouette():
                 return major, minor
         p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed])
         if None in p_fixed:
-            bar = tqdm(total=(16 * 3 * (100 + 1 + 1000 + 1)))
+            bar = tqdm(total=(16 * len(p_fixed[p_fixed == None]) 
+                              * (100 + 1 + 1000 + 1)))
             bar.set_description('Within the ranges')
             def lnprob(p):
                 bar.update(1)
