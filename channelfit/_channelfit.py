@@ -132,7 +132,7 @@ class ChannelFit():
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
     def gridondisk(self, cubefits: str = None,
-                   pa: float = 0, incl: float = 0, dist: float = 1,
+                   pa: float = 0, incl: float = 90, dist: float = 1,
                    center: str = None, vsys: float = 0,
                    rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
                    sigma: float = None):
@@ -140,6 +140,7 @@ class ChannelFit():
             self.read_cubefits(cubefits, center, dist, vsys,
                                rmax, rmax, vlim[0], vlim[3], sigma)
             self.fitsname = cubefits
+            v = self.v
         self.X, self.Y = np.meshgrid(self.x, self.y)
         xminor, xmajor = rot(self.X, self.Y, np.radians(pa))
         xminor = xminor / np.cos(np.radians(incl))
