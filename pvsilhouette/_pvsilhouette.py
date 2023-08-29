@@ -199,6 +199,9 @@ class PVSilhouette():
                 Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
                 alphainfall_range: list = [0.01, 1],
+                Mstar_fixed: float = None,
+                Rc_fixed: float = None,
+                alphainfall_fixed: float = None,
                 cutoff: float = 5, vmask: list = [0, 0],
                 show: bool = False, figname: str = 'PVsilhouette'):
         majobs = np.where(self.dpvmajor > cutoff * self.sigma, 1, 0)
@@ -255,25 +258,37 @@ class PVSilhouette():
                 return major, minor, a
             else:
                 return major, minor
-        
-        bar = tqdm(total=(8 * 3 * (100 + 1 + 200 + 1)))
-        bar.set_description('Within the ranges')
-        def lnprob(p):
-            bar.update(1)
-            q = 10**p
-            chi2 = calcchi2(*makemodel(*q))
-            return -np.inf if chi2 > chi2max else -0.5 * chi2
-        
-        plim = np.log10([Mstar_range, Rc_range, alphainfall_range]).T
-        mcmc = emcee_corner(plim, lnprob,
-                            nwalkers_per_ndim=8, nburnin=100, nsteps=200,
-                            labels=['log Mstar', 'log Rc', r'log $\alpha$'],
-                            rangelevel=0.95, figname=figname+'.corner.png',
-                            show_corner=show, simpleoutput=False)
-        popt, plow, _, phigh = mcmc
-        if np.isinf(lnprob(popt)):
-            print('No model is better than the all-0 or all-1 models.')
-        popt, plow, phigh = 10**popt, 10**plow, 10**phigh
+        p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed])
+        if None in p_fixed:
+            bar = tqdm(total=(16 * 3 * (100 + 1 + 1000 + 1)))
+            bar.set_description('Within the ranges')
+            def lnprob(p):
+                bar.update(1)
+                q = p_fixed.copy()
+                q[p_fixed == None] = 10**p
+                chi2 = calcchi2(*makemodel(*q))
+                return -np.inf if chi2 > chi2max else -0.5 * chi2
+            plim = np.array([Mstar_range, Rc_range, alphainfall_range])
+            plim = np.log10(plim[p_fixed == None]).T
+            labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$'])
+            labels = labels[p_fixed == None]
+            mcmc = emcee_corner(plim, lnprob,
+                                nwalkers_per_ndim=16, nburnin=100, nsteps=1000,
+                                labels=labels, rangelevel=0.95,
+                                figname=figname+'.corner.png',
+                                show_corner=show, simpleoutput=False)
+            if np.isinf(lnprob(mcmc[0])):
+                print('No model is better than the all-0 or all-1 models.')
+            popt = p_fixed.copy()
+            popt[p_fixed == None] = 10**mcmc[0]
+            plow = p_fixed.copy()
+            plow[p_fixed == None] = 10**mcmc[1]
+            phigh = p_fixed.copy()
+            phigh[p_fixed == None] = 10**mcmc[3]
+        else:
+            popt = p_fixed
+            plow = p_fixed
+            phigh = p_fixed
         self.popt = popt
         self.plow = plow
         self.phigh = phigh
