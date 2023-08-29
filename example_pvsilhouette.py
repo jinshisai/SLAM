@@ -28,5 +28,6 @@ pvsil.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
              sigma=sigma)
 pvsil.fitting(incl=incl, Mstar_range=[0.01, 10], Rc_range=[1, 1000],
               alphainfall_range=[0.01, 1],
+              Mstar_fixed=None, Rc_fixed=None, alphainfall_fixed=None,
               cutoff=5, show=show_figs, figname=filehead, vmask=vmask)
 '-------------------------------------'
