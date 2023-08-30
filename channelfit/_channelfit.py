@@ -368,7 +368,8 @@ class ChannelFit():
                     cs: float = None, filehead: str = 'best'):
         if None in [Mstar, Rc, cs, xoff, yoff]:
             Mstar, Rc, cs, xoff, yoff = self.popt
-        m = self.cubemodel(Mstar, Rc, cs, xoff, yoff)
+        logMstar, logRc, logcs = np.log10(Mstar), np.log10(Rc), np.log10(cs)
+        m = self.cubemodel(logMstar, logRc, logcs, xoff, yoff)
         m_red = m[np.max(self.v_blue) < self.v_valid]
         m_blue = m[self.v_valid < np.min(self.v_red)]
         model = np.full_like(self.data_mid, np.nan)
