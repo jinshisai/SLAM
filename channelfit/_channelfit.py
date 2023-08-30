@@ -308,11 +308,10 @@ class ChannelFit():
                 yoff_fixed: float = None,
                 figname: str = 'channelfit',
                 show: bool = False):
-        p_fixed = np.array([np.log10(Mstar_fixed),
-                            np.log10(Rc_fixed),
-                            np.log10(cs_fixed),
+        p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             xoff_fixed, yoff_fixed])
         if None in p_fixed:
+            p_fixed[:3] = np.where(p_fixed[:3] == None, None, np.log10(p_fixed[:3]))
             bar = tqdm(total=(8 * len(p_fixed[p_fixed == None]) 
                               * (100 + 1 + 100 + 1)))
             bar.set_description('Within the ranges')
