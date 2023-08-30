@@ -25,7 +25,7 @@ if __name__ == '__main__':
                  Rc_range=[5, 500],
                  cs_range=[0.2, 2],
                  offmajor_fixed=0, offminor_fixed=0,
-                 figname=filehead)
+                 filename=filehead)
     chan.modeltofits(filehead=filehead)
     #p = chan.popt
     #chan.plotmodelmom(*p, pa=pa, filename=filehead+'.modelmom01.png')
