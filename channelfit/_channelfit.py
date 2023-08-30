@@ -164,7 +164,7 @@ class ChannelFit():
         def modelvlos(Mstar: float, Rc: float, xoff: float, yoff:float):
             xminor, xmajor = rot(self.X - xoff, self.Y - yoff, np.radians(pa))
             xminor = xminor / np.cos(np.radians(incl))
-            rdisk = np.hypot(xminor * self.signmajor, xmajor * self.signminor)
+            rdisk = np.hypot(xmajor * self.signmajor, xminor * self.signminor)
             vkep = vunit * np.sqrt(Mstar / rdisk)
             vjrot = vunit * np.sqrt(Mstar * Rc) / rdisk
             vr = -vunit * np.sqrt(Mstar / rdisk) * np.sqrt(2 - Rc / rdisk)
