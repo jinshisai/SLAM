@@ -203,7 +203,9 @@ class PVSilhouette():
                 Rc_fixed: float = None,
                 alphainfall_fixed: float = None,
                 cutoff: float = 5, vmask: list = [0, 0],
-                show: bool = False, figname: str = 'PVsilhouette'):
+                show: bool = False,
+                progressbar: bool = True,
+                figname: str = 'PVsilhouette'):
         majobs = np.where(self.dpvmajor > cutoff * self.sigma, 1, 0)
         minobs = np.where(self.dpvminor > cutoff * self.sigma, 1, 0)
         x, v = np.meshgrid(self.x, self.v)
@@ -260,11 +262,13 @@ class PVSilhouette():
                 return major, minor
         p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed])
         if None in p_fixed:
-            bar = tqdm(total=(16 * len(p_fixed[p_fixed == None]) 
-                              * (100 + 1 + 1000 + 1)))
-            bar.set_description('Within the ranges')
+            if progressbar:
+                bar = tqdm(total=(16 * len(p_fixed[p_fixed == None]) 
+                                  * (100 + 1 + 1000 + 1)))
+                bar.set_description('Within the ranges')
             def lnprob(p):
-                bar.update(1)
+                if progressbar:
+                    bar.update(1)
                 q = p_fixed.copy()
                 q[p_fixed == None] = 10**p
                 chi2 = calcchi2(*makemodel(*q))
