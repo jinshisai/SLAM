@@ -307,7 +307,7 @@ class ChannelFit():
                 cs_fixed: float = None,
                 offmajor_fixed: float = None,
                 offminor_fixed: float = None,
-                figname: str = 'channelfit',
+                filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True):
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
@@ -338,7 +338,7 @@ class ChannelFit():
             mcmc = emcee_corner(plim, lnprob,
                                 nwalkers_per_ndim=8, nburnin=100, nsteps=100,
                                 labels=labels, rangelevel=0.95,
-                                figname=figname+'.corner.png',
+                                figname=filename+'.corner.png',
                                 show_corner=show,
                                 simpleoutput=False)
             popt = p_fixed.copy()
@@ -368,6 +368,7 @@ class ChannelFit():
         print('------------------------')
         print('popt :', ', '.join([f'{t:.2e}' for t in self.popt]))
         print('------------------------')
+        np.savetxt(filename+'.popt.txt', [self.popt, self.plow, self.pmid, self.phigh])
    
     def modeltofits(self, Mstar: float = None, Rc: float = None,
                     offmajor: float = None, offminor: float = None,
