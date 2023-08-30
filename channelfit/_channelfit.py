@@ -160,6 +160,7 @@ class ChannelFit():
         self.mom0 = m['mom0']
         self.mom1 = m['mom1']
         self.sigma_mom0 = m['sigma_mom0']
+        self.peak = np.max(self.data_valid, axis=0)
         self.signmajor = np.sign(np.nansum(self.mom1 * xmajor))
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
 
@@ -200,7 +201,7 @@ class ChannelFit():
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
             mom0 = np.nansum(m, axis=0) * self.dv
-            m = np.where(mom0 < mom0.max() * 1e-10, 0,
+            m = np.where(self.peak < 6 * self.sigma, 0,
                          m * np.broadcast_to(self.mom0 / mom0, np.shape(m)))
             return m
         self.cubemodel = cubemodel
