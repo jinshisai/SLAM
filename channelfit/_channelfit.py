@@ -308,17 +308,20 @@ class ChannelFit():
                 offmajor_fixed: float = None,
                 offminor_fixed: float = None,
                 figname: str = 'channelfit',
-                show: bool = False):
+                show: bool = False,
+                progressbar: bool = True):
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             offmajor_fixed, offminor_fixed])
         if None in p_fixed:
             c = (q := p_fixed[:3]) != None
             p_fixed[:3][c] = np.log10(q[c].astype('float'))
-            bar = tqdm(total=(8 * len(p_fixed[p_fixed == None]) 
-                              * (100 + 1 + 100 + 1)))
-            bar.set_description('Within the ranges')
+            if progressbar:
+                bar = tqdm(total=(8 * len(p_fixed[p_fixed == None]) 
+                                  * (100 + 1 + 100 + 1)))
+                bar.set_description('Within the ranges')
             def lnprob(p):
-                bar.update(1)
+                if progressbar:
+                    bar.update(1)
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
                 m = self.cubemodel(*q)
