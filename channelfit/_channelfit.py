@@ -362,11 +362,11 @@ class ChannelFit():
             self.plow = p_fixed
             self.pmid = p_fixed
             self.phigh = p_fixed
-        print('plow:', self.plow)
-        print('pmid:', self.pmid)
-        print('phigh:', self.phigh)
+        print('plow:', ', '.joint([f'{t:.2e}' for t in self.plow]))
+        print('pmid:', ', '.joint([f'{t:.2e}' for t in self.pmid]))
+        print('phigh:', ', '.joint([f'{t:.2e}' for t in self.phigh]))
         print('------------------------')
-        print('popt:', self.popt)
+        print('popt:', ', '.joint([f'{t:.2e}' for t in self.popt]))
         print('------------------------')
    
     def modeltofits(self, Mstar: float = None, Rc: float = None,
