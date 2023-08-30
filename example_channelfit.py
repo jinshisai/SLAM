@@ -9,7 +9,6 @@ vsys = 4  # km/s
 dist = 139  # pc
 sigma = 2e-3  # Jy/beam; None means automatic calculation.
 rmax = 1 * dist  # au
-#vlim = (-2.52, -1.4, 1.4, 2.52)  # km/s
 vlim = (-2.52, -0.9, 0.9, 2.52)  # km/s
 show_figs = True
 '------------------------'
@@ -25,6 +24,7 @@ if __name__ == '__main__':
     chan.fitting(Mstar_range=[0.01, 10.0],
                  Rc_range=[5, 500],
                  cs_range=[0.2, 2],
+                 offmajor_fixed=0, offminor_fixed=0,
                  figname=filehead)
     chan.modeltofits(filehead=filehead)
     #p = chan.popt
