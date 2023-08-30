@@ -179,10 +179,8 @@ class ChannelFit():
         xb = (np.arange(n) - (n - 1) // 2) * self.dx
         yb = (np.arange(n) - (n - 1) // 2) * self.dy
         xb, yb = np.meshgrid(xb, yb)
-        zb = (yb + 1j * xb) * np.exp(-1j * np.radians(self.bpa))
-        yb = np.real(zb) / self.bmaj
-        xb = np.imag(zb) / self.bmin
-        gaussbeam = np.exp(-(yb**2 + xb**2))
+        xb, yb = rot(xb, yb, np.radians(self.bpa))
+        gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
         self.pixperbeam = np.sum(gaussbeam)
         gaussbeam = gaussbeam / self.pixperbeam
         self.pixel_valid = len(self.x) * len(self.y) * len(self.v_valid)
@@ -350,7 +348,7 @@ class ChannelFit():
             phigh[p_fixed == None] = mcmc[3]
             phigh[:3] = 10**phigh[:3]
             self.popt = popt
-            self.plot = plow
+            self.plow = plow
             self.pmid = pmid
             self.phigh = phigh
         else:
