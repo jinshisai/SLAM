@@ -204,7 +204,8 @@ class ChannelFit():
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
             mom0 = np.nansum(m, axis=0) * self.dv
-            m = np.where(mom0 < mom0.max() * 1e-10, 0,
+            m = np.where((mom0 < mom0.max() * 1e-10)
+                         + (self.peak < 3 * self.sigma), 0,
                          m * np.broadcast_to(self.mom0 / mom0, np.shape(m)))
             return m
         self.cubemodel = cubemodel
