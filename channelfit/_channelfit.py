@@ -201,11 +201,11 @@ class ChannelFit():
                 v2 = np.add.outer(dv, v[i] - offvsys - vmodel)
                 v2 = np.min(v2**2, axis=0)
                 m[i] = np.exp(-v2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
+                m[i] = np.where(self.peak < 3 * self.sigma, 0, m[i])
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
             mom0 = np.nansum(m, axis=0) * self.dv
-            m = np.where((mom0 < mom0.max() * 1e-10)
-                         + (self.peak < 3 * self.sigma), 0,
+            m = np.where(mom0 < mom0.max() * 1e-10, 0,
                          m * np.broadcast_to(self.mom0 / mom0, np.shape(m)))
             return m
         self.cubemodel = cubemodel
