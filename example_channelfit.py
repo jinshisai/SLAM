@@ -24,7 +24,7 @@ if __name__ == '__main__':
     chan.fitting(Mstar_range=[0.01, 10.0],
                  Rc_range=[5, 500],
                  cs_range=[0.2, 2],
-                 offmajor_fixed=0, offminor_fixed=0,
+                 offmajor_fixed=0, offminor_fixed=0, offvsys_fixed=0,
                  filename=filehead)
     chan.modeltofits(filehead=filehead)
     #p = chan.popt

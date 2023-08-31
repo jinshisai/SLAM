@@ -190,13 +190,14 @@ class ChannelFit():
         self.pixel_valid = len(self.x) * len(self.y) * len(self.v_valid)
                 
         def cubemodel(logMstar: float, logRc: float, logcs: float,
-                      offmajor: float, offminor: float):
+                      offmajor: float, offminor: float, offvsys: float):
             #cs = self.mom2
             Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
             v = self.v_valid
             m = [None] * len(v)
             for i in range(len(v)):
-                m[i] = np.exp(-(v[i] - modelvlos(Mstar, Rc, offmajor, offminor))**2 / 2 / cs**2) \
+                vmodel = modelvlos(Mstar, Rc, offmajor, offminor)
+                m[i] = np.exp(-(v[i] - vmodel - offvsys)**2 / 2 / cs**2) \
                        / np.sqrt(2 * np.pi) / cs
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
@@ -207,10 +208,10 @@ class ChannelFit():
         self.cubemodel = cubemodel
     
     def plotmodelmom(self, Mstar: float, Rc: float, cs: float,
-                     offmajor: float, offminor: float,
+                     offmajor: float, offminor: float, offvsys: float,
                      filename: str = 'modelmom01.png', pa: float = None):
         logMstar, logRc, logcs = np.log10(Mstar), np.log10(Rc), np.log10(cs)
-        d = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor)
+        d = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor, offvsys)
         m = makemom01(d, self.v_valid, self.sigma)
         mom0 = m['mom0']
         mom1 = m['mom1']
@@ -265,11 +266,11 @@ class ChannelFit():
         plt.close()
 
     def plotresidualmom(self, Mstar: float, Rc: float, cs: float,
-                        offmajor: float, offminor: float,
+                        offmajor: float, offminor: float, offvsys: float,
                         filename: str = 'residualmom01.png',
                         pa: float = None):
         logMstar, logRc, logcs = np.log10(Mstar), np.log10(Rc), np.log10(cs)
-        d = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor)
+        d = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor, offvsys)
         m = makemom01(d, self.v_valid, self.sigma)
         mom0 = m['mom0']
         mom1 = self.mom1 - m['mom1']
@@ -303,16 +304,18 @@ class ChannelFit():
                 cs_range: list = [0.01, 1],
                 offmajor_range: list = [-100, 100],
                 offminor_range: list = [-100, 100],
+                offvsys_range: list = [-0.2, 0.2],
                 Mstar_fixed: float = None,
                 Rc_fixed: float = None,
                 cs_fixed: float = None,
                 offmajor_fixed: float = None,
                 offminor_fixed: float = None,
+                offvsys_fixed: float = None,
                 filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True):
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
-                            offmajor_fixed, offminor_fixed])
+                            offmajor_fixed, offminor_fixed, offvsys_fixed])
         if None in p_fixed:
             c = (q := p_fixed[:3]) != None
             p_fixed[:3][c] = np.log10(q[c].astype('float'))
@@ -332,9 +335,10 @@ class ChannelFit():
             plim = np.array([np.log10(Mstar_range),
                              np.log10(Rc_range),
                              np.log10(cs_range),
-                             offmajor_range, offminor_range])
+                             offmajor_range, offminor_range, offvsys_range])
             plim = plim[p_fixed == None].T
-            labels = np.array(['log Mstar', 'log Rc', 'log cs', 'offmajor', 'offminor'])
+            labels = np.array(['log Mstar', 'log Rc', 'log cs',
+                               'offmajor', 'offminor', 'offvsys'])
             labels = labels[p_fixed == None]
             mcmc = emcee_corner(plim, lnprob,
                                 nwalkers_per_ndim=8, nburnin=100, nsteps=100,
@@ -373,11 +377,12 @@ class ChannelFit():
    
     def modeltofits(self, Mstar: float = None, Rc: float = None,
                     offmajor: float = None, offminor: float = None,
+                    offvsys: float = None,
                     cs: float = None, filehead: str = 'best'):
-        if None in [Mstar, Rc, cs, offmajor, offminor]:
-            Mstar, Rc, cs, offmajor, offminor = self.popt
+        if None in [Mstar, Rc, cs, offmajor, offminor, offvsys]:
+            Mstar, Rc, cs, offmajor, offminor, offvsys = self.popt
         logMstar, logRc, logcs = np.log10(Mstar), np.log10(Rc), np.log10(cs)
-        m = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor)
+        m = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor, offvsys)
         m_red = m[np.max(self.v_blue) < self.v_valid]
         m_blue = m[self.v_valid < np.min(self.v_red)]
         model = np.full_like(self.data_mid, np.nan)
