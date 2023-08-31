@@ -195,10 +195,12 @@ class ChannelFit():
             Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
             v = self.v_valid
             m = [None] * len(v)
+            dv = np.linspace(-self.dv * 0.5, self.dv * 0.5, 9)
             for i in range(len(v)):
                 vmodel = modelvlos(Mstar, Rc, offmajor, offminor)
-                m[i] = np.exp(-(v[i] - vmodel - offvsys)**2 / 2 / cs**2) \
-                       / np.sqrt(2 * np.pi) / cs
+                v2 = np.add.outer(dv, v[i] - offvsys - vmodel)
+                v2 = np.min(v2**2, axis=0)
+                m[i] = np.exp(-v2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
             mom0 = np.nansum(m, axis=0) * self.dv
