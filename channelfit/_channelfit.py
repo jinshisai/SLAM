@@ -156,6 +156,7 @@ class ChannelFit():
         self.data_red = self.data[vlim[2] <= v]
         self.data_mid = self.data[(vlim[1] < v) * (v < vlim[2])]
         self.data_valid = np.append(self.data_blue, self.data_red, axis=0) 
+        self.maxsnr = np.max(self.data_valid / self.sigma)
         
         m = makemom01(self.data_valid, self.v_valid, sigma)
         self.mom0 = m['mom0']
@@ -205,7 +206,7 @@ class ChannelFit():
                 m[i] = np.exp(-v2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
                 m[i] = np.where(self.peak > 3 * self.sigma, m[i], 0)
                 m[i] = convolve(m[i], gaussbeam, mode='same')
-                m[i][m[i] < np.max(m[i]) * 1e-2] = 0
+                m[i][m[i] < np.max(m[i]) / (self.maxsnr * 2.)] = 0
             m = np.array(m)
             mom0 = np.nansum(m, axis=0) * self.dv
             normfactor = np.broadcast_to(self.mom0 / mom0, np.shape(m))
