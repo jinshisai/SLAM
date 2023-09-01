@@ -204,7 +204,6 @@ class ChannelFit():
                 v2 = np.add.outer(subv, v[i] - offvsys - vmodel)
                 v2 = np.min(v2**2, axis=0)
                 m[i] = np.exp(-v2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
-                m[i] = np.where(self.peak > 6 * self.sigma, m[i], 0)
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
             m[m < m.max() / (self.maxsnr * 10.) ] = 0
