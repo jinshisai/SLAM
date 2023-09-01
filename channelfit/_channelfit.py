@@ -314,6 +314,9 @@ class ChannelFit():
                 offmajor_fixed: float = None,
                 offminor_fixed: float = None,
                 offvsys_fixed: float = None,
+                nwalkers_per_ndim: int = 16,
+                nburnin: int = 100,
+                nsteps: int = 300,
                 filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True):
@@ -323,8 +326,9 @@ class ChannelFit():
             c = (q := p_fixed[:3]) != None
             p_fixed[:3][c] = np.log10(q[c].astype('float'))
             if progressbar:
-                bar = tqdm(total=(16 * len(p_fixed[p_fixed == None]) 
-                                  * (100 + 1 + 300 + 1)))
+                bar = tqdm(total=(nwalkers_per_ndim 
+                                  * len(p_fixed[p_fixed == None]) 
+                                  * (nburnin + 1 + nsteps + 1)))
                 bar.set_description('Within the ranges')
             def lnprob(p):
                 if progressbar:
@@ -344,7 +348,8 @@ class ChannelFit():
                                'offmajor', 'offminor', 'offvsys'])
             labels = labels[p_fixed == None]
             mcmc = emcee_corner(plim, lnprob,
-                                nwalkers_per_ndim=16, nburnin=100, nsteps=300,
+                                nwalkers_per_ndim=nwalkers_per_ndim,
+                                nburnin=nburnin, nsteps=nsteps,
                                 labels=labels, rangelevel=0.95,
                                 figname=filename+'.corner.png',
                                 show_corner=show,
