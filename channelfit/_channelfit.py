@@ -48,8 +48,9 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     vv = np.moveaxis(vv, 2, 0)
     dmasked[dmasked < 3 * sigma] = 0
     mom1 = np.sum(d * vv, axis=0) / np.sum(d, axis=0)
+    mom2 = np.sqrt(np.sum(d * (vv - mom1)**2, axis=0), np.sum(d, axis=0))
     mom1[mom0 < 3 * sigma_mom0] = np.nan
-    return {'mom0':mom0, 'mom1':mom1, 'sigma_mom0':sigma_mom0}
+    return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
     
 
 class ChannelFit():
@@ -159,6 +160,7 @@ class ChannelFit():
         m = makemom01(self.data_valid, self.v_valid, sigma)
         self.mom0 = m['mom0']
         self.mom1 = m['mom1']
+        self.mom2 = m['mom2']
         self.sigma_mom0 = m['sigma_mom0']
         self.peak = np.max(self.data_valid, axis=0)
         self.signmajor = np.sign(np.nansum(self.mom1 * xmajor))
@@ -201,7 +203,7 @@ class ChannelFit():
                 v2 = np.add.outer(dv, v[i] - offvsys - vmodel)
                 v2 = np.min(v2**2, axis=0)
                 m[i] = np.exp(-v2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
-                m[i] = np.where(self.peak < 3 * self.sigma, 0, m[i])
+                m[i] = np.where(self.mom2 > 1, m[i], 0)
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
             mom0 = np.nansum(m, axis=0) * self.dv
