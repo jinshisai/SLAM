@@ -350,7 +350,7 @@ class ChannelFit():
             mcmc = emcee_corner(plim, lnprob,
                                 nwalkers_per_ndim=nwalkers_per_ndim,
                                 nburnin=nburnin, nsteps=nsteps,
-                                labels=labels, rangelevel=0.95,
+                                labels=labels, rangelevel=0.90,
                                 figname=filename+'.corner.png',
                                 show_corner=show,
                                 simpleoutput=False)
