@@ -206,11 +206,10 @@ class ChannelFit():
             for i in range(len(v)):
                 vmodel = modelvlos(Mstar, Rc, offmajor, offminor)
                 v2 = np.add.outer(subv, v[i] - offvsys - vmodel)
-                v2 = np.min(v2**2, axis=0)
                 m[i] = np.exp(-v2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
+                m[i] = np.mean(m[i], axis=0)
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
-            m[m < m.max() / (self.maxsnr * 100.) ] = 0
             mom0 = np.nansum(m, axis=0) * self.dv
             normfactor = np.broadcast_to(self.mom0 / mom0, np.shape(m))
             m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
