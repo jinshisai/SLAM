@@ -114,8 +114,10 @@ class ChannelFit():
         j0, j1 = np.argmin(np.abs(y + ymax)), np.argmin(np.abs(y - ymax))
         k0, k1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
         self.offpix = (i0, j0, k0)
-        x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[k0:k1 + 1],
-        d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
+        #x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[k0:k1 + 1]
+        x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[:]
+        #d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
+        d =  d[:, j0:j1 + 1, i0:i1 + 1]
         dx, dy, dv = x[1] - x[0], y[1] - y[0], v[1] - v[0]
         if 'BMAJ' in h.keys():
             bmaj = h['BMAJ'] * 3600. * dist  # au
