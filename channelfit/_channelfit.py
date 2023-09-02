@@ -205,8 +205,8 @@ class ChannelFit():
             subv = ((np.arange(10) + 0.5) / 10 - 0.5) * self.dv
             for i in range(len(v)):
                 vmodel = modelvlos(Mstar, Rc, offmajor, offminor)
-                v2 = np.add.outer(subv, v[i] - offvsys - vmodel)
-                m[i] = np.exp(-v2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
+                vsub = np.add.outer(subv, v[i] - offvsys - vmodel)
+                m[i] = np.exp(-vsub**2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
                 m[i] = np.mean(m[i], axis=0)
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
