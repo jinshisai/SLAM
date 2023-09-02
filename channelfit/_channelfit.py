@@ -411,7 +411,8 @@ class ChannelFit():
         m_blue = m[self.v_valid < np.min(self.v_red)]
         nanblue = np.full((self.offpix[2], ny, nx), np.nan)
         nanmid = np.full_like(self.data_mid, np.nan)
-        nanred = np.full((nv - len(nanblue) - len(nanmid), ny, nx), np.nan)
+        nrest = nv - len(nanblue) - len(m_blue) - len(nanmid) - len(m_red)
+        nanred = np.full((nrest, ny, nx), np.nan)
         model = m_blue
         if len(nanblue) > 0:
             model = np.append(nanblue, model, axis=0)
