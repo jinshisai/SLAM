@@ -227,14 +227,15 @@ class ChannelFit():
         mom0 = m['mom0']
         mom1 = m['mom1']
         sigma_mom0 = m['sigma_mom0']
-        levels = np.arange(1, 20) * 3 * sigma_mom0
+        levels = np.arange(1, 20) * 6 * sigma_mom0
         levels = levels[::2]
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
+        vplot = (np.nanpercentile(self.mom1, 95) 
+                 - np.nanpercentile(self.mom1, 5)) / 2.
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
-                          vmin=np.nanmin(self.mom1),
-                          vmax=np.nanmax(self.mom1))
+                          vmin=-vplot, vmax=vplot)
         fig.colorbar(m, ax=ax, label='km/s')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         if pa is not None:
@@ -252,14 +253,14 @@ class ChannelFit():
         plt.close()
 
     def plotobsmom(self, filename: str = 'obsmom01.png', pa: float = None):
-        levels = np.arange(1, 20) * 3 * self.sigma_mom0
-        levels = levels[::2]
+        levels = np.arange(1, 20) * 6 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
+        vplot = (np.nanpercentile(self.mom1, 95) 
+                 - np.nanpercentile(self.mom1, 5)) / 2.
         m = ax.pcolormesh(self.x, self.y, self.mom1, cmap='jet',
-                          vmin=np.nanmin(self.mom1),
-                          vmax=np.nanmax(self.mom1))
+                          vmin=-vplot, vmax=vplot)
         fig.colorbar(m, ax=ax, label='km/s')
         ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
         if pa is not None:
@@ -286,14 +287,12 @@ class ChannelFit():
         mom0 = m['mom0']
         mom1 = self.mom1 - m['mom1']
         sigma_mom0 = m['sigma_mom0']
-        levels = np.arange(1, 20) * 3 * sigma_mom0
-        levels = levels[::2]
+        levels = np.arange(1, 20) * 6 * sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
-                          vmin=np.nanmin(self.mom1),
-                          vmax=np.nanmax(self.mom1))
+                          vmin=-self.dv * 3, vmax=self.dv * 3)
         fig.colorbar(m, ax=ax, label='km/s')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         if pa is not None:
