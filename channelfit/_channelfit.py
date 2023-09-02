@@ -391,24 +391,34 @@ class ChannelFit():
                     offmajor: float = None, offminor: float = None,
                     offvsys: float = None,
                     cs: float = None, filehead: str = 'best'):
+        w = wcs.WCS(naxis=3)
+        h = fits.open(self.fitsname)[0].header
+        h['NAXIS1'] = len(self.x)
+        h['NAXIS2'] = len(self.y)
+        #h['NAXIS3'] = len(self.v)
+        h['CRPIX1'] = h['CRPIX1'] - self.offpix[0]
+        h['CRPIX2'] = h['CRPIX2'] - self.offpix[1]
+        #h['CRPIX3'] = h['CRPIX3'] - self.offpix[2]
+        nx, ny, nv = h['NAXIS1'], h['NAXIS2'], h['NAXIS3']
+
         if None in [Mstar, Rc, cs, offmajor, offminor, offvsys]:
             Mstar, Rc, cs, offmajor, offminor, offvsys = self.popt
         logMstar, logRc, logcs = np.log10(Mstar), np.log10(Rc), np.log10(cs)
         m = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor, offvsys)
         m_red = m[np.max(self.v_blue) < self.v_valid]
         m_blue = m[self.v_valid < np.min(self.v_red)]
-        model = np.full_like(self.data_mid, np.nan)
-        model = np.append(m_blue, model, axis=0)
+        nanblue = np.full((self.offpix[2], ny, nx), np.nan)
+        nanmid = np.full_like(self.data_mid, np.nan)
+        nanred = np.full((nv - len(nanblue) - len(nanmid), ny, nx), np.nan)
+        model = m_blue
+        if len(nanblue) > 0:
+            model = np.append(nanblue, model, axis=0)
+        if len(nanmid) > 0:
+            model = np.append(model, nanmid, axis=0)
         model = np.append(model, m_red, axis=0)
+        if len(nanred) > 0:
+            model = np.append(model, nanred, axis=0)
                 
-        w = wcs.WCS(naxis=3)
-        h = fits.open(self.fitsname)[0].header
-        h['NAXIS1'] = len(self.x)
-        h['NAXIS2'] = len(self.y)
-        h['NAXIS3'] = len(self.v)
-        h['CRPIX1'] = h['CRPIX1'] - self.offpix[0]
-        h['CRPIX2'] = h['CRPIX2'] - self.offpix[1]
-        h['CRPIX3'] = h['CRPIX3'] - self.offpix[2]
         def tofits(d: np.ndarray, ext: str):
             header = w.to_header()
             hdu = fits.PrimaryHDU(d, header=header)
