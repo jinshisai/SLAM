@@ -150,13 +150,15 @@ class ChannelFit():
         xminor = xminor * deproj
         self.xminor, self.xmajor = xminor, xmajor
         
-        self.v_blue = v[v <= vlim[1]]
-        self.v_red = v[vlim[2] <= v]
-        self.v_mid = v[(vlim[1] < v) * (v < vlim[2])]
+        self.v_nanblue = v[v < vlim[0]]
+        self.v_blue = v[(vlim[0] <= v) * (v <= vlim[1])]
+        self.v_nanmid = v[(vlim[1] < v) * (v < vlim[2])]
+        self.v_red = v[(vlim[2] <= v) * (v <= vlim[3])]
+        self.v_nanred = v[vlim[3] < v]
         self.v_valid = np.r_[self.v_blue, self.v_red]
-        self.data_blue = self.data[v <= vlim[1]]
-        self.data_red = self.data[vlim[2] <= v]
-        self.data_mid = self.data[(vlim[1] < v) * (v < vlim[2])]
+
+        self.data_blue = self.data[(vlim[0] <= v) * (v <= vlim[1])]
+        self.data_red = self.data[(vlim[2] <= v) * (v <= vlim[3])]
         self.data_valid = np.append(self.data_blue, self.data_red, axis=0) 
         self.maxsnr = np.max(self.data_valid / self.sigma)
         
@@ -409,10 +411,9 @@ class ChannelFit():
         m = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor, offvsys)
         m_red = m[np.max(self.v_blue) < self.v_valid]
         m_blue = m[self.v_valid < np.min(self.v_red)]
-        nanblue = np.full((self.offpix[2], ny, nx), np.nan)
-        nanmid = np.full_like(self.data_mid, np.nan)
-        nrest = nv - len(nanblue) - len(m_blue) - len(nanmid) - len(m_red)
-        nanred = np.full((nrest, ny, nx), np.nan)
+        nanblue = np.full((len(self.v_nanblue), ny, nx), np.nan)
+        nanmid = np.full((len(self.v_nanmid), ny, nx), np.nan)
+        nanred = np.full((len(self.v_nanred), ny, nx), np.nan)
         model = m_blue
         if len(nanblue) > 0:
             model = np.append(nanblue, model, axis=0)
