@@ -209,7 +209,8 @@ class ChannelFit():
             m[m < m.max() / (self.maxsnr * 100.) ] = 0
             mom0 = np.nansum(m, axis=0) * self.dv
             normfactor = np.broadcast_to(self.mom0 / mom0, np.shape(m))
-            m = np.where((mom0 > 0) * (self.mom0 > 0), m * normfactor, 0)
+            m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
+                         m * normfactor, 0)
             return m
         self.cubemodel = cubemodel
     
