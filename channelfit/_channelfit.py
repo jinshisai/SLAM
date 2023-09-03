@@ -38,7 +38,7 @@ def irot(s, t, pa):
     y = -s * np.sin(pa) + t * np.cos(pa)  # along Dec. axis
     return np.array([x, y])
 
-def boxgauss(v_over_cs: np.ndarray, dv_over_cs: float) -> np.ndarray:
+def boxgauss(dv_over_cs: float) -> tuple:
     clipsigma = 3. + dv_over_cs
     dv = min([2, dv_over_cs]) / 10.
     ndv = 2 * int(dv_over_cs / 2. / dv + 0.5) + 1
@@ -49,10 +49,7 @@ def boxgauss(v_over_cs: np.ndarray, dv_over_cs: float) -> np.ndarray:
     p = np.sum([g[i:i + n - ndv + 1] for i in range(ndv)], axis=0)
     #p /= ndv
     n = n - ndv
-    n0 = n // 2
-    iv = (np.round(v_over_cs / dv) + n0).astype('int').clip(0, n)
-    p = np.where((iv == 0) | (iv == n), 0, p[iv])
-    return p
+    return p, n, dv
     
 def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     dmasked = d * 1
@@ -237,7 +234,9 @@ class ChannelFit():
             xmajor0 = np.add.outer(suby, self.xmajor - offmajor_fixed)  # subxy, y, x
         if offminor_fixed is not None:
             xminor0 = np.add.outer(subx, self.xminor - offminor_fixed * self.deproj)  # subxy, y, x
-
+        if cs_fixed is not None:
+            prof0, n_prof0, dv_prof0 = boxgauss(self.dv / cs_fixed)
+            
         def cubemodel(logMstar: float, logRc: float, logcs: float,
                       offmajor: float, offminor: float, offvsys: float):
             global xmajor, xminor
@@ -250,15 +249,21 @@ class ChannelFit():
                 xminor = np.add.outer(subx, self.xminor - offminor * self.deproj)
             else:
                 xminor= xminor0
+            if cs_fixed is None:
+                prof, n_prof, dv_prof = boxgauss(self.dv / cs)
+            else:
+                prof, n_prof, dv_prof = prof0, n_prof0, dv_prof0
             vmodel = self.modelvlos(xmajor, xminor, Mstar, Rc)  # subxy, y, x
             v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, subxy, y, x
-            m = boxgauss(v / cs, self.dv / cs)  # v, subxy, y, x
+            iv = np.round(v / cs / dv_prof) + n_prof // 2
+            iv = iv.astype('int').clip(0, n_prof)
+            m = np.where((iv == 0) | (iv == n), 0, prof[iv])  # v, subxy, y, x
             m = np.mean(m, axis=1)  # v, y, x
             m = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
             mom0 = np.nansum(m, axis=0) * self.dv
             m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
                          m * self.mom0 / mom0, 0)
-            return m
+            return prof
         self.cubemodel = cubemodel
 
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
