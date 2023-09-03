@@ -38,6 +38,19 @@ def irot(s, t, pa):
     y = -s * np.sin(pa) + t * np.cos(pa)  # along Dec. axis
     return np.array([x, y])
 
+def convolvedprofile(v_over_cs: np.ndarray, dv_over_cs: float) -> np.ndarray:
+    dv = min([1, dv_over_cs]) * 0.1
+    v = np.linspace(-5, 5, 10 / dv + 1)
+    n = len(v) - 1
+    g = np.exp(-0.5 * v**2)
+    g /= np.sum(g)
+    b = ((-0.5 * dv_over_cs <= v) * (v <= 0.5 * dv_over_cs)).astype('int')
+    b /= np.sum(b)
+    p = fftconvolve(g, b, mode='same')
+    iv = ((v_over_cs / 5 + 1) * 0.5 * n).astyep('int')
+    p = np.where((0 <= iv) * (iv <= n), p[iv], 0)
+    return p
+    
 def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     dmasked = d * 1
     dmasked[np.isnan(dmasked)] = 0
@@ -192,24 +205,21 @@ class ChannelFit():
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
         self.pixperbeam = np.sum(gaussbeam)
         gaussbeam = gaussbeam / self.pixperbeam
-        self.pixel_valid = len(self.x) * len(self.y) * len(self.v_valid)
                 
         def cubemodel(logMstar: float, logRc: float, logcs: float,
                       offmajor: float, offminor: float, offvsys: float):
             #cs = self.mom2
             Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
-            nsubv = nsubx = nsuby = nsubpixel
+            nsubx = nsuby = nsubpixel
             subx = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dx * deproj
             suby = ((np.arange(nsuby) + 0.5) / nsuby - 0.5) * self.dy
             subx, suby = [np.ravel(a) for a in np.meshgrid(subx, suby)]
-            subv = ((np.arange(nsubv) + 0.5) / nsubv - 0.5) * self.dv
-            xmajor = np.add.outer(suby, self.xmajor - offmajor)
-            xminor = np.add.outer(subx, self.xminor - offminor * deproj)
+            xmajor = np.add.outer(suby, self.xmajor - offmajor)  # subxy, y, x
+            xminor = np.add.outer(subx, self.xminor - offminor * deproj)  # subxy, y, x
             vmodel = modelvlos(xmajor, xminor, Mstar, Rc)  # subxy, y, x
             v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, subxy, y, x
-            v = np.add.outer(subv, v)  # subv, v, subxy, y, x
-            m = np.exp(-v**2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
-            m = np.mean(m, axis=(0, 2))  # subv and subxy
+            m = convolvedprofile(v / cs, self.dv / cs)  # v, subxy, y, x
+            m = np.mean(m, axis=1)  # v, y, x
             m = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
             mom0 = np.nansum(m, axis=0) * self.dv
             m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
