@@ -40,7 +40,7 @@ def irot(s, t, pa):
 
 def convolvedprofile(v_over_cs: np.ndarray, dv_over_cs: float) -> np.ndarray:
     dv = min([2, dv_over_cs]) * 0.1
-    clipsigma = 3
+    clipsigma = 5
     v = np.linspace(-clipsigma, clipsigma, int(2 * clipsigma / dv + 0.5) + 1)
     n = len(v) - 1
     g = np.exp(-0.5 * v**2)
