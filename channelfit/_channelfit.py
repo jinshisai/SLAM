@@ -172,26 +172,24 @@ class ChannelFit():
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
 
         def modelvlos(Mstar: float, Rc: float, offmajor: float, offminor:float):
-            vloslist = [None] * 9
             n = np.linspace(-1, 1, 3)
-            dxlist, dylist = np.meshgrid(n, n)
-            dxlist = np.ravel(dxlist) / 3.
-            dylist = np.ravel(dylist) / 3.
-            for i, dx, dy in zip(range(9), dxlist, dylist):
-                xmajor = self.xmajor - (offmajor + dx)
-                xminor = self.xminor - (offminor + dy) * deproj
-                rdisk = np.hypot(xmajor, xminor)
-                vkep = vunit * np.sqrt(Mstar / rdisk)
-                vjrot = vunit * np.sqrt(Mstar * Rc) / rdisk
-                vr = -vunit * np.sqrt(Mstar / rdisk) * np.sqrt(2 - Rc / rdisk)
-                vr[rdisk < Rc] = 0
-                vrot = np.where(rdisk < Rc, vkep, vjrot)
-                vlos = (vrot * xmajor * self.signmajor 
-                        + vr * xminor * self.signminor) / rdisk
-                vlos = vlos * np.sin(np.radians(incl))
-                vloslist[i] = vlos
-            vloslist = np.array(vloslist)
-            return vloslist
+            subx, suby = np.meshgrid(n, n)
+            subx = np.ravel(subx) / 3.
+            suby = np.ravel(suby) / 3.
+            dx = subx - offmajor
+            dy = (suby - offminor) * deproj
+            xmajor = np.add.outer(dx, self.xmajor)
+            xminor = np.add.outer(dy, self.xminor)
+            rdisk = np.hypot(xmajor, xminor)
+            vkep = vunit * np.sqrt(Mstar / rdisk)
+            vjrot = vunit * np.sqrt(Mstar * Rc) / rdisk
+            vr = -vunit * np.sqrt(Mstar / rdisk) * np.sqrt(2 - Rc / rdisk)
+            vr[rdisk < Rc] = 0
+            vrot = np.where(rdisk < Rc, vkep, vjrot)
+            vlos = (vrot * xmajor * self.signmajor 
+                    + vr * xminor * self.signminor) / rdisk
+            vlos = vlos * np.sin(np.radians(incl))
+            return vlos
         self.modelvlos = modelvlos
 
         n = len(self.x) - 1 if len(self.x) // 2 == 0 else len(self.x)
