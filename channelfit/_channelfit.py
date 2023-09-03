@@ -153,7 +153,7 @@ class ChannelFit():
                    pa: float = 0, incl: float = 90, dist: float = 1,
                    center: str = None, vsys: float = 0,
                    rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
-                   sigma: float = None, nsubpixel: int = 5):
+                   sigma: float = None):
         if not (cubefits is None):
             self.read_cubefits(cubefits, center, dist, vsys,
                                rmax, rmax, vlim[0], vlim[3], sigma)
@@ -161,8 +161,8 @@ class ChannelFit():
             v = self.v
         self.X, self.Y = np.meshgrid(self.x, self.y)
         xminor, xmajor = rot(self.X, self.Y, np.radians(pa))
-        deproj = 1 / np.cos(np.radians(incl))
-        xminor = xminor * deproj
+        self.deproj = 1 / np.cos(np.radians(incl))
+        xminor = xminor * self.deproj
         self.xminor, self.xmajor = xminor, xmajor
         
         self.v_nanblue = v[v < vlim[0]]
@@ -199,27 +199,56 @@ class ChannelFit():
             vlos = vlos * np.sin(np.radians(incl))
             return vlos
         self.modelvlos = modelvlos
-
+                        
+    def fitting(self, Mstar_range: list = [0.01, 10],
+                Rc_range: list = [1, 1000],
+                cs_range: list = [0.01, 1],
+                offmajor_range: list = [-100, 100],
+                offminor_range: list = [-100, 100],
+                offvsys_range: list = [-0.2, 0.2],
+                Mstar_fixed: float = None,
+                Rc_fixed: float = None,
+                cs_fixed: float = None,
+                offmajor_fixed: float = None,
+                offminor_fixed: float = None,
+                offvsys_fixed: float = None,
+                nwalkers_per_ndim: int = 16,
+                nburnin: int = 100,
+                nsteps: int = 300,
+                filename: str = 'channelfit',
+                show: bool = False,
+                progressbar: bool = True,
+                nsubpixel: int = 5):
+        
         n = len(self.x) - 1 if len(self.x) // 2 == 0 else len(self.x)
         xb = (np.arange(n) - (n - 1) // 2) * self.dx
         yb = (np.arange(n) - (n - 1) // 2) * self.dy
         xb, yb = np.meshgrid(xb, yb)
         xb, yb = rot(xb, yb, np.radians(self.bpa))
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
-        self.pixperbeam = np.sum(gaussbeam)
-        gaussbeam = gaussbeam / self.pixperbeam
-                
+        pixperbeam = np.sum(gaussbeam)
+        gaussbeam = gaussbeam / pixperbeam
+        
+        nsubx = nsuby = nsubpixel
+        subx = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dx * self.deproj
+        suby = ((np.arange(nsuby) + 0.5) / nsuby - 0.5) * self.dy
+        subx, suby = [np.ravel(a) for a in np.meshgrid(subx, suby)]
+        xmajor0 = np.add.outer(suby, self.xmajor)  # subxy, y, x
+        xminor0 = np.add.outer(subx, self.xminor)  # subxy, y, x
+
         def cubemodel(logMstar: float, logRc: float, logcs: float,
                       offmajor: float, offminor: float, offvsys: float):
-            #cs = self.mom2
+            global xmajor, xminor
             Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
-            nsubx = nsuby = nsubpixel
-            subx = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dx * deproj
-            suby = ((np.arange(nsuby) + 0.5) / nsuby - 0.5) * self.dy
-            subx, suby = [np.ravel(a) for a in np.meshgrid(subx, suby)]
-            xmajor = np.add.outer(suby, self.xmajor - offmajor)  # subxy, y, x
-            xminor = np.add.outer(subx, self.xminor - offminor * deproj)  # subxy, y, x
-            vmodel = modelvlos(xmajor, xminor, Mstar, Rc)  # subxy, y, x
+            if offmajor_fixed is None:
+                xmajor = np.add.outer(suby, self.xmajor - offmajor)
+            else:
+                xmajor = xmajor0
+            if offminor_fixed is None:
+                xminor = np.add.outer(subx, self.xminor - offminor * self.deproj)
+            else:
+                xminor= xminor0
+            vmodel = self.modelvlos(xmajor, xminor, Mstar, Rc)  # subxy, y, x
             v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, subxy, y, x
             m = boxgauss(v / cs, self.dv / cs)  # v, subxy, y, x
             m = np.mean(m, axis=1)  # v, y, x
@@ -229,7 +258,113 @@ class ChannelFit():
                          m * self.mom0 / mom0, 0)
             return m
         self.cubemodel = cubemodel
-    
+
+        p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
+                            offmajor_fixed, offminor_fixed, offvsys_fixed])
+        if None in p_fixed:
+            c = (q := p_fixed[:3]) != None
+            p_fixed[:3][c] = np.log10(q[c].astype('float'))
+            if progressbar:
+                bar = tqdm(total=(nwalkers_per_ndim 
+                                  * len(p_fixed[p_fixed == None]) 
+                                  * (nburnin + 1 + nsteps + 1)))
+                bar.set_description('Within the ranges')
+            def lnprob(p):
+                if progressbar:
+                    bar.update(1)
+                q = p_fixed.copy()
+                q[p_fixed == None] = p
+                m = self.cubemodel(*q)
+                chi2 = np.nansum((self.data_valid - m)**2) / self.sigma**2
+                chi2 /= pixperbeam
+                return -0.5 * chi2
+            plim = np.array([np.log10(Mstar_range),
+                             np.log10(Rc_range),
+                             np.log10(cs_range),
+                             offmajor_range, offminor_range, offvsys_range])
+            plim = plim[p_fixed == None].T
+            labels = np.array(['log Mstar', 'log Rc', 'log cs',
+                               'offmajor', 'offminor', 'offvsys'])
+            labels = labels[p_fixed == None]
+            mcmc = emcee_corner(plim, lnprob,
+                                nwalkers_per_ndim=nwalkers_per_ndim,
+                                nburnin=nburnin, nsteps=nsteps,
+                                labels=labels, rangelevel=0.90,
+                                figname=filename+'.corner.png',
+                                show_corner=show,
+                                simpleoutput=False)
+            popt = p_fixed.copy()
+            popt[p_fixed == None] = mcmc[0]
+            popt[:3] = 10**popt[:3]
+            plow = p_fixed.copy()
+            plow[p_fixed == None] = mcmc[1]
+            plow[:3] = 10**plow[:3]
+            pmid = p_fixed.copy()
+            pmid[p_fixed == None] = mcmc[2]
+            pmid[:3] = 10**pmid[:3]
+            phigh = p_fixed.copy()
+            phigh[p_fixed == None] = mcmc[3]
+            phigh[:3] = 10**phigh[:3]
+            self.popt = popt
+            self.plow = plow
+            self.pmid = pmid
+            self.phigh = phigh
+        else:
+            self.popt = p_fixed
+            self.plow = p_fixed
+            self.pmid = p_fixed
+            self.phigh = p_fixed
+        print('plow :', ', '.join([f'{t:.2e}' for t in self.plow]))
+        print('pmid :', ', '.join([f'{t:.2e}' for t in self.pmid]))
+        print('phigh:', ', '.join([f'{t:.2e}' for t in self.phigh]))
+        print('------------------------')
+        print('popt :', ', '.join([f'{t:.2e}' for t in self.popt]))
+        print('------------------------')
+        np.savetxt(filename+'.popt.txt', [self.popt, self.plow, self.pmid, self.phigh])
+   
+    def modeltofits(self, Mstar: float = None, Rc: float = None,
+                    offmajor: float = None, offminor: float = None,
+                    offvsys: float = None,
+                    cs: float = None, filehead: str = 'best'):
+        w = wcs.WCS(naxis=3)
+        h = fits.open(self.fitsname)[0].header
+        h['NAXIS1'] = len(self.x)
+        h['NAXIS2'] = len(self.y)
+        #h['NAXIS3'] = len(self.v)
+        h['CRPIX1'] = h['CRPIX1'] - self.offpix[0]
+        h['CRPIX2'] = h['CRPIX2'] - self.offpix[1]
+        #h['CRPIX3'] = h['CRPIX3'] - self.offpix[2]
+        nx, ny, nv = h['NAXIS1'], h['NAXIS2'], h['NAXIS3']
+
+        if None in [Mstar, Rc, cs, offmajor, offminor, offvsys]:
+            Mstar, Rc, cs, offmajor, offminor, offvsys = self.popt
+        logMstar, logRc, logcs = np.log10(Mstar), np.log10(Rc), np.log10(cs)
+        m = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor, offvsys)
+        m_red = m[np.max(self.v_blue) < self.v_valid]
+        m_blue = m[self.v_valid < np.min(self.v_red)]
+        nanblue = np.full((len(self.v_nanblue), ny, nx), np.nan)
+        nanmid = np.full((len(self.v_nanmid), ny, nx), np.nan)
+        nanred = np.full((len(self.v_nanred), ny, nx), np.nan)
+        model = m_blue
+        if len(nanblue) > 0:
+            model = np.append(nanblue, model, axis=0)
+        if len(nanmid) > 0:
+            model = np.append(model, nanmid, axis=0)
+        model = np.append(model, m_red, axis=0)
+        if len(nanred) > 0:
+            model = np.append(model, nanred, axis=0)
+                
+        def tofits(d: np.ndarray, ext: str):
+            header = w.to_header()
+            hdu = fits.PrimaryHDU(d, header=header)
+            for k in h.keys():
+                if not ('COMMENT' in k or 'HISTORY' in k):
+                    hdu.header[k]=h[k]
+            hdu = fits.HDUList([hdu])
+            hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
+        tofits(model, 'model')
+        tofits(self.data - model, 'residual')
+        
     def plotmodelmom(self, Mstar: float, Rc: float, cs: float,
                      offmajor: float, offminor: float, offvsys: float,
                      filename: str = 'modelmom01.png', pa: float = None):
@@ -320,127 +455,4 @@ class ChannelFit():
         ax.set_aspect(1)
         fig.savefig(filename)
         plt.close()
-    
-    def fitting(self, Mstar_range: list = [0.01, 10],
-                Rc_range: list = [1, 1000],
-                cs_range: list = [0.01, 1],
-                offmajor_range: list = [-100, 100],
-                offminor_range: list = [-100, 100],
-                offvsys_range: list = [-0.2, 0.2],
-                Mstar_fixed: float = None,
-                Rc_fixed: float = None,
-                cs_fixed: float = None,
-                offmajor_fixed: float = None,
-                offminor_fixed: float = None,
-                offvsys_fixed: float = None,
-                nwalkers_per_ndim: int = 16,
-                nburnin: int = 100,
-                nsteps: int = 300,
-                filename: str = 'channelfit',
-                show: bool = False,
-                progressbar: bool = True):
-        p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
-                            offmajor_fixed, offminor_fixed, offvsys_fixed])
-        if None in p_fixed:
-            c = (q := p_fixed[:3]) != None
-            p_fixed[:3][c] = np.log10(q[c].astype('float'))
-            if progressbar:
-                bar = tqdm(total=(nwalkers_per_ndim 
-                                  * len(p_fixed[p_fixed == None]) 
-                                  * (nburnin + 1 + nsteps + 1)))
-                bar.set_description('Within the ranges')
-            def lnprob(p):
-                if progressbar:
-                    bar.update(1)
-                q = p_fixed.copy()
-                q[p_fixed == None] = p
-                m = self.cubemodel(*q)
-                chi2 = np.nansum((self.data_valid - m)**2) / self.sigma**2
-                chi2 /= self.pixperbeam
-                return -0.5 * chi2
-            plim = np.array([np.log10(Mstar_range),
-                             np.log10(Rc_range),
-                             np.log10(cs_range),
-                             offmajor_range, offminor_range, offvsys_range])
-            plim = plim[p_fixed == None].T
-            labels = np.array(['log Mstar', 'log Rc', 'log cs',
-                               'offmajor', 'offminor', 'offvsys'])
-            labels = labels[p_fixed == None]
-            mcmc = emcee_corner(plim, lnprob,
-                                nwalkers_per_ndim=nwalkers_per_ndim,
-                                nburnin=nburnin, nsteps=nsteps,
-                                labels=labels, rangelevel=0.90,
-                                figname=filename+'.corner.png',
-                                show_corner=show,
-                                simpleoutput=False)
-            popt = p_fixed.copy()
-            popt[p_fixed == None] = mcmc[0]
-            popt[:3] = 10**popt[:3]
-            plow = p_fixed.copy()
-            plow[p_fixed == None] = mcmc[1]
-            plow[:3] = 10**plow[:3]
-            pmid = p_fixed.copy()
-            pmid[p_fixed == None] = mcmc[2]
-            pmid[:3] = 10**pmid[:3]
-            phigh = p_fixed.copy()
-            phigh[p_fixed == None] = mcmc[3]
-            phigh[:3] = 10**phigh[:3]
-            self.popt = popt
-            self.plow = plow
-            self.pmid = pmid
-            self.phigh = phigh
-        else:
-            self.popt = p_fixed
-            self.plow = p_fixed
-            self.pmid = p_fixed
-            self.phigh = p_fixed
-        print('plow :', ', '.join([f'{t:.2e}' for t in self.plow]))
-        print('pmid :', ', '.join([f'{t:.2e}' for t in self.pmid]))
-        print('phigh:', ', '.join([f'{t:.2e}' for t in self.phigh]))
-        print('------------------------')
-        print('popt :', ', '.join([f'{t:.2e}' for t in self.popt]))
-        print('------------------------')
-        np.savetxt(filename+'.popt.txt', [self.popt, self.plow, self.pmid, self.phigh])
-   
-    def modeltofits(self, Mstar: float = None, Rc: float = None,
-                    offmajor: float = None, offminor: float = None,
-                    offvsys: float = None,
-                    cs: float = None, filehead: str = 'best'):
-        w = wcs.WCS(naxis=3)
-        h = fits.open(self.fitsname)[0].header
-        h['NAXIS1'] = len(self.x)
-        h['NAXIS2'] = len(self.y)
-        #h['NAXIS3'] = len(self.v)
-        h['CRPIX1'] = h['CRPIX1'] - self.offpix[0]
-        h['CRPIX2'] = h['CRPIX2'] - self.offpix[1]
-        #h['CRPIX3'] = h['CRPIX3'] - self.offpix[2]
-        nx, ny, nv = h['NAXIS1'], h['NAXIS2'], h['NAXIS3']
 
-        if None in [Mstar, Rc, cs, offmajor, offminor, offvsys]:
-            Mstar, Rc, cs, offmajor, offminor, offvsys = self.popt
-        logMstar, logRc, logcs = np.log10(Mstar), np.log10(Rc), np.log10(cs)
-        m = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor, offvsys)
-        m_red = m[np.max(self.v_blue) < self.v_valid]
-        m_blue = m[self.v_valid < np.min(self.v_red)]
-        nanblue = np.full((len(self.v_nanblue), ny, nx), np.nan)
-        nanmid = np.full((len(self.v_nanmid), ny, nx), np.nan)
-        nanred = np.full((len(self.v_nanred), ny, nx), np.nan)
-        model = m_blue
-        if len(nanblue) > 0:
-            model = np.append(nanblue, model, axis=0)
-        if len(nanmid) > 0:
-            model = np.append(model, nanmid, axis=0)
-        model = np.append(model, m_red, axis=0)
-        if len(nanred) > 0:
-            model = np.append(model, nanred, axis=0)
-                
-        def tofits(d: np.ndarray, ext: str):
-            header = w.to_header()
-            hdu = fits.PrimaryHDU(d, header=header)
-            for k in h.keys():
-                if not ('COMMENT' in k or 'HISTORY' in k):
-                    hdu.header[k]=h[k]
-            hdu = fits.HDUList([hdu])
-            hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
-        tofits(model, 'model')
-        tofits(self.data - model, 'residual')
