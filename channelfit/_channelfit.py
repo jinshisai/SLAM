@@ -233,8 +233,10 @@ class ChannelFit():
         subx = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dx * self.deproj
         suby = ((np.arange(nsuby) + 0.5) / nsuby - 0.5) * self.dy
         subx, suby = [np.ravel(a) for a in np.meshgrid(subx, suby)]
-        xmajor0 = np.add.outer(suby, self.xmajor)  # subxy, y, x
-        xminor0 = np.add.outer(subx, self.xminor)  # subxy, y, x
+        if offmajor_fixed is not None:
+            xmajor0 = np.add.outer(suby, self.xmajor - offmajor_fixed)  # subxy, y, x
+        if offminor_fixed is not None:
+            xminor0 = np.add.outer(subx, self.xminor - offminor_fixed * self.deproj)  # subxy, y, x
 
         def cubemodel(logMstar: float, logRc: float, logcs: float,
                       offmajor: float, offminor: float, offvsys: float):
