@@ -172,18 +172,26 @@ class ChannelFit():
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
 
         def modelvlos(Mstar: float, Rc: float, offmajor: float, offminor:float):
-            xmajor = self.xmajor - offmajor
-            xminor = self.xminor - offminor * deproj
-            rdisk = np.hypot(xmajor, xminor)
-            vkep = vunit * np.sqrt(Mstar / rdisk)
-            vjrot = vunit * np.sqrt(Mstar * Rc) / rdisk
-            vr = -vunit * np.sqrt(Mstar / rdisk) * np.sqrt(2 - Rc / rdisk)
-            vr[rdisk < Rc] = 0
-            vrot = np.where(rdisk < Rc, vkep, vjrot)
-            vlos = (vrot * xmajor * self.signmajor 
-                    + vr * xminor * self.signminor) / rdisk
-            vlos = vlos * np.sin(np.radians(incl))
-            return vlos
+            vloslist = [None] * 9
+            n = np.linspace(-1, 1, 3)
+            dxlist, dylist = np.meshgrid(n, n)
+            dxlist = np.ravel(dxlist) / 3.
+            dylist = np.ravel(dylist) / 3.
+            for i, dx, dy in zip(range(9), dxlist, dylist):
+                xmajor = self.xmajor - (offmajor + dx)
+                xminor = self.xminor - (offminor + dy) * deproj
+                rdisk = np.hypot(xmajor, xminor)
+                vkep = vunit * np.sqrt(Mstar / rdisk)
+                vjrot = vunit * np.sqrt(Mstar * Rc) / rdisk
+                vr = -vunit * np.sqrt(Mstar / rdisk) * np.sqrt(2 - Rc / rdisk)
+                vr[rdisk < Rc] = 0
+                vrot = np.where(rdisk < Rc, vkep, vjrot)
+                vlos = (vrot * xmajor * self.signmajor 
+                        + vr * xminor * self.signminor) / rdisk
+                vlos = vlos * np.sin(np.radians(incl))
+                vloslist[i] = vlos
+            vloslist = np.array(vloslist)
+            return vloslist
         self.modelvlos = modelvlos
 
         n = len(self.x) - 1 if len(self.x) // 2 == 0 else len(self.x)
@@ -202,12 +210,12 @@ class ChannelFit():
             Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
             v = self.v_valid
             m = [None] * len(v)
-            subv = ((np.arange(10) + 0.5) / 10 - 0.5) * self.dv
+            subv = ((np.arange(3) + 0.5) / 3 - 0.5) * self.dv
             for i in range(len(v)):
                 vmodel = modelvlos(Mstar, Rc, offmajor, offminor)
                 vsub = np.add.outer(subv, v[i] - offvsys - vmodel)
                 m[i] = np.exp(-vsub**2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
-                m[i] = np.mean(m[i], axis=0)
+                m[i] = np.mean(m[i], axis=(0, 1))
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
             mom0 = np.nansum(m, axis=0) * self.dv
