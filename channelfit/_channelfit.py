@@ -206,15 +206,13 @@ class ChannelFit():
             subv = ((np.arange(nsubv) + 0.5) / nsubv - 0.5) * self.dv
             xmajor = np.add.outer(suby, self.xmajor - offmajor)
             xminor = np.add.outer(subx, self.xminor - offminor * deproj)
-            v = self.v_valid
-            m = [None] * (nv := len(v))
-            for i in range(nv):
-                vmodel = modelvlos(xmajor, xminor, Mstar, Rc)
-                vsub = np.add.outer(subv, v[i] - offvsys - vmodel)
-                m[i] = np.exp(-vsub**2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
-                m[i] = np.max(m[i], axis=(0, 1))  # subv and (subx, suby)
-                m[i] = convolve(m[i], gaussbeam, mode='same')
-            m = np.array(m)
+            vmodel = modelvlos(xmajor, xminor, Mstar, Rc)  # subxy, y, x
+            v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, subxy, y, x
+            v = np.add.outer(subv, v)  # subv, v, subxy, y, x
+            m = np.exp(-v**2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
+            m = np.mean(m, axis=(0, 2))  # subv and subxy
+            conv2d = lambda x: convolve(x, gaussbeam, mode='same')
+            m = np.apply_along_axis(conv2d, axis=0, arr=m)
             mom0 = np.nansum(m, axis=0) * self.dv
             m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
                          m * self.mom0 / mom0, 0)
