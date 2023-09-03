@@ -173,9 +173,9 @@ class ChannelFit():
 
         def modelvlos(Mstar: float, Rc: float, offmajor: float, offminor:float):
             nsubx = 5
-            dn = (nsubx - 1) * 0.5
-            g = np.linspace(-dn, dn, nsubx) / nsubx
-            subx, suby = [np.ravel(a) for a in np.meshgrid(g, g)]
+            subx = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dx
+            suby = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dy
+            subx, suby = [np.ravel(a) for a in np.meshgrid(subx, suby)]
             dx = subx - offmajor
             dy = (suby - offminor) * deproj
             xmajor = np.add.outer(dx, self.xmajor)
