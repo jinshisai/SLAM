@@ -41,8 +41,7 @@ def irot(s, t, pa):
 def boxgauss(v_over_cs: np.ndarray, dv_over_cs: float) -> np.ndarray:
     clipsigma = 3. + dv_over_cs
     dv = min([2, dv_over_cs]) / 10.
-    ndvhalf = int(dv_over_cs / 2. / dv + 0.5)
-    ndv = 2 * ndvhalf + 1
+    ndv = 2 * int(dv_over_cs / 2. / dv + 0.5) + 1
     n = 2 * int(clipsigma / dv + 0.5) + 1
     v = np.linspace(-clipsigma, clipsigma, n)
     g = np.exp(-0.5 * v**2)
