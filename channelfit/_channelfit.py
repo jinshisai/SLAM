@@ -172,14 +172,8 @@ class ChannelFit():
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
 
         def modelvlos(Mstar: float, Rc: float, offmajor: float, offminor:float):
-            nsubx = nsubpixel
-            subx = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dx
-            suby = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dy
-            subx, suby = [np.ravel(a) for a in np.meshgrid(subx, suby)]
-            dx = subx - offmajor
-            dy = (suby - offminor) * deproj
-            xmajor = np.add.outer(dx, self.xmajor)
-            xminor = np.add.outer(dy, self.xminor)
+            xmajor = self.xmajor - offmajor
+            xminor = self.xminor - offminor * deproj
             rdisk = np.hypot(xmajor, xminor)
             vkep = vunit * np.sqrt(Mstar / rdisk)
             vjrot = vunit * np.sqrt(Mstar * Rc) / rdisk
@@ -208,11 +202,15 @@ class ChannelFit():
             Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
             v = self.v_valid
             m = [None] * len(v)
-            nsubv = nsubpixel
+            nsubv = nsubx = nsuby = nsubpixel
+            subx = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dx * deproj
+            suby = ((np.arange(nsuby) + 0.5) / nsuby - 0.5) * self.dy
+            subx, suby = [np.ravel(a) for a in np.meshgrid(subx, suby)]
             subv = ((np.arange(nsubv) + 0.5) / nsubv - 0.5) * self.dv
             for i in range(len(v)):
-                vmodel = modelvlos(Mstar, Rc, offmajor, offminor)
-                vsub = np.add.outer(subv, v[i] - offvsys - vmodel)
+                vmodel = [modelvlos(Mstar, Rc, offmajor + dy, offminor + dx)
+                          for dx, dy in zip(subx, suby)]
+                vsub = np.add.outer(subv, v[i] - offvsys - np.array(vmodel))
                 m[i] = np.exp(-vsub**2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
                 m[i] = np.max(m[i], axis=(0, 1))  # subv and (subx, suby)
                 m[i] = convolve(m[i], gaussbeam, mode='same')
