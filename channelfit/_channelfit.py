@@ -44,7 +44,7 @@ def convolvedprofile(v_over_cs: np.ndarray, dv_over_cs: float) -> np.ndarray:
     n = len(v) - 1
     g = np.exp(-0.5 * v**2)
     g /= np.sum(g)
-    b = ((-0.5 * dv_over_cs <= v) * (v <= 0.5 * dv_over_cs)).astype('int')
+    b = ((-0.5 * dv_over_cs <= v) * (v <= 0.5 * dv_over_cs)).astype('float')
     b /= np.sum(b)
     p = fftconvolve(g, b, mode='same')
     iv = ((v_over_cs / 5 + 1) * 0.5 * n).astyep('int')
