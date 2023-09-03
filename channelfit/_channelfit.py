@@ -172,10 +172,10 @@ class ChannelFit():
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
 
         def modelvlos(Mstar: float, Rc: float, offmajor: float, offminor:float):
-            n = np.linspace(-1, 1, 3)
-            subx, suby = np.meshgrid(n, n)
-            subx = np.ravel(subx) / 3.
-            suby = np.ravel(suby) / 3.
+            nsubx = 5
+            dn = (nsubx - 1) * 0.5
+            g = np.linspace(-dn, dn, nsubx) / nsubx
+            subx, suby = [np.ravel(a) for a in np.meshgrid(g, g)]
             dx = subx - offmajor
             dy = (suby - offminor) * deproj
             xmajor = np.add.outer(dx, self.xmajor)
