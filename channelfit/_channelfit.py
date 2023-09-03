@@ -44,8 +44,8 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     dv = np.min(v[1:] - v[:-1])
     mom0 = np.sum(d, axis=0) * dv
     sigma_mom0 = sigma * dv * np.sqrt(len(d))
-    vv = np.broadcast_to(v, np.shape(d)[::-1])
-    vv = np.moveaxis(vv, 2, 0)
+    #vv = np.broadcast_to(v, np.shape(d)[::-1])
+    vv = np.moveaxis([[vv]], 2, 0)
     dmasked[dmasked < 3 * sigma] = 0
     mom1 = np.sum(d * vv, axis=0) / np.sum(d, axis=0)
     mom2 = np.sqrt(np.sum(d * (vv - mom1)**2, axis=0), np.sum(d, axis=0))
@@ -211,8 +211,7 @@ class ChannelFit():
             v = np.add.outer(subv, v)  # subv, v, subxy, y, x
             m = np.exp(-v**2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
             m = np.mean(m, axis=(0, 2))  # subv and subxy
-            m = fftconvolve(m, np.expand_dims(gaussbeam, axis=0),
-                            mode='same', axes=(1, 2))
+            m = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
             mom0 = np.nansum(m, axis=0) * self.dv
             m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
                          m * self.mom0 / mom0, 0)
