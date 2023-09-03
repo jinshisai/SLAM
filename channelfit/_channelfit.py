@@ -214,7 +214,7 @@ class ChannelFit():
             #m = fftconvolve(m, np.expand_dims(gaussbeam, axis=0),
             #                mode='same', axes=(1, 2))
             for i in range(len(m)):
-                m[i] = convolve(m, gaussbeam, mode='same')
+                m[i] = convolve(m[i], gaussbeam, mode='same')
             mom0 = np.nansum(m, axis=0) * self.dv
             m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
                          m * self.mom0 / mom0, 0)
