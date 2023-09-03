@@ -40,14 +40,15 @@ def irot(s, t, pa):
 
 def convolvedprofile(v_over_cs: np.ndarray, dv_over_cs: float) -> np.ndarray:
     dv = min([2, dv_over_cs]) * 0.1
-    v = np.linspace(-5, 5, int(10 / dv + 0.5) + 1)
+    clipsigma = 3
+    v = np.linspace(-clipsigma, clipsigma, int(2 * clipsigma / dv + 0.5) + 1)
     n = len(v) - 1
     g = np.exp(-0.5 * v**2)
-    g /= np.sum(g)
+    #g /= np.sum(g)
     b = ((-0.5 * dv_over_cs <= v) * (v <= 0.5 * dv_over_cs)).astype('float')
-    b /= np.sum(b)
+    #b /= np.sum(b)
     p = fftconvolve(g, b, mode='same')
-    iv = ((v_over_cs / 5 + 1).clip(0, 2) * 0.5 * n).astype('int')
+    iv = ((v_over_cs / clipsigma + 1).clip(0, 2) * 0.5 * n).astype('int')
     p = np.where((iv == 0) | (iv == n), 0, p[iv])
     return p
     
