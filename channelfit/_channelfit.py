@@ -38,7 +38,7 @@ def irot(s, t, pa):
     y = -s * np.sin(pa) + t * np.cos(pa)  # along Dec. axis
     return np.array([x, y])
 
-def convolvedprofile(v_over_cs: np.ndarray, dv_over_cs: float) -> np.ndarray:
+def boxgauss(v_over_cs: np.ndarray, dv_over_cs: float) -> np.ndarray:
     dv = min([2, dv_over_cs]) * 0.1
     clipsigma = 5
     v = np.linspace(-clipsigma, clipsigma, int(2 * clipsigma / dv + 0.5) + 1)
@@ -219,7 +219,7 @@ class ChannelFit():
             xminor = np.add.outer(subx, self.xminor - offminor * deproj)  # subxy, y, x
             vmodel = modelvlos(xmajor, xminor, Mstar, Rc)  # subxy, y, x
             v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, subxy, y, x
-            m = convolvedprofile(v / cs, self.dv / cs)  # v, subxy, y, x
+            m = boxgauss(v / cs, self.dv / cs)  # v, subxy, y, x
             m = np.mean(m, axis=1)  # v, y, x
             m = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
             mom0 = np.nansum(m, axis=0) * self.dv
