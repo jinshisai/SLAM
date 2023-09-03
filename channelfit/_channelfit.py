@@ -171,7 +171,7 @@ class ChannelFit():
         self.signmajor = np.sign(np.nansum(self.mom1 * xmajor))
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
 
-        def modelvlos(xmajor: np.ndarray, xminor: np.narray,
+        def modelvlos(xmajor: np.ndarray, xminor: np.ndarray,
                       Mstar: float, Rc: float):
             rdisk = np.hypot(xmajor, xminor)
             vkep = vunit * np.sqrt(Mstar / rdisk)
