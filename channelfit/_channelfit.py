@@ -171,9 +171,8 @@ class ChannelFit():
         self.signmajor = np.sign(np.nansum(self.mom1 * xmajor))
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
 
-        def modelvlos(Mstar: float, Rc: float, offmajor: float, offminor:float):
-            xmajor = self.xmajor - offmajor
-            xminor = self.xminor - offminor * deproj
+        def modelvlos(xmajor: np.ndarray, xminor: np.narray,
+                      Mstar: float, Rc: float):
             rdisk = np.hypot(xmajor, xminor)
             vkep = vunit * np.sqrt(Mstar / rdisk)
             vjrot = vunit * np.sqrt(Mstar * Rc) / rdisk
@@ -200,17 +199,18 @@ class ChannelFit():
                       offmajor: float, offminor: float, offvsys: float):
             #cs = self.mom2
             Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
-            v = self.v_valid
-            m = [None] * len(v)
             nsubv = nsubx = nsuby = nsubpixel
             subx = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dx * deproj
             suby = ((np.arange(nsuby) + 0.5) / nsuby - 0.5) * self.dy
             subx, suby = [np.ravel(a) for a in np.meshgrid(subx, suby)]
             subv = ((np.arange(nsubv) + 0.5) / nsubv - 0.5) * self.dv
-            for i in range(len(v)):
-                vmodel = [modelvlos(Mstar, Rc, offmajor + dy, offminor + dx)
-                          for dx, dy in zip(subx, suby)]
-                vsub = np.add.outer(subv, v[i] - offvsys - np.array(vmodel))
+            xmajor = np.add.outer(suby, self.xmajor - offmajor)
+            xminor = np.add.outer(subx, self.xminor - offminor * deproj)
+            v = self.v_valid
+            m = [None] * (nv := len(v))
+            for i in range(nv):
+                vmodel = modelvlos(xmajor, xminor, Mstar, Rc)
+                vsub = np.add.outer(subv, v[i] - offvsys - vmodel)
                 m[i] = np.exp(-vsub**2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
                 m[i] = np.max(m[i], axis=(0, 1))  # subv and (subx, suby)
                 m[i] = convolve(m[i], gaussbeam, mode='same')
