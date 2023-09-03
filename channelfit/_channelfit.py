@@ -239,7 +239,6 @@ class ChannelFit():
             
         def cubemodel(logMstar: float, logRc: float, logcs: float,
                       offmajor: float, offminor: float, offvsys: float):
-            global xmajor, xminor
             Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
             if offmajor_fixed is None:
                 xmajor = np.add.outer(suby, self.xmajor - offmajor)
