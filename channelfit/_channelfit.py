@@ -138,7 +138,7 @@ class ChannelFit():
                    pa: float = 0, incl: float = 90, dist: float = 1,
                    center: str = None, vsys: float = 0,
                    rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
-                   sigma: float = None):
+                   sigma: float = None, nsubpixel: int = 5):
         if not (cubefits is None):
             self.read_cubefits(cubefits, center, dist, vsys,
                                rmax, rmax, vlim[0], vlim[3], sigma)
@@ -172,7 +172,7 @@ class ChannelFit():
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
 
         def modelvlos(Mstar: float, Rc: float, offmajor: float, offminor:float):
-            nsubx = 5
+            nsubx = nsubpixel
             subx = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dx
             suby = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dy
             subx, suby = [np.ravel(a) for a in np.meshgrid(subx, suby)]
@@ -208,14 +208,13 @@ class ChannelFit():
             Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
             v = self.v_valid
             m = [None] * len(v)
-            nsubv = 5
+            nsubv = nsubpixel
             subv = ((np.arange(nsubv) + 0.5) / nsubv - 0.5) * self.dv
             for i in range(len(v)):
                 vmodel = modelvlos(Mstar, Rc, offmajor, offminor)
                 vsub = np.add.outer(subv, v[i] - offvsys - vmodel)
                 m[i] = np.exp(-vsub**2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
-                m[i] = np.max(m[i], axis=1)  # subx and suby
-                m[i] = np.mean(m[i], axis=0)  # subv
+                m[i] = np.max(m[i], axis=(0, 1))  # subv and (subx, suby)
                 m[i] = convolve(m[i], gaussbeam, mode='same')
             m = np.array(m)
             mom0 = np.nansum(m, axis=0) * self.dv
