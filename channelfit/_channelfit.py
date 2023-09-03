@@ -242,7 +242,7 @@ class ChannelFit():
                  - np.nanpercentile(self.mom1, 5)) / 2.
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
                           vmin=-vplot, vmax=vplot)
-        fig.colorbar(m, ax=ax, label='km/s')
+        fig.colorbar(m, ax=ax, label=r'Model mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         if pa is not None:
             r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
@@ -267,7 +267,7 @@ class ChannelFit():
                  - np.nanpercentile(self.mom1, 5)) / 2.
         m = ax.pcolormesh(self.x, self.y, self.mom1, cmap='jet',
                           vmin=-vplot, vmax=vplot)
-        fig.colorbar(m, ax=ax, label='km/s')
+        fig.colorbar(m, ax=ax, label=r'Obs. mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
         if pa is not None:
             r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
@@ -299,7 +299,7 @@ class ChannelFit():
         ax = fig.add_subplot(1, 1, 1)
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
                           vmin=-self.dv * 3, vmax=self.dv * 3)
-        fig.colorbar(m, ax=ax, label='km/s')
+        fig.colorbar(m, ax=ax, label=r'Obs. $-$ model mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         if pa is not None:
             r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
