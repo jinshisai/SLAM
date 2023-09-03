@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy import constants, units, wcs
 from astropy.coordinates import SkyCoord
-from scipy.signal import convolve
+from scipy.signal import convolve2d
 import warnings
 from tqdm import tqdm
 from utils import emcee_corner
@@ -211,8 +211,7 @@ class ChannelFit():
             v = np.add.outer(subv, v)  # subv, v, subxy, y, x
             m = np.exp(-v**2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
             m = np.mean(m, axis=(0, 2))  # subv and subxy
-            conv2d = lambda x: convolve(x, gaussbeam, mode='same')
-            m = np.apply_over_axes(conv2d, a=m, axis=(1, 2))
+            m = convolve2d(m, np.expand_dims(gaussbeam, axis=0), mode='same')
             mom0 = np.nansum(m, axis=0) * self.dv
             m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
                          m * self.mom0 / mom0, 0)
