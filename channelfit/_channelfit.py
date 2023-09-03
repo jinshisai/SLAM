@@ -44,7 +44,6 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     dv = np.min(v[1:] - v[:-1])
     mom0 = np.sum(d, axis=0) * dv
     sigma_mom0 = sigma * dv * np.sqrt(len(d))
-    #vv = np.broadcast_to(v, np.shape(d)[::-1])
     vv = np.moveaxis([[v]], 2, 0)
     dmasked[dmasked < 3 * sigma] = 0
     mom1 = np.sum(d * vv, axis=0) / np.sum(d, axis=0)
