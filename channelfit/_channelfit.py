@@ -48,9 +48,9 @@ def boxgauss(v_over_cs: np.ndarray, dv_over_cs: float) -> np.ndarray:
     g = np.exp(-0.5 * v**2)
     #g /= np.sum(g)
     p = np.sum([g[i::ndv] for i in range(ndv)], axis=0)[:-ndv + 1]
-    n = n - ndv + 1
-    n0 = (n - 1) // 2
-    iv = (np.round(v_over_cs / dv) + n0).astype('int').clip(0, n - 1)
+    n = n - ndv
+    n0 = n // 2
+    iv = (np.round(v_over_cs / dv) + n0).astype('int').clip(0, n)
     #b = ((-0.5 * dv_over_cs <= v) * (v <= 0.5 * dv_over_cs)).astype('float')
     #b /= np.sum(b)
     #p = fftconvolve(g, b, mode='same')
