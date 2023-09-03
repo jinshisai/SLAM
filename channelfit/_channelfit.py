@@ -263,7 +263,7 @@ class ChannelFit():
             mom0 = np.nansum(m, axis=0) * self.dv
             m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
                          m * self.mom0 / mom0, 0)
-            return prof
+            return m
         self.cubemodel = cubemodel
 
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
