@@ -212,7 +212,7 @@ class ChannelFit():
             m = np.exp(-v**2 / 2 / cs**2) / np.sqrt(2 * np.pi) / cs
             m = np.mean(m, axis=(0, 2))  # subv and subxy
             conv2d = lambda x: convolve(x, gaussbeam, mode='same')
-            m = np.apply_along_axis(conv2d, axis=0, arr=m)
+            m = np.apply_over_axes(conv2d, a=m, axis=(1, 2))
             mom0 = np.nansum(m, axis=0) * self.dv
             m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
                          m * self.mom0 / mom0, 0)
