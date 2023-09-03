@@ -208,7 +208,8 @@ class ChannelFit():
             Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
             v = self.v_valid
             m = [None] * len(v)
-            subv = ((np.arange(3) + 0.5) / 3 - 0.5) * self.dv
+            nsubv = 5
+            subv = ((np.arange(nsubv) + 0.5) / nsubv - 0.5) * self.dv
             for i in range(len(v)):
                 vmodel = modelvlos(Mstar, Rc, offmajor, offminor)
                 vsub = np.add.outer(subv, v[i] - offvsys - vmodel)
