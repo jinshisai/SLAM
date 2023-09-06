@@ -153,9 +153,12 @@ class ChannelFit():
                                rmax, rmax, vlim[0], vlim[3], sigma)
             self.fitsname = cubefits
             v = self.v
+        self.cospa = np.cos(np.radians(pa))
+        self.sinpa = np.sin(np.radians(pa))
+        self.sini = np.sin(np.radians(incl))
         self.X, self.Y = np.meshgrid(self.x, self.y)
-        xminor, xmajor = rot(self.X, self.Y, np.radians(pa))
-        self.deproj = 1 / np.cos(np.radians(incl))
+        xminor, xmajor = rot(self.X, self.Y, pa)
+        self.deproj = 1 / np.cos(self.incl)
         xminor = xminor * self.deproj
         self.xminor, self.xmajor = xminor, xmajor
         
@@ -183,7 +186,8 @@ class ChannelFit():
         # x and y are major and minor axis coordinates before projection.
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         npix = max([len(self.x), len(self.y)])
-        npixnest = 2**(int(np.log2(npix)) + 1)
+        npixnest = int(2**(np.ceil(np.log2(npix)) + 1))
+        self.npixnest = npixnest
         if npix % 2 == 1: npix += 1
         self.i0nest = npix // 2 - npixnest // 4
         s = (np.arange(npix) - npix // 2 + 0.5) * dpix
@@ -193,8 +197,8 @@ class ChannelFit():
         Xnest = [X]
         Ynest = [Y]
         Rnest = [np.hypot(X, Y)]
-        
-        for l in range(3):
+        self.nlayer = 4
+        for l in range(self.nlayer - 1):
             n = npixnest // 2 + 0.5
             s = np.linspace(-n, n, npixnest) * dpix / 2**(l + 1)
             X, Y = np.meshgrid(s, s)
@@ -203,6 +207,11 @@ class ChannelFit():
             Xnest.append(X)
             Ynest.append(Y)
             Rnest.append(np.hypot(X, Y))
+        self.xnest = xnest
+        self.ynest = ynest
+        self.Xnest = Xnest
+        self.Ynest = Ynest
+        self.Rnest = Rnest
         print('-------- nested grid --------')
         for l in range(len(xnest)):
             n = npix if l == 0 else npixnest
@@ -210,53 +219,19 @@ class ChannelFit():
                   + f' {xnest[l][1]-xnest[l][0]:.2f} au,'
                   + f' {n:d}')
         print('-----------------------------')
-        
-        def nestmodel(logMstar: float, logRc: float, logcs: float,
-                      offmajor: float, offminor: float, offvsys: float,
-                      ) -> np.ndarray:
-            Mstar = 10**logMstar
-            Rc = 10**logRc
-            cs = 10**logcs
-            prof, n_prof, dv_prof = boxgauss(self.dv / cs)
-            intensity = []
-            for r, x, y in zip(Rnest, Xnest, Ynest):
-                vkep = vunit * np.sqrt(Mstar / r)
-                vjrot = vunit * np.sqrt(Mstar * Rc) / r
-                vr = -vunit * np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
-                vr[r < Rc] = 0
-                vrot = np.where(r < Rc, vkep, vjrot)
-                vlos = (vrot * y * self.signmajor 
-                        + vr * x * self.signminor) / r
-                vlos = vlos * np.sin(np.radians(incl))
-                v = np.subtract.outer(self.v_valid, vlos + offvsys)  # v, y, x
-                iv = np.round(v / cs / dv_prof) + n_prof // 2
-                iv = iv.astype('int').clip(0, n_prof)
-                m = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])  # v, y, x
-                intensity.append(m)
-            i0 = npixnest // 4
-            i1 = i0 + npixnest // 2
-            for l in range(len(intensity) - 2):
-                a = intensity[-1 - l]
-                a = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
-                     + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
-                intensity[-2 - l][:, i0:i1, i0:i1] = a
-            a = intensity[1]
-            a = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
-                     + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
-            i0 = self.i0nest
-            i1 = i0 + npixnest // 2
-            intensity[0][:, i0:i1, i0:i1] = a
-            m = intensity[0]
-            intensity = [None] * len(m)
-            y = self.xmajor - offmajor
-            x = self.xminor - offminor * self.deproj
-            for i, mm in zip(range(len(m)), m):
-                interp = RGI((ynest[0], xnest[0]), mm,
-                             bounds_error=False, fill_value=0)
-                intensity[i] = interp((y, x))
-            intensity = np.array(intensity) / np.max(intensity)
-            return intensity
-        self.nestmodel = nestmodel
+
+        def getvlos(Mstar: float, Rc: float,
+                    r: np.ndarray, x: np.ndarray, y: np.ndarray):
+            vkep = vunit * np.sqrt(Mstar / r)
+            vjrot = vunit * np.sqrt(Mstar * Rc) / r
+            vr = -vunit * np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
+            vr[r < Rc] = 0
+            vrot = np.where(r < Rc, vkep, vjrot)
+            vlos = (vrot * y * self.signmajor 
+                    + vr * x * self.signminor) / r
+            vlos = vlos * self.sini
+            return vlos
+        self.getvlos = getvlos
                         
     def fitting(self, Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
@@ -285,16 +260,50 @@ class ChannelFit():
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
         pixperbeam = np.sum(gaussbeam)
         gaussbeam = gaussbeam / pixperbeam
+
+        def avefour(a: np.ndarray) -> np.ndarray:
+            b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
+                 + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
+            return b
+                
+        if cs_fixed is not None:            
+            prof0, n_prof0, dv_prof0 = boxgauss(self.dv / cs_fixed)
             
         def cubemodel(logMstar: float, logRc: float, logcs: float,
                       offmajor: float, offminor: float, offvsys: float):
-            m = self.nestmodel(logMstar, logRc, logcs,
-                               offmajor, offminor, offvsys)
-            m = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
-            mom0 = np.nansum(m, axis=0) * self.dv
-            m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
-                         m * self.mom0 / mom0, 0)
-            return m
+            Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
+            if cs_fixed is None:
+                prof, n_prof, dv_prof = boxgauss(self.dv / cs)
+            else:
+                prof, n_prof, dv_prof = prof0, n_prof0, dv_prof0
+            Iout = [None] * self.nlayer
+            for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
+                vlos = self.getvlos(Mstar, Rc, r, x, y)
+                v = np.subtract.outer(self.v_valid, vlos + offvsys)
+                iv = np.round(v / cs / dv_prof) + n_prof // 2
+                iv = iv.astype('int').clip(0, n_prof)
+                Iout[i] = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
+            i0 = self.npixnest // 4
+            i1 = i0 + self.npixnest // 2
+            for l in range(self.nlayer - 1, 2, -1):
+                Iout[l - 1][:, i0:i1, i0:i1] = avefour(Iout[l])
+            i0 = self.i0nest
+            i1 = i0 + self.npixnest // 2
+            Iout[0][:, i0:i1, i0:i1] = avefour(Iout[1])
+            Iout = Iout[0]
+            y = self.xmajor - offmajor
+            x = self.xminor - offminor * self.deproj
+            m = [None] * (nv := len(Iout))
+            for i, c in zip(range(nv), Iout):
+                interp = RGI((self.ynest[0], self.xnest[0]), c,
+                             bounds_error=False, fill_value=0)
+                m[i] = interp((y, x))
+            #intensity = np.array(intensity) / np.max(intensity)
+            Iout = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
+            mom0 = np.nansum(Iout, axis=0) * self.dv
+            Iout = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
+                            Iout * self.mom0 / mom0, 0)
+            return Iout
         self.cubemodel = cubemodel
 
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
@@ -425,10 +434,8 @@ class ChannelFit():
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         if pa is not None:
             r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
-            ax.plot(r * np.sin(np.radians(pa)), r * np.cos(np.radians(pa)),
-                    'k:')
-            ax.plot(r * np.cos(np.radians(pa)), -r * np.sin(np.radians(pa)),
-                    'k:')
+            ax.plot(r * self.sinpa, r * self.cospa, 'k:')
+            ax.plot(r * self.cospa, -r * self.sinpa,'k:')
         ax.set_xlabel('R.A. offset (au)')
         ax.set_ylabel('Dec. offset (au)')
         ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
@@ -450,10 +457,8 @@ class ChannelFit():
         ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
         if pa is not None:
             r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
-            ax.plot(r * np.sin(np.radians(pa)), r * np.cos(np.radians(pa)),
-                    'k:')
-            ax.plot(r * np.cos(np.radians(pa)), -r * np.sin(np.radians(pa)),
-                    'k:')
+            ax.plot(r * self.sinpa, r * self.cospa, 'k:')
+            ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
         ax.set_xlabel('R.A. offset (au)')
         ax.set_ylabel('Dec. offset (au)')
         ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
@@ -482,10 +487,8 @@ class ChannelFit():
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         if pa is not None:
             r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
-            ax.plot(r * np.sin(np.radians(pa)), r * np.cos(np.radians(pa)),
-                    'k:')
-            ax.plot(r * np.cos(np.radians(pa)), -r * np.sin(np.radians(pa)),
-                    'k:')
+            ax.plot(r * self.sinpa, r * self.cospa, 'k:')
+            ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
         ax.set_xlabel('R.A. offset (au)')
         ax.set_ylabel('Dec. offset (au)')
         ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
