@@ -231,7 +231,7 @@ class ChannelFit():
                     + vr * xminor * self.signminor) / r
             vlos = vlos * np.sin(np.radians(incl))
             interp = RGI(points=(self.theta, self.lnr), values=vlos)
-            vmodel = interp(theta, lnr)
+            vmodel = interp((theta, lnr))
             return vmodel
         self.polarvlos = polarvlos
                         
