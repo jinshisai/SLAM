@@ -160,7 +160,7 @@ class ChannelFit():
         self.sini = np.sin(i)
         self.deproj = 1 / np.cos(i)
         self.X, self.Y = np.meshgrid(self.x, self.y)
-        xminor, xmajor = rot(self.X, self.Y, pa)
+        xminor, xmajor = rot(self.X, self.Y, p)
         xminor = xminor * self.deproj
         self.xminor, self.xmajor = xminor, xmajor
         
