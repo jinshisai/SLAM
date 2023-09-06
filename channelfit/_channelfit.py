@@ -187,12 +187,14 @@ class ChannelFit():
 
         # log R polar grid (with incl=0)
         npix = max([len(self.x), len(self.y)])
-        nr = int(npix * np.sqrt(np.log(npix) / 2. / np.pi) + 0.5)
-        dlnr = np.log(npix) / (nr - 1)
-        dtheta = dlnr
-        ntheta = int(2 * np.pi / dtheta + 0.5)
+        xmax = max([np.max(np.abs(self.x)), np.max(np.abs(self.y))])
+        lnrmax = np.log(xmax)
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         lnrmin = np.log(dpix / 2.)
+        nr = int(npix * np.sqrt(np.log(npix) / 2. / np.pi) + 0.5)
+        dlnr = (lnrmax - lnrmin) / (nr - 1)
+        dtheta = dlnr
+        ntheta = int(2 * np.pi / dtheta + 0.5)
         lnr = lnrmin + np.arange(nr) * dlnr
         theta = np.linspace(-np.pi - dtheta/2., np.pi + dtheta/2., ntheta + 1)
         self.lnr, self.theta = lnr, theta
@@ -200,7 +202,7 @@ class ChannelFit():
         r = np.exp(self.lnr) / dpix
         rdt = (r[1:] + r[:-1]) / 2. * dtheta
         dr = r[1:] - r[:-1]
-        print(f'   Npix    = {npix:d}')
+        print(f'Npix, size = {npix:d}, {dpix:.2f} au')
         print(f'    r      = {r[0]:.2f}, {r[1]:.2f}, {r[2]:.2f},...,{r[-3]:.2f}, {r[-2]:.2f}, {r[-1]:.2f} pixel.')
         print(f'   dr      = {dr[0]:.2f}, {dr[1]:.2f}, {dr[2]:.2f},...,{dr[-3]:.2f}, {dr[-2]:.2f}, {dr[-1]:.2f} pixel.')
         print(f'r * dtheta = {rdt[0]:.2f}, {rdt[1]:.2f}, {rdt[2]:.2f},...,{rdt[-3]:.2f}, {rdt[-2]:.2f}, {rdt[-1]:.2f} pixel.')
