@@ -201,8 +201,8 @@ class ChannelFit():
             Rnest.append(np.hypot(X, Y))
         print('-------- nested grid --------')
         for l in range(len(xnest)):
-            print(f'x, dx: +/-{xnest[l][-1]:.3f},'
-                  + f' {xnest[l][1]-xnest[l][0]:.3f} au')
+            print(f'x, dx: +/-{xnest[l][-1]:.2f},'
+                  + f' {xnest[l][1]-xnest[l][0]:.2f} au')
         print('-----------------------------')
         
         def nestmodel(logMstar: float, logRc: float, logcs: float,
