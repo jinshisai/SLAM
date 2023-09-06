@@ -135,9 +135,9 @@ class ChannelFit():
         else:
             bmaj, bmin, bpa = dy, -dx, 0
             print('No valid beam in the FITS file.')
-        self.x, self.dx = x, dx
-        self.y, self.dy = y, dy
-        self.v, self.dv = v, dv
+        self.x, self.dx, self.nx = x, dx, len(x)
+        self.y, self.dy, self.ny = y, dy, len(y)
+        self.v, self.dv, self.nv = v, dv, len(v)
         self.data, self.header, self.sigma = d, h, sigma
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
@@ -254,7 +254,9 @@ class ChannelFit():
                 mm = np.ravel(mm)
                 i2d = np.zeros_like(self.X)
                 for k in range(len(ix)):
-                    i2d[iy[k], ix[k]] += mm[k] * r[k]**2
+                    jj, ii = iy[k], ix[k]
+                    if 0 <= jj < self.ny and 0 <= ii < self.nx:
+                        i2d[jj, ii] += mm[k] * r[k]**2
                 intensity[i] = i2d
             intensity = np.array(intensity) / np.max(intensity)
             return intensity
