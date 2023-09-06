@@ -211,7 +211,7 @@ class ChannelFit():
             return vlos
         self.modelvlos = modelvlos
 
-        def polarvlos(logMstar: float, logRc: float) -> function:
+        def polarvlos(logMstar: float, logRc: float):
             lnMstar = logMstar * np.log(10)
             lnRc = logRc * np.log(10)
             lnr = self.lnr2d
