@@ -211,26 +211,28 @@ class ChannelFit():
             return vlos
         self.modelvlos = modelvlos
 
-        def polarvlos(logMstar: float, logRc: float):
+        def polarvlos(logMstar: float, logRc: float,
+                      lnr: np.ndarray, theta: np.ndarray) -> np.ndarray:
             lnMstar = logMstar * np.log(10)
             lnRc = logRc * np.log(10)
-            lnr = self.lnr2d
-            r = np.exp(lnr)
-            lnvkep = lnvunit + 0.5 * (lnMstar - lnr)
-            lnvjrot = lnvunit + 0.5 * (lnMstar + lnRc) - lnr
-            lnvrot = np.where(lnr < lnRc, lnvkep, lnvjrot)
+            #lnr = self.lnr2d
+            r = np.exp(self.lnr2d)
+            lnvkep = lnvunit + 0.5 * (lnMstar - self.lnr2d)
+            lnvjrot = lnvunit + 0.5 * (lnMstar + lnRc) - self.lnr2d
+            lnvrot = np.where(self.lnr2d < lnRc, lnvkep, lnvjrot)
             vrot = np.exp(lnvrot)
-            lnvr = lnvunit + 0.5 * (lnMstar - lnr) \
+            lnvr = lnvunit + 0.5 * (lnMstar - self.lnr2d) \
                    + 0.5 * np.log(2 - np.exp(lnRc) / r)
             vr = -np.exp(lnvr)
-            vr[lnr < lnRc] = 0
+            vr[self.lnr2d < lnRc] = 0
             xmajor = r * np.cos(self.theta2d)
             xminor = r * np.sin(self.theta2d)
             vlos = (vrot * xmajor * self.signmajor 
                     + vr * xminor * self.signminor) / r
             vlos = vlos * np.sin(np.radians(incl))
             interp = RGI((self.theta, self.lnr), vlos)
-            return interp
+            vmodel = interp(theta, lnr)
+            return vmodel
         self.polarvlos = polarvlos
                         
     def fitting(self, Mstar_range: list = [0.01, 10],
@@ -294,7 +296,7 @@ class ChannelFit():
                 prof, n_prof, dv_prof = prof0, n_prof0, dv_prof0
             #vmodel = self.modelvlos(xmajor, xminor, Mstar, Rc)  # subxy, y, x
             #v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, subxy, y, x
-            vmodel = self.polarvlos(logMstar, logRc)(theta, lnr)  # y, x
+            vmodel = self.polarvlos(logMstar, logRc, lnr, theta)  # y, x
             v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, y, x
             iv = np.round(v / cs / dv_prof) + n_prof // 2
             iv = iv.astype('int').clip(0, n_prof)
