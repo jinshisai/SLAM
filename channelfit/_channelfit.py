@@ -182,8 +182,9 @@ class ChannelFit():
         # 2d nested grid on the disk plane. x and y are major and minor axis coordinates before projection.
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         npix = max([len(self.x), len(self.y)])
+        npixnest = 64
         if npix % 2 == 1: npix += 1
-        self.i0nest = npix // 2 - 16
+        self.i0nest = npix // 2 - npixnest // 4
         s = (np.arange(npix) - npix // 2 + 0.5) * dpix
         X, Y = np.meshgrid(s, s)
         xnest = [s]
@@ -192,7 +193,8 @@ class ChannelFit():
         Ynest = [Y]
         Rnest = [np.hypot(X, Y)]
         for l in range(4):
-            s = np.linspace(-32.5, 32.5, 64) * dpix / 2**(l + 1)
+            s = np.linspace(-npixnest // 2 - 0.5,
+                            npixnest // 2 + 0.5, npixnest) * dpix / 2**(l + 1)
             X, Y = np.meshgrid(s, s)
             xnest.append(s)
             ynest.append(s)
