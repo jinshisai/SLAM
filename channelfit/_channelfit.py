@@ -296,11 +296,11 @@ class ChannelFit():
             y = self.xmajor - offmajor
             x = self.xminor - offminor * self.deproj
             m = [None] * (nv := len(Iout))
-            for i, c in zip(range(nv), Iout):
+            for i, c in enumerate(Iout):
                 interp = RGI((self.ynest[0], self.xnest[0]), c,
                              bounds_error=False, fill_value=0)
                 m[i] = interp((y, x))
-            #intensity = np.array(intensity) / np.max(intensity)
+            #m = np.array(m) / np.max(m)
             Iout = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
             mom0 = np.nansum(Iout, axis=0) * self.dv
             Iout = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
