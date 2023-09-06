@@ -191,11 +191,18 @@ class ChannelFit():
         dlnr = np.log(npix) / (nr - 1)
         dtheta = dlnr
         ntheta = int(2 * np.pi / dtheta + 0.5)
+        dpix = min([np.abs(self.dx), np.abs(self.dy)])
         lnrmin = np.log(min([np.abs(self.dx), np.abs(self.dy)]))
         lnr = lnrmin + np.arange(nr) * dlnr
         theta = np.linspace(-np.pi - dtheta/2., np.pi + dtheta/2., ntheta + 1)
         self.lnr, self.theta = lnr, theta
         self.lnr2d, self.theta2d = np.meshgrid(lnr, theta)
+        r = np.exp(self.lnr)
+        rdt = r * dtheta
+        dr = (r[1:] - r[:-1]) / dpix
+        print(f'dr = {dr[0]:.2f}, {dr[1]:.2f}, {dr[2]:.2},...,{dr[-3]:.2}, {dr[-2]:.2}, {dr[-1]:.2} pixel.')
+        print(r'rd$\theta$'+f' = {rdt[0]:.2f}, {rdt[1]:.2f}, {rdt[2]:.2},...,{rdt[-3]:.2}, {rdt[-2]:.2}, {rdt[-1]:.2} pixel.')
+        
         
         def modelvlos(xmajor: np.ndarray, xminor: np.ndarray,
                       Mstar: float, Rc: float) -> np.ndarray:
@@ -269,10 +276,10 @@ class ChannelFit():
         subx = ((np.arange(nsubx) + 0.5) / nsubx - 0.5) * self.dx * self.deproj
         suby = ((np.arange(nsuby) + 0.5) / nsuby - 0.5) * self.dy
         subx, suby = [np.ravel(a) for a in np.meshgrid(subx, suby)]
-        if offmajor_fixed is not None:
-            xmajor0 = np.add.outer(suby, self.xmajor - offmajor_fixed)  # subxy, y, x
-        if offminor_fixed is not None:
-            xminor0 = np.add.outer(subx, self.xminor - offminor_fixed * self.deproj)  # subxy, y, x
+        #if offmajor_fixed is not None:
+        #    xmajor0 = np.add.outer(suby, self.xmajor - offmajor_fixed)  # subxy, y, x
+        #if offminor_fixed is not None:
+        #    xminor0 = np.add.outer(subx, self.xminor - offminor_fixed * self.deproj)  # subxy, y, x
         if cs_fixed is not None:
             prof0, n_prof0, dv_prof0 = boxgauss(self.dv / cs_fixed)
             
