@@ -206,7 +206,7 @@ class ChannelFit():
         for l in range(len(xnest)):
             n = npix if l == 0 else npixnest
             print(f'x, dx: +/-{xnest[l][-1]:.2f},'
-                  + f' {xnest[l][1]-xnest[l][0]:.2f} au'
+                  + f' {xnest[l][1]-xnest[l][0]:.2f} au,'
                   + f' {n:d} pixels')
         print('-----------------------------')
         
