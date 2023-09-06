@@ -287,7 +287,7 @@ class ChannelFit():
                 Iout[i] = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
             i0 = self.npixnest // 4
             i1 = i0 + self.npixnest // 2
-            for l in range(self.nlayer - 1, 2, -1):
+            for l in range(self.nlayer - 1, 1, -1):
                 Iout[l - 1][:, i0:i1, i0:i1] = avefour(Iout[l])
             i0 = self.i0nest
             i1 = i0 + self.npixnest // 2
