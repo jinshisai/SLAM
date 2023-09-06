@@ -17,6 +17,7 @@ from astropy.io import fits
 from astropy import constants, units, wcs
 from astropy.coordinates import SkyCoord
 from scipy.signal import fftconvolve
+from scipy.interpolate import RegularGridInterpolator as RGI
 import warnings
 from tqdm import tqdm
 from utils import emcee_corner
@@ -27,6 +28,7 @@ GG = constants.G.si.value
 M_sun = constants.M_sun.si.value
 au = units.au.to('m')
 vunit = np.sqrt(GG * M_sun / au) * 1e-3
+lnvunit = np.log(vunit)
 
 def rot(x, y, pa):
     s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
@@ -183,8 +185,20 @@ class ChannelFit():
         self.signmajor = np.sign(np.nansum(self.mom1 * xmajor))
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
 
+        # log R polar grid (with incl=0)
+        npix = max([len(self.x), len(self.y)])
+        nr = npix * np.sqrt(np.log(npix) / 2. / np.pi)
+        dlnr = np.log(npix) / (nr - 1)
+        dtheta = dlnr
+        ntheta = 2 * np.pi / dtheta
+        lnrmin = np.log(min([np.abs(self.dx), np.abs(self.dy)]))
+        lnr = lnrmin + np.arange(nr) * dlnr
+        theta = np.linspace(-np.pi - dtheta/2., np.pi + dtheta/2., ntheta + 1)
+        self.lnr, self.theta = lnr, theta
+        self.lnr2d, self.theta2d = np.meshgrid(lnr, theta)
+        
         def modelvlos(xmajor: np.ndarray, xminor: np.ndarray,
-                      Mstar: float, Rc: float):
+                      Mstar: float, Rc: float) -> np.ndarray:
             rdisk = np.hypot(xmajor, xminor)
             vkep = vunit * np.sqrt(Mstar / rdisk)
             vjrot = vunit * np.sqrt(Mstar * Rc) / rdisk
@@ -196,6 +210,28 @@ class ChannelFit():
             vlos = vlos * np.sin(np.radians(incl))
             return vlos
         self.modelvlos = modelvlos
+
+        def polarvlos(logMstar: float, logRc: float) -> function:
+            lnMstar = logMstar * np.log(10)
+            lnRc = logRc * np.log(10)
+            lnr = self.lnr2d
+            r = np.exp(lnr)
+            lnvkep = lnvunit + 0.5 * (lnMstar - lnr)
+            lnvjrot = lnvunit + 0.5 * (lnMstar + lnRc) - lnr
+            lnvrot = np.where(lnr < lnRc, lnvkep, lnvjrot)
+            vrot = np.exp(lnvrot)
+            lnvr = lnvunit + 0.5 * (lnMstar - lnr) \
+                   + 0.5 * np.log(2 - np.exp(lnRc) / r)
+            vr = -np.exp(lnvr)
+            vr[lnr < lnRc] = 0
+            xmajor = r * np.cos(self.theta2d)
+            xminor = r * np.sin(self.theta2d)
+            vlos = (vrot * xmajor * self.signmajor 
+                    + vr * xminor * self.signminor) / r
+            vlos = vlos * np.sin(np.radians(incl))
+            interp = RGI((self.theta, self.lnr), vlos)
+            return interp
+        self.polarvlos = polarvlos
                         
     def fitting(self, Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
@@ -240,20 +276,26 @@ class ChannelFit():
         def cubemodel(logMstar: float, logRc: float, logcs: float,
                       offmajor: float, offminor: float, offvsys: float):
             Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
-            if offmajor_fixed is None:
-                xmajor = np.add.outer(suby, self.xmajor - offmajor)
-            else:
-                xmajor = xmajor0
-            if offminor_fixed is None:
-                xminor = np.add.outer(subx, self.xminor - offminor * self.deproj)
-            else:
-                xminor= xminor0
+            xmajor = self.xmajor - offmajor
+            xminor = self.xminor - offminor * self.deproj
+            lnr = 0.5 * np.log(xmajor**2 + xminor**2)
+            theta = np.arctan2(xminor, xmajor)
+            #if offmajor_fixed is None:
+            #    xmajor = np.add.outer(suby, self.xmajor - offmajor)
+            #else:
+            #    xmajor = xmajor0
+            #if offminor_fixed is None:
+            #    xminor = np.add.outer(subx, self.xminor - offminor * self.deproj)
+            #else:
+            #    xminor= xminor0
             if cs_fixed is None:
                 prof, n_prof, dv_prof = boxgauss(self.dv / cs)
             else:
                 prof, n_prof, dv_prof = prof0, n_prof0, dv_prof0
-            vmodel = self.modelvlos(xmajor, xminor, Mstar, Rc)  # subxy, y, x
-            v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, subxy, y, x
+            #vmodel = self.modelvlos(xmajor, xminor, Mstar, Rc)  # subxy, y, x
+            #v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, subxy, y, x
+            vmodel = self.polarvlos(logMstar, logRc)(theta, lnr)  # y, x
+            v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, y, x
             iv = np.round(v / cs / dv_prof) + n_prof // 2
             iv = iv.astype('int').clip(0, n_prof)
             m = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])  # v, subxy, y, x
