@@ -183,7 +183,7 @@ class ChannelFit():
         # x and y are major and minor axis coordinates before projection.
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         npix = max([len(self.x), len(self.y)])
-        npixnest = 2**int(np.log2(npix))
+        npixnest = 2**(int(np.log2(npix)) + 1)
         if npix % 2 == 1: npix += 1
         self.i0nest = npix // 2 - npixnest // 4
         s = (np.arange(npix) - npix // 2 + 0.5) * dpix
@@ -205,9 +205,9 @@ class ChannelFit():
         print('-------- nested grid --------')
         for l in range(len(xnest)):
             n = npix if l == 0 else npixnest
-            print(f'x, dx: +/-{xnest[l][-1]:.2f},'
+            print(f'x, dx, npix: +/-{xnest[l][-1]:.2f},'
                   + f' {xnest[l][1]-xnest[l][0]:.2f} au,'
-                  + f' {n:d} pixels')
+                  + f' {n:d}')
         print('-----------------------------')
         
         def nestmodel(logMstar: float, logRc: float, logcs: float,
