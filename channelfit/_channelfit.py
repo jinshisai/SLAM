@@ -222,10 +222,12 @@ class ChannelFit():
             return vlos
         self.modelvlos = modelvlos
 
-        def polarvlos(logMstar: float, logRc: float,
-                      lnr: np.ndarray, theta: np.ndarray) -> np.ndarray:
+        def polarmodel(logMstar: float, logRc: float, logcs: float,
+                       lnr: np.ndarray, theta: np.ndarray) -> np.ndarray:
             lnMstar = logMstar * np.log(10)
             lnRc = logRc * np.log(10)
+            Rc = 10**logRc
+            cs = 10**logcs
             #lnr = self.lnr2d
             r = np.exp(self.lnr2d)
             lnvkep = lnvunit + 0.5 * (lnMstar - self.lnr2d)
@@ -233,7 +235,7 @@ class ChannelFit():
             lnvrot = np.where(self.lnr2d < lnRc, lnvkep, lnvjrot)
             vrot = np.exp(lnvrot)
             lnvr = lnvunit + 0.5 * (lnMstar - self.lnr2d) \
-                   + 0.5 * np.log(2 - np.exp(lnRc) / r)
+                   + 0.5 * np.log(2 - Rc / r)
             vr = -np.exp(lnvr)
             vr[self.lnr2d < lnRc] = 0
             xmajor = r * np.cos(self.theta2d)
@@ -241,11 +243,18 @@ class ChannelFit():
             vlos = (vrot * xmajor * self.signmajor 
                     + vr * xminor * self.signminor) / r
             vlos = vlos * np.sin(np.radians(incl))
-            interp = RGI((self.theta, self.lnr), vlos,
-                         bounds_error=False, fill_value=0)
-            vmodel = interp((theta, lnr))
-            return vmodel
-        self.polarvlos = polarvlos
+            v = np.subtract.outer(self.v_valid, vlos)
+            prof, n_prof, dv_prof = boxgauss(self.dv / cs)
+            iv = np.round(v / cs / dv_prof) + n_prof // 2
+            iv = iv.astype('int').clip(0, n_prof)
+            m = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
+            intensity = [None] * len(m)
+            for i, mm in zip(range(len(m)), m):
+                interp = RGI((self.theta, self.lnr), mm,
+                             bounds_error=False, fill_value=0)
+                intensity[i] = interp((theta, lnr))
+            return np.array(intensity)
+        self.polarmodel = polarmodel
                         
     def fitting(self, Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
@@ -308,12 +317,13 @@ class ChannelFit():
                 prof, n_prof, dv_prof = prof0, n_prof0, dv_prof0
             #vmodel = self.modelvlos(xmajor, xminor, Mstar, Rc)  # subxy, y, x
             #v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, subxy, y, x
-            vmodel = self.polarvlos(logMstar, logRc, lnr, theta)  # y, x
-            v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, y, x
-            iv = np.round(v / cs / dv_prof) + n_prof // 2
-            iv = iv.astype('int').clip(0, n_prof)
-            m = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])  # v, subxy, y, x
+            #vmodel = self.polarvlos(logMstar, logRc, lnr, theta)  # y, x
+            #v = np.subtract.outer(self.v_valid, vmodel + offvsys)  # v, y, x
+            #iv = np.round(v / cs / dv_prof) + n_prof // 2
+            #iv = iv.astype('int').clip(0, n_prof)
+            #m = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])  # v, subxy, y, x
             #m = np.mean(m, axis=1)  # v, y, x
+            m = self.polarmodel(logMstar, logRc, logcs, lnr ,theta)
             m = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
             mom0 = np.nansum(m, axis=0) * self.dv
             m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
