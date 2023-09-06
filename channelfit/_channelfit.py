@@ -237,6 +237,7 @@ class ChannelFit():
                 nwalkers_per_ndim: int = 16,
                 nburnin: int = 100,
                 nsteps: int = 300,
+                rangelevel: float = None,
                 filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True):
@@ -339,6 +340,7 @@ class ChannelFit():
                                 labels=labels, rangelevel=0.90,
                                 figname=filename+'.corner.png',
                                 show_corner=show,
+                                rangelevel=rangelevel,
                                 simpleoutput=False)
             popt = p_fixed.copy()
             popt[p_fixed == None] = mcmc[0]
