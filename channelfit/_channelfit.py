@@ -197,11 +197,12 @@ class ChannelFit():
         theta = np.linspace(-np.pi - dtheta/2., np.pi + dtheta/2., ntheta + 1)
         self.lnr, self.theta = lnr, theta
         self.lnr2d, self.theta2d = np.meshgrid(lnr, theta)
-        r = np.exp(self.lnr)
-        rdt = r * dtheta
-        dr = (r[1:] - r[:-1]) / dpix
-        print(f'dr = {dr[0]:.2f}, {dr[1]:.2f}, {dr[2]:.2},...,{dr[-3]:.2}, {dr[-2]:.2}, {dr[-1]:.2} pixel.')
-        print(r'rd$\theta$'+f' = {rdt[0]:.2f}, {rdt[1]:.2f}, {rdt[2]:.2},...,{rdt[-3]:.2}, {rdt[-2]:.2}, {rdt[-1]:.2} pixel.')
+        r = np.exp(self.lnr) / dpix
+        rdt = (r[1:] + r[:-1]) / 2. * dtheta
+        dr = r[1:] - r[:-1]
+        print(f'r = {r[0]:.2f}, {r[1]:.2f}, {r[2]:.2f},...,{r[-3]:.2f}, {r[-2]:.2f}, {r[-1]:.2f} pixel.')
+        print(f'dr = {dr[0]:.2f}, {dr[1]:.2f}, {dr[2]:.2f},...,{dr[-3]:.2f}, {dr[-2]:.2f}, {dr[-1]:.2f} pixel.')
+        print(r'rd$\theta$'+f' = {rdt[0]:.2f}, {rdt[1]:.2f}, {rdt[2]:.2f},...,{rdt[-3]:.2f}, {rdt[-2]:.2f}, {rdt[-1]:.2f} pixel.')
         
         
         def modelvlos(xmajor: np.ndarray, xminor: np.ndarray,
