@@ -200,9 +200,10 @@ class ChannelFit():
         r = np.exp(self.lnr) / dpix
         rdt = (r[1:] + r[:-1]) / 2. * dtheta
         dr = r[1:] - r[:-1]
-        print(f'r = {r[0]:.2f}, {r[1]:.2f}, {r[2]:.2f},...,{r[-3]:.2f}, {r[-2]:.2f}, {r[-1]:.2f} pixel.')
-        print(f'dr = {dr[0]:.2f}, {dr[1]:.2f}, {dr[2]:.2f},...,{dr[-3]:.2f}, {dr[-2]:.2f}, {dr[-1]:.2f} pixel.')
-        print(r'r * dtheta'+f' = {rdt[0]:.2f}, {rdt[1]:.2f}, {rdt[2]:.2f},...,{rdt[-3]:.2f}, {rdt[-2]:.2f}, {rdt[-1]:.2f} pixel.')
+        print(f'   Npix    = {npix:d}')
+        print(f'    r      = {r[0]:.2f}, {r[1]:.2f}, {r[2]:.2f},...,{r[-3]:.2f}, {r[-2]:.2f}, {r[-1]:.2f} pixel.')
+        print(f'   dr      = {dr[0]:.2f}, {dr[1]:.2f}, {dr[2]:.2f},...,{dr[-3]:.2f}, {dr[-2]:.2f}, {dr[-1]:.2f} pixel.')
+        print(f'r * dtheta = {rdt[0]:.2f}, {rdt[1]:.2f}, {rdt[2]:.2f},...,{rdt[-3]:.2f}, {rdt[-2]:.2f}, {rdt[-1]:.2f} pixel.')
         
         
         def modelvlos(xmajor: np.ndarray, xminor: np.ndarray,
