@@ -302,7 +302,7 @@ class ChannelFit():
             iv = np.round(v / cs / dv_prof) + n_prof // 2
             iv = iv.astype('int').clip(0, n_prof)
             m = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])  # v, subxy, y, x
-            m = np.mean(m, axis=1)  # v, y, x
+            #m = np.mean(m, axis=1)  # v, y, x
             m = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
             mom0 = np.nansum(m, axis=0) * self.dv
             m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
