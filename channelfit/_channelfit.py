@@ -215,9 +215,9 @@ class ChannelFit():
             return vlos
         self.modelvlos = modelvlos
 
-        def polarmodel(logMstar: float, logRc: float, logcs: float,
-                       offmajor: float, offminor: float, offvsys: float,
-                       ) -> np.ndarray:
+        def nestmodel(logMstar: float, logRc: float, logcs: float,
+                      offmajor: float, offminor: float, offvsys: float,
+                      ) -> np.ndarray:
             Mstar = 10**logMstar
             Rc = 10**logRc
             cs = 10**logcs
@@ -257,7 +257,7 @@ class ChannelFit():
                 intensity[i] = interp((y, x))
             intensity = np.array(intensity) / np.max(intensity)
             return intensity
-        self.polarmodel = polarmodel
+        self.nestmodel = nestmodel
                         
     def fitting(self, Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
@@ -326,8 +326,8 @@ class ChannelFit():
             #iv = iv.astype('int').clip(0, n_prof)
             #m = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])  # v, subxy, y, x
             #m = np.mean(m, axis=1)  # v, y, x
-            m = self.polarmodel(logMstar, logRc, logcs,
-                                offmajor, offminor, offvsys, lnr, theta)
+            m = self.nestmodel(logMstar, logRc, logcs,
+                               offmajor, offminor, offvsys)
             m = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
             mom0 = np.nansum(m, axis=0) * self.dv
             m = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
