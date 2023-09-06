@@ -200,7 +200,7 @@ class ChannelFit():
             Ynest.append(Y)
             Rnest.append(np.hypot(X, Y))
         for l in range(len(xnest)):
-            print(f'x, dx: {xnest[l][0]:.3f}-{xnest[l][-1]:.3f},'
+            print(f'x, dx: +/-{xnest[l][-1]:.3f},'
                   + f' {xnest[l][1]-xnest[l][0]:.3f} au')
         
         def nestmodel(logMstar: float, logRc: float, logcs: float,
