@@ -153,12 +153,14 @@ class ChannelFit():
                                rmax, rmax, vlim[0], vlim[3], sigma)
             self.fitsname = cubefits
             v = self.v
-        self.cospa = np.cos(np.radians(pa))
-        self.sinpa = np.sin(np.radians(pa))
-        self.sini = np.sin(np.radians(incl))
+        p = np.radians(pa)
+        i = np.radians(incl)
+        self.cospa = np.cos(p)
+        self.sinpa = np.sin(p)
+        self.sini = np.sin(i)
+        self.deproj = 1 / np.cos(i)
         self.X, self.Y = np.meshgrid(self.x, self.y)
         xminor, xmajor = rot(self.X, self.Y, pa)
-        self.deproj = 1 / np.cos(self.incl)
         xminor = xminor * self.deproj
         self.xminor, self.xmajor = xminor, xmajor
         
