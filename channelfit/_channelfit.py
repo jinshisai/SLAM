@@ -187,10 +187,10 @@ class ChannelFit():
 
         # log R polar grid (with incl=0)
         npix = max([len(self.x), len(self.y)])
-        nr = npix * np.sqrt(np.log(npix) / 2. / np.pi)
+        nr = int(npix * np.sqrt(np.log(npix) / 2. / np.pi) + 0.5)
         dlnr = np.log(npix) / (nr - 1)
         dtheta = dlnr
-        ntheta = 2 * np.pi / dtheta
+        ntheta = int(2 * np.pi / dtheta + 0.5)
         lnrmin = np.log(min([np.abs(self.dx), np.abs(self.dy)]))
         lnr = lnrmin + np.arange(nr) * dlnr
         theta = np.linspace(-np.pi - dtheta/2., np.pi + dtheta/2., ntheta + 1)
