@@ -232,11 +232,13 @@ class ChannelFit():
                 iv = iv.astype('int').clip(0, n_prof)
                 m = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])  # v, y, x
                 intensity.append(m)
+            i0 = npixnest // 4
+            i1 = i0 + npixnest // 2
             for l in range(len(intensity) - 2):
                 a = intensity[-1 - l]
                 a = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
                      + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
-                intensity[-2 - l][:, 16:48, 16:48] = a
+                intensity[-2 - l][:, i0:i1, i0:i1] = a
             a = intensity[1]
             a = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
                      + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
