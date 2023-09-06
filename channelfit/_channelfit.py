@@ -35,11 +35,6 @@ def rot(x, y, pa):
     t = x * np.sin(pa) + y * np.cos(pa)  # along major axis
     return np.array([s, t])
 
-def irot(s, t, pa):
-    x =  s * np.cos(pa) + t * np.sin(pa)  # along R.A. axis
-    y = -s * np.sin(pa) + t * np.cos(pa)  # along Dec. axis
-    return np.array([x, y])
-
 def boxgauss(dv_over_cs: float) -> tuple:
     clipsigma = 3. + dv_over_cs
     dv = min([2, dv_over_cs]) / 10.
@@ -223,12 +218,12 @@ class ChannelFit():
         self.modelvlos = modelvlos
 
         def polarmodel(logMstar: float, logRc: float, logcs: float,
+                       offmajor: float, offminor: float, offvsys: float,
                        lnr: np.ndarray, theta: np.ndarray) -> np.ndarray:
             lnMstar = logMstar * np.log(10)
             lnRc = logRc * np.log(10)
             Rc = 10**logRc
             cs = 10**logcs
-            #lnr = self.lnr2d
             r = np.exp(self.lnr2d)
             lnvkep = lnvunit + 0.5 * (lnMstar - self.lnr2d)
             lnvjrot = lnvunit + 0.5 * (lnMstar + lnRc) - self.lnr2d
@@ -243,16 +238,23 @@ class ChannelFit():
             vlos = (vrot * xmajor * self.signmajor 
                     + vr * xminor * self.signminor) / r
             vlos = vlos * np.sin(np.radians(incl))
-            v = np.subtract.outer(self.v_valid, vlos)
+            v = np.subtract.outer(self.v_valid, vlos + offvsys)  # v, y, x
             prof, n_prof, dv_prof = boxgauss(self.dv / cs)
             iv = np.round(v / cs / dv_prof) + n_prof // 2
             iv = iv.astype('int').clip(0, n_prof)
-            m = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
+            m = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])  # v, y, x
+            
+            x, y = rot((xminor + offminor) / self.deproj,
+                       xmajor + offmajor, np.radians(-pa))
+            ix = np.round((x - self.x[0]) / self.dx).astype('int').ravel()
+            iy = np.round((y - self.y[0]) / self.dy).astype('int').ravel()
             intensity = [None] * len(m)
             for i, mm in zip(range(len(m)), m):
-                interp = RGI((self.theta, self.lnr), mm,
-                             bounds_error=False, fill_value=0)
-                intensity[i] = interp((theta, lnr))
+                mm = np.ravel(mm)
+                i2d = np.zeros_like(self.X)
+                for k in range(len(ix)):
+                    i2d[iy[k], ix[k]] += mm[k]
+                intensity[i] = i2d
             return np.array(intensity)
         self.polarmodel = polarmodel
                         
