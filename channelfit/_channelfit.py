@@ -192,7 +192,7 @@ class ChannelFit():
         dtheta = dlnr
         ntheta = int(2 * np.pi / dtheta + 0.5)
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
-        lnrmin = np.log(min([np.abs(self.dx), np.abs(self.dy)]))
+        lnrmin = np.log(dpix / 2.)
         lnr = lnrmin + np.arange(nr) * dlnr
         theta = np.linspace(-np.pi - dtheta/2., np.pi + dtheta/2., ntheta + 1)
         self.lnr, self.theta = lnr, theta
