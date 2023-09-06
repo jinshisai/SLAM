@@ -180,28 +180,26 @@ class ChannelFit():
         self.signmajor = np.sign(np.nansum(self.mom1 * xmajor))
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
 
-        # log R polar grid (with incl=0)
-        npix = max([len(self.x), len(self.y)])
-        xmax = max([np.max(np.abs(self.x)), np.max(np.abs(self.y))])
-        lnrmax = np.log(xmax)
+        # nested grid (with incl=0)
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
-        lnrmin = np.log(dpix / 2.)
-        nr = int(npix * np.sqrt(np.log(npix) / 2. / np.pi) + 0.5)
-        dlnr = (lnrmax - lnrmin) / (nr - 1)
-        dtheta = dlnr
-        ntheta = int(2 * np.pi / dtheta + 0.5)
-        lnr = lnrmin + np.arange(nr) * dlnr
-        theta = np.linspace(-np.pi - dtheta/2., np.pi + dtheta/2., ntheta + 1)
-        self.lnr, self.theta = lnr, theta
-        self.lnr2d, self.theta2d = np.meshgrid(lnr, theta)
-        r = np.exp(self.lnr) / dpix
-        rdt = (r[1:] + r[:-1]) / 2. * dtheta
-        dr = r[1:] - r[:-1]
-        print(f'Npix, size = {npix:d}, {dpix:.2f} au')
-        print(f'    r      = {r[0]:.2f}, {r[1]:.2f}, {r[2]:.2f},...,{r[-3]:.2f}, {r[-2]:.2f}, {r[-1]:.2f} pixel.')
-        print(f'   dr      = {dr[0]:.2f}, {dr[1]:.2f}, {dr[2]:.2f},...,{dr[-3]:.2f}, {dr[-2]:.2f}, {dr[-1]:.2f} pixel.')
-        print(f'r * dtheta = {rdt[0]:.2f}, {rdt[1]:.2f}, {rdt[2]:.2f},...,{rdt[-3]:.2f}, {rdt[-2]:.2f}, {rdt[-1]:.2f} pixel.')
-        
+        npix = max([len(self.x), len(self.y)])
+        if npix % 2 == 1: npix += 1
+        self.i0nest = npix // 2 - 16
+        s = (np.arange(npix) - npix // 2 + 0.5) * dpix
+        X, Y = np.meshgrid(s, s)
+        xnest = [s]
+        ynest = [s]
+        Xnest = [X]
+        Ynest = [Y]
+        Rnest = [np.hypot(X, Y)]
+        for l in range(3):
+            s = np.linspace(-32.5, 32.5, 64) * dpix / 2**(l + 1)
+            X, Y = np.meshgrid(s, s)
+            xnest.append(s)
+            ynest.append(s)
+            Xnest.append(X)
+            Ynest.append(Y)
+            Rnest.append(np.hypot(X, Y))
         
         def modelvlos(xmajor: np.ndarray, xminor: np.ndarray,
                       Mstar: float, Rc: float) -> np.ndarray:
@@ -219,45 +217,44 @@ class ChannelFit():
 
         def polarmodel(logMstar: float, logRc: float, logcs: float,
                        offmajor: float, offminor: float, offvsys: float,
-                       lnr: np.ndarray, theta: np.ndarray) -> np.ndarray:
-            lnMstar = logMstar * np.log(10)
-            lnRc = logRc * np.log(10)
+                       ) -> np.ndarray:
+            Mstar = 10**logMstar
             Rc = 10**logRc
             cs = 10**logcs
-            r = np.exp(self.lnr2d)
-            lnvkep = lnvunit + 0.5 * (lnMstar - self.lnr2d)
-            lnvjrot = lnvunit + 0.5 * (lnMstar + lnRc) - self.lnr2d
-            lnvrot = np.where(self.lnr2d < lnRc, lnvkep, lnvjrot)
-            vrot = np.exp(lnvrot)
-            lnvr = lnvunit + 0.5 * (lnMstar - self.lnr2d) \
-                   + 0.5 * np.log(2 - Rc / r)
-            vr = -np.exp(lnvr)
-            vr[self.lnr2d < lnRc] = 0
-            xmajor = r * np.cos(self.theta2d)
-            xminor = r * np.sin(self.theta2d)
-            vlos = (vrot * xmajor * self.signmajor 
-                    + vr * xminor * self.signminor) / r
-            vlos = vlos * np.sin(np.radians(incl))
-            v = np.subtract.outer(self.v_valid, vlos + offvsys)  # v, y, x
             prof, n_prof, dv_prof = boxgauss(self.dv / cs)
-            iv = np.round(v / cs / dv_prof) + n_prof // 2
-            iv = iv.astype('int').clip(0, n_prof)
-            m = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])  # v, y, x
-            
-            x, y = rot((xminor + offminor) / self.deproj,
-                       xmajor + offmajor, np.radians(-pa))
-            ix = np.round((x - self.x[0]) / self.dx).astype('int').ravel()
-            iy = np.round((y - self.y[0]) / self.dy).astype('int').ravel()
-            r = np.ravel(r)
+            intensity = []
+            for r, x, y in zip(Rnest, Xnest, Ynest):
+                vkep = vunit * np.sqrt(Mstar / r)
+                vjrot = vunit * np.sqrt(Mstar * Rc) / r
+                vr = -vunit * np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
+                vr[r < Rc] = 0
+                vrot = np.where(r < Rc, vkep, vjrot)
+                vlos = (vrot * y * self.signmajor 
+                        + vr * x * self.signminor) / r
+                vlos = vlos * np.sin(np.radians(incl))
+                v = np.subtract.outer(self.v_valid, vlos + offvsys)  # v, y, x
+                iv = np.round(v / cs / dv_prof) + n_prof // 2
+                iv = iv.astype('int').clip(0, n_prof)
+                m = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])  # v, y, x
+                intensity.append(m)
+            for l in range(len(intensity) - 2):
+                a = intensity[-1 - l]
+                a = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
+                     + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
+                intensity[-2 - l][:, 16:48, 16:48] = a
+            a = intensity[1]
+            a = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
+                     + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
+            i0 = self.i0nest
+            i1 = i0 + 32
+            intensity[0][:, i0:i1, i0:i1] = a
+            m = intensity[0]
             intensity = [None] * len(m)
+            y = self.xmajor - offmajor
+            x = self.xminor - offminor * self.deproj
             for i, mm in zip(range(len(m)), m):
-                mm = np.ravel(mm)
-                i2d = np.zeros_like(self.X)
-                for k in range(len(ix)):
-                    jj, ii = iy[k], ix[k]
-                    if 0 <= jj < self.ny and 0 <= ii < self.nx:
-                        i2d[jj, ii] += mm[k] * r[k]**2
-                intensity[i] = i2d
+                interp = RGI((ynest[0], xnest[0]), mm)
+                intensity[i] = interp((y, x))
             intensity = np.array(intensity) / np.max(intensity)
             return intensity
         self.polarmodel = polarmodel
