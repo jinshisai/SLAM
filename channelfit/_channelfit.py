@@ -188,7 +188,7 @@ class ChannelFit():
         # x and y are major and minor axis coordinates before projection.
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         npix = max([len(self.x), len(self.y)])
-        npixnest = int(2**(np.ceil(np.log2(npix)) + 1))
+        npixnest = int(2**(np.ceil(np.log2(npix))))
         self.npixnest = npixnest
         if npix % 2 == 1: npix += 1
         self.i0nest = npix // 2 - npixnest // 4
