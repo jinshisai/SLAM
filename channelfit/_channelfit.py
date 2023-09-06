@@ -253,7 +253,8 @@ class ChannelFit():
             y = self.xmajor - offmajor
             x = self.xminor - offminor * self.deproj
             for i, mm in zip(range(len(m)), m):
-                interp = RGI((ynest[0], xnest[0]), mm)
+                interp = RGI((ynest[0], xnest[0]), mm,
+                             bounds_error=False, fill_value=0)
                 intensity[i] = interp((y, x))
             intensity = np.array(intensity) / np.max(intensity)
             return intensity
