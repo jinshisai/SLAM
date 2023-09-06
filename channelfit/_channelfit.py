@@ -143,6 +143,7 @@ class ChannelFit():
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
+
     def gridondisk(self, cubefits: str = None,
                    pa: float = 0, incl: float = 90, dist: float = 1,
                    center: str = None, vsys: float = 0,
@@ -153,16 +154,15 @@ class ChannelFit():
                                rmax, rmax, vlim[0], vlim[3], sigma)
             self.fitsname = cubefits
             v = self.v
-        p = np.radians(pa)
-        i = np.radians(incl)
-        self.cospa = np.cos(p)
-        self.sinpa = np.sin(p)
-        self.sini = np.sin(i)
-        self.deproj = 1 / np.cos(i)
-        self.X, self.Y = np.meshgrid(self.x, self.y)
-        xminor, xmajor = rot(self.X, self.Y, p)
-        xminor = xminor * self.deproj
-        self.xminor, self.xmajor = xminor, xmajor
+        pa_rad = np.radians(pa)
+        incl_rad = np.radians(incl)
+        self.cospa = np.cos(pa_rad)
+        self.sinpa = np.sin(pa_rad)
+        self.sini = np.sin(incl_rad)
+        self.deproj = 1 / np.cos(incl_rad)
+        xminor, xmajor = rot(*np.meshgrid(self.x, self.y), pa_rad)
+        self.xmajor = xmajor
+        self.xminor = xminor * self.deproj
         
         self.v_nanblue = v[v < vlim[0]]
         self.v_blue = v[(vlim[0] <= v) * (v <= vlim[1])]
@@ -174,7 +174,6 @@ class ChannelFit():
         self.data_blue = self.data[(vlim[0] <= v) * (v <= vlim[1])]
         self.data_red = self.data[(vlim[2] <= v) * (v <= vlim[3])]
         self.data_valid = np.append(self.data_blue, self.data_red, axis=0) 
-        self.maxsnr = np.max(self.data_valid / self.sigma)
         
         m = makemom01(self.data_valid, self.v_valid, sigma)
         self.mom0 = m['mom0']
@@ -199,7 +198,7 @@ class ChannelFit():
         Xnest = [X]
         Ynest = [Y]
         Rnest = [np.hypot(X, Y)]
-        self.nlayer = 4
+        self.nlayer = 4  # down to dpix / 2**(nlayer-1)
         for l in range(self.nlayer - 1):
             n = npixnest // 2 + 0.5
             s = np.linspace(-n, n, npixnest) * dpix / 2**(l + 1)
@@ -222,18 +221,6 @@ class ChannelFit():
                   + f' {n:d}')
         print('-----------------------------')
 
-        def getvlos(Mstar: float, Rc: float,
-                    r: np.ndarray, x: np.ndarray, y: np.ndarray):
-            vkep = vunit * np.sqrt(Mstar / r)
-            vjrot = vunit * np.sqrt(Mstar * Rc) / r
-            vr = -vunit * np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
-            vr[r < Rc] = 0
-            vrot = np.where(r < Rc, vkep, vjrot)
-            vlos = (vrot * y * self.signmajor 
-                    + vr * x * self.signminor) / r
-            vlos = vlos * self.sini
-            return vlos
-        self.getvlos = getvlos
                         
     def fitting(self, Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
@@ -263,6 +250,18 @@ class ChannelFit():
         pixperbeam = np.sum(gaussbeam)
         gaussbeam = gaussbeam / pixperbeam
 
+        def getvlos(Mstar: float, Rc: float,
+                    r: np.ndarray, x: np.ndarray, y: np.ndarray):
+            vkep = vunit * np.sqrt(Mstar / r)
+            vjrot = vunit * np.sqrt(Mstar * Rc) / r
+            vr = -vunit * np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
+            vr[r < Rc] = 0
+            vrot = np.where(r < Rc, vkep, vjrot)
+            vlos = (vrot * y * self.signmajor 
+                    + vr * x * self.signminor) / r
+            vlos = vlos * self.sini
+            return vlos
+
         def avefour(a: np.ndarray) -> np.ndarray:
             b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
                  + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
@@ -280,7 +279,7 @@ class ChannelFit():
                 prof, n_prof, dv_prof = prof0, n_prof0, dv_prof0
             Iout = [None] * self.nlayer
             for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
-                vlos = self.getvlos(Mstar, Rc, r, x, y)
+                vlos = getvlos(Mstar, Rc, r, x, y)
                 v = np.subtract.outer(self.v_valid, vlos + offvsys)
                 iv = np.round(v / cs / dv_prof) + n_prof // 2
                 iv = iv.astype('int').clip(0, n_prof)
@@ -295,7 +294,7 @@ class ChannelFit():
             Iout = Iout[0]
             y = self.xmajor - offmajor
             x = self.xminor - offminor * self.deproj
-            m = [None] * (nv := len(Iout))
+            m = [None] * len(Iout)
             for i, c in enumerate(Iout):
                 interp = RGI((self.ynest[0], self.xnest[0]), c,
                              bounds_error=False, fill_value=0)
@@ -323,9 +322,8 @@ class ChannelFit():
                     bar.update(1)
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
-                m = self.cubemodel(*q)
-                chi2 = np.nansum((self.data_valid - m)**2) / self.sigma**2
-                chi2 /= pixperbeam
+                chi2 = np.nansum((self.data_valid - cubemodel(*q))**2)
+                chi2 /= self.sigma**2 * pixperbeam
                 return -0.5 * chi2
             plim = np.array([np.log10(Mstar_range),
                              np.log10(Rc_range),
