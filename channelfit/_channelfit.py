@@ -179,10 +179,11 @@ class ChannelFit():
         self.signmajor = np.sign(np.nansum(self.mom1 * xmajor))
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
 
-        # 2d nested grid on the disk plane. x and y are major and minor axis coordinates before projection.
+        # 2d nested grid on the disk plane.
+        # x and y are major and minor axis coordinates before projection.
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         npix = max([len(self.x), len(self.y)])
-        npixnest = 64
+        npixnest = 2**int(np.log2(npix))
         if npix % 2 == 1: npix += 1
         self.i0nest = npix // 2 - npixnest // 4
         s = (np.arange(npix) - npix // 2 + 0.5) * dpix
