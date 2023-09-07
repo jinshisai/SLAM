@@ -236,15 +236,31 @@ class ChannelFit():
         
     def getvlos(self, Mstar: float, Rc: float,
                 r: np.ndarray, x: np.ndarray, y: np.ndarray):
-        vkep = vunit * np.sqrt(Mstar / r)
-        vjrot = vunit * np.sqrt(Mstar * Rc) / r
-        vr = -vunit * np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
+        vkep = np.sqrt(Mstar / r)
+        vjrot = np.sqrt(Mstar * Rc) / r
+        vr = -np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
         vr[r < Rc] = 0
         vrot = np.where(r < Rc, vkep, vjrot)
         vlos = (vrot * y * self.signmajor 
                 + vr * x * self.signminor) / r
-        vlos = vlos * self.sini
+        vlos = vlos * self.sini * vunit
         return vlos
+
+
+    def getvcube_fixed(self, Rc):
+        self.vcube = [None] * self.nlayer
+        for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
+            Mstar = 1
+            vkep = np.sqrt(Mstar / r)
+            vjrot = np.sqrt(Mstar * Rc) / r
+            vr = -np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
+            vr[r < Rc] = 0
+            vrot = np.where(r < Rc, vkep, vjrot)
+            vlos = (vrot * y * self.signmajor 
+                    + vr * x * self.signminor) / r
+            vlos = vlos * self.sini * vunit
+            v3d = np.subtract.outer(self.v_valid, vlos)
+            self.vcube[i] = v3d
 
         
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
