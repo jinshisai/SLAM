@@ -308,6 +308,7 @@ class ChannelFit():
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
         if cs_fixed is not None:
             prof0, n_prof0, dv_prof0 = boxgauss(self.dv / cs_fixed)
+            self.prof0, self.n_prof0, self.dv_prof0 = prof0, n_prof0, dv_prof0
             
         
         
@@ -376,7 +377,7 @@ class ChannelFit():
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
                 q[:3] = 10**q[:3]
-                m = cubemodel(*q, cs_fixed)
+                m = self.cubemodel(*q, cs_fixed)
                 chi2 = np.nansum((self.data_valid - m)**2)
                 chi2 /= self.sigma**2 * self.pixperbeam
                 return -0.5 * chi2
