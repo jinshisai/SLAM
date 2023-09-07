@@ -234,8 +234,6 @@ class ChannelFit():
         self.gaussbeam = gaussbeam / self.pixperbeam
 
         
-
-
     def getvlos(self, Mstar: float, Rc: float,
                 r: np.ndarray, x: np.ndarray, y: np.ndarray):
         vkep = vunit * np.sqrt(Mstar / r)
@@ -305,66 +303,9 @@ class ChannelFit():
                 show: bool = False,
                 progressbar: bool = True):
         
-        '''
-        def getvlos(Mstar: float, Rc: float,
-                    r: np.ndarray, x: np.ndarray, y: np.ndarray):
-            vkep = vunit * np.sqrt(Mstar / r)
-            vjrot = vunit * np.sqrt(Mstar * Rc) / r
-            vr = -vunit * np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
-            vr[r < Rc] = 0
-            vrot = np.where(r < Rc, vkep, vjrot)
-            vlos = (vrot * y * self.signmajor 
-                    + vr * x * self.signminor) / r
-            vlos = vlos * self.sini
-            return vlos
-
-        def avefour(a: np.ndarray) -> np.ndarray:
-            b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
-                 + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
-            return b
-        '''        
         if cs_fixed is not None:            
-            #prof0, n_prof0, dv_prof0 = boxgauss(self.dv / cs_fixed)
             self.cs_fixed = cs_fixed
             self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
-        '''    
-        def cubemodel(Mstar: float, Rc: float, cs: float,
-                      offmajor: float, offminor: float, offvsys: float):
-            if cs_fixed is None:
-                prof, n_prof, dv_prof = boxgauss(self.dv / cs)
-            else:
-                prof, n_prof, dv_prof = prof0, n_prof0, dv_prof0
-            Iout = [None] * self.nlayer
-            for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
-                vlos = getvlos(Mstar, Rc, r, x, y)
-                v = np.subtract.outer(self.v_valid, vlos + offvsys)
-                iv = np.round(v / cs / dv_prof) + n_prof // 2
-                iv = iv.astype('int').clip(0, n_prof)
-                Iout[i] = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
-            i0 = self.npixnest // 4
-            i1 = i0 + self.npixnest // 2
-            for l in range(self.nlayer - 1, 1, -1):
-                Iout[l - 1][:, i0:i1, i0:i1] = avefour(Iout[l])
-            i0 = self.i0nest
-            i1 = i0 + self.npixnest // 2
-            Iout[0][:, i0:i1, i0:i1] = avefour(Iout[1])
-            Iout = Iout[0]
-            y = self.xmajor - offmajor
-            x = self.xminor - offminor * self.deproj
-            m = [None] * len(Iout)
-            for i, c in enumerate(Iout):
-                interp = RGI((self.ynest[0], self.xnest[0]), c,
-                             bounds_error=False, fill_value=0)
-                m[i] = interp((y, x))
-            #m = np.array(m) / np.max(m)
-            Iout = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
-            mom0 = np.nansum(Iout, axis=0) * self.dv
-            Iout = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
-                            Iout * self.mom0 / mom0, 0)
-            return Iout
-        self.cubemodel = cubemodel
-        '''
-
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
         if None in p_fixed:
