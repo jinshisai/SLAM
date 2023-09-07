@@ -369,6 +369,11 @@ class ChannelFit():
         print('popt :', ', '.join([f'{t:.2e}' for t in self.popt]))
         print('------------------------')
         np.savetxt(filename+'.popt.txt', [self.popt, self.plow, self.pmid, self.phigh])
+        k = ['Mstar', 'Rc', 'cs', 'offmajor', 'offminor', 'offvsys']
+        self.popt = dict(zip(k, self.popt))
+        self.low = dict(zip(k, self.low))
+        self.mid = dict(zip(k, self.mid))
+        self.high = dict(zip(k, self.high))
 
    
     def modeltofits(self, Mstar: float = None, Rc: float = None,
