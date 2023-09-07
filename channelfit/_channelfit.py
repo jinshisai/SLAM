@@ -194,9 +194,6 @@ class ChannelFit():
         npix = max([len(self.x), len(self.y)])
         npixnest = int(2**(np.ceil(np.log2(npix))))
         self.npixnest = npixnest
-        npix = npixnest
-        if npix % 2 == 1: npix += 1
-        self.i0nest = npix // 2 - npixnest // 4
         xnest, ynest, Xnest, Ynest, Rnest = [], [], [], [], []
         self.nlayer = 4  # down to dpix / 2**(nlayer-1)
         for l in range(self.nlayer):
@@ -215,14 +212,13 @@ class ChannelFit():
         self.Rnest = Rnest
         print('-------- nested grid --------')
         for l in range(len(xnest)):
-            n = npixnest
             print(f'x, dx, npix: +/-{xnest[l][-1]:.2f},'
                   + f' {xnest[l][1]-xnest[l][0]:.2f} au,'
-                  + f' {n:d}')
+                  + f' {npixnest:d}')
         print('-----------------------------')
         
-        xb = (np.arange(npix + 1) - npix // 2) * self.dx
-        yb = (np.arange(npix + 1) - npix // 2) * self.dy
+        xb = (np.arange(npixnest + 1) - npixnest // 2) * self.dx
+        yb = (np.arange(npixnest + 1) - npixnest // 2) * self.dy
         xb, yb = rot(*np.meshgrid(xb, yb), np.radians(self.bpa))
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
         self.pixperbeam = np.sum(gaussbeam)
@@ -276,11 +272,8 @@ class ChannelFit():
             Iout[i] = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
         i0 = self.npixnest // 4
         i1 = i0 + self.npixnest // 2
-        for l in range(self.nlayer - 1, 1, -1):
+        for l in range(self.nlayer - 1, 0, -1):
             Iout[l - 1][:, i0:i1, i0:i1] = avefour(Iout[l])
-        i0 = self.i0nest
-        i1 = i0 + self.npixnest // 2
-        Iout[0][:, i0:i1, i0:i1] = avefour(Iout[1])
         Iout = Iout[0]
         y = self.xmajor - offmajor
         x = self.xminor - offminor * self.deproj
