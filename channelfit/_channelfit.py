@@ -194,17 +194,21 @@ class ChannelFit():
         npix = max([len(self.x), len(self.y)])
         npixnest = int(2**(np.ceil(np.log2(npix))))
         self.npixnest = npixnest
-        xnest, ynest, Xnest, Ynest, Rnest = [], [], [], [], []
         self.nlayer = 4  # down to dpix / 2**(nlayer-1)
+        xnest = [None] * self.nlayer
+        ynest = [None] * self.nlayer
+        Xnest = [None] * self.nlayer
+        Ynest = [None] * self.nlayer
+        Rnest = [None] * self.nlayer
         for l in range(self.nlayer):
             n = npixnest // 2 + 0.5
             s = np.linspace(-n, n, npixnest) * dpix / 2**(l + 1)
             X, Y = np.meshgrid(s, s)
-            xnest.append(s)
-            ynest.append(s)
-            Xnest.append(X)
-            Ynest.append(Y)
-            Rnest.append(np.hypot(X, Y))
+            xnest[l] = s
+            ynest[l] = s
+            Xnest[l] = X
+            Ynest[l] = Y
+            Rnest[l] = np.hypot(X, Y)
         self.xnest = xnest
         self.ynest = ynest
         self.Xnest = Xnest
@@ -259,17 +263,16 @@ class ChannelFit():
             prof, n_prof, dv_prof = boxgauss(self.dv / cs)
         else:
             prof, n_prof, dv_prof = self.prof, self.n_prof, self.dv_prof
-        Iout = [None] * self.nlayer
-        for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
-            if self.Rc_fixed is None:
-                vlos = self.get_vlos(Rc, r, x, y)
-            else:
-                vlos = self.vlos[i]
-            vlos *= np.sqrt(Mstar)
-            v = np.subtract.outer(self.v_valid, vlos) - offvsys
-            iv = np.round(v / cs / dv_prof) + n_prof // 2
-            iv = iv.astype('int').clip(0, n_prof)
-            Iout[i] = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
+        if self.Rc_fixed is None:
+            vlos = self.get_vlos(Rc, self.Rnest, self.Xnest, self.Ynest)
+        else:
+            vlos = self.vlos
+        vlos *= np.sqrt(Mstar)
+        v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
+        v = np.moveaxis(v, 1, 0)  # layer, v, y, x
+        iv = np.round(v / cs / dv_prof) + n_prof // 2
+        iv = iv.astype('int').clip(0, n_prof)
+        Iout = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
         i0 = self.npixnest // 4
         i1 = i0 + self.npixnest // 2
         for l in range(self.nlayer - 1, 0, -1):
