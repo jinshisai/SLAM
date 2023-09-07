@@ -313,8 +313,8 @@ class ChannelFit():
                       offmajor: float, offminor: float, offvsys: float):
             if cs_fixed is None:
                 prof, n_prof, dv_prof = boxgauss(self.dv / cs)
-            else:
-                prof, n_prof, dv_prof = prof0, n_prof0, dv_prof0
+            #else:
+            #    prof, n_prof, dv_prof = prof0, n_prof0, dv_prof0
             Iout = [None] * self.nlayer
             for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
                 vlos = getvlos(Mstar, Rc, r, x, y)
