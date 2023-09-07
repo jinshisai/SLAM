@@ -61,6 +61,11 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     mom1[mom0 < 3 * sigma_mom0] = np.nan
     return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
     
+def avefour(a: np.ndarray) -> np.ndarray:
+    b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
+         + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
+    return b
+
 
 class ChannelFit():
 
@@ -220,6 +225,64 @@ class ChannelFit():
                   + f' {xnest[l][1]-xnest[l][0]:.2f} au,'
                   + f' {n:d}')
         print('-----------------------------')
+        
+        n = len(self.x) - 1 if len(self.x) // 2 == 0 else len(self.x)
+        xb = (np.arange(n) - (n - 1) // 2) * self.dx
+        yb = (np.arange(n) - (n - 1) // 2) * self.dy
+        xb, yb = np.meshgrid(xb, yb)
+        xb, yb = rot(xb, yb, np.radians(self.bpa))
+        gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
+        self.pixperbeam = np.sum(gaussbeam)
+        self.gaussbeam = gaussbeam / self.pixperbeam
+        
+    def getvlos(self, Mstar: float, Rc: float,
+                r: np.ndarray, x: np.ndarray, y: np.ndarray):
+        vkep = vunit * np.sqrt(Mstar / r)
+        vjrot = vunit * np.sqrt(Mstar * Rc) / r
+        vr = -vunit * np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
+        vr[r < Rc] = 0
+        vrot = np.where(r < Rc, vkep, vjrot)
+        vlos = (vrot * y * self.signmajor 
+                + vr * x * self.signminor) / r
+        vlos = vlos * self.sini
+        return vlos
+
+
+    def cubemodel(self, Mstar: float, Rc: float, cs: float,
+                  offmajor: float, offminor: float, offvsys: float,
+                  cs_fixed: float = None):
+        if cs_fixed is None:
+            prof, n_prof, dv_prof = boxgauss(self.dv / cs)
+        else:
+            prof, n_prof, dv_prof = self.prof, self.n_prof, self.dv_prof
+        Iout = [None] * self.nlayer
+        for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
+            vlos = self.getvlos(Mstar, Rc, r, x, y)
+            v = np.subtract.outer(self.v_valid, vlos + offvsys)
+            iv = np.round(v / cs / dv_prof) + n_prof // 2
+            iv = iv.astype('int').clip(0, n_prof)
+            Iout[i] = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
+        i0 = self.npixnest // 4
+        i1 = i0 + self.npixnest // 2
+        for l in range(self.nlayer - 1, 1, -1):
+            Iout[l - 1][:, i0:i1, i0:i1] = avefour(Iout[l])
+        i0 = self.i0nest
+        i1 = i0 + self.npixnest // 2
+        Iout[0][:, i0:i1, i0:i1] = avefour(Iout[1])
+        Iout = Iout[0]
+        y = self.xmajor - offmajor
+        x = self.xminor - offminor * self.deproj
+        m = [None] * len(Iout)
+        for i, c in enumerate(Iout):
+            interp = RGI((self.ynest[0], self.xnest[0]), c,
+                         bounds_error=False, fill_value=0)
+            m[i] = interp((y, x))
+        #m = np.array(m) / np.max(m)
+        Iout = fftconvolve(m, [self.gaussbeam], mode='same', axes=(1, 2))
+        mom0 = np.nansum(Iout, axis=0) * self.dv
+        Iout = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
+                        Iout * self.mom0 / mom0, 0)
+        return Iout
 
                         
     def fitting(self, Mstar_range: list = [0.01, 10],
@@ -241,72 +304,6 @@ class ChannelFit():
                 filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True):
-        
-        n = len(self.x) - 1 if len(self.x) // 2 == 0 else len(self.x)
-        xb = (np.arange(n) - (n - 1) // 2) * self.dx
-        yb = (np.arange(n) - (n - 1) // 2) * self.dy
-        xb, yb = np.meshgrid(xb, yb)
-        xb, yb = rot(xb, yb, np.radians(self.bpa))
-        gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
-        pixperbeam = np.sum(gaussbeam)
-        gaussbeam = gaussbeam / pixperbeam
-
-        def getvlos(Mstar: float, Rc: float,
-                    r: np.ndarray, x: np.ndarray, y: np.ndarray):
-            vkep = vunit * np.sqrt(Mstar / r)
-            vjrot = vunit * np.sqrt(Mstar * Rc) / r
-            vr = -vunit * np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
-            vr[r < Rc] = 0
-            vrot = np.where(r < Rc, vkep, vjrot)
-            vlos = (vrot * y * self.signmajor 
-                    + vr * x * self.signminor) / r
-            vlos = vlos * self.sini
-            return vlos
-
-        def avefour(a: np.ndarray) -> np.ndarray:
-            b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
-                 + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
-            return b
-                
-        if cs_fixed is not None:            
-            prof0, n_prof0, dv_prof0 = boxgauss(self.dv / cs_fixed)
-            
-        def cubemodel(Mstar: float, Rc: float, cs: float,
-                      offmajor: float, offminor: float, offvsys: float):
-            if cs_fixed is None:
-                prof, n_prof, dv_prof = boxgauss(self.dv / cs)
-            else:
-                prof, n_prof, dv_prof = prof0, n_prof0, dv_prof0
-            Iout = [None] * self.nlayer
-            for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
-                vlos = getvlos(Mstar, Rc, r, x, y)
-                v = np.subtract.outer(self.v_valid, vlos + offvsys)
-                iv = np.round(v / cs / dv_prof) + n_prof // 2
-                iv = iv.astype('int').clip(0, n_prof)
-                Iout[i] = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
-            i0 = self.npixnest // 4
-            i1 = i0 + self.npixnest // 2
-            for l in range(self.nlayer - 1, 1, -1):
-                Iout[l - 1][:, i0:i1, i0:i1] = avefour(Iout[l])
-            i0 = self.i0nest
-            i1 = i0 + self.npixnest // 2
-            Iout[0][:, i0:i1, i0:i1] = avefour(Iout[1])
-            Iout = Iout[0]
-            y = self.xmajor - offmajor
-            x = self.xminor - offminor * self.deproj
-            m = [None] * len(Iout)
-            for i, c in enumerate(Iout):
-                interp = RGI((self.ynest[0], self.xnest[0]), c,
-                             bounds_error=False, fill_value=0)
-                m[i] = interp((y, x))
-            #m = np.array(m) / np.max(m)
-            Iout = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
-            mom0 = np.nansum(Iout, axis=0) * self.dv
-            Iout = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
-                            Iout * self.mom0 / mom0, 0)
-            return Iout
-        self.cubemodel = cubemodel
-
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
         if None in p_fixed:
@@ -323,8 +320,9 @@ class ChannelFit():
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
                 q[:3] = 10**q[:3]
-                chi2 = np.nansum((self.data_valid - cubemodel(*q))**2)
-                chi2 /= self.sigma**2 * pixperbeam
+                m = self.cubemodel(*q, cs_fixed)
+                chi2 = np.nansum((self.data_valid - m)**2)
+                chi2 /= self.sigma**2 * self.pixperbeam
                 return -0.5 * chi2
             plim = np.array([np.log10(Mstar_range),
                              np.log10(Rc_range),
@@ -369,6 +367,7 @@ class ChannelFit():
         print('popt :', ', '.join([f'{t:.2e}' for t in self.popt]))
         print('------------------------')
         np.savetxt(filename+'.popt.txt', [self.popt, self.plow, self.pmid, self.phigh])
+
    
     def modeltofits(self, Mstar: float = None, Rc: float = None,
                     offmajor: float = None, offminor: float = None,
