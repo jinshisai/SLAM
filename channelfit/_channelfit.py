@@ -308,13 +308,13 @@ class ChannelFit():
         if cs_fixed is not None:            
             #prof0, n_prof0, dv_prof0 = boxgauss(self.dv / cs_fixed)
             self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
-            
+        '''    
         def cubemodel(Mstar: float, Rc: float, cs: float,
                       offmajor: float, offminor: float, offvsys: float):
             if cs_fixed is None:
                 prof, n_prof, dv_prof = boxgauss(self.dv / cs)
-            #else:
-            #    prof, n_prof, dv_prof = prof0, n_prof0, dv_prof0
+            else:
+                prof, n_prof, dv_prof = prof0, n_prof0, dv_prof0
             Iout = [None] * self.nlayer
             for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
                 vlos = getvlos(Mstar, Rc, r, x, y)
@@ -344,6 +344,7 @@ class ChannelFit():
                             Iout * self.mom0 / mom0, 0)
             return Iout
         self.cubemodel = cubemodel
+        '''
 
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
