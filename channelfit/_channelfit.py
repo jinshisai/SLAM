@@ -306,6 +306,8 @@ class ChannelFit():
                 progressbar: bool = True):
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
+        if cs_fixed is not None:
+            self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
         if None in p_fixed:
             c = (q := p_fixed[:3]) != None
             p_fixed[:3][c] = np.log10(q[c].astype('float'))
