@@ -35,6 +35,11 @@ def rot(x, y, pa):
     t = x * np.sin(pa) + y * np.cos(pa)  # along major axis
     return np.array([s, t])
 
+def avefour(a: np.ndarray) -> np.ndarray:
+    b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
+         + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
+    return b
+
 def boxgauss(dv_over_cs: float) -> tuple:
     clipsigma = 3. + dv_over_cs
     dv = min([2, dv_over_cs]) / 10.
@@ -61,11 +66,6 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     mom1[mom0 < 3 * sigma_mom0] = np.nan
     return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
     
-
-def avefour(a: np.ndarray) -> np.ndarray:
-            b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
-                 + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
-            return b
 
 class ChannelFit():
 
@@ -312,9 +312,9 @@ class ChannelFit():
             c = (q := p_fixed[:3]) != None
             p_fixed[:3][c] = np.log10(q[c].astype('float'))
             if progressbar:
-                bar = tqdm(total=(nwalkers_per_ndim 
-                                  * len(p_fixed[p_fixed == None]) 
-                                  * (nburnin + 1 + nsteps + 1)))
+                total = len(p_fixed[p_fixed == None]) \
+                        * nwalkers_per_ndim * (nburnin + nsteps + 2)
+                bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
             def lnprob(p):
                 if progressbar:
