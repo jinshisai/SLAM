@@ -11,7 +11,7 @@ def gauss1d(x, amp, mean, fwhm):
 
 def emcee_corner(bounds, log_prob_fn, args: list = [],
                  nwalkers_per_ndim: int = 16,
-                 nburnin: int = 2000, nsteps: int = 1000,
+                 nburnin: int = 2000, nsteps: int = 2000,
                  gr_check: bool = False, ndata: int = 1000,
                  labels: list = None, rangelevel: float = 0.8,
                  figname: str = None, show_corner: bool = False,
