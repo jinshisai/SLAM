@@ -226,16 +226,13 @@ class ChannelFit():
                   + f' {n:d}')
         print('-----------------------------')
         
-        n = len(self.x) - 1 if len(self.x) // 2 == 0 else len(self.x)
-        xb = (np.arange(n) - (n - 1) // 2) * self.dx
-        yb = (np.arange(n) - (n - 1) // 2) * self.dy
-        xb, yb = np.meshgrid(xb, yb)
-        xb, yb = rot(xb, yb, np.radians(self.bpa))
+        xb = (np.arange(npix + 1) - npix // 2) * self.dx
+        yb = (np.arange(npix + 1) - npix // 2) * self.dy
+        xb, yb = rot(*np.meshgrid(xb, yb), np.radians(self.bpa))
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
-        pixperbeam = np.sum(gaussbeam)
-        gaussbeam = gaussbeam / pixperbeam
-        self.gaussbeam = gaussbeam
-        self.pixperbeam = pixperbeam
+        self.pixperbeam = np.sum(gaussbeam)
+        self.gaussbeam = gaussbeam / self.pixperbeam
+
         
 
 
