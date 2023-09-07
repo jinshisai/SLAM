@@ -62,6 +62,11 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
     
 
+def avefour(a: np.ndarray) -> np.ndarray:
+            b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
+                 + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
+            return b
+
 class ChannelFit():
 
 #    def __init__(self):
@@ -222,7 +227,19 @@ class ChannelFit():
         print('-----------------------------')
 
 
+    def getvlos(self, Mstar: float, Rc: float,
+                    r: np.ndarray, x: np.ndarray, y: np.ndarray):
+            vkep = vunit * np.sqrt(Mstar / r)
+            vjrot = vunit * np.sqrt(Mstar * Rc) / r
+            vr = -vunit * np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
+            vr[r < Rc] = 0
+            vrot = np.where(r < Rc, vkep, vjrot)
+            vlos = (vrot * y * self.signmajor 
+                    + vr * x * self.signminor) / r
+            vlos = vlos * self.sini
+            return vlos
 
+        
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                       offmajor: float, offminor: float, offvsys: float):
             if self.cs_fixed is None:
@@ -231,7 +248,7 @@ class ChannelFit():
                 prof, n_prof, dv_prof = self.prof, self.n_prof, self.dv_prof
             Iout = [None] * self.nlayer
             for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
-                vlos = getvlos(Mstar, Rc, r, x, y)
+                vlos = self.getvlos(Mstar, Rc, r, x, y)
                 v = np.subtract.outer(self.v_valid, vlos + offvsys)
                 iv = np.round(v / cs / dv_prof) + n_prof // 2
                 iv = iv.astype('int').clip(0, n_prof)
@@ -287,7 +304,7 @@ class ChannelFit():
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
         pixperbeam = np.sum(gaussbeam)
         gaussbeam = gaussbeam / pixperbeam
-
+        '''
         def getvlos(Mstar: float, Rc: float,
                     r: np.ndarray, x: np.ndarray, y: np.ndarray):
             vkep = vunit * np.sqrt(Mstar / r)
@@ -304,7 +321,7 @@ class ChannelFit():
             b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
                  + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
             return b
-                
+        '''        
         if cs_fixed is not None:            
             #prof0, n_prof0, dv_prof0 = boxgauss(self.dv / cs_fixed)
             self.cs_fixed = cs_fixed
