@@ -388,8 +388,9 @@ class ChannelFit():
         nx, ny, nv = h['NAXIS1'], h['NAXIS2'], h['NAXIS3']
 
         if None in [Mstar, Rc, cs, offmajor, offminor, offvsys]:
-            Mstar, Rc, cs, offmajor, offminor, offvsys = self.popt
-        m = self.cubemodel(Mstar, Rc, cs, offmajor, offminor, offvsys)
+            m = self.cubemodel(**self.popt)
+        else:
+            m = self.cubemodel(Mstar, Rc, cs, offmajor, offminor, offvsys)
         m_red = m[np.max(self.v_blue) < self.v_valid]
         m_blue = m[self.v_valid < np.min(self.v_red)]
         nanblue = np.full((len(self.v_nanblue), ny, nx), np.nan)
