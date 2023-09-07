@@ -270,7 +270,10 @@ class ChannelFit():
             prof, n_prof, dv_prof = self.prof, self.n_prof, self.dv_prof
         Iout = [None] * self.nlayer
         for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
-            vlos = self.get_vlos(Rc, r, x, y)
+            if self.Rc_fixed is None:
+                vlos = self.get_vlos(Rc, r, x, y)
+            else:
+                vlos = self.vlos[i]
             vlos *= np.sqrt(Mstar)
             v = np.subtract.outer(self.v_valid, vlos) - offvsys
             iv = np.round(v / cs / dv_prof) + n_prof // 2
@@ -322,6 +325,9 @@ class ChannelFit():
         if cs_fixed is not None:            
             self.cs_fixed = cs_fixed
             self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
+        if Rc_fixed is not None:
+            self.Rc_fixed = Rc_fixed
+        
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
         if None in p_fixed:
