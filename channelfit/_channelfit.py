@@ -196,15 +196,9 @@ class ChannelFit():
         self.npixnest = npixnest
         if npix % 2 == 1: npix += 1
         self.i0nest = npix // 2 - npixnest // 4
-        s = (np.arange(npix) - npix // 2 + 0.5) * dpix
-        X, Y = np.meshgrid(s, s)
-        xnest = [s]
-        ynest = [s]
-        Xnest = [X]
-        Ynest = [Y]
-        Rnest = [np.hypot(X, Y)]
+        xnest, ynest, Xnest, Ynest, Rnest = [], [], [], [], []
         self.nlayer = 4  # down to dpix / 2**(nlayer-1)
-        for l in range(self.nlayer - 1):
+        for l in range(self.nlayer):
             n = npixnest // 2 + 0.5
             s = np.linspace(-n, n, npixnest) * dpix / 2**(l + 1)
             X, Y = np.meshgrid(s, s)
