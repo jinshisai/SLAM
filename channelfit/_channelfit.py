@@ -271,9 +271,8 @@ class ChannelFit():
         if cs_fixed is not None:            
             prof0, n_prof0, dv_prof0 = boxgauss(self.dv / cs_fixed)
             
-        def cubemodel(logMstar: float, logRc: float, logcs: float,
+        def cubemodel(Mstar: float, Rc: float, cs: float,
                       offmajor: float, offminor: float, offvsys: float):
-            Mstar, Rc, cs = 10**logMstar, 10**logRc, 10**logcs
             if cs_fixed is None:
                 prof, n_prof, dv_prof = boxgauss(self.dv / cs)
             else:
@@ -323,6 +322,7 @@ class ChannelFit():
                     bar.update(1)
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
+                q[:3] = 10**q[:3]
                 chi2 = np.nansum((self.data_valid - cubemodel(*q))**2)
                 chi2 /= self.sigma**2 * pixperbeam
                 return -0.5 * chi2
@@ -386,8 +386,7 @@ class ChannelFit():
 
         if None in [Mstar, Rc, cs, offmajor, offminor, offvsys]:
             Mstar, Rc, cs, offmajor, offminor, offvsys = self.popt
-        logMstar, logRc, logcs = np.log10(Mstar), np.log10(Rc), np.log10(cs)
-        m = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor, offvsys)
+        m = self.cubemodel(Mstar, Rc, cs, offmajor, offminor, offvsys)
         m_red = m[np.max(self.v_blue) < self.v_valid]
         m_blue = m[self.v_valid < np.min(self.v_red)]
         nanblue = np.full((len(self.v_nanblue), ny, nx), np.nan)
@@ -416,14 +415,9 @@ class ChannelFit():
     def plotmodelmom(self, Mstar: float, Rc: float, cs: float,
                      offmajor: float, offminor: float, offvsys: float,
                      filename: str = 'modelmom01.png', pa: float = None):
-        logMstar, logRc, logcs = np.log10(Mstar), np.log10(Rc), np.log10(cs)
-        d = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor, offvsys)
-        m = makemom01(d, self.v_valid, self.sigma)
-        mom0 = m['mom0']
-        mom1 = m['mom1']
-        sigma_mom0 = m['sigma_mom0']
-        levels = np.arange(1, 20) * 6 * sigma_mom0
-        levels = levels[::2]
+        d = self.cubemodel(Mstar, Rc, cs, offmajor, offminor, offvsys)
+        mom1 = makemom01(d, self.v_valid, self.sigma)['mom1']
+        levels = np.arange(1, 20) * 6 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
@@ -432,7 +426,7 @@ class ChannelFit():
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
                           vmin=-vplot, vmax=vplot)
         fig.colorbar(m, ax=ax, label=r'Model mom1 (km s$^{-1}$)')
-        ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
+        ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
         if pa is not None:
             r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
             ax.plot(r * self.sinpa, r * self.cospa, 'k:')
@@ -472,20 +466,16 @@ class ChannelFit():
                         offmajor: float, offminor: float, offvsys: float,
                         filename: str = 'residualmom01.png',
                         pa: float = None):
-        logMstar, logRc, logcs = np.log10(Mstar), np.log10(Rc), np.log10(cs)
-        d = self.cubemodel(logMstar, logRc, logcs, offmajor, offminor, offvsys)
-        m = makemom01(d, self.v_valid, self.sigma)
-        mom0 = m['mom0']
-        mom1 = self.mom1 - m['mom1']
-        sigma_mom0 = m['sigma_mom0']
-        levels = np.arange(1, 20) * 6 * sigma_mom0
+        d = self.cubemodel(Mstar, Rc, cs, offmajor, offminor, offvsys)
+        mom1 = self.mom1 - makemom01(d, self.v_valid, self.sigma)['mom1']
+        levels = np.arange(1, 20) * 6 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
                           vmin=-self.dv * 3, vmax=self.dv * 3)
         fig.colorbar(m, ax=ax, label=r'Obs. $-$ model mom1 (km s$^{-1}$)')
-        ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
+        ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
         if pa is not None:
             r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
             ax.plot(r * self.sinpa, r * self.cospa, 'k:')
