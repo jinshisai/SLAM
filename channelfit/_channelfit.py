@@ -308,7 +308,7 @@ class ChannelFit():
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
         if cs_fixed is not None:
             prof0, n_prof0, dv_prof0 = boxgauss(self.dv / cs_fixed)
-            self.prof0, self.n_prof0, self.dv_prof0 = prof0, n_prof0, dv_prof0
+            self.prof, self.n_prof, self.dv_prof = prof0, n_prof0, dv_prof0
             
         
         
