@@ -247,7 +247,7 @@ class ChannelFit():
         return vlos
 
 
-    def get_vlos_fixed(self, Rc):
+    def get_vlos_fixed(self, Rc: float) -> None:
         self.vlos = [None] * self.nlayer
         for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
             Mstar = 1
@@ -327,6 +327,7 @@ class ChannelFit():
             self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
         if Rc_fixed is not None:
             self.Rc_fixed = Rc_fixed
+            self.get_vlos_fixed(Rc_fixed)
         
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
