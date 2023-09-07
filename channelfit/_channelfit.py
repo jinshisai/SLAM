@@ -234,11 +234,11 @@ class ChannelFit():
         self.gaussbeam = gaussbeam / self.pixperbeam
 
         
-    def getvlos(self, Mstar: float, Rc: float,
+    def get_vlos(self, Rc: float,
                 r: np.ndarray, x: np.ndarray, y: np.ndarray):
-        vkep = np.sqrt(Mstar / r)
-        vjrot = np.sqrt(Mstar * Rc) / r
-        vr = -np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
+        vkep = np.sqrt(1 / r)
+        vjrot = np.sqrt(1 * Rc) / r
+        vr = -np.sqrt(1 / r) * np.sqrt(2 - Rc / r)
         vr[r < Rc] = 0
         vrot = np.where(r < Rc, vkep, vjrot)
         vlos = (vrot * y * self.signmajor 
@@ -247,8 +247,8 @@ class ChannelFit():
         return vlos
 
 
-    def getvcube_fixed(self, Rc):
-        self.vcube = [None] * self.nlayer
+    def get_vlos_fixed(self, Rc):
+        self.vlos = [None] * self.nlayer
         for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
             Mstar = 1
             vkep = np.sqrt(Mstar / r)
@@ -259,8 +259,7 @@ class ChannelFit():
             vlos = (vrot * y * self.signmajor 
                     + vr * x * self.signminor) / r
             vlos = vlos * self.sini * vunit
-            v3d = np.subtract.outer(self.v_valid, vlos)
-            self.vcube[i] = v3d
+            self.vlos[i] = vlos
 
         
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
@@ -271,8 +270,9 @@ class ChannelFit():
             prof, n_prof, dv_prof = self.prof, self.n_prof, self.dv_prof
         Iout = [None] * self.nlayer
         for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
-            vlos = self.getvlos(Mstar, Rc, r, x, y)
-            v = np.subtract.outer(self.v_valid, vlos + offvsys)
+            vlos = self.get_vlos(Rc, r, x, y)
+            vlos *= np.sqrt(Mstar)
+            v = np.subtract.outer(self.v_valid, vlos) - offvsys
             iv = np.round(v / cs / dv_prof) + n_prof // 2
             iv = iv.astype('int').clip(0, n_prof)
             Iout[i] = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
