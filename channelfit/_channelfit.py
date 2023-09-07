@@ -193,7 +193,8 @@ class ChannelFit():
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         npix = max([len(self.x), len(self.y)])
         npixnest = int(2**(np.ceil(np.log2(npix))))
-        self.npixnest = npixnest
+        self.nq1 = npixnest // 4
+        self.nq2 = npixnest // 2
         self.nlayer = 4  # down to dpix / 2**(nlayer-1)
         xnest = [None] * self.nlayer
         ynest = [None] * self.nlayer
@@ -258,10 +259,8 @@ class ChannelFit():
         iv = np.round(v / cs / dv_prof) + n_prof // 2
         iv = iv.astype('int').clip(0, n_prof)
         Iout = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
-        i0 = self.npixnest // 4
-        i1 = i0 + self.npixnest // 2
         for l in range(self.nlayer - 1, 0, -1):
-            Iout[l - 1][:, i0:i1, i0:i1] = avefour(Iout[l])
+            Iout[l - 1][:, self.nq1:self.nq2, self.nq1:self.nq2] = avefour(Iout[l])
         Iout = Iout[0]
         y = self.xmajor - offmajor
         x = self.xminor - offminor * self.deproj
