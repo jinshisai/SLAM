@@ -194,6 +194,7 @@ class ChannelFit():
         npix = max([len(self.x), len(self.y)])
         npixnest = int(2**(np.ceil(np.log2(npix))))
         self.npixnest = npixnest
+        npix = npixnest
         if npix % 2 == 1: npix += 1
         self.i0nest = npix // 2 - npixnest // 4
         xnest, ynest, Xnest, Ynest, Rnest = [], [], [], [], []
@@ -214,7 +215,7 @@ class ChannelFit():
         self.Rnest = Rnest
         print('-------- nested grid --------')
         for l in range(len(xnest)):
-            n = npix if l == 0 else npixnest
+            n = npixnest
             print(f'x, dx, npix: +/-{xnest[l][-1]:.2f},'
                   + f' {xnest[l][1]-xnest[l][0]:.2f} au,'
                   + f' {n:d}')
