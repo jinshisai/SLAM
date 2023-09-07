@@ -230,7 +230,7 @@ class ChannelFit():
 
         
     def get_vlos(self, Rc: float,
-                r: np.ndarray, x: np.ndarray, y: np.ndarray):
+                 r: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
         vkep = np.sqrt(1 / r)
         vjrot = np.sqrt(1 * Rc) / r
         vr = -np.sqrt(1 / r) * np.sqrt(2 - Rc / r)
@@ -240,21 +240,6 @@ class ChannelFit():
                 + vr * x * self.signminor) / r
         vlos = vlos * self.sini * vunit
         return vlos
-
-
-    def get_vlos_fixed(self, Rc: float) -> None:
-        self.vlos = [None] * self.nlayer
-        r, x, y = self.Rnest, self.Xnest, self.Ynest
-        Mstar = 1
-        vkep = np.sqrt(Mstar / r)
-        vjrot = np.sqrt(Mstar * Rc) / r
-        vr = -np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
-        vr[r < Rc] = 0
-        vrot = np.where(r < Rc, vkep, vjrot)
-        vlos = (vrot * y * self.signmajor 
-                + vr * x * self.signminor) / r
-        vlos = vlos * self.sini * vunit
-        self.vlos = vlos
 
         
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
@@ -318,7 +303,7 @@ class ChannelFit():
             self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
         if Rc_fixed is not None:
             self.Rc_fixed = Rc_fixed
-            self.get_vlos_fixed(Rc_fixed)
+            self.vlos = self.get_vlos(Rc, self.Rnest, self.Xnest, self.Ynest)
         
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
