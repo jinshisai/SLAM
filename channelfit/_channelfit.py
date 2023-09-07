@@ -209,11 +209,11 @@ class ChannelFit():
             Xnest[l] = X
             Ynest[l] = Y
             Rnest[l] = np.hypot(X, Y)
-        self.xnest = xnest
-        self.ynest = ynest
-        self.Xnest = Xnest
-        self.Ynest = Ynest
-        self.Rnest = Rnest
+        self.xnest = np.array(xnest)
+        self.ynest = np.array(ynest)
+        self.Xnest = np.array(Xnest)
+        self.Ynest = np.array(Ynest)
+        self.Rnest = np.array(Rnest)
         print('-------- nested grid --------')
         for l in range(len(xnest)):
             print(f'x, dx, npix: +/-{xnest[l][-1]:.2f},'
@@ -244,17 +244,17 @@ class ChannelFit():
 
     def get_vlos_fixed(self, Rc: float) -> None:
         self.vlos = [None] * self.nlayer
-        for i, (r, x, y) in enumerate(zip(self.Rnest, self.Xnest, self.Ynest)):
-            Mstar = 1
-            vkep = np.sqrt(Mstar / r)
-            vjrot = np.sqrt(Mstar * Rc) / r
-            vr = -np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
-            vr[r < Rc] = 0
-            vrot = np.where(r < Rc, vkep, vjrot)
-            vlos = (vrot * y * self.signmajor 
-                    + vr * x * self.signminor) / r
-            vlos = vlos * self.sini * vunit
-            self.vlos[i] = vlos
+        r, x, y = self.Rnest, self.Xnest, self.Ynest
+        Mstar = 1
+        vkep = np.sqrt(Mstar / r)
+        vjrot = np.sqrt(Mstar * Rc) / r
+        vr = -np.sqrt(Mstar / r) * np.sqrt(2 - Rc / r)
+        vr[r < Rc] = 0
+        vrot = np.where(r < Rc, vkep, vjrot)
+        vlos = (vrot * y * self.signmajor 
+                + vr * x * self.signminor) / r
+        vlos = vlos * self.sini * vunit
+        self.vlos = vlos
 
         
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
