@@ -225,6 +225,18 @@ class ChannelFit():
                   + f' {xnest[l][1]-xnest[l][0]:.2f} au,'
                   + f' {n:d}')
         print('-----------------------------')
+        
+        n = len(self.x) - 1 if len(self.x) // 2 == 0 else len(self.x)
+        xb = (np.arange(n) - (n - 1) // 2) * self.dx
+        yb = (np.arange(n) - (n - 1) // 2) * self.dy
+        xb, yb = np.meshgrid(xb, yb)
+        xb, yb = rot(xb, yb, np.radians(self.bpa))
+        gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
+        pixperbeam = np.sum(gaussbeam)
+        gaussbeam = gaussbeam / pixperbeam
+        self.gaussbeam = gaussbeam
+        self.pixperbeam = pixperbeam
+        
 
 
     def getvlos(self, Mstar: float, Rc: float,
@@ -269,7 +281,7 @@ class ChannelFit():
                              bounds_error=False, fill_value=0)
                 m[i] = interp((y, x))
             #m = np.array(m) / np.max(m)
-            Iout = fftconvolve(m, [gaussbeam], mode='same', axes=(1, 2))
+            Iout = fftconvolve(m, [self.gaussbeam], mode='same', axes=(1, 2))
             mom0 = np.nansum(Iout, axis=0) * self.dv
             Iout = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
                             Iout * self.mom0 / mom0, 0)
@@ -296,14 +308,6 @@ class ChannelFit():
                 show: bool = False,
                 progressbar: bool = True):
         
-        n = len(self.x) - 1 if len(self.x) // 2 == 0 else len(self.x)
-        xb = (np.arange(n) - (n - 1) // 2) * self.dx
-        yb = (np.arange(n) - (n - 1) // 2) * self.dy
-        xb, yb = np.meshgrid(xb, yb)
-        xb, yb = rot(xb, yb, np.radians(self.bpa))
-        gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
-        pixperbeam = np.sum(gaussbeam)
-        gaussbeam = gaussbeam / pixperbeam
         '''
         def getvlos(Mstar: float, Rc: float,
                     r: np.ndarray, x: np.ndarray, y: np.ndarray):
@@ -381,7 +385,7 @@ class ChannelFit():
                 q[p_fixed == None] = p
                 q[:3] = 10**q[:3]
                 chi2 = np.nansum((self.data_valid - self.cubemodel(*q))**2)
-                chi2 /= self.sigma**2 * pixperbeam
+                chi2 /= self.sigma**2 * self.pixperbeam
                 return -0.5 * chi2
             plim = np.array([np.log10(Mstar_range),
                              np.log10(Rc_range),
