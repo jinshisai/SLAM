@@ -297,7 +297,7 @@ class ChannelFit():
         #m = np.array(m) / np.max(m)
         Iout = fftconvolve(m, [self.gaussbeam], mode='same', axes=(1, 2))
         mom0 = np.nansum(Iout, axis=0) * self.dv
-        Iout = np.where((mom0 > 0) * (self.mom0 > 3 * self.sigma_mom0),
+        Iout = np.where((self.mom0 > 3 * self.sigma_mom0),
                         Iout * self.mom0 / mom0, 0)
         return Iout
 
