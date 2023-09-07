@@ -307,6 +307,7 @@ class ChannelFit():
                 
         if cs_fixed is not None:            
             #prof0, n_prof0, dv_prof0 = boxgauss(self.dv / cs_fixed)
+            self.cs_fixed = cs_fixed
             self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
         '''    
         def cubemodel(Mstar: float, Rc: float, cs: float,
