@@ -28,7 +28,6 @@ GG = constants.G.si.value
 M_sun = constants.M_sun.si.value
 au = units.au.to('m')
 vunit = np.sqrt(GG * M_sun / au) * 1e-3
-lnvunit = np.log(vunit)
 
 def rot(x, y, pa):
     s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
@@ -41,15 +40,15 @@ def avefour(a: np.ndarray) -> np.ndarray:
     return b
 
 def boxgauss(dv_over_cs: float) -> tuple:
-    clipsigma = 3. + dv_over_cs
+    clipsigma = 3. + dv_over_cs  # in the unit of cs
     dv = min([2, dv_over_cs]) / 10.
-    ndv = 2 * int(dv_over_cs / 2. / dv + 0.5) + 1
+    ndv = 2 * int(dv_over_cs / 2. / dv + 0.5) + 1  # 0.5 is for rounding
     n = 2 * int(clipsigma / dv + 0.5) + 1
     v = np.linspace(-clipsigma, clipsigma, n)
     g = np.exp(-0.5 * v**2)
     #g /= np.sum(g)
     n = n - ndv
-    p = np.sum([g[i:i + n + 1] for i in range(ndv)], axis=0)
+    p = np.sum([g[i:i + n + 1] for i in range(ndv)], axis=0)  # new n = len(p) - 1
     #p /= ndv
     p[0] = p[n] = 0
     return p, n, dv
@@ -70,9 +69,7 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
 
 class ChannelFit():
 
-    def __init__(self):
-        self.Rc_fixed = None
-        self.cs_fixed = None
+    #def __init__(self):
         
 
     def read_cubefits(self, cubefits: str, center: str = None,
@@ -235,14 +232,13 @@ class ChannelFit():
         self.gaussbeam = gaussbeam / self.pixperbeam
 
         
-    def get_vlos(self, Rc: float,
-                 r: np.ndarray, erot: np.ndarray, erad: np.ndarray) -> np.ndarray:
-        vkep = r**(-1/2)
-        vjrot = np.sqrt(Rc) / r
-        vr = -r**(-1/2) * np.sqrt(2 - Rc / r)
-        vr[r < Rc] = 0
-        vrot = np.where(r < Rc, vkep, vjrot)
-        vlos = vrot * erot + vr * erad
+    def get_vlos(self, Rc: float) -> np.ndarray:
+        vkep = self.r**(-1/2)
+        vjrot = np.sqrt(Rc) / self.r
+        vr = -self.r**(-1/2) * np.sqrt(2 - Rc / self.r)
+        vr[self.Rnest < Rc] = 0
+        vrot = np.where(self.Rnest < Rc, vkep, vjrot)
+        vlos = vrot * self.erot + vr * self.erad
         vlos = vlos * self.sini * vunit
         return vlos
 
@@ -254,7 +250,7 @@ class ChannelFit():
         else:
             prof, n_prof, dv_prof = self.prof, self.n_prof, self.dv_prof
         if self.Rc_fixed is None:
-            vlos = self.get_vlos(Rc, self.Rnest, self.erot, self.erad)
+            vlos = self.get_vlos(Rc)
         else:
             vlos = self.vlos
         vlos = vlos * np.sqrt(Mstar)  # Don't use *=. It changes self.vlos.
@@ -307,7 +303,7 @@ class ChannelFit():
             self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
         if Rc_fixed is not None:
             self.Rc_fixed = Rc_fixed
-            self.vlos = self.get_vlos(Rc_fixed, self.Rnest, self.erot, self.erad)
+            self.vlos = self.get_vlos(Rc_fixed)
         
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
@@ -325,8 +321,8 @@ class ChannelFit():
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
                 q[:3] = 10**q[:3]
-                chi2 = np.nansum((self.data_valid - self.cubemodel(*q))**2)
-                chi2 /= self.sigma**2 * self.pixperbeam
+                chi2 = np.nansum((self.data_valid - self.cubemodel(*q))**2) \
+                       / self.sigma**2 / self.pixperbeam
                 return -0.5 * chi2
             plim = np.array([np.log10(Mstar_range),
                              np.log10(Rc_range),
@@ -391,7 +387,8 @@ class ChannelFit():
         h['CRPIX2'] = h['CRPIX2'] - self.offpix[1]
         #h['CRPIX3'] = h['CRPIX3'] - self.offpix[2]
         nx, ny, nv = h['NAXIS1'], h['NAXIS2'], h['NAXIS3']
-
+        self.cs_fixed = None
+        self.Rc_fixed = None
         if None in [Mstar, Rc, cs, offmajor, offminor, offvsys]:
             m = self.cubemodel(**self.popt)
         else:
