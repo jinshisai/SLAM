@@ -257,7 +257,7 @@ class ChannelFit():
             vlos = self.get_vlos(Rc, self.Rnest, self.erot, self.erad)
         else:
             vlos = self.vlos
-        vlos *= np.sqrt(Mstar)
+        vlos = vlos * np.sqrt(Mstar)
         v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
         v = np.moveaxis(v, 1, 0)  # layer, v, y, x
         iv = v / cs / dv_prof + n_prof // 2 + 0.5  # 0.5 is for rounding
