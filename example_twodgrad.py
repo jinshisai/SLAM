@@ -27,16 +27,15 @@ write_point = False  # True: write the 2D centers to a text file.
 
 
 '-------- HOW TO DO EACH STEP --------'
-if __name__ == '__main__':
-    filehead = cubefits.replace('.fits', '')
-    tdg = TwoDGrad()
-    tdg.get_2Dcenter(cubefits=cubefits, center=center,
-                      vsys=vsys, dist=dist, sigma=sigma, cutoff=cutoff,
-                      xmax=xmax, ymax=ymax, vmax=vmax, vmin=vmin,
-                      minrelerr=minrelerr, minabserr=minabserr, method=method)
-    tdg.find_rkep(pa=pa, tol_kep=tol_kep)
-    tdg.get_mstar(incl=incl)
-    if write_point: tdg.write_2Dcenter(filehead)
-    tdg.plot_center(filehead=filehead, xmax=xmax_plot, ymax=ymax_plot,
-                     vmax=vmax_plot, vmin=vmin_plot, show_figs=True)
+filehead = cubefits.replace('.fits', '')
+tdg = TwoDGrad()
+tdg.get_2Dcenter(cubefits=cubefits, center=center,
+                  vsys=vsys, dist=dist, sigma=sigma, cutoff=cutoff,
+                  xmax=xmax, ymax=ymax, vmax=vmax, vmin=vmin,
+                  minrelerr=minrelerr, minabserr=minabserr, method=method)
+tdg.find_rkep(pa=pa, tol_kep=tol_kep)
+tdg.get_mstar(incl=incl)
+if write_point: tdg.write_2Dcenter(filehead)
+tdg.plot_center(filehead=filehead, xmax=xmax_plot, ymax=ymax_plot,
+                 vmax=vmax_plot, vmin=vmin_plot, show_figs=True)
 '-------------------------------------'
