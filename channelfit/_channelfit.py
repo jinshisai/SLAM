@@ -202,22 +202,23 @@ class ChannelFit():
         self.nlayer = 4  # down to dpix / 2**(nlayer-1)
         xnest = [None] * self.nlayer
         ynest = [None] * self.nlayer
-        Xnest = [None] * self.nlayer
-        Ynest = [None] * self.nlayer
+        erot = [None] * self.nlayer
+        erad = [None] * self.nlayer
         Rnest = [None] * self.nlayer
         for l in range(self.nlayer):
             n = npixnest // 2 + 0.5
             s = np.linspace(-n, n, npixnest) * dpix / 2**(l + 1)
             X, Y = np.meshgrid(s, s)
+            R = np.hypot(X, Y)
             xnest[l] = s
             ynest[l] = s
-            Xnest[l] = X
-            Ynest[l] = Y
-            Rnest[l] = np.hypot(X, Y)
+            erot[l] = Y * self.signmajor / R
+            erad[l] = X * self.signminor / R
+            Rnest[l] = R
         self.xnest = np.array(xnest)
         self.ynest = np.array(ynest)
-        self.Xnest = np.array(Xnest)
-        self.Ynest = np.array(Ynest)
+        self.erot = np.array(erot)
+        self.erad = np.array(erad)
         self.Rnest = np.array(Rnest)
         print('-------- nested grid --------')
         for l in range(len(xnest)):
@@ -235,14 +236,13 @@ class ChannelFit():
 
         
     def get_vlos(self, Rc: float,
-                 r: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
-        vkep = np.sqrt(1 / r)
-        vjrot = np.sqrt(1 * Rc) / r
-        vr = -np.sqrt(1 / r) * np.sqrt(2 - Rc / r)
+                 r: np.ndarray, erot: np.ndarray, erad: np.ndarray) -> np.ndarray:
+        vkep = r**(-1/2)
+        vjrot = np.sqrt(Rc) / r
+        vr = -r**(-1/2) * np.sqrt(2 - Rc / r)
         vr[r < Rc] = 0
         vrot = np.where(r < Rc, vkep, vjrot)
-        vlos = (vrot * y * self.signmajor 
-                + vr * x * self.signminor) / r
+        vlos = vrot * erot + vr * erad
         vlos = vlos * self.sini * vunit
         return vlos
 
@@ -254,7 +254,7 @@ class ChannelFit():
         else:
             prof, n_prof, dv_prof = self.prof, self.n_prof, self.dv_prof
         if self.Rc_fixed is None:
-            vlos = self.get_vlos(Rc, self.Rnest, self.Xnest, self.Ynest)
+            vlos = self.get_vlos(Rc, self.Rnest, self.erot, self.erad)
         else:
             vlos = self.vlos
         vlos *= np.sqrt(Mstar)
@@ -307,7 +307,7 @@ class ChannelFit():
             self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
         if Rc_fixed is not None:
             self.Rc_fixed = Rc_fixed
-            self.vlos = self.get_vlos(Rc_fixed, self.Rnest, self.Xnest, self.Ynest)
+            self.vlos = self.get_vlos(Rc_fixed, self.Rnest, self.erot, self.erad)
         
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
