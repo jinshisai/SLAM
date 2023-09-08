@@ -22,13 +22,14 @@ if __name__ == '__main__':
                     vsys=vsys, dist=dist, sigma=sigma,
                     rmax=rmax, vlim=vlim)
     chan.fitting(Mstar_range=[0.01, 10.0],
-                 Rc_range=[5, 500],
-                 cs_range=[0.2, 2],
+                 Rc_fixed=1e5,
+                 cs_fixed=0.1,
                  offmajor_fixed=0, offminor_fixed=0, offvsys_fixed=0,
+                 nwalkers_per_ndim=4, nburnin=1, nsteps=100,
                  filename=filehead)
-    chan.modeltofits(filehead=filehead)
     #p = chan.popt
-    #chan.plotmodelmom(*p, pa=pa, filename=filehead+'.modelmom01.png')
+    #chan.modeltofits(**p, filehead=filehead)
+    #chan.plotmodelmom(**p, pa=pa, filename=filehead+'.modelmom01.png')
     #chan.plotobsmom(pa=pa, filename=filehead+'.obsmom01.png')
-    #chan.plotresidualmom(*p, pa=pa, filename=filehead+'.residualmom01.png')
+    #chan.plotresidualmom(**p, pa=pa, filename=filehead+'.residualmom01.png')
 '-------------------------------------'

@@ -69,7 +69,10 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
 
 class ChannelFit():
 
-#    def __init__(self):
+    def __init__(self):
+        self.Rc_fixed = None
+        self.cs_fixed = None
+        
 
     def read_cubefits(self, cubefits: str, center: str = None,
                       dist: float = 1, vsys: float = 0,
