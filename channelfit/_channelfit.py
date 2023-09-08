@@ -260,7 +260,8 @@ class ChannelFit():
         iv = iv.astype('int').clip(0, n_prof)
         Iout = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
         for l in range(self.nlayer - 1, 0, -1):
-            Iout[l - 1][:, self.nq1:self.nq3, self.nq1:self.nq3] = avefour(Iout[l])
+            Iout[l - 1][:, self.nq1:self.nq3, self.nq1:self.nq3] \
+                = avefour(Iout[l])
         Iout = Iout[0]
         y = self.xmajor - offmajor
         x = self.xminor - offminor * self.deproj
