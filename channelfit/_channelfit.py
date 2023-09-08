@@ -48,7 +48,7 @@ def boxgauss(dv_over_cs: float) -> tuple:
     g = np.exp(-0.5 * v**2)
     #g /= np.sum(g)
     n = n - ndv
-    p = np.sum([g[i:i + n + 1] for i in range(ndv)], axis=0)  # new n = len(p) - 1
+    p = np.sum([g[i:i + n + 1] for i in range(ndv)], axis=0)  # n = len(p) - 1
     #p /= ndv
     p[0] = p[n] = 0
     return p, n, dv
