@@ -1,14 +1,12 @@
 from twodgrad import TwoDGrad
 
 '-------- INPUTS --------'
-#cubefits = './twodgrad/IRAS16253_SBLB_12COh_robust_0.5.imsub.fits'
 cubefits = './twodgrad/IRAS16253_SBLB_C18O_robust_2.0.imsub.fits'
 center = '16h28m21.61526785s -24d36m24.32538414s'
 pa = 113  # deg
 incl = 65  # deg
 vsys = 4  # km/s
 dist = 139  # pc
-#sigma = 1.4e-3  # Jy/beam; None means automatic calculation.
 sigma = 1.9e-3  # Jy/beam; None means automatic calculation.
 cutoff = 5.0  # sigma
 tol_kep = 0.25  # beam; tolerance from the major axis
