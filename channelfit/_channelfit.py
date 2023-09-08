@@ -234,7 +234,7 @@ class ChannelFit():
         
     def get_vlos(self, Rc: float) -> np.ndarray:
         vkep = self.Rnest**(-1/2)
-        vjrot = np.sqrt(Rc) / self.r
+        vjrot = np.sqrt(Rc) / self.Rnest
         vr = -self.Rnest**(-1/2) * np.sqrt(2 - Rc / self.Rnest)
         vr[self.Rnest < Rc] = 0
         vrot = np.where(self.Rnest < Rc, vkep, vjrot)
