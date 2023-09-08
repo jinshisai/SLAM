@@ -297,12 +297,12 @@ class ChannelFit():
                 filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True):
-        
+
+        self.cs_fixed = cs_fixed        
         if cs_fixed is not None:            
-            self.cs_fixed = cs_fixed
             self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
+        self.Rc_fixed = Rc_fixed
         if Rc_fixed is not None:
-            self.Rc_fixed = Rc_fixed
             self.vlos = self.get_vlos(Rc_fixed)
         
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
