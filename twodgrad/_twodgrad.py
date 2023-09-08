@@ -339,7 +339,7 @@ class TwoDGrad():
         sca = ax.scatter(x_k, y_k, s=50, c=v_k, marker='o', cmap='jet',
                          vmin=-vmax, vmax=vmax, zorder=4)
         cb = plt.colorbar(sca, ax=ax, label=r'velocity (km s$^{-1}$)')
-        bpos = xmax - 1.4 * self.bmaj
+        bpos = xmax - 0.7 * self.bmaj
         e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
                     angle=self.bpa * np.sign(self.dx), facecolor='g')
         ax.add_patch(e)
