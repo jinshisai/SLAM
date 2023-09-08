@@ -215,7 +215,7 @@ class TwoDGrad():
                 Rkep[i] = (tc[i][k_shift[i] + 1] - tc[i][k_shift[i]]) \
                           / (sc[i][k_shift[i] + 1] - sc[i][k_shift[i]]) \
                           * (tol - sc[i][k_shift[i]]) + tc[i][k_shift[i]]
-                Vkep[i] = np.array([v[i][k_shift[i] + 1] for i in [0, 1]])
+                Vkep[i] = v[i][k_shift[i] + 1]
         Rkep /= 0.760  # Appendix A in Aso+15_ApJ_812_27
         print(f'Rkep(red, blue) = {Rkep[0]:.2f}, {Rkep[1]:.2f} au '
               + '(1/0.76 corrected)')

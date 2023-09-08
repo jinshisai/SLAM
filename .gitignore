@@ -21,4 +21,4 @@ pvsilhouette/__pycache__/__init__.cpython-310.pyc
 pvsilhouette/__pycache__/ulrichenvelope.cpython-310.pyc
 twodgrad/IRAS16253_SBLB_C18O_robust_2.0.imsub.majmin.png
 twodgrad/IRAS16253_SBLB_C18O_robust_2.0.imsub.majvel.png
-.gitignore
+twodgrad/IRAS16253_SBLB_C18O_robust_2.0.imsub.radec.png
