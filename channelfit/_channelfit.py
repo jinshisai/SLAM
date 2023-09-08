@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy import constants, units, wcs
 from astropy.coordinates import SkyCoord
-from scipy.signal import fftconvolve
+from scipy.signal import convolve
 from scipy.interpolate import RegularGridInterpolator as RGI
 import warnings
 from tqdm import tqdm
@@ -48,9 +48,10 @@ def boxgauss(dv_over_cs: float) -> tuple:
     v = np.linspace(-clipsigma, clipsigma, n)
     g = np.exp(-0.5 * v**2)
     #g /= np.sum(g)
-    p = np.sum([g[i:i + n - ndv + 1] for i in range(ndv)], axis=0)
-    #p /= ndv
     n = n - ndv
+    p = np.sum([g[i:i + n + 1] for i in range(ndv)], axis=0)
+    #p /= ndv
+    p[0] = p[n] = 0
     return p, n, dv
     
 def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
@@ -259,9 +260,9 @@ class ChannelFit():
         vlos *= np.sqrt(Mstar)
         v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
         v = np.moveaxis(v, 1, 0)  # layer, v, y, x
-        iv = np.round(v / cs / dv_prof) + n_prof // 2
+        iv = v / cs / dv_prof + n_prof // 2 + 0.5  # 0.5 is for rounding
         iv = iv.astype('int').clip(0, n_prof)
-        Iout = np.where((iv == 0) | (iv == n_prof), 0, prof[iv])
+        Iout = prof[iv]
         for l in range(self.nlayer - 1, 0, -1):
             Iout[l - 1][:, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[l])
@@ -274,7 +275,7 @@ class ChannelFit():
                          bounds_error=False, fill_value=0)
             m[i] = interp((y, x))
         #m = np.array(m) / np.max(m)
-        Iout = fftconvolve(m, [self.gaussbeam], mode='same', axes=(1, 2))
+        Iout = convolve(m, [self.gaussbeam], mode='same')
         mom0 = np.nansum(Iout, axis=0) * self.dv
         Iout = np.where((self.mom0 > 3 * self.sigma_mom0),
                         Iout * self.mom0 / mom0, 0)
