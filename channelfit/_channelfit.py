@@ -386,7 +386,9 @@ class ChannelFit():
         h['CRPIX1'] = h['CRPIX1'] - self.offpix[0]
         h['CRPIX2'] = h['CRPIX2'] - self.offpix[1]
         #h['CRPIX3'] = h['CRPIX3'] - self.offpix[2]
-        nx, ny, nv = h['NAXIS1'], h['NAXIS2'], h['NAXIS3']
+        nx = h['NAXIS1']
+        ny = h['NAXIS2']
+        #nv = h['NAXIS3']
         self.cs_fixed = None
         self.Rc_fixed = None
         if None in [Mstar, Rc, cs, offmajor, offminor, offvsys]:
