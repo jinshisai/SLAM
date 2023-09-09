@@ -21,29 +21,28 @@ from astropy.coordinates import SkyCoord
 from scipy.optimize import curve_fit
 
 
-def gauss2d(xy, peak, cx, cy, wx, wy, pa):
-    x, y = xy
-    z = ((y - cy) + 1j * (x - cx)) / np.exp(1j * pa)
-    t, s = np.real(z), np.imag(z)
-    return np.ravel(peak * np.exp2(-s**2 / wx**2 - t**2 / wy**2))
-
 def rot(x, y, pa):
     s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
     t = x * np.sin(pa) + y * np.cos(pa)  # along major axis
     return np.array([s, t])
 
-def irot(s, t, pa):
-    x =  s * np.cos(pa) + t * np.sin(pa)  # along R.A. axis
-    y = -s * np.sin(pa) + t * np.cos(pa)  # along Dec. axis
-    return np.array([x, y])
+def gauss2d(xy, peak, cx, cy, wx, wy, pa):
+    x, y = xy
+    s, t = rot(x - cx, y - cy, pa)
+    return np.ravel(peak * np.exp2(-s**2 / wx**2 - t**2 / wy**2))
+
 
 
 class TwoDGrad():
 
-#    def __init__(self):
+    def __init__(self):
+        self.result = {}
 
-    def read_cubefits(self, cubefits, dist, center, vsys=0, xmax=1e4, ymax=1e4,
-                      vmax=100, sigma=None):
+    def read_cubefits(self, cubefits: str, center: str = None,
+                      dist: float = 1, vsys: float = 0,
+                      xmax: float = 1e4, ymax: float = 1e4,
+                      vmin: float = -100, vmax: float = 100,
+                      sigma: float = None) -> dict:
         """
         Read a position-velocity diagram in the FITS format.
 
@@ -51,10 +50,10 @@ class TwoDGrad():
         ----------
         cubefits : str
             Name of the input FITS file including the extension.
-        dist : float
-            Distance of the target, used to convert arcsec to au.
         center : str
             Coordinates of the target: e.g., "01h23m45.6s 01d23m45.6s".
+        dist : float
+            Distance of the target, used to convert arcsec to au.
         vsys : float
             Systemic velocity of the target.
         xmax : float
@@ -62,7 +61,9 @@ class TwoDGrad():
         ymax : float
             The Dec. axis is limited to (-xmax, xmax) in the unit of au.
         vmax : float
-            The velocity axis of the PV diagram is limited to (-vmax, vmax).
+            The velocity axis of the PV diagram is limited to (vmin, vmax).
+        vmin : float
+            The velocity axis of the PV diagram is limited to (vmin, vmax).
         sigma : float
             Standard deviation of the FITS data. None means automatic.
 
@@ -72,24 +73,32 @@ class TwoDGrad():
             x (1D array), v (1D array), data (2D array), header, and sigma.
         """
         cc = constants.c.si.value
-        coord = SkyCoord(center, frame='icrs')
-        cx, cy = coord.ra.degree, coord.dec.degree
         f = fits.open(cubefits)[0]
         d, h = np.squeeze(f.data), f.header
+        if center is None:
+            cx, cy = 0, 0
+        else:
+            coord = SkyCoord(center, frame='icrs')
+            cx = coord.ra.degree - h['CRVAL1']
+            cy = coord.dec.degree - h['CRVAL2']
         if sigma is None:
             sigma = np.mean([np.nanstd(d[:2]), np.std(d[-2:])])
             print(f'sigma = {sigma:.3e}')
-        x = (np.arange(h['NAXIS1'])-h['CRPIX1']+1)*h['CDELT1']+h['CRVAL1']
-        y = (np.arange(h['NAXIS2'])-h['CRPIX2']+1)*h['CDELT2']+h['CRVAL2']
-        v = (np.arange(h['NAXIS3'])-h['CRPIX3']+1)*h['CDELT3']+h['CRVAL3']
+        x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
+        y = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
+        v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
+        v = v + h['CRVAL3']
         x = (x - cx) * 3600. * dist  # au
         y = (y - cy) * 3600. * dist  # au
         v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
         i0, i1 = np.argmin(np.abs(x - xmax)), np.argmin(np.abs(x + xmax))
         j0, j1 = np.argmin(np.abs(y + ymax)), np.argmin(np.abs(y - ymax))
-        k0, k1 = np.argmin(np.abs(v + vmax)), np.argmin(np.abs(v - vmax))
-        x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[k0:k1 + 1],
+        k0, k1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
+        self.offpix = (i0, j0, k0)
+        x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[k0:k1 + 1]
+        x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[:]
         d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
+        d =  d[:, j0:j1 + 1, i0:i1 + 1]
         dx, dy, dv = x[1] - x[0], y[1] - y[0], v[1] - v[0]
         if 'BMAJ' in h.keys():
             bmaj = h['BMAJ'] * 3600. * dist  # au
@@ -98,9 +107,9 @@ class TwoDGrad():
         else:
             bmaj, bmin, bpa = dy, -dx, 0
             print('No valid beam in the FITS file.')
-        self.x, self.dx = x, dx
-        self.y, self.dy = y, dy
-        self.v, self.dv = v, dv
+        self.x, self.dx, self.nx = x, dx, len(x)
+        self.y, self.dy, self.ny = y, dy, len(y)
+        self.v, self.dv, self.nv = v, dv, len(v)
         self.data, self.header, self.sigma = d, h, sigma
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
@@ -110,42 +119,42 @@ class TwoDGrad():
                      xmax=1e4, ymax=1e4, vmax=100, vmin=0, sigma=None,
                      cutoff=5, minrelerr=0.01, minabserr=0.1, method='mean'):
         if not (cubefits is None):
-            self.read_cubefits(cubefits, dist, center, vsys,
-                               xmax, ymax, vmax, sigma)
+            self.read_cubefits(cubefits, center, dist, vsys,
+                               xmax, ymax, vmin, vmax, sigma)
         x, y, v = self.x, self.y, self.v
         self.rmax = np.max(np.hypot(*np.meshgrid(x, y)))
-        dx, dy, dv = self.dx, self.dy, self.dv
-        sigma, d = self.sigma, self.data
+        dx, dy = self.dx, self.dy
+        sigma, data = self.sigma, self.data
 
         def clipped_error(err, val):
             return max(err, minrelerr * np.abs(val), minabserr * self.bmaj)
 
-        X, Y = np.meshgrid(x, y)
+        X_org, Y_org = np.meshgrid(x, y)
         xc, yc, dxc, dyc = [], [], [], []
-        for d_ch in d:
-            cond = d_ch > cutoff * sigma
-            dd, XX, YY = d_ch[cond], X[cond], Y[cond]
+        for d_org in data:
+            cond = d_org > cutoff * sigma
+            d, X, Y = d_org[cond], X_org[cond], Y_org[cond]
             xval, xerr, yval, yerr = np.nan, np.nan, np.nan, np.nan
-            if len(dd) > 1:
+            if len(d) > 1:
                 if method == 'mean':
-                    xval = np.sum(dd * XX) / np.sum(dd)
-                    xerr = sigma * np.sum(XX - xval) / np.sum(dd)
-                    yval = np.sum(dd * YY) / np.sum(dd)
-                    yerr = sigma * np.sum(YY - yval) / np.sum(dd)
+                    xval = np.sum(d * X) / np.sum(d)
+                    xerr = sigma * np.sum(X - xval) / np.sum(d)
+                    yval = np.sum(d * Y) / np.sum(d)
+                    yerr = sigma * np.sum(Y - yval) / np.sum(d)
                 elif method == 'peak':
-                    xval = XX[np.argmax(dd)]
-                    xerr = self.bmaj / (np.max(dd) / sigma)
-                    yval = YY[np.argmax(dd)]
-                    yerr = self.bmaj / (np.max(dd) / sigma)
+                    xval = X[np.argmax(d)]
+                    xerr = self.bmaj / (np.max(d) / sigma)
+                    yval = Y[np.argmax(d)]
+                    yerr = self.bmaj / (np.max(d) / sigma)
                 elif method == 'gauss':
-                    if len(dd) < 7: continue
+                    if len(d) < 7: continue
                     bounds = [[0, -xmax, -ymax, dx, dy, 0],
-                              [dd.max() * 2, xmax, ymax, xmax, ymax, np.pi]]
+                              [d.max() * 2, xmax, ymax, xmax, ymax, np.pi]]
                     try:
                         popt, pcov = curve_fit(gauss2d,
-                                               (XX.ravel(), YY.ravel()),
-                                               dd.ravel(), max_nfev=1000,
-                                               sigma=XX.ravel() * 0 + sigma,
+                                               (X.ravel(), Y.ravel()),
+                                               d.ravel(), max_nfev=1000,
+                                               sigma=X.ravel() * 0 + sigma,
                                                absolute_sigma=True,
                                                bounds=bounds)
                         xval, yval = popt[[1, 2]]
@@ -165,23 +174,24 @@ class TwoDGrad():
 
     def find_rkep(self, pa=0., tol_kep=0.5):
         ### Coordinate transformation ###
-        p = np.radians(pa)
+        pa_rad = np.radians(pa)
+        cospa, sinpa = np.cos(pa_rad), np.sin(pa_rad)
         tol = tol_kep * self.bmaj
         self.pa = pa
         self.tol_kep = tol_kep
         v, xc, yc = [self.center[i] for i in ['v', 'xc', 'yc']]
         dxc, dyc = [self.center[i] for i in ['dxc', 'dyc']]
-        min_off, maj_off = rot(xc, yc, p) 
+        min_off, maj_off = rot(xc, yc, pa_rad) 
         #self.min_off = min_off = np.mean(np.r_[min_off[:3], min_off[-3:]])
         self.min_off = min_off = 0
         #self.maj_off = maj_off = np.mean(np.r_[maj_off[:3], maj_off[-3:]])
         self.maj_off = maj_off = 0
-        self.xoff, self.yoff = xoff, yoff = irot(min_off, maj_off, p)
+        self.xoff, self.yoff = xoff, yoff = rot(min_off, maj_off, -pa_rad)
         print(f'min_off, maj_off = {min_off:.2f} au, {maj_off:.2f} au')
         print(f'xoff, yoff = {xoff:.2f} au, {yoff:.2f} au')
-        sc, tc = rot(xc - xoff, yc - yoff, p)
-        dsc = np.sqrt(np.cos(p)**2 * dxc**2 + np.sin(p)**2 * dyc**2)
-        dtc = np.sqrt(np.sin(p)**2 * dxc**2 + np.cos(p)**2 * dyc**2)
+        sc, tc = rot(xc - xoff, yc - yoff, pa_rad)
+        dsc = np.sqrt(cospa**2 * dxc**2 + sinpa**2 * dyc**2)
+        dtc = np.sqrt(sinpa**2 * dxc**2 + cospa**2 * dyc**2)
         self.minmaj = {'v':v, 'min':sc, 'dmin':dsc, 'maj':tc, 'dmaj':dtc}
         # Find the Keplerian disk radius
         s_s = np.sign(np.mean(sc[v > 0]))
@@ -217,6 +227,10 @@ class TwoDGrad():
                           * (tol - sc[i][k_shift[i]]) + tc[i][k_shift[i]]
                 Vkep[i] = v[i][k_shift[i] + 1]
         Rkep /= 0.760  # Appendix A in Aso+15_ApJ_812_27
+        self.result['Rkep_red'] = Rkep[0]
+        self.result['Rkep_blue'] = Rkep[1]
+        self.result['Vkep_red'] = Vkep[0]
+        self.result['Vkep_blue'] = Vkep[1]
         print(f'Rkep(red, blue) = {Rkep[0]:.2f}, {Rkep[1]:.2f} au '
               + '(1/0.76 corrected)')
         print(f'Vkep(red, blue) = {Vkep[0]:.3f}, {Vkep[1]:.3f} km/s ')
@@ -232,10 +246,10 @@ class TwoDGrad():
         """
         for title, a in zip(['center', 'minmaj'], [self.center, self.minmaj]):
             if hasattr(self, title):
-                np.savetxt(filehead + '.' + title + '.dat',
+                np.savetxt(filehead + '.' + title + '.txt',
                            np.array([a[i] for i in a.keys()]).T,
                            header='v (km/s), x (au), dx (au), y (au), dy (au)')
-            print(f'- Wrote to {filehead}.' + title + '.dat.')
+            print(f'- Wrote to {filehead}.' + title + '.txt.')
 
     def make_moment0(self):
         self.mom0 = np.sum(self.data, axis=0) * self.dv
@@ -251,6 +265,13 @@ class TwoDGrad():
         tt = np.r_[t_kep[0], t_kep[1]]
         dtt = np.r_[dt_kep[0], dt_kep[1]]
         if len(dtt) == 0:
+            self.result['p'] = 0
+            self.result['dp'] = 0
+            self.result['r0'] = 0
+            self.result['dr0'] = 0
+            self.result['v0'] = 0
+            self.result['Mstar'] = 0
+            self.result['dMstar'] = 0
             print('Skip Mstar calculation.')
             return 
         v0 = np.average(np.abs(vv), weights=1. / dtt**2)
@@ -260,6 +281,11 @@ class TwoDGrad():
                                absolute_sigma=True,
                                bounds=[[0, 0.01], [self.rmax, 10]])
         r0, p, dr0, dp = *popt, *np.sqrt(np.diag(pcov))
+        self.result['p'] = p
+        self.result['dp'] = dp
+        self.result['r0'] = r0
+        self.result['dr0'] = dr0
+        self.result['v0'] = v0
         print(f'p = {p:.3f} +/- {dp:.3f}')
         print(f'r0 = {r0:.2f} +/- {dr0:.2f} au at {v0:.3f} km/s')
         GG = constants.G.si.value
@@ -272,8 +298,20 @@ class TwoDGrad():
         dM0 = np.std(np.abs(tt) * vv**2) * unit  # M_sun
         dM0 /= 0.760  # Appendix A in Aso+15_ApJ_812_27
         #dM0 = dr0 / r0 * M0
+        self.result['Mstar'] = M0
+        self.result['dMstar'] = dM0
         print(f'Mstar = {M0:.3f} +/- {dM0:.3f} Msun (1/0.76 corrected)')
 
+    def write_result(self, filename):
+        with open(filename, 'w') as f:
+            f.write('# The radius and mass are 1/0.76 corrected.\n')
+            f.write('# Rkep (au), Vkep (km/s), p, dp, r0 (au), dr0 (au),'
+                    +' v0 (km/s), Mstar (Msun), dMstar (Msun)\n')
+            for k in ['Rkep', 'Vkep', 'p', 'dp', 'r0', 'dr0', 
+                      'v0', 'Mstar', 'dMstar']:
+                a = self.result[k]
+                f.write(f'{a}:e ')
+        
     def plot_center(self, filehead='channelanalysis', show_figs=False,
                     xmax=1e4, ymax=1e4, vmax=10, vmin=0.1):
         p = np.radians(self.pa)
@@ -321,11 +359,11 @@ class TwoDGrad():
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(1, 1, 1)
         r = np.linspace(-xmax * 1.5, xmax * 1.5, 100)
-        r = np.concatenate((irot(0, r, p), [[np.nan],[np.nan]],
-                            irot(r, 0, p)), axis=1)
+        r = np.concatenate((rot(0, r, -p), [[np.nan],[np.nan]],
+                            rot(r, 0, -p)), axis=1)
         ax.plot(r[0] + self.xoff, r[1] + self.yoff, 'k-')
         for s in [1, -1]:
-            d = irot(self.min_off + s * tol, self.maj_off, p)
+            d = rot(self.min_off + s * tol, self.maj_off, -p)
             ax.plot(r[0] + d[0], r[1] + d[1], 'k--')
         ax.pcolor(x, y, mom0, shading='nearest', cmap='binary')
         ax.errorbar(x_k, y_k, xerr=dx_k, yerr=dy_k,
