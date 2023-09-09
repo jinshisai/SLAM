@@ -303,10 +303,13 @@ class TwoDGrad():
     def write_result(self, filename):
         with open(filename, 'w') as f:
             f.write('# The radius and mass are 1/0.76 corrected.\n')
-            f.write('# Rkep (au), Vkep (km/s), p, dp, r0 (au), dr0 (au),'
-                    +' v0 (km/s), Mstar (Msun), dMstar (Msun)\n')
-            for k in ['Rkep', 'Vkep', 'p', 'dp', 'r0', 'dr0', 
-                      'v0', 'Mstar', 'dMstar']:
+            f.write('# Rkep_blue (au), Rkep_red (au),'
+                    + ' Vkep_blue (km/s), Vkep_red (km/s),'
+                    + ' p, dp, r0 (au), dr0 (au), v0 (km/s),'
+                    + ' Mstar (Msun), dMstar (Msun)\n')
+            for k in ['Rkep_blue', 'Rkep_red', 'Vkep_blue', 'Vkep_red', 
+                      'p', 'dp', 'r0', 'dr0', 'v0',
+                      'Mstar', 'dMstar']:
                 a = self.result[k]
                 f.write(f'{a}:e ')
         
