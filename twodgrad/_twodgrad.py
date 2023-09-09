@@ -96,9 +96,7 @@ class TwoDGrad():
         k0, k1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
         self.offpix = (i0, j0, k0)
         x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[k0:k1 + 1]
-        x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[:]
         d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
-        d =  d[:, j0:j1 + 1, i0:i1 + 1]
         dx, dy, dv = x[1] - x[0], y[1] - y[0], v[1] - v[0]
         if 'BMAJ' in h.keys():
             bmaj = h['BMAJ'] * 3600. * dist  # au
@@ -116,7 +114,7 @@ class TwoDGrad():
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
     def get_2Dcenter(self, cubefits=None, dist=None, center=None, vsys=None,
-                     xmax=1e4, ymax=1e4, vmax=100, vmin=0, sigma=None,
+                     xmax=1e4, ymax=1e4, vmax=100, vmin=-100, sigma=None,
                      cutoff=5, minrelerr=0.01, minabserr=0.1, method='mean'):
         if not (cubefits is None):
             self.read_cubefits(cubefits, center, dist, vsys,
