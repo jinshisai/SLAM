@@ -311,7 +311,7 @@ class TwoDGrad():
                       'p', 'dp', 'r0', 'dr0', 'v0',
                       'Mstar', 'dMstar']:
                 a = self.result[k]
-                f.write(f'{a}:e ')
+                f.write(f'{a:e} ')
         print(f'- Wrote to {filename}.')
         
     def plot_center(self, filehead='channelanalysis', show_figs=False,
