@@ -154,7 +154,7 @@ class ChannelFit():
                    pa: float = 0, incl: float = 90, dist: float = 1,
                    center: str = None, vsys: float = 0,
                    rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
-                   sigma: float = None):
+                   sigma: float = None, nlayer: int = 4):
         if not (cubefits is None):
             self.read_cubefits(cubefits, center, dist, vsys,
                                rmax, rmax, vlim[0], vlim[3], sigma)
@@ -196,13 +196,13 @@ class ChannelFit():
         npixnest = int(2**(np.ceil(np.log2(npix))))
         self.nq1 = npixnest // 4
         self.nq3 = self.nq1 + npixnest // 2
-        self.nlayer = 4  # down to dpix / 2**(nlayer-1)
-        xnest = [None] * self.nlayer
-        ynest = [None] * self.nlayer
-        erot = [None] * self.nlayer
-        erad = [None] * self.nlayer
-        Rnest = [None] * self.nlayer
-        for l in range(self.nlayer):
+        self.nlayer = nlayer  # down to dpix / 2**(nlayer-1)
+        xnest = [None] * nlayer
+        ynest = [None] * nlayer
+        erot = [None] * nlayer
+        erad = [None] * nlayer
+        Rnest = [None] * nlayer
+        for l in range(nlayer):
             n = npixnest // 2 + 0.5
             s = np.linspace(-n, n, npixnest) * dpix / 2**l
             X, Y = np.meshgrid(s, s)
