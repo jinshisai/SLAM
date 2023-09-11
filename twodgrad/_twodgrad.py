@@ -332,7 +332,7 @@ class TwoDGrad():
         s_n, ds_n, t_n, dt_n = [], [], [], []
         v_n = []
         for i in [0, 1]:
-            if ~np.isnan(k):
+            if ~np.isnan(k[i]):
                 x_k  = np.r_[x_k,   xc[i][k[i]:]]
                 dx_k = np.r_[dx_k, dxc[i][k[i]:]]
                 y_k  = np.r_[y_k,   yc[i][k[i]:]]
