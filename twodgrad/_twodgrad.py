@@ -259,8 +259,8 @@ class TwoDGrad():
         for i in [0, 1]:
             if k[i] is not None:
                 v_kep[i] = v[i][k[i] + 1:]
-                t_kep = tc[i][k[i] + 1:]
-                dt_kep = dtc[i][k[i] + 1:]
+                t_kep[i] = tc[i][k[i] + 1:]
+                dt_kep[i] = dtc[i][k[i] + 1:]
         vv = np.r_[np.abs(v_kep[0]), np.abs(v_kep[1])]
         tt = np.r_[t_kep[0], t_kep[1]]
         dtt = np.r_[dt_kep[0], dt_kep[1]]
