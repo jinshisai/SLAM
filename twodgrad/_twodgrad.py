@@ -206,7 +206,7 @@ class TwoDGrad():
         v = [v[v > 0], -v[v < 0][::-1]]
         self.__X = {'v':v, 'x':xc, 'dx':dxc, 'y':yc, 'dy':dyc, 'n':nc}
         self.__M = {'v':v, 'min':sc, 'dmin':dsc, 'maj':tc, 'dmaj':dtc}
-        self.k_notkep = [None, None]
+        self.k_notkep = [np.nan, np.nan]
         for i, c in zip([0, 1], ['red', 'blue']):
             if nc[i] == 0:
                 print(f'!!!No point on the {c}shifted side.!!!')
@@ -257,7 +257,7 @@ class TwoDGrad():
         k = self.k_notkep
         v_kep, t_kep, dt_kep = [[], []], [[], []], [[], []]
         for i in [0, 1]:
-            if k[i] is not None:
+            if ~np.isnan(k[i]):
                 v_kep[i] = v[i][k[i] + 1:]
                 t_kep[i] = tc[i][k[i] + 1:]
                 dt_kep[i] = dtc[i][k[i] + 1:]
