@@ -255,9 +255,12 @@ class TwoDGrad():
     def get_mstar(self, incl):
         v, tc, dtc = [self.__M[i] for i in ['v', 'maj', 'dmaj']]
         k = self.k_notkep
-        v_kep = [v[i][k[i] + 1:] for i in [0, 1]]
-        t_kep = [tc[i][k[i] + 1:] for i in [0, 1]]
-        dt_kep = [dtc[i][k[i] + 1:] for i in [0, 1]]
+        v_kep, t_kep, dt_kep = [[], []], [[], []], [[], []]
+        for i in [0, 1]:
+            if k[i] is not None:
+                v_kep[i] = v[i][k[i] + 1:]
+                t_kep = tc[i][k[i] + 1:]
+                dt_kep = dtc[i][k[i] + 1:]
         vv = np.r_[np.abs(v_kep[0]), np.abs(v_kep[1])]
         tt = np.r_[t_kep[0], t_kep[1]]
         dtt = np.r_[dt_kep[0], dt_kep[1]]
