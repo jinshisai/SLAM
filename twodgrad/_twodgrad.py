@@ -196,6 +196,7 @@ class TwoDGrad():
         t_s = np.sign(np.mean(tc[v > 0]))
         sc = [s_s * sc[v > 0], -s_s * sc[v < 0][::-1]]
         tc = [t_s * tc[v > 0], -t_s * tc[v < 0][::-1]]
+        nc = [len(tc[0]), len(tc[1])]
         dsc = [dsc[v > 0], dsc[v < 0][::-1]]
         dtc = [dtc[v > 0], dtc[v < 0][::-1]]
         xc = [xc[v > 0], xc[v < 0][::-1]]
@@ -203,35 +204,33 @@ class TwoDGrad():
         dxc = [dxc[v > 0], dxc[v < 0][::-1]]
         dyc = [dyc[v > 0], dyc[v < 0][::-1]]
         v = [v[v > 0], -v[v < 0][::-1]]
-        self.__X = {'v':v, 'x':xc, 'dx':dxc, 'y':yc, 'dy':dyc}
+        self.__X = {'v':v, 'x':xc, 'dx':dxc, 'y':yc, 'dy':dyc, 'n':nc}
         self.__M = {'v':v, 'min':sc, 'dmin':dsc, 'maj':tc, 'dmaj':dtc}
-        k_back = [np.argmax(tc[i]) - 1 for i in [0, 1]]
-        k_shift = [np.where(np.r_[[1e10], np.abs(sc[i])] > tol)[0][-1] for i in [0, 1]]
-        k_shift = [max(0, i - 1) for i in k_shift]
-        k_notkep = [max(k_back[i], k_shift[i]) for i in [0, 1]]
-        self.k_notkep = k_notkep
+        self.k_notkep = [None, None]
         for i, c in zip([0, 1], ['red', 'blue']):
-            if k_back[i] == len(sc[i]) - 1:
-                print('!!!No spin-up point on the ' + c + 'shifted side.!!!')
-            if k_shift[i] == len(sc[i]) - 1:
-                print('!!!No major-axis point on the ' + c + 'shifted side.!!!')
-
-        Rkep = np.array([tc[i][k_back[i] + 1] for i in [0, 1]])
-        Vkep = np.array([v[i][k_back[i] + 1] for i in [0, 1]])
-        for i in [0, 1]:
-            if k_back[i] < k_shift[i] < len(sc[i]) - 1:
-                Rkep[i] = (tc[i][k_shift[i] + 1] - tc[i][k_shift[i]]) \
-                          / (sc[i][k_shift[i] + 1] - sc[i][k_shift[i]]) \
-                          * (tol - sc[i][k_shift[i]]) + tc[i][k_shift[i]]
-                Vkep[i] = v[i][k_shift[i] + 1]
-        Rkep /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-        self.result['Rkep_red'] = Rkep[0]
-        self.result['Rkep_blue'] = Rkep[1]
-        self.result['Vkep_red'] = Vkep[0]
-        self.result['Vkep_blue'] = Vkep[1]
-        print(f'Rkep(red, blue) = {Rkep[0]:.2f}, {Rkep[1]:.2f} au '
-              + '(1/0.76 corrected)')
-        print(f'Vkep(red, blue) = {Vkep[0]:.3f}, {Vkep[1]:.3f} km/s ')
+            if nc[i] == 0:
+                print(f'!!!No point on the {c}shifted side.!!!')
+                Rkep, Vkep = np.nan, np.nan
+            else:
+                k_back = np.argmax(tc[i])
+                k_shift = np.where(np.r_[[tol * 2], np.abs(sc[i])] > tol)[0][-1] - 1
+                self.k_notkep[i] = max(k_back - 1, k_shift)  # can be -1
+                if k_back == nc[i] - 1:
+                    print(f'!!!No spin-up point on the {c}shifted side.!!!')
+                if k_shift == nc[i] - 1:
+                    print(f'!!!No major-axis point on the {c}shifted side.!!!')
+                Rkep = tc[i][k_back]
+                Vkep = v[i][k_back]
+                if k_back < k_shift < nc[i] - 1:
+                    Rkep = (tc[i][k_shift + 1] - tc[i][k_shift]) \
+                            / (sc[i][k_shift + 1] - sc[i][k_shift]) \
+                            * (tol - sc[i][k_shift]) + tc[i][k_shift]
+                    Vkep = v[i][k_shift + 1]
+                Rkep /= 0.760  # Appendix A in Aso+15_ApJ_812_27
+                print(f'Rkep({c}) = {Rkep:.2f} au (1/0.76 corrected)')
+                print(f'Vkep({c}) = {Vkep:.3f} km/s')
+            self.result[f'Rkep_{c}'] = Rkep
+            self.result[f'Vkep_{c}'] = Vkep
 
     def write_2Dcenter(self, filehead='channelanalysis'):
         """
@@ -244,10 +243,10 @@ class TwoDGrad():
         """
         for title, a in zip(['center', 'minmaj'], [self.center, self.minmaj]):
             if hasattr(self, title):
-                np.savetxt(filehead + '.' + title + '.txt',
+                np.savetxt(f'{filehead}.{title}.txt',
                            np.array([a[i] for i in a.keys()]).T,
                            header='v (km/s), x (au), dx (au), y (au), dy (au)')
-            print(f'- Wrote to {filehead}.' + title + '.txt.')
+            print(f'- Wrote to {filehead}.{title}.txt.')
 
     def make_moment0(self):
         self.mom0 = np.sum(self.data, axis=0) * self.dv
