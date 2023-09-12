@@ -206,26 +206,30 @@ class TwoDGrad():
         v = [v[v > 0], -v[v < 0][::-1]]
         self.__X = {'v':v, 'x':xc, 'dx':dxc, 'y':yc, 'dy':dyc, 'n':nc}
         self.__M = {'v':v, 'min':sc, 'dmin':dsc, 'maj':tc, 'dmaj':dtc}
-        self.k_notkep = [np.nan, np.nan]
+        self.k_kep = [[], []]
+        self.k_notkep = [[], []]
         for i, c in zip([0, 1], ['red', 'blue']):
             if nc[i] == 0:
                 print(f'!!!No point on the {c}shifted side.!!!')
                 Rkep, Vkep = np.nan, np.nan
             else:
-                k_back = np.argmax(tc[i])
-                k_shift = np.where(np.r_[[tol * 2], np.abs(sc[i])] > tol)[0][-1] - 1
-                self.k_notkep[i] = max(k_back - 1, k_shift)  # can be -1
-                if k_back == nc[i] - 1:
+                c_major = (np.abs(sc[i]) <= tol)
+                c_spinup = (v[i] >= v[i][np.argmax(np.abs(tc[i]))])
+                k_major = np.where(c_major)[0]
+                k_spinup = np.where(c_spinup)[0]
+                self.k_kep[i] = np.where(c_major & c_spinup)[0]
+                self.k_notkep[i] = np.where(~(c_major & c_spinup))[0]
+                if len(k_spinup) == 0:
                     print(f'!!!No spin-up point on the {c}shifted side.!!!')
-                if k_shift == nc[i] - 1:
+                if len(k_major) == 0:
                     print(f'!!!No major-axis point on the {c}shifted side.!!!')
-                Rkep = tc[i][k_back]
-                Vkep = v[i][k_back]
-                if k_back < k_shift < nc[i] - 1:
-                    Rkep = (tc[i][k_shift + 1] - tc[i][k_shift]) \
-                            / (sc[i][k_shift + 1] - sc[i][k_shift]) \
-                            * (tol - sc[i][k_shift]) + tc[i][k_shift]
-                    Vkep = v[i][k_shift + 1]
+                Rkep = tc[i][self.k_kep[i][-1]]
+                Vkep = v[i][self.k_kep[i][-1]]
+                #if k_back < k_shift < nc[i] - 1:
+                #    Rkep = (tc[i][k_shift + 1] - tc[i][k_shift]) \
+                #            / (sc[i][k_shift + 1] - sc[i][k_shift]) \
+                ##            * (tol - sc[i][k_shift]) + tc[i][k_shift]
+                 #   Vkep = v[i][k_shift + 1]
                 Rkep /= 0.760  # Appendix A in Aso+15_ApJ_812_27
                 print(f'Rkep({c}) = {Rkep:.2f} au (1/0.76 corrected)')
                 print(f'Vkep({c}) = {Vkep:.3f} km/s')
@@ -254,13 +258,13 @@ class TwoDGrad():
 
     def get_mstar(self, incl):
         v, tc, dtc = [self.__M[i] for i in ['v', 'maj', 'dmaj']]
-        k = self.k_notkep
+        k = self.k_kep
         v_kep, t_kep, dt_kep = [[], []], [[], []], [[], []]
         for i in [0, 1]:
-            if ~np.isnan(k[i]):
-                v_kep[i] = v[i][k[i] + 1:]
-                t_kep[i] = tc[i][k[i] + 1:]
-                dt_kep[i] = dtc[i][k[i] + 1:]
+            if len(k[i]) == 0:
+                v_kep[i] = v[i][k]
+                t_kep[i] = tc[i][k]
+                dt_kep[i] = dtc[i][k]
         vv = np.r_[np.abs(v_kep[0]), np.abs(v_kep[1])]
         tt = np.r_[t_kep[0], t_kep[1]]
         dtt = np.r_[dt_kep[0], dt_kep[1]]
@@ -324,7 +328,6 @@ class TwoDGrad():
         dxc, dyc = [self.__X[i] for i in ['dx', 'dy']]
         sc, tc = [self.__M[i] for i in ['min', 'maj']]
         dsc, dtc = [self.__M[i] for i in ['dmin', 'dmaj']]
-        k = np.array(self.k_notkep) + 1
         x_k, dx_k, y_k, dy_k = [], [], [], []
         s_k, ds_k, t_k, dt_k = [], [], [], []
         v_k = []
@@ -332,26 +335,26 @@ class TwoDGrad():
         s_n, ds_n, t_n, dt_n = [], [], [], []
         v_n = []
         for i in [0, 1]:
-            if ~np.isnan(k[i]):
-                j = int(k[i])
-                x_k  = np.r_[x_k,   xc[i][j:]]
-                dx_k = np.r_[dx_k, dxc[i][j:]]
-                y_k  = np.r_[y_k,   yc[i][j:]]
-                dy_k = np.r_[dy_k, dyc[i][j:]]
-                s_k  = np.r_[s_k,   sc[i][j:]]
-                ds_k = np.r_[ds_k, dsc[i][j:]]
-                t_k  = np.r_[t_k,   tc[i][j:]]
-                dt_k = np.r_[dt_k, dtc[i][j:]]
-                v_k  = np.r_[v_k,    v[i][j:] * (-1)**i]
-                x_n  = np.r_[x_n,   xc[i][:j]]
-                dx_n = np.r_[dx_n, dxc[i][:j]]
-                y_n  = np.r_[y_n,   yc[i][:j]]
-                dy_n = np.r_[dy_n, dyc[i][:j]]
-                s_n  = np.r_[s_n,   sc[i][:j]]
-                ds_n = np.r_[ds_n, dsc[i][:j]]
-                t_n  = np.r_[t_n,   tc[i][:j]]
-                dt_n = np.r_[dt_n, dtc[i][:j]]
-                v_n  = np.r_[v_n ,   v[i][:j] * (-1)**i]
+            if len(j := self.k_kep[i]) > 0:
+                x_k  = np.r_[x_k,   xc[i][j]]
+                dx_k = np.r_[dx_k, dxc[i][j]]
+                y_k  = np.r_[y_k,   yc[i][j]]
+                dy_k = np.r_[dy_k, dyc[i][j]]
+                s_k  = np.r_[s_k,   sc[i][j]]
+                ds_k = np.r_[ds_k, dsc[i][j]]
+                t_k  = np.r_[t_k,   tc[i][j]]
+                dt_k = np.r_[dt_k, dtc[i][j]]
+                v_k  = np.r_[v_k,    v[i][j] * (-1)**i]
+            if len(j := self.k_notkep[i]) > 0:
+                x_n  = np.r_[x_n,   xc[i][j]]
+                dx_n = np.r_[dx_n, dxc[i][j]]
+                y_n  = np.r_[y_n,   yc[i][j]]
+                dy_n = np.r_[dy_n, dyc[i][j]]
+                s_n  = np.r_[s_n,   sc[i][j]]
+                ds_n = np.r_[ds_n, dsc[i][j]]
+                t_n  = np.r_[t_n,   tc[i][j]]
+                dt_n = np.r_[dt_n, dtc[i][j]]
+                v_n  = np.r_[v_n ,   v[i][j] * (-1)**i]
          
         ### Plot the derived points on three planes. ###
         plt.rcParams['font.size'] = 24
