@@ -297,8 +297,8 @@ class TwoDGrad():
         au = units.au.to('m')
         unit = 1.e6 * au / GG / M_sun / np.sin(np.radians(incl))**2
         #M0 = r0 * v0**2 * unit  # M_sun
-        M0 = np.average(np.abs(t) * v**2, weight=1. / dt**2) * unit  # M_sun
-        dM0 = np.average((np.abs(t) * v**2 - M0)**2, weight=1. / dt**2)
+        M0 = np.average(np.abs(t) * v**2, weights=1. / dt**2) * unit  # M_sun
+        dM0 = np.average((np.abs(t) * v**2 - M0)**2, weights=1. / dt**2)
         dM0 = np.sqrt(dM0) * unit  # M_sun
         M0 /= 0.760  # Appendix A in Aso+15_ApJ_812_27
         dM0 /= 0.760  # Appendix A in Aso+15_ApJ_812_27
