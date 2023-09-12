@@ -267,10 +267,10 @@ class TwoDGrad():
                 v_kep[i] = v[i][k]
                 t_kep[i] = tc[i][k]
                 dt_kep[i] = dtc[i][k]
-        vv = np.r_[np.abs(v_kep[0]), np.abs(v_kep[1])]
-        tt = np.r_[t_kep[0], t_kep[1]]
-        dtt = np.r_[dt_kep[0], dt_kep[1]]
-        if len(dtt) == 0:
+        v = np.r_[np.abs(v_kep[0]), np.abs(v_kep[1])]
+        t = np.r_[t_kep[0], t_kep[1]]
+        dt = np.r_[dt_kep[0], dt_kep[1]]
+        if len(dt) == 0:
             self.result['p'] = 0
             self.result['dp'] = 0
             self.result['r0'] = 0
@@ -280,11 +280,9 @@ class TwoDGrad():
             self.result['dMstar'] = 0
             print('Skip Mstar calculation.')
             return 
-        v0 = np.average(np.abs(vv), weights=1. / dtt**2)
+        v0 = np.average(np.abs(v), weights=1. / dt**2)
         power_r = lambda v, r0, p: r0 / (v / v0)**(1. / p)
-        popt, pcov = curve_fit(power_r, vv, tt,
-                               sigma=vv * 0 + dtt,
-                               absolute_sigma=True,
+        popt, pcov = curve_fit(power_r, v, t, sigma=dt, absolute_sigma=True,
                                bounds=[[0, 0.01], [self.rmax, 10]])
         r0, p, dr0, dp = *popt, *np.sqrt(np.diag(pcov))
         self.result['p'] = p
@@ -299,9 +297,10 @@ class TwoDGrad():
         au = units.au.to('m')
         unit = 1.e6 * au / GG / M_sun / np.sin(np.radians(incl))**2
         #M0 = r0 * v0**2 * unit  # M_sun
-        M0 = np.mean(np.abs(tt) * vv**2) * unit  # M_sun
+        M0 = np.average(np.abs(t) * v**2, weight=1. / dt**2) * unit  # M_sun
+        dM0 = np.average((np.abs(t) * v**2 - M0)**2, weight=1. / dt**2)
+        dM0 = np.sqrt(dM0) * unit  # M_sun
         M0 /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-        dM0 = np.std(np.abs(tt) * vv**2) * unit  # M_sun
         dM0 /= 0.760  # Appendix A in Aso+15_ApJ_812_27
         #dM0 = dr0 / r0 * M0
         self.result['Mstar'] = M0
