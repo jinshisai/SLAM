@@ -209,9 +209,9 @@ class TwoDGrad():
         self.k_kep = [[], []]
         self.k_notkep = [[], []]
         for i, c in zip([0, 1], ['red', 'blue']):
+            Rkep, Vkep = np.nan, np.nan
             if nc[i] == 0:
                 print(f'!!!No point on the {c}shifted side.!!!')
-                Rkep, Vkep = np.nan, np.nan
             else:
                 c_major = (np.abs(sc[i]) <= tol)
                 c_spinup = (v[i] >= v[i][np.argmax(np.abs(tc[i]))])
@@ -223,16 +223,19 @@ class TwoDGrad():
                     print(f'!!!No spin-up point on the {c}shifted side.!!!')
                 if len(k_major) == 0:
                     print(f'!!!No major-axis point on the {c}shifted side.!!!')
-                Rkep = tc[i][self.k_kep[i][-1]]
-                Vkep = v[i][self.k_kep[i][-1]]
-                #if k_back < k_shift < nc[i] - 1:
-                #    Rkep = (tc[i][k_shift + 1] - tc[i][k_shift]) \
-                #            / (sc[i][k_shift + 1] - sc[i][k_shift]) \
-                ##            * (tol - sc[i][k_shift]) + tc[i][k_shift]
-                 #   Vkep = v[i][k_shift + 1]
-                Rkep /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-                print(f'Rkep({c}) = {Rkep:.2f} au (1/0.76 corrected)')
-                print(f'Vkep({c}) = {Vkep:.3f} km/s')
+                if len(self.k_kep[i]) == 0:
+                    print(f'!!!No Keplerian point on the {c}shifted side.!!!')
+                else:
+                    Rkep = tc[i][self.k_kep[i][-1]]
+                    Vkep = v[i][self.k_kep[i][-1]]
+                    #if k_back < k_shift < nc[i] - 1:
+                    #    Rkep = (tc[i][k_shift + 1] - tc[i][k_shift]) \
+                    #            / (sc[i][k_shift + 1] - sc[i][k_shift]) \
+                    ##            * (tol - sc[i][k_shift]) + tc[i][k_shift]
+                     #   Vkep = v[i][k_shift + 1]
+                    Rkep /= 0.760  # Appendix A in Aso+15_ApJ_812_27
+                    print(f'Rkep({c}) = {Rkep:.2f} au (1/0.76 corrected)')
+                    print(f'Vkep({c}) = {Vkep:.3f} km/s')
             self.result[f'Rkep_{c}'] = Rkep
             self.result[f'Vkep_{c}'] = Vkep
 
