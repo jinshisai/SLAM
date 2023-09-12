@@ -330,12 +330,13 @@ class TwoDGrad():
         dxc, dyc = [self.__X[i] for i in ['dx', 'dy']]
         sc, tc = [self.__M[i] for i in ['min', 'maj']]
         dsc, dtc = [self.__M[i] for i in ['dmin', 'dmaj']]
-        x_k, dx_k, y_k, dy_k = [], [], [], []
-        s_k, ds_k, t_k, dt_k = [], [], [], []
-        v_k = []
-        x_n, dx_n, y_n, dy_n = [], [], [], []
-        s_n, ds_n, t_n, dt_n = [], [], [], []
-        v_n = []
+        c = np.array([])
+        x_k, dx_k, y_k, dy_k = c * 1, c * 1, c * 1, c * 1
+        s_k, ds_k, t_k, dt_k = c * 1, c * 1, c * 1, c * 1
+        v_k = c * 1
+        x_n, dx_n, y_n, dy_n = c * 1, c * 1, c * 1, c * 1
+        s_n, ds_n, t_n, dt_n = c * 1, c * 1, c * 1, c * 1
+        v_n = c * 1
         for i in [0, 1]:
             if len(j := self.k_kep[i]) > 0:
                 x_k  = np.r_[x_k,   xc[i][j]]
