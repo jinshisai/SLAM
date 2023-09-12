@@ -440,7 +440,6 @@ class TwoDGrad():
         print(f'- Plotted in {filehead}.majmin.png')
 
         # On the major-velocity plane
-        xmax = xmax / 2
         xmin = xmax * (vmin / vmax)
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(1, 1, 1)
