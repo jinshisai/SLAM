@@ -258,10 +258,9 @@ class TwoDGrad():
 
     def get_mstar(self, incl):
         v, tc, dtc = [self.__M[i] for i in ['v', 'maj', 'dmaj']]
-        k = self.k_kep
         v_kep, t_kep, dt_kep = [[], []], [[], []], [[], []]
         for i in [0, 1]:
-            if len(k[i]) == 0:
+            if len(k := self.k_kep[i]) > 0:
                 v_kep[i] = v[i][k]
                 t_kep[i] = tc[i][k]
                 dt_kep[i] = dtc[i][k]
