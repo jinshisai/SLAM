@@ -325,7 +325,7 @@ class TwoDGrad():
                     xmax=1e4, ymax=1e4, vmax=10, vmin=0.1):
         p = np.radians(self.pa)
         dpa = p - np.radians(self.bpa)
-        bmax = np.hypot(self.bmaj * np.cos(dpa), self.bmin * np.sin(dpa))
+        bmax = np.hypot(self.bmaj * np.sin(dpa), self.bmin * np.cos(dpa))
         tol = self.tol_kep * bmax
         v, xc, yc = [self.__X[i] for i in ['v', 'x', 'y']]
         dxc, dyc = [self.__X[i] for i in ['dx', 'dy']]
