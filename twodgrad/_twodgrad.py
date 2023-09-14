@@ -324,7 +324,9 @@ class TwoDGrad():
     def plot_center(self, filehead='channelanalysis', show_figs=False,
                     xmax=1e4, ymax=1e4, vmax=10, vmin=0.1):
         p = np.radians(self.pa)
-        tol = self.tol_kep * self.bmaj
+        dpa = p - np.radians(self.bpa)
+        bmax = np.hypot(self.bmaj * np.cos(dpa), self.bmin * np.sin(dpa))
+        tol = self.tol_kep * bmax
         v, xc, yc = [self.__X[i] for i in ['v', 'x', 'y']]
         dxc, dyc = [self.__X[i] for i in ['dx', 'dy']]
         sc, tc = [self.__M[i] for i in ['min', 'maj']]
