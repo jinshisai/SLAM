@@ -307,6 +307,9 @@ class ChannelFit():
         if None in p_fixed:
             c = (q := p_fixed[:3]) != None
             p_fixed[:3][c] = np.log10(q[c].astype('float'))
+            labels = np.array(['log Mstar', 'log Rc', 'log cs',
+                               'offmajor', 'offminor', 'offvsys'])
+            labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
                        'labels': labels, 'rangelevel':None,
                        'figname':filename+'.corner.png', 'show_corner':show}
@@ -330,9 +333,6 @@ class ChannelFit():
                              np.log10(cs_range),
                              offmajor_range, offminor_range, offvsys_range])
             plim = plim[p_fixed == None].T
-            labels = np.array(['log Mstar', 'log Rc', 'log cs',
-                               'offmajor', 'offminor', 'offvsys'])
-            labels = labels[p_fixed == None]
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
             popt = p_fixed.copy()
             popt[p_fixed == None] = mcmc[0]

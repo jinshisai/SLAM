@@ -263,6 +263,8 @@ class PVSilhouette():
                 return major, minor
         p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed])
         if None in p_fixed:
+            labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$'])
+            labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':100, 'nsteps':500,
                        'rangelevel':None, 'labels':labels,
                        'figname':figname+'.corner.png', 'show_corner':show}
@@ -281,8 +283,6 @@ class PVSilhouette():
                 return -np.inf if chi2 > chi2max else -0.5 * chi2
             plim = np.array([Mstar_range, Rc_range, alphainfall_range])
             plim = np.log10(plim[p_fixed == None]).T
-            labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$'])
-            labels = labels[p_fixed == None]
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
             if np.isinf(lnprob(mcmc[0])):
                 print('No model is better than the all-0 or all-1 models.')
