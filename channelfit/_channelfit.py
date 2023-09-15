@@ -290,13 +290,10 @@ class ChannelFit():
                 offmajor_fixed: float = None,
                 offminor_fixed: float = None,
                 offvsys_fixed: float = None,
-                nwalkers_per_ndim: int = 16,
-                nburnin: int = 100,
-                nsteps: int = 300,
-                rangelevel: float = None,
                 filename: str = 'channelfit',
                 show: bool = False,
-                progressbar: bool = True):
+                progressbar: bool = True,
+                kwargs_emcee_corner: dict = {}):
 
         self.cs_fixed = cs_fixed        
         if cs_fixed is not None:            
@@ -332,13 +329,11 @@ class ChannelFit():
             labels = np.array(['log Mstar', 'log Rc', 'log cs',
                                'offmajor', 'offminor', 'offvsys'])
             labels = labels[p_fixed == None]
-            mcmc = emcee_corner(plim, lnprob,
-                                nwalkers_per_ndim=nwalkers_per_ndim,
-                                nburnin=nburnin, nsteps=nsteps,
-                                labels=labels, rangelevel=rangelevel,
-                                figname=filename+'.corner.png',
-                                show_corner=show,
-                                simpleoutput=False)
+            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
+                       'labels': labels, 'rangelevel':None,
+                       'figname':filename+'.corner.png', 'show_corner':show}
+            kwargs = dict(kwargs0, **kwargs_emcee_corner)
+            mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
             popt = p_fixed.copy()
             popt[p_fixed == None] = mcmc[0]
             popt[:3] = 10**popt[:3]

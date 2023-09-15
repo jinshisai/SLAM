@@ -203,9 +203,9 @@ class PVSilhouette():
                 Rc_fixed: float = None,
                 alphainfall_fixed: float = None,
                 cutoff: float = 5, vmask: list = [0, 0],
+                figname: str = 'PVsilhouette',
                 show: bool = False,
                 progressbar: bool = True,
-                figname: str = 'PVsilhouette',
                 kwargs_emcee_corner: dict = {}):
         majobs = np.where(self.dpvmajor > cutoff * self.sigma, 1, 0)
         minobs = np.where(self.dpvminor > cutoff * self.sigma, 1, 0)
@@ -278,12 +278,11 @@ class PVSilhouette():
             plim = np.log10(plim[p_fixed == None]).T
             labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$'])
             labels = labels[p_fixed == None]
-            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':2000, 'nsteps':2000,
-                       'rangelevel':0.95, 'figname':figname+'.corner.png',
-                       'show_corner':show}
+            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
+                       'rangelevel':None, 'labels':labels,
+                       'figname':figname+'.corner.png', 'show_corner':show}
             kwargs = dict(kwargs0, **kwargs_emcee_corner)
-            mcmc = emcee_corner(plim, lnprob, labels=labels,
-                                simpleoutput=False, **kwargs)
+            mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
             if np.isinf(lnprob(mcmc[0])):
                 print('No model is better than the all-0 or all-1 models.')
             popt = p_fixed.copy()
