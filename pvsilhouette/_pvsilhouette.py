@@ -263,9 +263,14 @@ class PVSilhouette():
                 return major, minor
         p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed])
         if None in p_fixed:
+            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':100, 'nsteps':500,
+                       'rangelevel':None, 'labels':labels,
+                       'figname':figname+'.corner.png', 'show_corner':show}
+            kwargs = dict(kwargs0, **kwargs_emcee_corner)
             if progressbar:
-                bar = tqdm(total=(16 * len(p_fixed[p_fixed == None]) 
-                                  * (100 + 1 + 1000 + 1)))
+                total = kwargs['nwalkers_per_ndim'] * len(p_fixed[p_fixed == None])
+                total *= kwargs['nburnin'] + kwargs['nsteps'] + 2
+                bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
             def lnprob(p):
                 if progressbar:
@@ -278,10 +283,6 @@ class PVSilhouette():
             plim = np.log10(plim[p_fixed == None]).T
             labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$'])
             labels = labels[p_fixed == None]
-            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':100, 'nsteps':500,
-                       'rangelevel':None, 'labels':labels,
-                       'figname':figname+'.corner.png', 'show_corner':show}
-            kwargs = dict(kwargs0, **kwargs_emcee_corner)
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
             if np.isinf(lnprob(mcmc[0])):
                 print('No model is better than the all-0 or all-1 models.')

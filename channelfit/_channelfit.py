@@ -307,9 +307,13 @@ class ChannelFit():
         if None in p_fixed:
             c = (q := p_fixed[:3]) != None
             p_fixed[:3][c] = np.log10(q[c].astype('float'))
+            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
+                       'labels': labels, 'rangelevel':None,
+                       'figname':filename+'.corner.png', 'show_corner':show}
+            kwargs = dict(kwargs0, **kwargs_emcee_corner)
             if progressbar:
-                total = len(p_fixed[p_fixed == None]) \
-                        * nwalkers_per_ndim * (nburnin + nsteps + 2)
+                total = kwargs['nwalkers_per_ndim'] * len(p_fixed[p_fixed == None])
+                total *= kwargs['nburnin'] + kwargs['nsteps'] + 2
                 bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
             def lnprob(p):
@@ -329,10 +333,6 @@ class ChannelFit():
             labels = np.array(['log Mstar', 'log Rc', 'log cs',
                                'offmajor', 'offminor', 'offvsys'])
             labels = labels[p_fixed == None]
-            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
-                       'labels': labels, 'rangelevel':None,
-                       'figname':filename+'.corner.png', 'show_corner':show}
-            kwargs = dict(kwargs0, **kwargs_emcee_corner)
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
             popt = p_fixed.copy()
             popt[p_fixed == None] = mcmc[0]
