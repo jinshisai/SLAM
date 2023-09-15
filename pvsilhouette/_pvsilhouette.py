@@ -205,7 +205,8 @@ class PVSilhouette():
                 cutoff: float = 5, vmask: list = [0, 0],
                 show: bool = False,
                 progressbar: bool = True,
-                figname: str = 'PVsilhouette'):
+                figname: str = 'PVsilhouette',
+                kwargs_emcee_corner: dict = {}):
         majobs = np.where(self.dpvmajor > cutoff * self.sigma, 1, 0)
         minobs = np.where(self.dpvminor > cutoff * self.sigma, 1, 0)
         x, v = np.meshgrid(self.x, self.v)
@@ -277,11 +278,12 @@ class PVSilhouette():
             plim = np.log10(plim[p_fixed == None]).T
             labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$'])
             labels = labels[p_fixed == None]
-            mcmc = emcee_corner(plim, lnprob,
-                                nwalkers_per_ndim=16, nburnin=100, nsteps=1000,
-                                labels=labels, rangelevel=0.95,
-                                figname=figname+'.corner.png',
-                                show_corner=show, simpleoutput=False)
+            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':2000, 'nsteps':2000,
+                       'rangelevel':0.95, 'figname':figname+'.corner.png',
+                       'show_corner':show}
+            kwargs = dict(kwargs0, **kwargs_emcee_corner)
+            mcmc = emcee_corner(plim, lnprob, labels=labels,
+                                simpleoutput=False, **kwargs)
             if np.isinf(lnprob(mcmc[0])):
                 print('No model is better than the all-0 or all-1 models.')
             popt = p_fixed.copy()
