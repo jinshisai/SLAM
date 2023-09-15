@@ -278,7 +278,7 @@ class PVSilhouette():
             plim = np.log10(plim[p_fixed == None]).T
             labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$'])
             labels = labels[p_fixed == None]
-            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
+            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':100, 'nsteps':500,
                        'rangelevel':None, 'labels':labels,
                        'figname':figname+'.corner.png', 'show_corner':show}
             kwargs = dict(kwargs0, **kwargs_emcee_corner)
