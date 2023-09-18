@@ -180,10 +180,8 @@ class TwoDGrad():
         v, xc, yc = [self.center[i] for i in ['v', 'xc', 'yc']]
         dxc, dyc = [self.center[i] for i in ['dxc', 'dyc']]
         if len(v) > 6:
-            xoff = (np.average(xc[:3], weights=1 / dxc[:3]**2) 
-                    + np.average(xc[-3:], weights=1 / dxc[-3:]**2)) / 2
-            yoff = (np.average(yc[:3], weights=1 / dyc[:3]**2) 
-                    + np.average(yc[-3:], weights=1 / dyc[-3:]**2)) / 2
+            xoff = np.mean(np.r_[xc[:3], xc[-3:]])
+            yoff = np.mean(np.r_[yc[:3], yc[-3:]])
         else:
             xoff = yoff = 0
         self.xoff, self.yoff = xoff, yoff
