@@ -171,6 +171,12 @@ class TwoDGrad():
         self.center = {'v':v, 'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
 
     def find_rkep(self, pa=0., tol_kep=0.5):
+        x, y = np.meshgrid(self.x, self.y)
+        self.make_moment0()
+        mom0 = self.mom0 * 1
+        mom0[mom0 > 3 * self.sigma_mom0] = 0
+        xoff = np.average(x, weights=mom0)
+        yoff = np.average(y, weights=mom0)
         ### Coordinate transformation ###
         pa_rad = np.radians(pa)
         cospa, sinpa = np.cos(pa_rad), np.sin(pa_rad)
@@ -179,12 +185,8 @@ class TwoDGrad():
         self.tol_kep = tol_kep
         v, xc, yc = [self.center[i] for i in ['v', 'xc', 'yc']]
         dxc, dyc = [self.center[i] for i in ['dxc', 'dyc']]
-        min_off, maj_off = rot(xc, yc, pa_rad) 
-        #self.min_off = min_off = np.mean(np.r_[min_off[:3], min_off[-3:]])
-        self.min_off = min_off = 0
-        #self.maj_off = maj_off = np.mean(np.r_[maj_off[:3], maj_off[-3:]])
-        self.maj_off = maj_off = 0
-        self.xoff, self.yoff = xoff, yoff = rot(min_off, maj_off, -pa_rad)
+        self.xoff, self.yoff = xoff, yoff
+        self.min_off, self.maj_off = min_off, maj_off = rot(xoff, yoff, pa_rad)
         print(f'min_off, maj_off = {min_off:.2f} au, {maj_off:.2f} au')
         print(f'xoff, yoff = {xoff:.2f} au, {yoff:.2f} au')
         sc, tc = rot(xc - xoff, yc - yoff, pa_rad)
