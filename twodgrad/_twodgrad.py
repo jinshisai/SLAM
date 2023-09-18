@@ -184,6 +184,8 @@ class TwoDGrad():
                     + np.average(xc[-3:], weights=1 / dxc[-3:]**2)) / 2
             yoff = (np.average(yc[:3], weights=1 / dyc[:3]**2) 
                     + np.average(yc[-3:], weights=1 / dyc[-3:]**2)) / 2
+        else:
+            xoff = yoff = 0
         self.xoff, self.yoff = xoff, yoff
         self.min_off, self.maj_off = min_off, maj_off = rot(xoff, yoff, pa_rad)
         print(f'min_off, maj_off = {min_off:.2f} au, {maj_off:.2f} au')
