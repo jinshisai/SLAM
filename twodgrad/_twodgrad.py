@@ -413,8 +413,8 @@ class TwoDGrad():
         p = np.radians(self.pa_grad)
         a = rot(0, r, -p)
         ax.plot(a[0] + self.xoff, a[1] + self.yoff, 'g-')
-        x, y = self.x, self.y
         if np.any(kep):
+            x, y = self.x, self.y
             z = np.sum(self.data[kep], axis=0) * self.dv
             ax.pcolormesh(x, y, z, cmap='binary', zorder=1)
         x = self.kepler['xc'] + self.xoff
