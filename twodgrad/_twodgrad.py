@@ -404,7 +404,7 @@ class TwoDGrad():
         if pa is not None:
             p = np.radians(pa)
             a = rot(0, r, -p)
-            ax.plot(a[0] + self.xoff, a[1] + self.yoff, 'k-')
+            ax.plot(a[0], a[1], 'k-')
         p = np.radians(self.pa_grad)
         a = rot(0, r, -p)
         ax.plot(a[0] + self.xoff, a[1] + self.yoff, 'g-')
@@ -412,7 +412,8 @@ class TwoDGrad():
         if np.any(kep):
             z = np.sum(self.data[kep], axis=0) * self.dv
             ax.pcolormesh(x, y, z, cmap='binary', zorder=1)
-        x, y = self.kepler['xc'], self.kepler['yc']
+        x = self.kepler['xc'] + self.xoff
+        y = self.kepler['yc'] + self.yoff
         dx, dy = self.kepler['dxc'], self.kepler['dyc']
         ax.errorbar(x, y, xerr=dx, yerr=dy, color='g', zorder=2)
         m = ax.scatter(x, y, c=self.v, cmap='jet', s=50,
