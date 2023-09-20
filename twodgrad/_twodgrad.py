@@ -223,6 +223,14 @@ class TwoDGrad():
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
         dyc = self.center['dyc'] * 1
+        self.xoff = np.nan
+        self.yoff = np.nan
+        self.pa_grad = np.nan
+        self.Rkep = np.nan
+        self.Vkep = np.nan
+        self.vmid = np.nan
+        self.Mstar = np.nan
+        self.power = np.nan
         if (n := len(v)) % 2 == 0:
             print('!!! Even number channels.!!!')
         for i in range(n):
