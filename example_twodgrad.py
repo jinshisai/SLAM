@@ -30,5 +30,5 @@ tdg.read_cubefits(cubefits=cubefits, center=center,
 tdg.get_2Dcenter(cutoff=cutoff,
                  minrelerr=minrelerr, minabserr=minabserr, method=method)
 tdg.filtering(incl=incl)
-tdg.plot_center(filehead=filehead, pa=pa, show_figs=True)
+tdg.plot_center(filehead=filehead, pa=pa, show_figs=show_figs)
 '-------------------------------------'
