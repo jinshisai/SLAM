@@ -456,6 +456,8 @@ class TwoDGrad():
         
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
+        ax.set_xlim(xmin * 0.999, xmax * 1.001)  # au
+        ax.set_ylim(vmin * 0.999, vmax * 1.001)  # km/s
         ax.errorbar(x, v, xerr=dx, fmt='o', color='k', zorder=1)
         w = self.v
         ax.plot(x[w < 0], v[w < 0], 'bo', zorder=2)
