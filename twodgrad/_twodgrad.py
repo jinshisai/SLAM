@@ -235,11 +235,13 @@ class TwoDGrad():
             if np.isnan(xc[i]) or np.isnan(yc)[i]:
                 v[i] = xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
                 v[j] = xc[j] = yc[j] = dxc[j] = dyc[j] = np.nan
-        if np.all(np.isnan(xc)):
-            print('No blue-red pair.')
             
         goodcenter = False
         while not goodcenter:
+            c = ~np.isnan(xc) * ~np.isnan(yc)
+            if not np.any(c):
+                print('No blue-red pair.')
+                break
             self.xoff = xoff = np.nanmedian(xc)
             self.yoff = yoff = np.nanmedian(yc)
             print(f'(xoff, yoff) = ({xoff:.2f}, {yoff:.2f}) au')
@@ -256,27 +258,28 @@ class TwoDGrad():
                 goodcenter = True
                 xc = xc - xoff
                 yc = yc - yoff
-        nhalf = (n - 1) // 2
-        b = np.abs(xc[:nhalf])
-        wb = (b / dxc[:nhalf])**2
-        lnb = np.log(b)
-        r = np.abs(xc[-1:-1-nhalf:-1])
-        wr = (r / dxc[-1:-1-nhalf:-1])**2
-        lnr = np.log(r)
-        x1 = np.exp((lnb * wb + lnr * wr) / (wb + wr))
         
-        b = np.abs(yc[:nhalf])
-        wb = (b / dyc[:nhalf])**2
-        lnb = np.log(b)
-        r = np.abs(yc[-1:-1-nhalf:-1])
-        wr = (r / dyc[-1:-1-nhalf:-1])**2
-        lnr = np.log(r)
-        y1 = np.exp((lnb * wb + lnr * wr) / (wb + wr))
-        
-        imax = np.nanargmax(np.hypot(x1, y1)) + 1
-        jmax = -imax
-        xc[imax:jmax] = np.nan
-        yc[imax:jmax] = np.nan
+        if goodcenter:
+            nhalf = (n - 1) // 2
+            b = np.abs(xc[:nhalf])
+            wb = (b / dxc[:nhalf])**2
+            lnb = np.log(b)
+            r = np.abs(xc[-1:-1-nhalf:-1])
+            wr = (r / dxc[-1:-1-nhalf:-1])**2
+            lnr = np.log(r)
+            x1 = np.exp((lnb * wb + lnr * wr) / (wb + wr))
+            b = np.abs(yc[:nhalf])
+            wb = (b / dyc[:nhalf])**2
+            lnb = np.log(b)
+            r = np.abs(yc[-1:-1-nhalf:-1])
+            wr = (r / dyc[-1:-1-nhalf:-1])**2
+            lnr = np.log(r)
+            y1 = np.exp((lnb * wb + lnr * wr) / (wb + wr))
+            imax = np.nanargmax(np.hypot(x1, y1)) + 1
+            jmax = -imax
+            xc[imax:jmax] = np.nan
+            yc[imax:jmax] = np.nan
+            
         goodangle = False
         while not goodangle:
             c = ~np.isnan(xc) * ~np.isnan(yc)
@@ -297,22 +300,23 @@ class TwoDGrad():
                 v[c] = xc[c] = yc[c] = dxc[c] = dyc[c] = np.nan
             else:
                 goodangle = True
-        xmajor = xc * np.sin(gradangle) + yc * np.cos(gradangle)
-        dxmajor = np.hypot(dxc * np.sin(gradangle), dyc * np.cos(gradangle))
-        b = np.abs(xmajor[:nhalf])
-        wb = (b / dxmajor[:nhalf])**2
-        lnb = np.log(b)
-        r = np.abs(xmajor[-1:-1-nhalf:-1])
-        wr = (r / dxmajor[-1:-1-nhalf:-1])**2
-        lnr = np.log(r)
-        xmajor = np.exp((lnb * wb + lnr * wr) / (wb + wr))
-        imax = np.nanargmax(xmajor) + 1
-        jmax = -imax
-        xc[imax:jmax] = np.nan
-        yc[imax:jmax] = np.nan
-        if imax == 0:
-            print('No spin-up point.')
+        
         if goodangle:
+            xmajor = xc * np.sin(gradangle) + yc * np.cos(gradangle)
+            dxmajor = np.hypot(dxc * np.sin(gradangle), dyc * np.cos(gradangle))
+            nhalf = (n - 1) // 2
+            b = np.abs(xmajor[:nhalf])
+            wb = (b / dxmajor[:nhalf])**2
+            lnb = np.log(b)
+            r = np.abs(xmajor[-1:-1-nhalf:-1])
+            wr = (r / dxmajor[-1:-1-nhalf:-1])**2
+            lnr = np.log(r)
+            xmajor = np.exp((lnb * wb + lnr * wr) / (wb + wr))
+            imax = np.nanargmax(xmajor) + 1
+            jmax = -imax
+            xc[imax:jmax] = np.nan
+            yc[imax:jmax] = np.nan
+
             sin_g, cos_g = np.sin(gradangle), np.cos(gradangle)
             r = np.abs(xf * sin_g + yf * cos_g)
             v = np.abs(vf)
