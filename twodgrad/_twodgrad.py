@@ -220,6 +220,7 @@ class TwoDGrad():
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
         dyc = self.center['dyc'] * 1
+        self.incl = incl
         self.xoff = np.nan
         self.yoff = np.nan
         self.pa_grad = np.nan
@@ -332,7 +333,6 @@ class TwoDGrad():
             lnv0 = np.mean(np.log(v))
             v0 = np.exp(lnv0)
             self.vmid = v0
-            self.incl = incl
             lnv = np.log(v) - lnv0
             weights = 1 / dlnr**2
             a00 = np.sum(lnv**2 * weights)
