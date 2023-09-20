@@ -449,10 +449,10 @@ class TwoDGrad():
             vmin = v0 / ratio
             vmax = v0 * ratio
         else:
-            xmax = np.max(self.x)
-            xmin = xmax / 16
-            vmax = np.max(self.v)
-            vmin = vmax / 16
+            xmax = np.max(self.x) * 1.5
+            xmin = xmax / 30
+            vmax = np.max(self.v) * 1.5
+            vmin = vmax / 30
         
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
