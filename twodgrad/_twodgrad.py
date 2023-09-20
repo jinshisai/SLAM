@@ -100,6 +100,9 @@ class TwoDGrad():
         x = (x - cx) * 3600. * dist  # au
         y = (y - cy) * 3600. * dist  # au
         v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
+        i0, i1 = np.argmin(np.abs(x - xmax)), np.argmin(np.abs(x + xmax))
+        j0, j1 = np.argmin(np.abs(y + ymax)), np.argmin(np.abs(y - ymax))
+        x, y = x[i0:i1 + 1], y[j0:j1 + 1]
         if centering_velocity:
             vnew = v - v[np.argmin(np.abs(v))]
             for j in range(len(d[0])):
@@ -108,11 +111,9 @@ class TwoDGrad():
                                  bounds_error=False, fill_value=0)
                     d[:, j, i] = f(vnew)
             v = vnew
-        i0, i1 = np.argmin(np.abs(x - xmax)), np.argmin(np.abs(x + xmax))
-        j0, j1 = np.argmin(np.abs(y + ymax)), np.argmin(np.abs(y - ymax))
         k0, k1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
         self.offpix = (i0, j0, k0)
-        x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[k0:k1 + 1]
+        v = v[k0:k1 + 1]
         d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
         dx, dy, dv = x[1] - x[0], y[1] - y[0], v[1] - v[0]
         if 'BMAJ' in h.keys():
