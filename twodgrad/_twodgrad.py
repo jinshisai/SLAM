@@ -19,8 +19,14 @@ from astropy.io import fits
 from astropy import constants, units
 from astropy.coordinates import SkyCoord
 from scipy.optimize import curve_fit
+from scipy.interpolate import interp1d
 
 
+GG = constants.G.si.value
+M_sun = constants.M_sun.si.value
+au = units.au.to('m')
+unit = 1.e6 * au / GG / M_sun
+        
 def rot(x, y, pa):
     s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
     t = x * np.sin(pa) + y * np.cos(pa)  # along major axis
@@ -42,7 +48,8 @@ class TwoDGrad():
                       dist: float = 1, vsys: float = 0,
                       xmax: float = 1e4, ymax: float = 1e4,
                       vmin: float = -100, vmax: float = 100,
-                      sigma: float = None) -> dict:
+                      sigma: float = None,
+                      centering_velocity: bool = False) -> dict:
         """
         Read a position-velocity diagram in the FITS format.
 
@@ -66,6 +73,8 @@ class TwoDGrad():
             The velocity axis of the PV diagram is limited to (vmin, vmax).
         sigma : float
             Standard deviation of the FITS data. None means automatic.
+        centering_velocity : bool
+            One channel has the exact velocity of vsys by interpolation.
 
         Returns
         ----------
@@ -91,6 +100,14 @@ class TwoDGrad():
         x = (x - cx) * 3600. * dist  # au
         y = (y - cy) * 3600. * dist  # au
         v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
+        if centering_velocity:
+            vnew = v - v[np.argmin(np.abs(v))]
+            for j in range(len(d[0])):
+                for i in range(len(d[0][0])):
+                    f = interp1d(v, d[:, j, i], kind='cubic',
+                                 bounds_error=False, fill_value=0)
+                    d[:, j, i] = f(vnew)
+            v = vnew
         i0, i1 = np.argmin(np.abs(x - xmax)), np.argmin(np.abs(x + xmax))
         j0, j1 = np.argmin(np.abs(y + ymax)), np.argmin(np.abs(y - ymax))
         k0, k1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
@@ -113,32 +130,63 @@ class TwoDGrad():
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
-    def get_2Dcenter(self, cubefits=None, dist=None, center=None, vsys=None,
-                     xmax=1e4, ymax=1e4, vmax=100, vmin=-100, sigma=None,
-                     cutoff=5, minrelerr=0.01, minabserr=0.1, method='mean'):
-        if not (cubefits is None):
-            self.read_cubefits(cubefits, center, dist, vsys,
-                               xmax, ymax, vmin, vmax, sigma)
-        x, y, v = self.x, self.y, self.v
-        self.rmax = np.max(np.hypot(*np.meshgrid(x, y)))
+
+    def get_mom1grad(self, cutoff: float = 5, vmask: list = [0, 0],
+                     weights: np.ndarray = 1):
+        self.make_moment01(vmask=vmask)
+        mom0, mom1, sigma_mom0 = self.mom0, self.mom1, self.sigma_mom0
+        mom1[mom0 < cutoff * sigma_mom0] = np.nan
+        x, y = np.meshgrid(self.x, self.y)
+        x = x[~np.isnan(mom1)]
+        y = y[~np.isnan(mom1)]
+        mom0 = mom0[~np.isnan(mom1)]
+        mom1 = mom1[~np.isnan(mom1)]
+        w = weights
+        xx = np.sum(x**2 * w)
+        yy = np.sum(y**2 * w)
+        xy = np.sum(x * y * w)
+        x1 = np.sum(x * w)
+        y1 = np.sum(y * w)
+        one = np.sum(w)
+        m = [[xx, xy, x1],
+             [xy, yy, y1],
+             [x1, y1, one]]
+        a = [np.sum(mom1 * x * w), np.sum(mom1 * y * w), np.sum(mom1 * w)]
+        a, b, v0 = np.dot(np.linalg.inv(m), a)
+        amp_g = np.hypot(a, b)
+        ang_g = np.arctan2(a, b)
+        roff = -v0 / amp_g
+        self.xoff = x0 = roff * np.sin(ang_g)
+        self.yoff = y0 = roff * np.cos(ang_g)
+        ang_g = np.degrees(ang_g)
+        print(f'Gradient amp. : {amp_g:.2e} km/s/au')
+        print(f'Gradient angle: {ang_g:.2f} degree')
+        print(f'Offset: v={v0:.2f} km/s or (x,y)=({x0:.2f}, {y0:.2f}) au')
+        return {'xoff':x0, 'yoff':y0, 'amp':amp_g, 'ang':ang_g}
+
+        
+    def get_2Dcenter(self, cutoff: float = 5, vmask: list = [0, 0],
+                     minrelerr: float = 0.01, minabserr: float = 0.1,
+                     method: str = 'mean'):
         dx, dy = self.dx, self.dy
+        xmax, ymax = np.max(self.x), np.max(self.y)
         sigma, data = self.sigma, self.data
 
         def clipped_error(err, val):
             return max(err, minrelerr * np.abs(val), minabserr * self.bmaj)
 
-        X_org, Y_org = np.meshgrid(x, y)
+        X_org, Y_org = np.meshgrid(self.x, self.y)
         xc, yc, dxc, dyc = [], [], [], []
-        for d_org in data:
+        for d_org, v in zip(data, self.v):
             cond = d_org > cutoff * sigma
             d, X, Y = d_org[cond], X_org[cond], Y_org[cond]
             xval, xerr, yval, yerr = np.nan, np.nan, np.nan, np.nan
-            if len(d) > 1:
+            if len(d) > 1 and (v < vmask[0] or vmask[1] < v):
                 if method == 'mean':
                     xval = np.sum(d * X) / np.sum(d)
-                    xerr = sigma * np.sum(X - xval) / np.sum(d)
+                    xerr = sigma * np.sqrt(np.sum((X - xval)**2)) / np.sum(d)
                     yval = np.sum(d * Y) / np.sum(d)
-                    yerr = sigma * np.sum(Y - yval) / np.sum(d)
+                    yerr = sigma * np.sqrt(np.sum((Y - yval)**2)) / np.sum(d)
                 elif method == 'peak':
                     xval = X[np.argmax(d)]
                     xerr = self.bmaj / (np.max(d) / sigma)
@@ -166,202 +214,133 @@ class TwoDGrad():
             yc.append(yval)
             dyc.append(yerr)
         xc, dxc, yc, dyc = np.array([xc, dxc, yc, dyc])
-        cond = ~np.isnan(xc) * ~np.isnan(yc)
-        xc, dxc, yc, dyc, v = np.c_[xc, dxc, yc, dyc, v][cond].T
-        self.center = {'v':v, 'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
-
-    def find_rkep(self, pa=0., tol_kep=0.5):
-        ### Coordinate transformation ###
-        pa_rad = np.radians(pa)
-        cospa, sinpa = np.cos(pa_rad), np.sin(pa_rad)
-        tol = tol_kep * self.bmaj
-        self.pa = pa
-        self.tol_kep = tol_kep
-        v, xc, yc = [self.center[i] for i in ['v', 'xc', 'yc']]
-        dxc, dyc = [self.center[i] for i in ['dxc', 'dyc']]
-        if len(v) > 6:
-            xoff = np.mean(np.r_[xc[:3], xc[-3:]])
-            yoff = np.mean(np.r_[yc[:3], yc[-3:]])
-        else:
-            xoff = yoff = 0
-        self.xoff, self.yoff = xoff, yoff
-        self.min_off, self.maj_off = min_off, maj_off = rot(xoff, yoff, pa_rad)
-        print(f'min_off, maj_off = {min_off:.2f} au, {maj_off:.2f} au')
-        print(f'xoff, yoff = {xoff:.2f} au, {yoff:.2f} au')
-        sc, tc = rot(xc - xoff, yc - yoff, pa_rad)
-        dsc = np.sqrt(cospa**2 * dxc**2 + sinpa**2 * dyc**2)
-        dtc = np.sqrt(sinpa**2 * dxc**2 + cospa**2 * dyc**2)
-        self.minmaj = {'v':v, 'min':sc, 'dmin':dsc, 'maj':tc, 'dmaj':dtc}
-        # Find the Keplerian disk radius
-        s_s = np.sign(np.mean(sc[v > 0]))
-        t_s = np.sign(np.mean(tc[v > 0]))
-        sc = [s_s * sc[v > 0], -s_s * sc[v < 0][::-1]]
-        tc = [t_s * tc[v > 0], -t_s * tc[v < 0][::-1]]
-        nc = [len(tc[0]), len(tc[1])]
-        dsc = [dsc[v > 0], dsc[v < 0][::-1]]
-        dtc = [dtc[v > 0], dtc[v < 0][::-1]]
-        xc = [xc[v > 0], xc[v < 0][::-1]]
-        yc = [yc[v > 0], yc[v < 0][::-1]]
-        dxc = [dxc[v > 0], dxc[v < 0][::-1]]
-        dyc = [dyc[v > 0], dyc[v < 0][::-1]]
-        v = [v[v > 0], -v[v < 0][::-1]]
-        self.__X = {'v':v, 'x':xc, 'dx':dxc, 'y':yc, 'dy':dyc, 'n':nc}
-        self.__M = {'v':v, 'min':sc, 'dmin':dsc, 'maj':tc, 'dmaj':dtc}
-        self.k_kep = [[], []]
-        self.k_notkep = [[], []]
-        for i, c in zip([0, 1], ['red', 'blue']):
-            Rkep, Vkep = np.nan, np.nan
-            if nc[i] == 0:
-                print(f'!!!No point on the {c}shifted side.!!!')
-            else:
-                c_major = (np.abs(sc[i]) <= tol)
-                c_spinup = (v[i] >= v[i][np.argmax(np.abs(tc[i]))])
-                k_major = np.where(c_major)[0]
-                k_spinup = np.where(c_spinup)[0]
-                self.k_kep[i] = np.where(c_major & c_spinup)[0]
-                self.k_notkep[i] = np.where(~(c_major & c_spinup))[0]
-                if len(k_spinup) == 0:
-                    print(f'!!!No spin-up point on the {c}shifted side.!!!')
-                if len(k_major) == 0:
-                    print(f'!!!No major-axis point on the {c}shifted side.!!!')
-                if len(self.k_kep[i]) == 0:
-                    print(f'!!!No Keplerian point on the {c}shifted side.!!!')
-                else:
-                    Rkep = tc[i][self.k_kep[i][-1]]
-                    Vkep = v[i][self.k_kep[i][-1]]
-                    #if k_back < k_shift < nc[i] - 1:
-                    #    Rkep = (tc[i][k_shift + 1] - tc[i][k_shift]) \
-                    #            / (sc[i][k_shift + 1] - sc[i][k_shift]) \
-                    ##            * (tol - sc[i][k_shift]) + tc[i][k_shift]
-                     #   Vkep = v[i][k_shift + 1]
-                    Rkep /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-                    print(f'Rkep({c}) = {Rkep:.2f} au (1/0.76 corrected)')
-                    print(f'Vkep({c}) = {Vkep:.3f} km/s')
-            self.result[f'Rkep_{c}'] = Rkep
-            self.result[f'Vkep_{c}'] = Vkep
-
-    def write_2Dcenter(self, filehead='channelanalysis'):
-        """
-        Write the 2D center in a text file.
-
-        Parameters
-        ----------
-        filehead : str
-            The output text file has a name of "filehead".center.dat. The file consists of five columns of v (km/s), x (au), dx (au), y (au), and dy (au).
-        """
-        for title, a in zip(['center', 'minmaj'], [self.center, self.minmaj]):
-            if hasattr(self, title):
-                np.savetxt(f'{filehead}.{title}.txt',
-                           np.array([a[i] for i in a.keys()]).T,
-                           header='v (km/s), x (au), dx (au), y (au), dy (au)')
-            print(f'- Wrote to {filehead}.{title}.txt.')
-
-    def make_moment0(self):
-        self.mom0 = np.sum(self.data, axis=0) * self.dv
-        self.sigma_mom0 = self.sigma * self.dv * np.sqrt(len(self.v))
-
-    def get_mstar(self, incl):
-        v, tc, dtc = [self.__M[i] for i in ['v', 'maj', 'dmaj']]
-        v_kep, t_kep, dt_kep = [[], []], [[], []], [[], []]
-        for i in [0, 1]:
-            if len(k := self.k_kep[i]) > 0:
-                v_kep[i] = v[i][k]
-                t_kep[i] = tc[i][k]
-                dt_kep[i] = dtc[i][k]
-        v = np.r_[np.abs(v_kep[0]), np.abs(v_kep[1])]
-        t = np.r_[t_kep[0], t_kep[1]]
-        dt = np.r_[dt_kep[0], dt_kep[1]]
-        if len(dt) == 0:
-            self.result['p'] = 0
-            self.result['dp'] = 0
-            self.result['r0'] = 0
-            self.result['dr0'] = 0
-            self.result['v0'] = 0
-            self.result['Mstar'] = 0
-            self.result['dMstar'] = 0
-            print('Skip Mstar calculation.')
-            return 
-        v0 = np.average(np.abs(v), weights=1. / dt**2)
-        power_r = lambda v, r0, p: r0 / (v / v0)**(1. / p)
-        popt, pcov = curve_fit(power_r, v, t, sigma=dt, absolute_sigma=True,
-                               bounds=[[0, 0.01], [self.rmax, 10]])
-        r0, p, dr0, dp = *popt, *np.sqrt(np.diag(pcov))
-        self.result['p'] = p
-        self.result['dp'] = dp
-        self.result['r0'] = r0
-        self.result['dr0'] = dr0
-        self.result['v0'] = v0
-        print(f'p = {p:.3f} +/- {dp:.3f}')
-        print(f'r0 = {r0:.2f} +/- {dr0:.2f} au at {v0:.3f} km/s')
-        GG = constants.G.si.value
-        M_sun = constants.M_sun.si.value
-        au = units.au.to('m')
-        unit = 1.e6 * au / GG / M_sun / np.sin(np.radians(incl))**2
-        #M0 = r0 * v0**2 * unit  # M_sun
-        M0 = np.average(np.abs(t) * v**2, weights=1. / dt**2) * unit  # M_sun
-        dM0 = np.average((np.abs(t) * v**2 - M0)**2, weights=1. / dt**2)
-        dM0 = np.sqrt(dM0) * unit  # M_sun
-        M0 /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-        dM0 /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-        #dM0 = dr0 / r0 * M0
-        self.result['Mstar'] = M0
-        self.result['dMstar'] = dM0
-        print(f'Mstar = {M0:.3f} +/- {dM0:.3f} Msun (1/0.76 corrected)')
-
-    def write_result(self, filename):
-        with open(filename, 'w') as f:
-            f.write('# The radius and mass are 1/0.76 corrected.\n')
-            f.write('# Rkep_blue (au), Rkep_red (au),'
-                    + ' Vkep_blue (km/s), Vkep_red (km/s),'
-                    + ' p, dp, r0 (au), dr0 (au), v0 (km/s),'
-                    + ' Mstar (Msun), dMstar (Msun)\n')
-            for k in ['Rkep_blue', 'Rkep_red', 'Vkep_blue', 'Vkep_red', 
-                      'p', 'dp', 'r0', 'dr0', 'v0',
-                      'Mstar', 'dMstar']:
-                a = self.result[k]
-                f.write(f'{a:e} ')
-        print(f'- Wrote to {filename}.')
+        self.center = {'v':self.v, 'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
         
-    def plot_center(self, filehead='channelanalysis', show_figs=False,
-                    xmax=1e4, ymax=1e4, vmax=10, vmin=0.1):
-        p = np.radians(self.pa)
-        dpa = p - np.radians(self.bpa)
-        bmax = np.hypot(self.bmaj * np.sin(dpa), self.bmin * np.cos(dpa))
-        tol = self.tol_kep * bmax
-        v, xc, yc = [self.__X[i] for i in ['v', 'x', 'y']]
-        dxc, dyc = [self.__X[i] for i in ['dx', 'dy']]
-        sc, tc = [self.__M[i] for i in ['min', 'maj']]
-        dsc, dtc = [self.__M[i] for i in ['dmin', 'dmaj']]
-        c = np.array([])
-        x_k, dx_k, y_k, dy_k = c * 1, c * 1, c * 1, c * 1
-        s_k, ds_k, t_k, dt_k = c * 1, c * 1, c * 1, c * 1
-        v_k = c * 1
-        x_n, dx_n, y_n, dy_n = c * 1, c * 1, c * 1, c * 1
-        s_n, ds_n, t_n, dt_n = c * 1, c * 1, c * 1, c * 1
-        v_n = c * 1
-        for i in [0, 1]:
-            if len(j := self.k_kep[i]) > 0:
-                x_k  = np.r_[x_k,   xc[i][j]]
-                dx_k = np.r_[dx_k, dxc[i][j]]
-                y_k  = np.r_[y_k,   yc[i][j]]
-                dy_k = np.r_[dy_k, dyc[i][j]]
-                s_k  = np.r_[s_k,   sc[i][j]]
-                ds_k = np.r_[ds_k, dsc[i][j]]
-                t_k  = np.r_[t_k,   tc[i][j]]
-                dt_k = np.r_[dt_k, dtc[i][j]]
-                v_k  = np.r_[v_k,    v[i][j] * (-1)**i]
-            if len(j := self.k_notkep[i]) > 0:
-                x_n  = np.r_[x_n,   xc[i][j]]
-                dx_n = np.r_[dx_n, dxc[i][j]]
-                y_n  = np.r_[y_n,   yc[i][j]]
-                dy_n = np.r_[dy_n, dyc[i][j]]
-                s_n  = np.r_[s_n,   sc[i][j]]
-                ds_n = np.r_[ds_n, dsc[i][j]]
-                t_n  = np.r_[t_n,   tc[i][j]]
-                dt_n = np.r_[dt_n, dtc[i][j]]
-                v_n  = np.r_[v_n ,   v[i][j] * (-1)**i]
-         
-        ### Plot the derived points on three planes. ###
+        
+    def filtering(self, incl: float = 90):
+        v = self.center['v'] * 1
+        xc = self.center['xc'] * 1
+        yc = self.center['yc'] * 1
+        dxc = self.center['dxc'] * 1
+        dyc = self.center['dyc'] * 1
+        if (n := len(v)) % 2 == 0:
+            print('!!! Even number channels.!!!')
+        for i in range(n):
+            j = -1 - i
+            if np.isnan(xc[i]) or np.isnan(yc)[i]:
+                v[i] = xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
+                v[j] = xc[j] = yc[j] = dxc[j] = dyc[j] = np.nan
+        if np.all(np.isnan(xc)):
+            print('No blue-red pair.')
+            
+        goodcenter = False
+        while not goodcenter:
+            self.xoff = xoff = np.nanmedian(xc)
+            self.yoff = yoff = np.nanmedian(yc)
+            print(f'(xoff, yoff) = ({xoff:.2f}, {yoff:.2f}) au')
+            x = xc - xoff
+            y = yc - yoff
+            x = x + x[::-1]
+            y = y + y[::-1]
+            sx = np.nanstd(x)
+            sy = np.nanstd(y)
+            d2 = (x / sx)**2 + (y / sy)**2
+            if np.any(c := d2 > 11.5):
+                v[c] = xc[c] = yc[c] = dxc[c] = dyc[c] = np.nan
+            else:
+                goodcenter = True
+                xc = xc - xoff
+                yc = yc - yoff
+        nhalf = (n - 1) // 2
+        x1 = np.sqrt((-1) * xc[:nhalf] * xc[-1:-1-nhalf:-1])
+        y1 = np.sqrt((-1) * yc[:nhalf] * yc[-1:-1-nhalf:-1])
+        imax = np.nanargmax(np.hypot(x1, y1)) + 1
+        jmax = -imax
+        xc[imax:jmax] = np.nan
+        yc[imax:jmax] = np.nan
+        goodangle = False
+        while not goodangle:
+            c = ~np.isnan(xc) * ~np.isnan(yc)
+            if not np.any(c):
+                print('No point seems aligned.')
+                gradangle = np.nan
+                break
+            vf, xf, yf, dxf, dyf = v[c], xc[c], yc[c], dxc[c], dyc[c]
+            xx = np.average(xf * xf, weights=1 / (dxf * dxf))
+            yy = np.average(yf * yf, weights=1 / (dyf * dyf))
+            xy = np.average(xf * yf, weights=1 / (dxf * dyf))
+            gradangle = 0.5 * np.arctan2(2 * xy, yy - xx)
+            self.pa_grad = np.degrees(gradangle)
+            print(f'Vel. grad.: P.A. = {self.pa_grad:.2f} deg')
+            d = xc * np.cos(gradangle) - yc * np.sin(gradangle)
+            s = np.nanstd(d)
+            if np.any(c := np.abs(d) > 3 * s):
+                v[c] = xc[c] = yc[c] = dxc[c] = dyc[c] = np.nan
+            else:
+                goodangle = True
+        xmajor = xc * np.sin(gradangle) + yc * np.cos(gradangle)
+        xmajor = np.sqrt((-1) * xmajor[:nhalf] * xmajor[-1:-1-nhalf:-1])
+        imax = np.nanargmax(xmajor) + 1
+        jmax = -imax
+        xc[imax:jmax] = np.nan
+        yc[imax:jmax] = np.nan
+        if imax == 0:
+            print('No spin-up point.')
+        if goodangle:
+            sin_g, cos_g = np.sin(gradangle), np.cos(gradangle)
+            r = np.abs(xf * sin_g + yf * cos_g)
+            v = np.abs(vf)
+            Rkep = np.max(r) / 0.760  # Appendix A in Aso+15_ApJ_812_27
+            print(f'Max r = {Rkep:.1f} au at v={np.min(v):.2f} km/s'
+                  + ' (1/0.76 corrected)')
+            self.Rkep = Rkep
+            lnr = np.log(r)
+            dr = np.hypot(dxf * sin_g, dyf * cos_g)
+            dlnr = dr / r
+            lnv0 = np.mean(np.log(v))
+            v0 = np.exp(lnv0)
+            self.vmid = v0
+            self.incl = incl
+            lnv = np.log(v) - lnv0
+            weights = 1 / dlnr**2
+            a00 = np.sum(lnv**2 * weights)
+            a01 = a10 = np.sum(lnv * weights)
+            a11 = np.sum(weights)
+            b0 = np.sum(lnr * lnv * weights)
+            b1 = np.sum(lnr * weights)
+            ainv = np.linalg.inv([[a00, a01], [a10, a11]])
+            a = np.dot([b0, b1], ainv)
+            da = np.sqrt(np.diag(ainv))
+            p = 1 / a[0]
+            dp = da[0] / a[0]**2
+            self.power = p
+            Mstar = np.exp(a[1] + 2 * lnv0) * unit / np.sin(np.radians(incl))**2
+            Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
+            dMstar = Mstar * 2 * lnv0 * da[1]
+            self.Mstar = Mstar
+            print(f'Power law index: p = {p:.3} +/- {dp:.3}')
+            print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun at v={v0:.2f} km/s'
+                  + ' (1/0.76 corrected)')
+        self.kepler = {'v':self.v, 'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
+        
+        
+
+    def make_moment01(self, vmask: list = [0, 0]):
+        v = self.v * 1
+        v[(vmask[0] < v) * (v < vmask[1])] = np.nan
+        self.sigma_mom0 = self.sigma * self.dv * np.sqrt(len(v[~np.isnan(v)]))
+        v = np.moveaxis([[v]], 2, 0)
+        total = np.nansum(self.data + v * 0, axis=0)
+        mom1 = np.nansum(self.data * v, axis=0) / total
+        self.mom0 = total * self.dv
+        self.mom1 = mom1
+        
+
+
+
+    def plot_center(self, pa: float = None,
+                     filehead: str = 'channelanalysis',
+                     show_figs: bool = False):
         plt.rcParams['font.size'] = 24
         plt.rcParams['axes.linewidth'] = 1.5
         plt.rcParams['xtick.direction'] = 'out'
@@ -374,30 +353,30 @@ class TwoDGrad():
         plt.rcParams['ytick.major.width'] = 1.5
         plt.rcParams['xtick.minor.width'] = 1.5
         plt.rcParams['ytick.minor.width'] = 1.5
-        # On the moment 0 image
-        self.make_moment0()
-        x, y, mom0 = self.x, self.y, self.mom0
-        fig = plt.figure(figsize=(8, 6))
+        
+        kep = ~np.isnan(self.kepler['xc'])
+        vmax = np.abs(np.max(self.v[kep]))
+        xmax, ymax = np.max(self.x), np.max(self.y)
+        
+        fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
-        r = np.linspace(-xmax * 1.5, xmax * 1.5, 100)
-        r = np.concatenate((rot(0, r, -p), [[np.nan],[np.nan]],
-                            rot(r, 0, -p)), axis=1)
-        ax.plot(r[0] + self.xoff, r[1] + self.yoff, 'k-')
-        for s in [1, -1]:
-            d = rot(self.min_off + s * tol, self.maj_off, -p)
-            ax.plot(r[0] + d[0], r[1] + d[1], 'k--')
-        ax.pcolor(x, y, mom0, shading='nearest', cmap='binary')
-        ax.errorbar(x_k, y_k, xerr=dx_k, yerr=dy_k,
-                    fmt='.', color='gray', zorder=1)
-        ax.errorbar(x_n, y_n, xerr=dx_n, yerr=dy_n,
-                    fmt='.', color='gray', zorder=1)
-        ax.scatter(x_n, y_n, s=50, c=v_n, marker='^', cmap='jet',
-                   vmin=-vmax, vmax=vmax, zorder=2)
-        ax.scatter(x_n, y_n, s=50, c='none', marker='^',
-                   edgecolors='k', zorder=3)
-        sca = ax.scatter(x_k, y_k, s=50, c=v_k, marker='o', cmap='jet',
-                         vmin=-vmax, vmax=vmax, zorder=4)
-        cb = plt.colorbar(sca, ax=ax, label=r'velocity (km s$^{-1}$)')
+        r = np.linspace(-xmax * 1.5, xmax * 1.5, 5)
+        if pa is not None:
+            p = np.radians(pa)
+            a = rot(0, r, -p)
+            ax.plot(a[0] + self.xoff, a[1] + self.yoff, 'k-')
+        p = np.radians(self.pa_grad)
+        a = rot(0, r, -p)
+        ax.plot(a[0] + self.xoff, a[1] + self.yoff, 'g-')
+        x, y = self.x, self.y
+        z = np.sum(self.data[kep], axis=0) * self.dv
+        ax.pcolormesh(x, y, z, cmap='binary', zorder=1)
+        x, y = self.kepler['xc'], self.kepler['yc']
+        dx, dy = self.kepler['dxc'], self.kepler['dyc']
+        ax.errorbar(x, y, xerr=dx, yerr=dy, color='g', zorder=2)
+        m = ax.scatter(x, y, c=self.v, cmap='jet', s=50,
+                       vmin=-vmax, vmax=vmax, zorder=3)
+        fig.colorbar(m, ax=ax, label=r'velocity (km s$^{-1}$)')
         bpos = xmax - 0.7 * self.bmaj
         e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
                     angle=self.bpa * np.sign(self.dx), facecolor='g')
@@ -417,57 +396,33 @@ class TwoDGrad():
         if show_figs: plt.show()
         plt.close()
         print(f'- Plotted in {filehead}.radec.png')
-
-        # On the major-minor plane
-        fig = plt.figure(figsize=(8, 6))
+        
+        x, y = self.kepler['xc'], self.kepler['yc']
+        dx, dy = self.kepler['dxc'], self.kepler['dyc']
+        x = np.abs(x * np.sin(p) + y * np.cos(p))
+        dx = np.hypot(dx * np.sin(p), y * np.cos(p))
+        v = np.abs(self.v)
+        x0 = np.exp(np.mean(np.log(x[kep])))
+        v0 = np.exp(np.mean(np.log(v[kep])))
+        ratiox = np.exp(np.max(np.abs(np.log(x[kep] / x0))))
+        ratiov = np.exp(np.max(np.abs(np.log(v[kep] / v0))))
+        ratio = max(ratiox, ratiov, 4)
+        xmin = x0 / ratio
+        xmax = x0 * ratio
+        vmin = v0 / ratio
+        vmax = v0 * ratio
+        
+        fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
-        for t in [tol, -tol]: ax.axhline(t, color='k', lw=1, ls='--')
-        ax.errorbar(t_k, s_k, xerr=ds_k, yerr=dt_k,
-                    fmt='.', color='gray', zorder=1)
-        ax.errorbar(t_n, s_n, xerr=ds_n, yerr=dt_n,
-                    fmt='.', color='gray', zorder=1)
-        ax.scatter(t_n, s_n, s=50, c=v_n, marker='^', cmap='jet',
-                   vmin=-vmax, vmax=vmax, zorder=2)
-        ax.scatter(t_n, s_n, s=50, c='none', marker='^',
-                   edgecolors='k', zorder=3)
-        sca = ax.scatter(t_k, s_k, s=50, c=v_k, marker='o', cmap='jet',
-                         vmin=-vmax, vmax=vmax, zorder=4)
-        cb = plt.colorbar(sca, ax=ax, label=r'velocity km s$^{-1}$')
-        ax.set_aspect(1, adjustable='box')
-        ax.set_xlabel('Major offset (au)')
-        ax.set_ylabel('Minor offset (au)')
-        #ax.set_xlim(-tol * 3, xmax * 0.501)  # au
-        #ax.set_ylim(-tol * 3, ymax * 0.501)  # au
-        ax.grid()
-        fig.tight_layout()
-        fig.savefig(filehead + '.majmin.png', transparent=True)
-        if show_figs: plt.show()
-        plt.close()
-        print(f'- Plotted in {filehead}.majmin.png')
-
-        # On the major-velocity plane
-        xmin = xmax * (vmin / vmax)
-        fig = plt.figure(figsize=(8, 6))
-        ax = fig.add_subplot(1, 1, 1)
-        ax.errorbar(t_k, np.abs(v_k), xerr=dt_k, fmt='.',
-                    color='gray', zorder=1)
-        ax.errorbar(t_n, np.abs(v_n), xerr=dt_n, fmt='.',
-                    color='gray', zorder=1)
-        ax.scatter(t_n, np.abs(v_n), s=100, c=s_n / self.bmaj,
-                   marker='^', cmap='Greens',
-                   vmin=0, vmax=2 * self.tol_kep, zorder=2)
-        sca = ax.scatter(t_k, np.abs(v_k), s=100, c=s_k / self.bmaj,
-                         marker='o', cmap='Greens',
-                         vmin=0, vmax=2 * self.tol_kep, zorder=3)
-        fig.colorbar(sca, ax=ax, label='Minor offset (beam)')
-        ax.plot(t_n[v_n < 0], np.abs(v_n[v_n < 0]), '^',
-                mfc='none', mec='b', markersize=10, zorder=4)
-        ax.plot(t_n[v_n > 0], np.abs(v_n[v_n > 0]), '^',
-                mfc='none', mec='r', markersize=10, zorder=4)
-        ax.plot(t_k[v_k < 0], np.abs(v_k[v_k < 0]), 'o', mfc='none',
-                mec='b', markersize=10, zorder=4)
-        ax.plot(t_k[v_k > 0], np.abs(v_k[v_k > 0]), 'o', mfc='none',
-                mec='r', markersize=10, zorder=4)
+        ax.errorbar(x, v, xerr=dx, fmt='o', color='k', zorder=1)
+        w = self.v
+        ax.plot(x[w < 0], v[w < 0], 'bo', zorder=2)
+        ax.plot(x[w > 0], v[w > 0], 'ro', zorder=2)
+        if hasattr(self, 'Mstar'):
+            vp = v[w > 0][~np.isnan(x[w > 0])]
+            rp = self.Mstar / unit * np.sin(np.radians(self.incl))**2 * 0.760 \
+                 / self.vmid**2 * (vp / self.vmid)**(1 / self.power)
+        ax.plot(rp, vp, 'm-', zorder=3)
         ax.set_xscale('log')
         ax.set_yscale('log')
         def nice_ticks(ticks, tlim):
@@ -488,7 +443,7 @@ class TwoDGrad():
         ax.set_xlim(xmin * 0.999, xmax * 1.001)  # au
         ax.set_ylim(vmin * 0.999, vmax * 1.001)  # km/s
         ax.set_aspect('equal', adjustable='box')
-        ax.set_xlabel('Major offset (au)')
+        ax.set_xlabel('Offset along vel. grad. (au)')
         ax.set_ylabel(r'Velocity (km s$^{-1}$)')
         ax.grid()
         fig.tight_layout()
