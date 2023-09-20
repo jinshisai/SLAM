@@ -340,20 +340,25 @@ class TwoDGrad():
             a11 = np.sum(weights)
             b0 = np.sum(lnr * lnv * weights)
             b1 = np.sum(lnr * weights)
-            if a00 * a11 - a01 * a10 != 0:
-                ainv = np.linalg.inv([[a00, a01], [a10, a11]])
-                a = np.dot([b0, b1], ainv)
-                da = np.sqrt(np.diag(ainv))
-            else:
-                a = [np.nan, np.nan]
-                da = [np.nan, np.nan]
-                print('Power-law fitting failed.')
-            p = 1 / a[0]
-            dp = da[0] / a[0]**2
-            self.power = p
-            Mstar = np.exp(a[1] + 2 * lnv0) * unit / np.sin(np.radians(incl))**2
+            #if a00 * a11 - a01 * a10 != 0:
+            #    ainv = np.linalg.inv([[a00, a01], [a10, a11]])
+            #    a = np.dot([b0, b1], ainv)
+            #    da = np.sqrt(np.diag(ainv))
+            #else:
+            #    a = [np.nan, np.nan]
+            #    da = [np.nan, np.nan]
+            #    print('Power-law fitting failed.')
+            #p = 1 / a[0]
+            #dp = da[0] / a[0]**2
+            #Mstar = np.exp(a[1] + 2 * lnv0) * unit / np.sin(np.radians(incl))**2
+            #Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
+            #dMstar = Mstar * 2 * lnv0 * da[1]
+            Mstar = np.exp((b1 + 2 * a01) / a11) \
+                    * unit / np.sin(np.radians(incl))**2
             Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-            dMstar = Mstar * 2 * lnv0 * da[1]
+            dMstar = np.sqrt(1 / a11) * Mstar
+            p, dp = -0.5, 0.0
+            self.power = p
             self.Mstar = Mstar
             print(f'Power law index: p = {p:.3} +/- {dp:.3}')
             print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun at v={v0:.2f} km/s'
@@ -415,9 +420,16 @@ class TwoDGrad():
         x = self.kepler['xc'] + self.xoff
         y = self.kepler['yc'] + self.yoff
         dx, dy = self.kepler['dxc'], self.kepler['dyc']
-        ax.errorbar(x, y, xerr=dx, yerr=dy, color='g', zorder=2)
+        ax.errorbar(x, y, xerr=dx, yerr=dy, color='g', fmt='.', zorder=4)
         m = ax.scatter(x, y, c=self.v, cmap='jet', s=50,
-                       vmin=-vmax, vmax=vmax, zorder=3)
+                       vmin=-vmax, vmax=vmax, zorder=5)
+        x = self.center['xc'] + self.xoff
+        y = self.center['yc'] + self.yoff
+        dx, dy = self.center['dxc'], self.center['dyc']
+        ax.errorbar(x, y, xerr=dx, yerr=dy, color='g', fmt='.', zorder=2)
+        ax.scatter(x, y, c=self.v, cmap='jet', s=50,
+                   vmin=-vmax, vmax=vmax, zorder=3)
+        ax.scatter(x, y, c='w', s=15, zorder=3)
         fig.colorbar(m, ax=ax, label=r'velocity (km s$^{-1}$)')
         bpos = xmax - 0.7 * self.bmaj
         e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
