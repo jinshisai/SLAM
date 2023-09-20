@@ -24,9 +24,9 @@ method = 'mean'  # mean or gauss
 filehead = cubefits.replace('.fits', '')
 tdg = TwoDGrad()
 tdg.read_cubefits(cubefits=cubefits, center=center,
-                 vsys=vsys, dist=dist, sigma=sigma,
-                 xmax=xmax, ymax=ymax, vmax=vmax, vmin=vmin,
-                 centering_velocity=True)
+                  vsys=vsys, dist=dist, sigma=sigma,
+                  xmax=xmax, ymax=ymax, vmax=vmax, vmin=vmin,
+                  centering_velocity=True)
 tdg.get_2Dcenter(cutoff=cutoff,
                  minrelerr=minrelerr, minabserr=minabserr, method=method)
 tdg.filtering(incl=incl)
