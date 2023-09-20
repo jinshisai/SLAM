@@ -387,7 +387,10 @@ class TwoDGrad():
         plt.rcParams['ytick.minor.width'] = 1.5
         
         kep = ~np.isnan(self.kepler['xc'])
-        vmax = np.abs(np.max(self.v[kep]))
+        if len(kep) == 0:
+            vmax = 1
+        else:
+            vmax = np.abs(np.max(self.v[kep]))
         xmax, ymax = np.max(self.x), np.max(self.y)
         
         fig = plt.figure()
@@ -401,8 +404,9 @@ class TwoDGrad():
         a = rot(0, r, -p)
         ax.plot(a[0] + self.xoff, a[1] + self.yoff, 'g-')
         x, y = self.x, self.y
-        z = np.sum(self.data[kep], axis=0) * self.dv
-        ax.pcolormesh(x, y, z, cmap='binary', zorder=1)
+        if len(kep) > 0:
+            z = np.sum(self.data[kep], axis=0) * self.dv
+            ax.pcolormesh(x, y, z, cmap='binary', zorder=1)
         x, y = self.kepler['xc'], self.kepler['yc']
         dx, dy = self.kepler['dxc'], self.kepler['dyc']
         ax.errorbar(x, y, xerr=dx, yerr=dy, color='g', zorder=2)
@@ -434,15 +438,21 @@ class TwoDGrad():
         x = np.abs(x * np.sin(p) + y * np.cos(p))
         dx = np.hypot(dx * np.sin(p), y * np.cos(p))
         v = np.abs(self.v)
-        x0 = np.exp(np.mean(np.log(x[kep])))
-        v0 = np.exp(np.mean(np.log(v[kep])))
-        ratiox = np.exp(np.max(np.abs(np.log(x[kep] / x0))))
-        ratiov = np.exp(np.max(np.abs(np.log(v[kep] / v0))))
-        ratio = max(ratiox, ratiov, 4)
-        xmin = x0 / ratio
-        xmax = x0 * ratio
-        vmin = v0 / ratio
-        vmax = v0 * ratio
+        if len(kep) > 0:
+            x0 = np.exp(np.mean(np.log(x[kep])))
+            v0 = np.exp(np.mean(np.log(v[kep])))
+            ratiox = np.exp(np.max(np.abs(np.log(x[kep] / x0))))
+            ratiov = np.exp(np.max(np.abs(np.log(v[kep] / v0))))
+            ratio = max(ratiox, ratiov, 4)
+            xmin = x0 / ratio
+            xmax = x0 * ratio
+            vmin = v0 / ratio
+            vmax = v0 * ratio
+        else:
+            xmax = np.max(self.x)
+            xmin = xmax / 16
+            vmax = np.max(self.v)
+            vmin = vmax / 16
         
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
