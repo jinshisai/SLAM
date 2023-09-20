@@ -340,9 +340,14 @@ class TwoDGrad():
             a11 = np.sum(weights)
             b0 = np.sum(lnr * lnv * weights)
             b1 = np.sum(lnr * weights)
-            ainv = np.linalg.inv([[a00, a01], [a10, a11]])
-            a = np.dot([b0, b1], ainv)
-            da = np.sqrt(np.diag(ainv))
+            if a00 * a11 - a01 * a10 != 0:
+                ainv = np.linalg.inv([[a00, a01], [a10, a11]])
+                a = np.dot([b0, b1], ainv)
+                da = np.sqrt(np.diag(ainv))
+            else:
+                a = [np.nan, np.nan]
+                da = [np.nan, np.nan]
+                print('Power-law fitting failed.')
             p = 1 / a[0]
             dp = da[0] / a[0]**2
             self.power = p
