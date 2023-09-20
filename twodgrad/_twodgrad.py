@@ -460,11 +460,11 @@ class TwoDGrad():
         w = self.v
         ax.plot(x[w < 0], v[w < 0], 'bo', zorder=2)
         ax.plot(x[w > 0], v[w > 0], 'ro', zorder=2)
-        if hasattr(self, 'Mstar'):
+        if ~np.isnan(self.Mstar):
             vp = v[w > 0][~np.isnan(x[w > 0])]
             rp = self.Mstar / unit * np.sin(np.radians(self.incl))**2 * 0.760 \
                  / self.vmid**2 * (vp / self.vmid)**(1 / self.power)
-        ax.plot(rp, vp, 'm-', zorder=3)
+            ax.plot(rp, vp, 'm-', zorder=3)
         ax.set_xscale('log')
         ax.set_yscale('log')
         def nice_ticks(ticks, tlim):
