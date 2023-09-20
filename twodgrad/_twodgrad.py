@@ -423,8 +423,8 @@ class TwoDGrad():
         ax.errorbar(x, y, xerr=dx, yerr=dy, color='g', fmt='.', zorder=4)
         m = ax.scatter(x, y, c=self.v, cmap='jet', s=50,
                        vmin=-vmax, vmax=vmax, zorder=5)
-        x = self.center['xc'] + self.xoff
-        y = self.center['yc'] + self.yoff
+        x = self.center['xc']
+        y = self.center['yc']
         dx, dy = self.center['dxc'], self.center['dyc']
         ax.errorbar(x, y, xerr=dx, yerr=dy, color='g', fmt='.', zorder=2)
         ax.scatter(x, y, c=self.v, cmap='jet', s=50,
@@ -454,8 +454,14 @@ class TwoDGrad():
         x, y = self.kepler['xc'], self.kepler['yc']
         dx, dy = self.kepler['dxc'], self.kepler['dyc']
         x = np.abs(x * np.sin(p) + y * np.cos(p))
-        dx = np.hypot(dx * np.sin(p), y * np.cos(p))
+        dx = np.hypot(dx * np.sin(p), dy * np.cos(p))
         v = np.abs(self.v)
+        xn = self.center['xc'] - self.xoff
+        yn = self.center['yc'] - self.yoff
+        dxn, dyn = self.center['dxc'], self.center['dyc']
+        xn = np.abs(xn * np.sin(p) + yn * np.cos(p))
+        dxn = np.hypot(dxn * np.sin(p), dyn * np.cos(p))
+
         if np.any(kep):
             x0 = np.exp(np.mean(np.log(x[kep])))
             v0 = np.exp(np.mean(np.log(v[kep])))
@@ -476,15 +482,19 @@ class TwoDGrad():
         ax = fig.add_subplot(1, 1, 1)
         ax.set_xlim(xmin * 0.999, xmax * 1.001)  # au
         ax.set_ylim(vmin * 0.999, vmax * 1.001)  # km/s
-        ax.errorbar(x, v, xerr=dx, fmt='o', color='k', zorder=1)
+        ax.errorbar(x, v, xerr=dx, fmt='o', color='k', zorder=2)
         w = self.v
-        ax.plot(x[w < 0], v[w < 0], 'bo', zorder=2)
-        ax.plot(x[w > 0], v[w > 0], 'ro', zorder=2)
+        ax.plot(x[w < 0], v[w < 0], 'bo', zorder=3)
+        ax.plot(x[w > 0], v[w > 0], 'ro', zorder=3)
+        ax.plot(xn[w < 0], v[w < 0], 'bo', zorder=1)
+        ax.plot(xn[w < 0], v[w < 0], 'wo', zorder=1, markersize=4)
+        ax.plot(xn[w > 0], v[w > 0], 'ro', zorder=1)
+        ax.plot(xn[w > 0], v[w > 0], 'wo', zorder=1, markersize=4)
         if ~np.isnan(self.Mstar):
             vp = v[w > 0][~np.isnan(x[w > 0])]
             rp = self.Mstar / unit * np.sin(np.radians(self.incl))**2 * 0.760 \
                  / self.vmid**2 * (vp / self.vmid)**(1 / self.power)
-            ax.plot(rp, vp, 'm-', zorder=3)
+            ax.plot(rp, vp, 'm-', zorder=4)
         ax.set_xscale('log')
         ax.set_yscale('log')
         def nice_ticks(ticks, tlim):
