@@ -41,8 +41,8 @@ def gauss2d(xy, peak, cx, cy, wx, wy, pa):
 
 class TwoDGrad():
 
-    def __init__(self):
-        self.result = {}
+    #def __init__(self):
+
 
     def read_cubefits(self, cubefits: str, center: str = None,
                       dist: float = 1, vsys: float = 0,
@@ -104,13 +104,9 @@ class TwoDGrad():
         j0, j1 = np.argmin(np.abs(y + ymax)), np.argmin(np.abs(y - ymax))
         x, y = x[i0:i1 + 1], y[j0:j1 + 1]
         if centering_velocity:
-            vnew = v - v[np.argmin(np.abs(v))]
-            for j in range(len(d[0])):
-                for i in range(len(d[0][0])):
-                    f = interp1d(v, d[:, j, i], kind='cubic',
-                                 bounds_error=False, fill_value=0)
-                    d[:, j, i] = f(vnew)
-            v = vnew
+            f = interp1d(v, d, kind='cubic', bounds_error=False,
+                         fill_value=0, axis=0)
+            d = f(v := v - v[np.argmin(np.abs(v))])
         k0, k1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
         self.offpix = (i0, j0, k0)
         v = v[k0:k1 + 1]
@@ -261,8 +257,22 @@ class TwoDGrad():
                 xc = xc - xoff
                 yc = yc - yoff
         nhalf = (n - 1) // 2
-        x1 = np.sqrt((-1) * xc[:nhalf] * xc[-1:-1-nhalf:-1])
-        y1 = np.sqrt((-1) * yc[:nhalf] * yc[-1:-1-nhalf:-1])
+        b = np.abs(xc[:nhalf])
+        wb = (b / dxc[:nhalf])**2
+        lnb = np.log(b)
+        r = np.abs(xc[-1:-1-nhalf:-1])
+        wr = (r / dxc[-1:-1-nhalf:-1])**2
+        lnr = np.log(r)
+        x1 = np.exp((lnb * wb + lnr * wr) / (wb + wr))
+        
+        b = np.abs(yc[:nhalf])
+        wb = (b / dyc[:nhalf])**2
+        lnb = np.log(b)
+        r = np.abs(yc[-1:-1-nhalf:-1])
+        wr = (r / dyc[-1:-1-nhalf:-1])**2
+        lnr = np.log(r)
+        y1 = np.exp((lnb * wb + lnr * wr) / (wb + wr))
+        
         imax = np.nanargmax(np.hypot(x1, y1)) + 1
         jmax = -imax
         xc[imax:jmax] = np.nan
@@ -288,7 +298,14 @@ class TwoDGrad():
             else:
                 goodangle = True
         xmajor = xc * np.sin(gradangle) + yc * np.cos(gradangle)
-        xmajor = np.sqrt((-1) * xmajor[:nhalf] * xmajor[-1:-1-nhalf:-1])
+        dxmajor = np.hypot(dxc * np.sin(gradangle), dyc * np.cos(gradangle))
+        b = np.abs(xmajor[:nhalf])
+        wb = (b / dxmajor[:nhalf])**2
+        lnb = np.log(b)
+        r = np.abs(xmajor[-1:-1-nhalf:-1])
+        wr = (r / dxmajor[-1:-1-nhalf:-1])**2
+        lnr = np.log(r)
+        xmajor = np.exp((lnb * wb + lnr * wr) / (wb + wr))
         imax = np.nanargmax(xmajor) + 1
         jmax = -imax
         xc[imax:jmax] = np.nan
