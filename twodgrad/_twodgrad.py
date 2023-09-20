@@ -291,9 +291,11 @@ class TwoDGrad():
             r = np.abs(xf * sin_g + yf * cos_g)
             v = np.abs(vf)
             Rkep = np.max(r) / 0.760  # Appendix A in Aso+15_ApJ_812_27
-            print(f'Max r = {Rkep:.1f} au at v={np.min(v):.2f} km/s'
+            Vkep = np.min(v)
+            print(f'Max r = {Rkep:.1f} au at v={Vkep:.2f} km/s'
                   + ' (1/0.76 corrected)')
             self.Rkep = Rkep
+            self.Vkep = Vkep
             lnr = np.log(r)
             dr = np.hypot(dxf * sin_g, dyf * cos_g)
             dlnr = dr / r
