@@ -387,10 +387,10 @@ class TwoDGrad():
         plt.rcParams['ytick.minor.width'] = 1.5
         
         kep = ~np.isnan(self.kepler['xc'])
-        if len(kep) == 0:
-            vmax = 1
-        else:
+        if np.any(kep) > 0:
             vmax = np.abs(np.max(self.v[kep]))
+        else:
+            vmax = 1
         xmax, ymax = np.max(self.x), np.max(self.y)
         
         fig = plt.figure()
@@ -404,7 +404,7 @@ class TwoDGrad():
         a = rot(0, r, -p)
         ax.plot(a[0] + self.xoff, a[1] + self.yoff, 'g-')
         x, y = self.x, self.y
-        if len(kep) > 0:
+        if np.any(kep):
             z = np.sum(self.data[kep], axis=0) * self.dv
             ax.pcolormesh(x, y, z, cmap='binary', zorder=1)
         x, y = self.kepler['xc'], self.kepler['yc']
@@ -438,7 +438,7 @@ class TwoDGrad():
         x = np.abs(x * np.sin(p) + y * np.cos(p))
         dx = np.hypot(dx * np.sin(p), y * np.cos(p))
         v = np.abs(self.v)
-        if len(kep) > 0:
+        if np.any(kep):
             x0 = np.exp(np.mean(np.log(x[kep])))
             v0 = np.exp(np.mean(np.log(v[kep])))
             ratiox = np.exp(np.max(np.abs(np.log(x[kep] / x0))))
