@@ -252,8 +252,7 @@ class TwoDGrad():
             y = y + y[::-1]
             sx = np.nanstd(x)
             sy = np.nanstd(y)
-            d2 = (x / sx)**2 + (y / sy)**2
-            if np.any(c := d2 > 11.5):
+            if np.any(c := np.hypot(x / sx, y / sy) > 3):
                 v[c] = xc[c] = yc[c] = dxc[c] = dyc[c] = np.nan
             else:
                 goodcenter = True
@@ -297,7 +296,7 @@ class TwoDGrad():
             print(f'Vel. grad.: P.A. = {self.pa_grad:.2f} deg')
             d = xc * np.cos(gradangle) - yc * np.sin(gradangle)
             s = np.nanstd(d)
-            if np.any(c := np.abs(d) > 3 * s):
+            if np.any(c := np.abs(d / s) > 3):
                 v[c] = xc[c] = yc[c] = dxc[c] = dyc[c] = np.nan
             else:
                 goodangle = True
