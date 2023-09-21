@@ -211,55 +211,44 @@ class TwoDGrad():
             yc.append(yval)
             dyc.append(yerr)
         xc, dxc, yc, dyc = np.array([xc, dxc, yc, dyc])
-        self.center = {'v':self.v, 'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
+        self.center = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
         
         
-    def filtering(self, incl: float = 90):
-        v = self.center['v'] * 1
+    def filtering(self):
         xc = self.center['xc'] * 1
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
         dyc = self.center['dyc'] * 1
-        self.incl = incl
         self.xoff = np.nan
         self.yoff = np.nan
         self.pa_grad = np.nan
-        self.Rkep = np.nan
-        self.Vkep = np.nan
-        self.vmid = np.nan
-        self.Mstar = np.nan
-        self.power = np.nan
-        if (n := len(v)) % 2 == 0:
+        if (n := len(self.v)) % 2 == 0:
             print('!!! Even number channels.!!!')
         for i in range(n):
             j = -1 - i
             if np.isnan(xc[i]) or np.isnan(yc)[i]:
-                v[i] = xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
-                v[j] = xc[j] = yc[j] = dxc[j] = dyc[j] = np.nan
+                xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
+                xc[j] = yc[j] = dxc[j] = dyc[j] = np.nan
             
         goodcenter = False
         while not goodcenter:
-            c = ~np.isnan(xc) * ~np.isnan(yc)
-            if not np.any(c):
+            if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
                 print('No blue-red pair.')
                 break
-            self.xoff = xoff = np.nanmedian(xc)
-            self.yoff = yoff = np.nanmedian(yc)
+            self.xoff = xoff = np.median(xc[c])
+            self.yoff = yoff = np.median(yc[c])
             print(f'(xoff, yoff) = ({xoff:.2f}, {yoff:.2f}) au')
-            x = xc - xoff
-            y = yc - yoff
-            x = x + x[::-1]
-            y = y + y[::-1]
-            sx = np.nanstd(x)
-            sy = np.nanstd(y)
-            if np.any(c := np.hypot(x / sx, y / sy) > 3):
-                v[c] = xc[c] = yc[c] = dxc[c] = dyc[c] = np.nan
+            x, y = xc - xoff, yc - yoff
+            x, y = x + x[::-1], y + y[::-1]
+            sx, sy = np.nanstd(x), np.nanstd(y)
+            if np.any(b := np.hypot(x / sx, y / sy) > 3):
+                xc[b] = yc[b] = dxc[b] = dyc[b] = np.nan
             else:
                 goodcenter = True
                 xc = xc - xoff
                 yc = yc - yoff
         
-        if goodcenter:
+        if np.any(~np.isnan(xc) * ~np.isnan(yc)):
             nhalf = (n - 1) // 2
             b = np.abs(xc[:nhalf])
             wb = (b / dxc[:nhalf])**2
@@ -282,26 +271,25 @@ class TwoDGrad():
             
         goodangle = False
         while not goodangle:
-            c = ~np.isnan(xc) * ~np.isnan(yc)
-            if not np.any(c):
+            if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
                 print('No point seems aligned.')
                 gradangle = np.nan
                 break
-            vf, xf, yf, dxf, dyf = v[c], xc[c], yc[c], dxc[c], dyc[c]
-            xx = np.average(xf * xf, weights=1 / (dxf * dxf))
-            yy = np.average(yf * yf, weights=1 / (dyf * dyf))
-            xy = np.average(xf * yf, weights=1 / (dxf * dyf))
+            x, y, dx, dy = xc[c], yc[c], dxc[c], dyc[c]
+            xx = np.average(x * x, weights=1 / (dx * dx))
+            yy = np.average(y * y, weights=1 / (dy * dy))
+            xy = np.average(x * y, weights=1 / (dx * dy))
             gradangle = 0.5 * np.arctan2(2 * xy, yy - xx)
             self.pa_grad = np.degrees(gradangle)
             print(f'Vel. grad.: P.A. = {self.pa_grad:.2f} deg')
             d = xc * np.cos(gradangle) - yc * np.sin(gradangle)
             s = np.nanstd(d)
-            if np.any(c := np.abs(d / s) > 3):
-                v[c] = xc[c] = yc[c] = dxc[c] = dyc[c] = np.nan
+            if np.any(b := np.abs(d / s) > 3):
+                xc[b] = yc[b] = dxc[b] = dyc[b] = np.nan
             else:
                 goodangle = True
         
-        if goodangle:
+        if np.any(~np.isnan(xc) * ~np.isnan(yc)):
             xmajor = xc * np.sin(gradangle) + yc * np.cos(gradangle)
             dxmajor = np.hypot(dxc * np.sin(gradangle), dyc * np.cos(gradangle))
             nhalf = (n - 1) // 2
@@ -316,10 +304,28 @@ class TwoDGrad():
             jmax = -imax
             xc[imax:jmax] = np.nan
             yc[imax:jmax] = np.nan
+        self.kepler = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
+        
 
-            sin_g, cos_g = np.sin(gradangle), np.cos(gradangle)
-            r = np.abs(xf * sin_g + yf * cos_g)
-            v = np.abs(vf)
+    def calc_mstar(self, incl: float = 90):
+        self.incl = incl
+        xc = self.kepler['xc'] * 1
+        yc = self.kepler['yc'] * 1
+        dxc = self.kepler['dxc'] * 1
+        dyc = self.kepler['dyc'] * 1
+        self.Rkep = np.nan
+        self.Vkep = np.nan
+        self.vmid = np.nan
+        self.Mstar = np.nan
+        self.power = np.nan
+        if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
+            print('No point to calculate Rkep, Vkep, and Mstar.')
+        else:
+            v, x, y, dx, dy = self.v[c], xc[c], yc[c], dxc[c], dyc[c]
+            sin_g = np.sin(np.radians(self.pa_grad))
+            cos_g = np.cos(np.radians(self.pa_grad))
+            r = np.abs(x * sin_g + y * cos_g)
+            v = np.abs(v)
             Rkep = np.max(r) / 0.760  # Appendix A in Aso+15_ApJ_812_27
             Vkep = np.min(v)
             print(f'Max r = {Rkep:.1f} au at v={Vkep:.2f} km/s'
@@ -327,7 +333,7 @@ class TwoDGrad():
             self.Rkep = Rkep
             self.Vkep = Vkep
             lnr = np.log(r)
-            dr = np.hypot(dxf * sin_g, dyf * cos_g)
+            dr = np.hypot(dx * sin_g, dy * cos_g)
             dlnr = dr / r
             lnv0 = np.mean(np.log(v))
             v0 = np.exp(lnv0)
@@ -362,8 +368,6 @@ class TwoDGrad():
             print(f'Power law index: p = {p:.3} +/- {dp:.3}')
             print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun at v={v0:.2f} km/s'
                   + ' (1/0.76 corrected)')
-        self.kepler = {'v':self.v, 'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
-        
         
 
     def make_moment01(self, vmask: list = [0, 0]):
@@ -377,12 +381,10 @@ class TwoDGrad():
         self.mom1 = mom1
         
 
-
-
     def plot_center(self, pa: float = None,
                      filehead: str = 'channelanalysis',
                      show_figs: bool = False):
-        plt.rcParams['font.size'] = 24
+        plt.rcParams['font.size'] = 20
         plt.rcParams['axes.linewidth'] = 1.5
         plt.rcParams['xtick.direction'] = 'out'
         plt.rcParams['ytick.direction'] = 'out'
@@ -395,7 +397,7 @@ class TwoDGrad():
         plt.rcParams['xtick.minor.width'] = 1.5
         plt.rcParams['ytick.minor.width'] = 1.5
         
-        kep = ~np.isnan(self.kepler['xc'])
+        kep = ~np.isnan(self.kepler['xc']) * ~np.isnan(self.kepler['yc'])
         if np.any(kep) > 0:
             vmax = np.abs(np.max(self.v[kep]))
         else:
