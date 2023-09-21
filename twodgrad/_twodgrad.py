@@ -243,7 +243,7 @@ class TwoDGrad():
             print(f'(xoff, yoff) = ({xoff:.2f}, {yoff:.2f}) au')
             x, y = xc - xoff, yc - yoff
             x, y = x + x[::-1], y + y[::-1]
-            sx, sy = np.nanstd(x), np.nanstd(y)
+            sx, sy = np.sqrt(np.nanmean(x**2)), np.sqrt(np.nanmean(y**2))
             c1 = np.hypot(x / sx, y / sy) > 3.41  # 3.41 covers 99.7%
             c2 = np.hypot(xoff - xofforg, yoff - yofforg) > 1.0  # 1.0 au
             if c2 and np.any(c1):
@@ -290,7 +290,8 @@ class TwoDGrad():
             self.pa_grad = np.degrees(gradangle)
             print(f'Vel. grad.: P.A. = {self.pa_grad:.2f} deg')
             d = xc * np.cos(gradangle) - yc * np.sin(gradangle)
-            s = np.nanstd(d)
+            d = (d - d[::-1]) / 2
+            s = np.sqrt(np.nanmean(d**2))
             c1 = np.abs(d / s) > 3.0  # 3.0 covers 99.7%
             c2 = np.abs(gradangle - gradangleorg) > np.radians(1.0)  # 1.0 deg
             if c2 and np.any(c1):
