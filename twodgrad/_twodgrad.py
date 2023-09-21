@@ -233,6 +233,7 @@ class TwoDGrad():
                 print('No blue-red pair.')
                 
         goodcenter = False
+        xofforg, yofforg = 0, 0
         while not goodcenter:
             if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
                 print('Failed to find a good center.')
@@ -243,12 +244,15 @@ class TwoDGrad():
             x, y = xc - xoff, yc - yoff
             x, y = x + x[::-1], y + y[::-1]
             sx, sy = np.nanstd(x), np.nanstd(y)
-            if np.any(b := np.hypot(x / sx, y / sy) > 3.41):  # 3.41 covers 99.7%
-                xc[b] = yc[b] = dxc[b] = dyc[b] = np.nan
+            c1 = np.hypot(x / sx, y / sy) > 3.41  # 3.41 covers 99.7%
+            c2 = np.hypot(xoff - xofforg, yoff - yofforg) > 1.0  # 1.0 au
+            if c2 and np.any(c1):
+                xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
             else:
                 goodcenter = True
                 xc = xc - xoff
                 yc = yc - yoff
+            xofforg, yofforg = xoff, yoff
         
         if np.any(~np.isnan(xc) * ~np.isnan(yc)):
             nhalf = (n - 1) // 2
@@ -272,6 +276,7 @@ class TwoDGrad():
             yc[imax:jmax] = np.nan
             
         goodangle = False
+        gradangleorg = 0
         while not goodangle:
             if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
                 print('No point seems aligned.')
@@ -286,8 +291,10 @@ class TwoDGrad():
             print(f'Vel. grad.: P.A. = {self.pa_grad:.2f} deg')
             d = xc * np.cos(gradangle) - yc * np.sin(gradangle)
             s = np.nanstd(d)
-            if np.any(b := np.abs(d / s) > 3.0):  # 3.0 covers 99.7%
-                xc[b] = yc[b] = dxc[b] = dyc[b] = np.nan
+            c1 = np.abs(d / s) > 3.0  # 3.0 covers 99.7%
+            c2 = np.abs(gradangle - gradangleorg) > np.radians(1.0)  # 1.0 deg
+            if c2 and np.any(c1):
+                xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
             else:
                 goodangle = True
         
