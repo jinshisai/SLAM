@@ -294,7 +294,7 @@ class TwoDGrad():
             res = diffevo(func=chi2, bounds=bounds,
                           args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
             xoff, yoff, pa_grad = res.x
-            print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f}) au, {pa_grad:.2f} deg')
+            print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
                             
             c1 = low_velocity(xc - xoff, yc - yoff, dxc, dyc)
             xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
@@ -302,7 +302,7 @@ class TwoDGrad():
             res = diffevo(func=chi2, bounds=bounds,
                           args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
             xoff, yoff, pa_grad = res.x
-            print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f}) au, {pa_grad:.2f} deg')
+            print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
 
             c1 = bad_channels(xc, yc, xoff, yoff, pa_grad)
             if np.any(c1):
