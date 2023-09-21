@@ -290,7 +290,7 @@ class TwoDGrad():
                 break
             bounds = [[self.x.min(), self.x.max()],
                       [self.y.min(), self.y.max()],
-                      [pa0 - 180.0, pa0 + 180.0]]
+                      [pa0 - 90.0, pa0 + 90.0]]
             res = diffevo(func=chi2, bounds=bounds,
                           args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
             xoff, yoff, pa_grad = res.x
