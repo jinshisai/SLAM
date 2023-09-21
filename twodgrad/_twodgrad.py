@@ -231,90 +231,93 @@ class TwoDGrad():
                 xc[j] = yc[j] = dxc[j] = dyc[j] = np.nan
         if not np.any(~np.isnan(xc) * ~np.isnan(yc)):
                 print('No blue-red pair.')
-                
-        goodcenter = False
-        xofforg, yofforg = 0, 0
-        while not goodcenter:
-            if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
-                print('Failed to find a good center.')
-                break
-            x, y, dx, dy = xc[c], yc[c], dxc[c], dyc[c]
-            xoff = np.average(x, weights=1 / dx**2)
-            yoff = np.average(y, weights=1 / dy**2)
-            self.xoff = xoff
-            self.yoff = yoff
-            print(f'(xoff, yoff) = ({xoff:.2f}, {yoff:.2f}) au')
-            x, y = xc - xoff, yc - yoff
-            x, y = x + x[::-1], y + y[::-1]
-            sx, sy = np.sqrt(np.nanmean(x**2)), np.sqrt(np.nanmean(y**2))
-            c1 = np.hypot(x / sx, y / sy) > 3.41  # 3.41 covers 99.7%
-            if np.any(c1):
-                xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
-            else:
-                goodcenter = True
-                xc = xc - xoff
-                yc = yc - yoff
-            xofforg, yofforg = xoff, yoff
         
-        if np.any(~np.isnan(xc) * ~np.isnan(yc)):
-            nhalf = (n - 1) // 2
-            b = np.abs(xc[:nhalf])
-            wb = (b / dxc[:nhalf])**2
-            lnb = np.log(b)
-            r = np.abs(xc[-1:-1-nhalf:-1])
-            wr = (r / dxc[-1:-1-nhalf:-1])**2
-            lnr = np.log(r)
-            x1 = np.exp((lnb * wb + lnr * wr) / (wb + wr))
-            b = np.abs(yc[:nhalf])
-            wb = (b / dyc[:nhalf])**2
-            lnb = np.log(b)
-            r = np.abs(yc[-1:-1-nhalf:-1])
-            wr = (r / dyc[-1:-1-nhalf:-1])**2
-            lnr = np.log(r)
-            y1 = np.exp((lnb * wb + lnr * wr) / (wb + wr))
-            imax = np.nanargmax(np.hypot(x1, y1)) + 1
-            jmax = -imax
-            xc[imax:jmax] = np.nan
-            yc[imax:jmax] = np.nan
-            
-        goodangle = False
-        gradangleorg = 0
-        while not goodangle:
-            if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
-                print('No point seems aligned.')
-                gradangle = np.nan
-                break
-            x, y, dx, dy = xc[c], yc[c], dxc[c], dyc[c]
+        def get_offset(x_in, y_in, dx_in, dy_in):
+            if np.all(c := np.isnan(x_in) | np.isnan(y_in)):
+                return np.nan, np.nan
+            x, y, dx, dy = np.c_[x_in, y_in, dx_in, dy_in][~c].T
+            xoff = np.average(x, weights=dx**(-2))
+            yoff = np.average(y, weights=dy**(-2))
+            return xoff, yoff
+
+        def get_grad(x_in, y_in, dx_in, dy_in):
+            if np.all(c := np.isnan(x_in) | np.isnan(y_in)):
+                return np.nan
+            x, y, dx, dy = np.c_[x_in, y_in, dx_in, dy_in][~c].T
             xx = np.sum(x * x / (dx * dx))
             yy = np.sum(y * y / (dy * dy))
             xy = np.sum(x * y / (dx * dy))
-            gradangle = 0.5 * np.arctan2(2 * xy, yy - xx)
-            self.pa_grad = np.degrees(gradangle)
-            print(f'Vel. grad.: P.A. = {self.pa_grad:.2f} deg')
-            d = xc * np.cos(gradangle) - yc * np.sin(gradangle)
+            return 0.5 * np.arctan2(2 * xy, yy - xx)
+
+        def bad_offset(x_in, y_in):
+            if np.all(np.isnan(x_in) | np.isnan(y_in)):
+                return np.full_like(x_in, False)
+            x, y = x_in + x_in[::-1], y_in + y_in[::-1]
+            sx, sy = np.sqrt(np.nanmean(x**2)), np.sqrt(np.nanmean(y**2))
+            return np.hypot(x / sx, y / sy) > 3.41  # 3.41 covers 99.7%
+
+        def bad_grad(x_in, y_in, pa):
+            if np.all(np.isnan(x_in) | np.isnan(y_in)):
+                return np.full_like(x_in, False)
+            d = x_in * np.cos(pa) - y_in * np.sin(pa)
             d = (d - d[::-1]) / 2
             s = np.sqrt(np.nanmean(d**2))
-            c1 = np.abs(d / s) > 3.0  # 3.0 covers 99.7%
+            return np.abs(d / s) > 3.0  # 3.0 covers 99.7%
+
+        def low_velocity(x_in, y_in, dx_in, dy_in):
+            c = np.full_like(x_in, False)
+            if np.all(np.isnan(x_in) | np.isnan(y_in)):
+                return c
+            nhalf = (n - 1) // 2
+            s = np.abs(x_in[:nhalf])
+            wb = (s / dx_in[:nhalf])**2
+            lnb = np.log(s)
+            s = np.abs(x_in[-1:-1-nhalf:-1])
+            wr = (s / dx_in[-1:-1-nhalf:-1])**2
+            lnr = np.log(s)
+            x1 = np.exp((lnb * wb + lnr * wr) / (wb + wr))
+            s = np.abs(y_in[:nhalf])
+            wb = (s / dy_in[:nhalf])**2
+            lnb = np.log(s)
+            s = np.abs(y_in[-1:-1-nhalf:-1])
+            wr = (s / dy_in[-1:-1-nhalf:-1])**2
+            lnr = np.log(s)
+            y1 = np.exp((lnb * wb + lnr * wr) / (wb + wr))
+            imax = np.nanargmax(np.hypot(x1, y1)) + 1
+            jmax = -imax
+            c[imax:jmax] = True
+            return c.astype('bool')
+
+        goodcenter, goodangle = False, False
+        while not goodcenter or not goodangle:
+            if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
+                print('No point survived.')
+                break
+            xoff, yoff = get_offset(xc, yc, dxc, dyc)
+            print(f'(xoff, yoff) = ({xoff:.2f}, {yoff:.2f}) au')
+                
+            c1 = low_velocity(xc - xoff, yc - yoff, dxc, dyc)
+            xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
+
+            gradangle = get_grad(xc - xoff, yc - yoff, dxc, dyc)
+            self.pa_grad = np.degrees(gradangle)
+            print(f'Vel. grad.: P.A. = {self.pa_grad:.2f} deg')
+            
+            c1 = bad_offset(xc - xoff, yc - yoff)
             if np.any(c1):
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
+                goodcenter = False
+            else:
+                goodcenter = True
+            c1 = bad_grad(xc - xoff, yc - yoff, gradangle)
+            if np.any(c1):
+                xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
+                goodangle = False
             else:
                 goodangle = True
         
-        if np.any(~np.isnan(xc) * ~np.isnan(yc)):
-            xmajor = xc * np.sin(gradangle) + yc * np.cos(gradangle)
-            dxmajor = np.hypot(dxc * np.sin(gradangle), dyc * np.cos(gradangle))
-            nhalf = (n - 1) // 2
-            b = np.abs(xmajor[:nhalf])
-            wb = (b / dxmajor[:nhalf])**2
-            lnb = np.log(b)
-            r = np.abs(xmajor[-1:-1-nhalf:-1])
-            wr = (r / dxmajor[-1:-1-nhalf:-1])**2
-            lnr = np.log(r)
-            xmajor = np.exp((lnb * wb + lnr * wr) / (wb + wr))
-            imax = np.nanargmax(xmajor) + 1
-            jmax = -imax
-            xc[imax:jmax] = np.nan
-            yc[imax:jmax] = np.nan
+        xc, yc = xc - xoff, yc - yoff
+        self.xoff, self.yoff = xoff, yoff
         self.kepler = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
         
 
@@ -444,7 +447,6 @@ class TwoDGrad():
         ax.scatter(x, y, c=self.v, cmap='jet', s=50,
                    vmin=-vmax, vmax=vmax, zorder=3)
         ax.scatter(x, y, c='w', s=15, zorder=3)
-        ax.plot(self.xoff, self.yoff, 'g+', markersize=10)
         fig.colorbar(m, ax=ax, label=r'velocity (km s$^{-1}$)')
         bpos = xmax - 0.7 * self.bmaj
         e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
