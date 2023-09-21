@@ -13,6 +13,7 @@ xmax = 1 * dist  # au
 ymax = xmax  # au
 vmax = 2.5  # km/s
 vmin = -vmax  # km/s
+vmask = [-0.5, 0.5]  # km/s
 show_figs = True
 minrelerr = 0.01
 minabserr = 0.1
@@ -27,7 +28,7 @@ tdg.read_cubefits(cubefits=cubefits, center=center,
                   vsys=vsys, dist=dist, sigma=sigma,
                   xmax=xmax, ymax=ymax, vmax=vmax, vmin=vmin,
                   centering_velocity=True)
-tdg.get_2Dcenter(cutoff=cutoff,
+tdg.get_2Dcenter(cutoff=cutoff, vmask=vmask,
                  minrelerr=minrelerr, minabserr=minabserr, method=method)
 tdg.filtering()
 tdg.calc_mstar(incl=incl)
