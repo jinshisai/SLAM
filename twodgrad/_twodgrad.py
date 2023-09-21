@@ -238,8 +238,9 @@ class TwoDGrad():
             if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
                 print('Failed to find a good center.')
                 break
-            self.xoff = xoff = np.median(xc[c])
-            self.yoff = yoff = np.median(yc[c])
+            x, y = xc + xc[::-1], yc + yc[::-1]
+            self.xoff = xoff = np.nanmedian(x)
+            self.yoff = yoff = np.nanmedian(y)
             print(f'(xoff, yoff) = ({xoff:.2f}, {yoff:.2f}) au')
             x, y = xc - xoff, yc - yoff
             x, y = x + x[::-1], y + y[::-1]
