@@ -276,9 +276,9 @@ class TwoDGrad():
                 gradangle = np.nan
                 break
             x, y, dx, dy = xc[c], yc[c], dxc[c], dyc[c]
-            xx = np.average(x * x, weights=1 / (dx * dx))
-            yy = np.average(y * y, weights=1 / (dy * dy))
-            xy = np.average(x * y, weights=1 / (dx * dy))
+            xx = np.sum(x * x / (dx * dx))
+            yy = np.sum(y * y / (dy * dy))
+            xy = np.sum(x * y / (dx * dy))
             gradangle = 0.5 * np.arctan2(2 * xy, yy - xx)
             self.pa_grad = np.degrees(gradangle)
             print(f'Vel. grad.: P.A. = {self.pa_grad:.2f} deg')
@@ -414,6 +414,8 @@ class TwoDGrad():
         p = np.radians(self.pa_grad)
         a = rot(0, r, -p)
         ax.plot(a[0] + self.xoff, a[1] + self.yoff, 'g-')
+        a = rot(r / 1.5 * 0.5, 0, -p)
+        ax.plot(a[0] + self.xoff, a[1] + self.yoff, 'g-')
         if np.any(kep):
             x, y = self.x, self.y
             z = np.sum(self.data[kep], axis=0) * self.dv
@@ -431,6 +433,7 @@ class TwoDGrad():
         ax.scatter(x, y, c=self.v, cmap='jet', s=50,
                    vmin=-vmax, vmax=vmax, zorder=3)
         ax.scatter(x, y, c='w', s=15, zorder=3)
+        ax.plot(self.xoff, self.yoff, 'g+', markersize=10)
         fig.colorbar(m, ax=ax, label=r'velocity (km s$^{-1}$)')
         bpos = xmax - 0.7 * self.bmaj
         e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
