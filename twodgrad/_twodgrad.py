@@ -220,9 +220,6 @@ class TwoDGrad():
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
         dyc = self.center['dyc'] * 1
-        self.xoff = np.nan
-        self.yoff = np.nan
-        self.pa_grad = np.nan
         if (n := len(self.v)) % 2 == 0:
             print('!!! Even number channels.!!!')
         for i in range(n):
@@ -286,6 +283,7 @@ class TwoDGrad():
             return c.astype('bool')
 
         goodsolution = False
+        xoff = yoff = pa_grad = np.nan
         while not goodsolution:
             if np.all(np.isnan(xc) | np.isnan(yc)):
                 print('No point survived.')
