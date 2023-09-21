@@ -231,10 +231,6 @@ class TwoDGrad():
                 xc[j] = yc[j] = dxc[j] = dyc[j] = np.nan
         if not np.any(~np.isnan(xc) * ~np.isnan(yc)):
                 print('No blue-red pair.')
-        x, y = xc - 0, yc - 0
-        x, y = x + x[::-1], y + y[::-1]
-        b = np.hypot(x, y) > self.bmaj
-        xc[b] = yc[b] = dxc[b] = dyc[b] = np.nan
                 
         goodcenter = False
         while not goodcenter:
