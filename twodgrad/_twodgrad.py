@@ -299,6 +299,9 @@ class TwoDGrad():
             c1 = low_velocity(xc - xoff, yc - yoff, dxc, dyc)
             xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
 
+            xoff, yoff = get_offset(xc, yc, dxc, dyc)
+            print(f'(xoff, yoff) = ({xoff:.2f}, {yoff:.2f}) au')
+
             gradangle = get_grad(xc - xoff, yc - yoff, dxc, dyc)
             self.pa_grad = np.degrees(gradangle)
             print(f'Vel. grad.: P.A. = {self.pa_grad:.2f} deg')
