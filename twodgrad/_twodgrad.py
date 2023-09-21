@@ -248,8 +248,7 @@ class TwoDGrad():
             x, y = x + x[::-1], y + y[::-1]
             sx, sy = np.sqrt(np.nanmean(x**2)), np.sqrt(np.nanmean(y**2))
             c1 = np.hypot(x / sx, y / sy) > 3.41  # 3.41 covers 99.7%
-            c2 = np.hypot(xoff - xofforg, yoff - yofforg) > 1.0  # 1.0 au
-            if c2 and np.any(c1):
+            if np.any(c1):
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
             else:
                 goodcenter = True
@@ -296,8 +295,7 @@ class TwoDGrad():
             d = (d - d[::-1]) / 2
             s = np.sqrt(np.nanmean(d**2))
             c1 = np.abs(d / s) > 3.0  # 3.0 covers 99.7%
-            c2 = np.abs(gradangle - gradangleorg) > np.radians(1.0)  # 1.0 deg
-            if c2 and np.any(c1):
+            if np.any(c1):
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
             else:
                 goodangle = True
