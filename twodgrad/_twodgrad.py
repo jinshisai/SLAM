@@ -229,11 +229,13 @@ class TwoDGrad():
             if np.isnan(xc[i]) or np.isnan(yc)[i]:
                 xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
                 xc[j] = yc[j] = dxc[j] = dyc[j] = np.nan
-            
+        if not np.any(~np.isnan(xc) * ~np.isnan(yc)):
+                print('No blue-red pair.')
+                
         goodcenter = False
         while not goodcenter:
             if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
-                print('No blue-red pair.')
+                print('Failed to find a good center.')
                 break
             self.xoff = xoff = np.median(xc[c])
             self.yoff = yoff = np.median(yc[c])
@@ -241,7 +243,7 @@ class TwoDGrad():
             x, y = xc - xoff, yc - yoff
             x, y = x + x[::-1], y + y[::-1]
             sx, sy = np.nanstd(x), np.nanstd(y)
-            if np.any(b := np.hypot(x / sx, y / sy) > 3):
+            if np.any(b := np.hypot(x / sx, y / sy) > 3.41):  # 3.41 covers 99.7%
                 xc[b] = yc[b] = dxc[b] = dyc[b] = np.nan
             else:
                 goodcenter = True
@@ -284,7 +286,7 @@ class TwoDGrad():
             print(f'Vel. grad.: P.A. = {self.pa_grad:.2f} deg')
             d = xc * np.cos(gradangle) - yc * np.sin(gradangle)
             s = np.nanstd(d)
-            if np.any(b := np.abs(d / s) > 3):
+            if np.any(b := np.abs(d / s) > 3.0):  # 3.0 covers 99.7%
                 xc[b] = yc[b] = dxc[b] = dyc[b] = np.nan
             else:
                 goodangle = True
