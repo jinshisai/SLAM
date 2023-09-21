@@ -19,6 +19,7 @@ from astropy.io import fits
 from astropy import constants, units
 from astropy.coordinates import SkyCoord
 from scipy.optimize import curve_fit
+from scipy.optimize import differential_evolution as diffevo
 from scipy.interpolate import interp1d
 
 
@@ -214,7 +215,7 @@ class TwoDGrad():
         self.center = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
         
         
-    def filtering(self):
+    def filtering(self, pa0: float = 0.0):
         xc = self.center['xc'] * 1
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
@@ -232,38 +233,34 @@ class TwoDGrad():
         if not np.any(~np.isnan(xc) * ~np.isnan(yc)):
                 print('No blue-red pair.')
         
-        def get_offset(x_in, y_in, dx_in, dy_in):
-            if np.all(c := np.isnan(x_in) | np.isnan(y_in)):
-                return np.nan, np.nan
-            x, y, dx, dy = np.c_[x_in, y_in, dx_in, dy_in][~c].T
-            xoff = np.average(x, weights=dx**(-2))
-            yoff = np.average(y, weights=dy**(-2))
-            return xoff, yoff
-
-        def get_grad(x_in, y_in, dx_in, dy_in):
-            if np.all(c := np.isnan(x_in) | np.isnan(y_in)):
-                return np.nan
-            x, y, dx, dy = np.c_[x_in, y_in, dx_in, dy_in][~c].T
-            xx = np.sum(x * x / (dx * dx))
-            yy = np.sum(y * y / (dy * dy))
-            xy = np.sum(x * y / (dx * dy))
-            return 0.5 * np.arctan2(2 * xy, yy - xx)
-
-        def bad_offset(x_in, y_in):
+        def bad_channels(x_in, y_in, xoff, yoff, pa):
             if np.all(np.isnan(x_in) | np.isnan(y_in)):
                 return np.full_like(x_in, False)
-            x, y = x_in + x_in[::-1], y_in + y_in[::-1]
-            sx, sy = np.sqrt(np.nanmean(x**2)), np.sqrt(np.nanmean(y**2))
-            return np.hypot(x / sx, y / sy) > 3.41  # 3.41 covers 99.7%
-
-        def bad_grad(x_in, y_in, pa):
-            if np.all(np.isnan(x_in) | np.isnan(y_in)):
-                return np.full_like(x_in, False)
-            d = x_in * np.cos(pa) - y_in * np.sin(pa)
+            x0 = x_in - xoff
+            y0 = y_in - yoff
+            x = x0 + x0[::-1]
+            y = y0 + y0[::-1]
+            parad = np.radians(pa)
+            d = x0 * np.cos(parad) - y0 * np.sin(parad)
             d = (d - d[::-1]) / 2
-            s = np.sqrt(np.nanmean(d**2))
-            return np.abs(d / s) > 3.0  # 3.0 covers 99.7%
+            sx2 = np.nanmean(x**2)
+            sy2 = np.nanmean(y**2)
+            sd2 = np.nanmean(d**2)
+            a = x**2 / sx2 + y**2 / sy2 + d**2 / sd2
+            return a > 14.0  # 14.0 covers 99.7%
 
+        def chi2(x, x_in, y_in, dx_in, dy_in):
+            xoff, yoff, pa = x
+            c = ~np.isnan(x_in) & ~np.isnan(y_in)
+            x, y, dx, dy = x_in[c], y_in[c], dx_in[c], dy_in[c]
+            x = (x - xoff) / dx
+            y = (y - yoff) / dy
+            d1 = (x + x[::-1])**2
+            d2 = (y + y[::-1])**2
+            parad = np.radians(pa)
+            d3 = (x * np.cos(parad) - y * np.sin(parad))**2
+            return np.sum(d1 + d2 + d3)
+            
         def low_velocity(x_in, y_in, dx_in, dy_in):
             c = np.full_like(x_in, False)
             if np.all(np.isnan(x_in) | np.isnan(y_in)):
@@ -288,39 +285,36 @@ class TwoDGrad():
             c[imax:jmax] = True
             return c.astype('bool')
 
-        goodcenter, goodangle = False, False
-        while not goodcenter or not goodangle:
-            if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
+        goodsolution = False
+        while not goodsolution:
+            if np.all(np.isnan(xc) | np.isnan(yc)):
                 print('No point survived.')
                 break
-            xoff, yoff = get_offset(xc, yc, dxc, dyc)
-            print(f'(xoff, yoff) = ({xoff:.2f}, {yoff:.2f}) au')
-                
+            bounds = [[self.x.min(), self.x.max()],
+                      [self.y.min(), self.y.max()],
+                      [pa0 - 180.0, pa0 + 180.0]]
+            res = diffevo(func=chi2, bounds=bounds,
+                          args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
+            xoff, yoff, pa_grad = res.x
+            print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f}) au, {pa_grad:.2f} deg')
+                            
             c1 = low_velocity(xc - xoff, yc - yoff, dxc, dyc)
             xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
 
-            xoff, yoff = get_offset(xc, yc, dxc, dyc)
-            print(f'(xoff, yoff) = ({xoff:.2f}, {yoff:.2f}) au')
+            res = diffevo(func=chi2, bounds=bounds,
+                          args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
+            xoff, yoff, pa_grad = res.x
+            print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f}) au, {pa_grad:.2f} deg')
 
-            gradangle = get_grad(xc - xoff, yc - yoff, dxc, dyc)
-            self.pa_grad = np.degrees(gradangle)
-            print(f'Vel. grad.: P.A. = {self.pa_grad:.2f} deg')
-            
-            c1 = bad_offset(xc - xoff, yc - yoff)
+            c1 = bad_channels(xc, yc, xoff, yoff, pa_grad)
             if np.any(c1):
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
-                goodcenter = False
             else:
-                goodcenter = True
-            c1 = bad_grad(xc - xoff, yc - yoff, gradangle)
-            if np.any(c1):
-                xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
-                goodangle = False
-            else:
-                goodangle = True
+                goodsolution = True
         
         xc, yc = xc - xoff, yc - yoff
         self.xoff, self.yoff = xoff, yoff
+        self.pa_grad = pa_grad
         self.kepler = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
         
 

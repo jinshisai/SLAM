@@ -30,7 +30,7 @@ tdg.read_cubefits(cubefits=cubefits, center=center,
                   centering_velocity=True)
 tdg.get_2Dcenter(cutoff=cutoff, vmask=vmask,
                  minrelerr=minrelerr, minabserr=minabserr, method=method)
-tdg.filtering()
+tdg.filtering(pa0=pa)
 tdg.calc_mstar(incl=incl)
 tdg.plot_center(filehead=filehead, pa=pa, show_figs=show_figs)
 '-------------------------------------'
