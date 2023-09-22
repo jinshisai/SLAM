@@ -475,8 +475,10 @@ class ChannelFit():
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
+        vplot = (np.nanpercentile(self.mom1, 95) 
+                 - np.nanpercentile(self.mom1, 5)) / 2.
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
-                          vmin=-self.dv * 3, vmax=self.dv * 3)
+                          vmin=-vplot, vmax=vplot)
         fig.colorbar(m, ax=ax, label=r'Obs. $-$ model mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
         if pa is not None:
