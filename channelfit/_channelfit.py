@@ -403,12 +403,13 @@ class ChannelFit():
         nanblue = np.full((len(self.v_nanblue), ny, nx), np.nan)
         nanmid = np.full((len(self.v_nanmid), ny, nx), np.nan)
         nanred = np.full((len(self.v_nanred), ny, nx), np.nan)
-        model = m_blue
-        if len(nanblue) > 0:
-            model = np.append(nanblue, model, axis=0)
+        model = nanblue
+        if len(m_blue) > 0:
+            model = np.append(model, m_blue, axis=0)
         if len(nanmid) > 0:
             model = np.append(model, nanmid, axis=0)
-        model = np.append(model, m_red, axis=0)
+        if len(m_red) > 0:
+            model = np.append(model, m_red, axis=0)
         if len(nanred) > 0:
             model = np.append(model, nanred, axis=0)
                 
