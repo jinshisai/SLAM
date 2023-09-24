@@ -390,8 +390,16 @@ class ChannelFit():
             m = self.cubemodel(**self.popt)
         else:
             m = self.cubemodel(Mstar, Rc, cs, offmajor, offminor, offvsys)
-        m_red = m[np.max(self.v_blue) < self.v_valid]
-        m_blue = m[self.v_valid < np.min(self.v_red)]
+        if len(self.v_blue) > 0:
+            m_red = m[np.max(self.v_blue) < self.v_valid]
+        else:
+            m_red = m * 1
+            m_blue = np.array([])
+        if len(self.v_red) > 0:
+            m_blue = m[self.v_valid < np.min(self.v_red)]
+        else:
+            m_blue = m * 1
+            m_red = np.array([])
         nanblue = np.full((len(self.v_nanblue), ny, nx), np.nan)
         nanmid = np.full((len(self.v_nanmid), ny, nx), np.nan)
         nanred = np.full((len(self.v_nanred), ny, nx), np.nan)
