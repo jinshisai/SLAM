@@ -223,7 +223,7 @@ class ChannelFit():
                                 self.dx * (nxnew // 2 - 0.5), nxnew)
         z3d, y3d, x3d = np.meshgrid(self.xnest[0], self.ynest[0],
                                     self.xnew, indexing='ij')
-        h_min = np.abs(z3d / np.hypot(x3d + z3d, y3d * np.cos(incl_rad)) / np.tan(incl_rad))
+        h_min = np.abs(z3d / np.hypot(x3d + z3d, y3d) / np.tan(incl_rad))
         self.h_min = np.moveaxis([h_min] * len(self.v_valid), 0, 1)
         print('-------- nested grid --------')
         for l in range(len(xnest)):
