@@ -271,7 +271,7 @@ class ChannelFit():
         Iout = Iout[0]  # v, y, x
         f = interp1d(self.xnest[0], Iout, kind='cubic', axis=2,
                      bounds_error=False, fill_value=0)
-        Iout = f(self.xnext[0] * self.deproj)
+        Iout = f(self.xnest[0] * self.deproj)
         nx = len(Iout[0][0])
         j0 = np.arange(nx) - (nx - 1) / 2
         Iz = [None] * nx
