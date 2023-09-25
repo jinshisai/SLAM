@@ -273,7 +273,7 @@ class ChannelFit():
                 = avefour(Iout[l])
         Iout = Iout[0]  # v, y, x
         nx = len(self.xnest[0])
-        nxnew = int(self.xnew)
+        nxnew = int(len(self.xnew))
         j0 = np.arange(nxnew) - nxnew // 2
         Iz = [None] * nx
         for i in range(nx):
