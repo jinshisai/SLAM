@@ -217,6 +217,11 @@ class ChannelFit():
         self.erot = np.array(erot)
         self.erad = np.array(erad)
         self.Rnest = np.array(Rnest)
+        z3d, y3d, x3d = np.meshgrid(self.xnest[0], self.ynest[0],
+                                    self.xnest[0], indexing='ij')
+        r3d = np.hypot(x3d, y3d)
+        min_h = np.abs(z3d / np.tan(incl_rad) / (r3d + z3d))
+        self.min_h = np.moveaxis([min_h] * len(self.v_valid), 0, 1)
         print('-------- nested grid --------')
         for l in range(len(xnest)):
             print(f'x, dx, npix: +/-{xnest[l][-1]:.2f},'
@@ -244,6 +249,7 @@ class ChannelFit():
 
         
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
+                  hdisk: float,
                   offmajor: float, offminor: float, offvsys: float):
         if self.cs_fixed is None:
             prof, n_prof, dv_prof = boxgauss(self.dv / cs)
@@ -263,6 +269,14 @@ class ChannelFit():
             Iout[l - 1][:, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[l])
         Iout = Iout[0]
+        nx = len(Iout[0][0])
+        j0 = np.arange(nx) - (nx - 1) / 2
+        Iz = [None] * nx
+        for i in range(nx):
+            j = (j0 + i).clip(0, nx - 1)
+            Iz[i] = Iout[:, :, j]
+        Iz = np.array(Iz)  # z, v, y, x
+        Iout = np.sum(Iz * (self.h_min < hdisk), axis=0)
         y = self.xmajor - offmajor
         x = self.xminor - offminor * self.deproj
         m = [None] * len(Iout)
@@ -281,12 +295,14 @@ class ChannelFit():
     def fitting(self, Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
                 cs_range: list = [0.01, 1],
+                hdisk_range: list = [0.01, 1],
                 offmajor_range: list = [-100, 100],
                 offminor_range: list = [-100, 100],
                 offvsys_range: list = [-0.2, 0.2],
                 Mstar_fixed: float = None,
                 Rc_fixed: float = None,
                 cs_fixed: float = None,
+                hdisk_fixed: float = None,
                 offmajor_fixed: float = None,
                 offminor_fixed: float = None,
                 offvsys_fixed: float = None,
@@ -302,12 +318,13 @@ class ChannelFit():
         if Rc_fixed is not None:
             self.vlos = self.get_vlos(Rc_fixed)
         
-        p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
+        p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed, hdisk_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
         if None in p_fixed:
             c = (q := p_fixed[:3]) != None
             p_fixed[:3][c] = np.log10(q[c].astype('float'))
             labels = np.array(['log Mstar', 'log Rc', 'log cs',
+                               'hdisk',
                                'offmajor', 'offminor', 'offvsys'])
             labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
@@ -331,6 +348,7 @@ class ChannelFit():
             plim = np.array([np.log10(Mstar_range),
                              np.log10(Rc_range),
                              np.log10(cs_range),
+                             hdisk_range,
                              offmajor_range, offminor_range, offvsys_range])
             plim = plim[p_fixed == None].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
@@ -362,7 +380,7 @@ class ChannelFit():
         print('popt :', ', '.join([f'{t:.2e}' for t in self.popt]))
         print('------------------------')
         np.savetxt(filename+'.popt.txt', [self.popt, self.plow, self.pmid, self.phigh])
-        k = ['Mstar', 'Rc', 'cs', 'offmajor', 'offminor', 'offvsys']
+        k = ['Mstar', 'Rc', 'cs', 'hdisk', 'offmajor', 'offminor', 'offvsys']
         self.popt = dict(zip(k, self.popt))
         self.plow = dict(zip(k, self.plow))
         self.pmid = dict(zip(k, self.pmid))
@@ -370,9 +388,10 @@ class ChannelFit():
  
    
     def modeltofits(self, Mstar: float = None, Rc: float = None,
+                    cs: float = None, hdisk: float = None,
                     offmajor: float = None, offminor: float = None,
                     offvsys: float = None,
-                    cs: float = None, filehead: str = 'best'):
+                    filehead: str = 'best'):
         w = wcs.WCS(naxis=3)
         h = fits.open(self.fitsname)[0].header
         h['NAXIS1'] = len(self.x)
@@ -386,10 +405,10 @@ class ChannelFit():
         #nv = h['NAXIS3']
         self.cs_fixed = None
         self.Rc_fixed = None
-        if None in [Mstar, Rc, cs, offmajor, offminor, offvsys]:
+        if None in (p := [Mstar, Rc, cs, hdisk, offmajor, offminor, offvsys]):
             m = self.cubemodel(**self.popt)
         else:
-            m = self.cubemodel(Mstar, Rc, cs, offmajor, offminor, offvsys)
+            m = self.cubemodel(*p)
         if len(self.v_red) > 0:
             m_blue = m[self.v_valid < np.min(self.v_red)]
         else:
@@ -425,9 +444,10 @@ class ChannelFit():
         tofits(self.data - model, 'residual')
         
     def plotmodelmom(self, Mstar: float, Rc: float, cs: float,
+                     hdisk: float,
                      offmajor: float, offminor: float, offvsys: float,
                      filename: str = 'modelmom01.png', pa: float = None):
-        d = self.cubemodel(Mstar, Rc, cs, offmajor, offminor, offvsys)
+        d = self.cubemodel(Mstar, Rc, cs, hdisk, offmajor, offminor, offvsys)
         mom1 = makemom01(d, self.v_valid, self.sigma)['mom1']
         levels = np.arange(1, 20) * 6 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
@@ -475,10 +495,11 @@ class ChannelFit():
         plt.close()
 
     def plotresidualmom(self, Mstar: float, Rc: float, cs: float,
+                        hdisk: float,
                         offmajor: float, offminor: float, offvsys: float,
                         filename: str = 'residualmom01.png',
                         pa: float = None):
-        d = self.cubemodel(Mstar, Rc, cs, offmajor, offminor, offvsys)
+        d = self.cubemodel(Mstar, Rc, cs, hdisk, offmajor, offminor, offvsys)
         mom1 = self.mom1 - makemom01(d, self.v_valid, self.sigma)['mom1']
         levels = np.arange(1, 20) * 6 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
