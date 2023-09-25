@@ -273,7 +273,7 @@ class ChannelFit():
         j0 = np.arange(nx) - (nx - 1) / 2
         Iz = [None] * nx
         for i in range(nx):
-            j = (j0 + i).clip(0, nx - 1)
+            j = (j0 + i).astype('int').clip(0, nx - 1)
             Iz[i] = Iout[:, :, j]
         Iz = np.array(Iz)  # z, v, y, x
         Iout = np.sum(Iz * (self.h_min < hdisk), axis=0)
