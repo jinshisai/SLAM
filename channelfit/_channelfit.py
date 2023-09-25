@@ -190,7 +190,7 @@ class ChannelFit():
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
 
         # 2d nested grid on the disk plane.
-        # x and y are major and minor axis coordinates before projection.
+        # x and y are minor and major axis coordinates before projection.
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         npix = max([len(self.x), len(self.y)])
         npixnest = int(2**(np.ceil(np.log2(npix))))
@@ -219,8 +219,7 @@ class ChannelFit():
         self.Rnest = np.array(Rnest)
         z3d, y3d, x3d = np.meshgrid(self.xnest[0], self.ynest[0],
                                     self.xnest[0], indexing='ij')
-        r3d = np.hypot(x3d, y3d)
-        h_min = np.abs(z3d / np.tan(incl_rad) / (r3d + z3d))
+        h_min = np.abs(z3d / np.hypot(x3d + z3d, y3d)/ np.tan(incl_rad))
         self.h_min = np.moveaxis([h_min] * len(self.v_valid), 0, 1)
         print('-------- nested grid --------')
         for l in range(len(xnest)):
