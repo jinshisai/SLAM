@@ -276,7 +276,7 @@ class ChannelFit():
             j = (j0 + i).astype('int').clip(0, nx - 1)
             Iz[i] = Iout[:, :, j]
         Iz = np.array(Iz)  # z, v, y, x
-        Iout = np.sum(Iz * (self.h_min < hdisk), axis=0)
+        Iout = np.sum(Iz * (self.h_min < hdisk), axis=0) / self.sini
         y = self.xmajor - offmajor
         x = self.xminor - offminor * self.deproj
         m = [None] * len(Iout)
