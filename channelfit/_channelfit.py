@@ -169,7 +169,7 @@ class ChannelFit():
         self.deproj = 1 / np.cos(incl_rad)
         xminor, xmajor = rot(*np.meshgrid(self.x, self.y), pa_rad)
         self.xmajor = xmajor
-        self.xminor = xminor
+        self.xminor = xminor * self.deproj
         
         self.v_nanblue = v[v < vlim[0]]
         self.v_blue = v[(vlim[0] <= v) * (v <= vlim[1])]
@@ -218,8 +218,11 @@ class ChannelFit():
         self.erot = np.array(erot)
         self.erad = np.array(erad)
         self.Rnest = np.array(Rnest)
+        nxnew = int(self.nx * self.deproj)
+        self.xnew = np.linspace(-self.dx * (nxnew - 0.5),
+                                self.dx * (nxnew - 0.5), nxnew)
         z3d, y3d, x3d = np.meshgrid(self.xnest[0], self.ynest[0],
-                                    self.xnest[0], indexing='ij')
+                                    self.xnew, indexing='ij')
         h_min = np.abs(z3d / np.hypot(x3d + z3d, y3d * np.cos(incl_rad)) / np.tan(incl_rad))
         self.h_min = np.moveaxis([h_min] * len(self.v_valid), 0, 1)
         print('-------- nested grid --------')
@@ -269,11 +272,9 @@ class ChannelFit():
             Iout[l - 1][:, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[l])
         Iout = Iout[0]  # v, y, x
-        f = interp1d(self.xnest[0], Iout, kind='cubic', axis=2,
-                     bounds_error=False, fill_value=0)
-        Iout = f(self.xnest[0] * self.deproj)
         nx = len(self.xnest[0])
-        j0 = np.arange(nx) - (nx - 1) / 2
+        nxnew = int(nx * self.deproj)
+        j0 = np.arange(nxnew) - (nx - 1) / 2
         Iz = [None] * nx
         for i in range(nx):
             j = (j0 + i).astype('int').clip(0, nx - 1)
@@ -281,10 +282,10 @@ class ChannelFit():
         Iz = np.array(Iz)  # z, v, y, x
         Iout = np.sum(Iz * (self.h_min < hdisk), axis=0)
         y = self.xmajor - offmajor
-        x = self.xminor - offminor
+        x = self.xminor - offminor * self.deproj
         m = [None] * len(Iout)
         for i, c in enumerate(Iout):
-            interp = RGI((self.ynest[0], self.xnest[0]), c,
+            interp = RGI((self.ynest[0], self.xnew), c,
                          bounds_error=False, fill_value=0)
             m[i] = interp((y, x))
         #m = np.array(m) / np.max(m)
