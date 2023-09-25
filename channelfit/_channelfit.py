@@ -284,7 +284,7 @@ class ChannelFit():
         x = self.xminor - offminor
         m = [None] * len(Iout)
         for i, c in enumerate(Iout):
-            interp = RGI((self.ynest[0], self.xnew), c,
+            interp = RGI((self.ynest[0], self.xnest[0]), c,
                          bounds_error=False, fill_value=0)
             m[i] = interp((y, x))
         #m = np.array(m) / np.max(m)
