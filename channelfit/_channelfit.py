@@ -169,7 +169,7 @@ class ChannelFit():
         self.deproj = 1 / np.cos(incl_rad)
         xminor, xmajor = rot(*np.meshgrid(self.x, self.y), pa_rad)
         self.xmajor = xmajor
-        self.xminor = xminor * self.deproj
+        self.xminor = xminor
         
         self.v_nanblue = v[v < vlim[0]]
         self.v_blue = v[(vlim[0] <= v) * (v <= vlim[1])]
@@ -279,7 +279,7 @@ class ChannelFit():
             j = (j0 + i).astype('int').clip(0, nx - 1)
             Iz[i] = Iout[:, :, j]
         Iz = np.array(Iz)  # z, v, y, x
-        Iout = np.sum(Iz * (self.h_min < hdisk), axis=0) / self.sini
+        Iout = np.sum(Iz * (self.h_min < hdisk), axis=0)
         y = self.xmajor - offmajor
         x = self.xminor - offminor
         m = [None] * len(Iout)
