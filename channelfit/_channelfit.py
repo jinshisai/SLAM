@@ -18,6 +18,7 @@ from astropy import constants, units, wcs
 from astropy.coordinates import SkyCoord
 from scipy.signal import convolve
 from scipy.interpolate import RegularGridInterpolator as RGI
+from scipy.interpolate import interp1d
 import warnings
 from tqdm import tqdm
 from utils import emcee_corner
@@ -168,7 +169,7 @@ class ChannelFit():
         self.deproj = 1 / np.cos(incl_rad)
         xminor, xmajor = rot(*np.meshgrid(self.x, self.y), pa_rad)
         self.xmajor = xmajor
-        self.xminor = xminor * self.deproj
+        self.xminor = xminor
         
         self.v_nanblue = v[v < vlim[0]]
         self.v_blue = v[(vlim[0] <= v) * (v <= vlim[1])]
@@ -267,7 +268,10 @@ class ChannelFit():
         for l in range(self.nlayer - 1, 0, -1):
             Iout[l - 1][:, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[l])
-        Iout = Iout[0]
+        Iout = Iout[0]  # v, y, x
+        f = interp1d(self.xnest[0], Iout, kind='cubic', axis=2,
+                     bounds_error=False, fill_value=0)
+        Iout = f(self.xnext[0] * self.deproj)
         nx = len(Iout[0][0])
         j0 = np.arange(nx) - (nx - 1) / 2
         Iz = [None] * nx
@@ -277,7 +281,7 @@ class ChannelFit():
         Iz = np.array(Iz)  # z, v, y, x
         Iout = np.sum(Iz * (self.h_min < hdisk), axis=0) / self.sini
         y = self.xmajor - offmajor
-        x = self.xminor - offminor * self.deproj
+        x = self.xminor - offminor
         m = [None] * len(Iout)
         for i, c in enumerate(Iout):
             interp = RGI((self.ynest[0], self.xnest[0]), c,
