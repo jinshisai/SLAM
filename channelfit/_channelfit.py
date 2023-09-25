@@ -219,8 +219,8 @@ class ChannelFit():
         self.erad = np.array(erad)
         self.Rnest = np.array(Rnest)
         nxnew = int(self.nx * self.deproj)
-        self.xnew = np.linspace(-self.dx * (nxnew - 0.5),
-                                self.dx * (nxnew - 0.5), nxnew)
+        self.xnew = np.linspace(-self.dx * (nxnew // 2 - 0.5),
+                                self.dx * (nxnew // 2 - 0.5), nxnew)
         z3d, y3d, x3d = np.meshgrid(self.xnest[0], self.ynest[0],
                                     self.xnew, indexing='ij')
         h_min = np.abs(z3d / np.hypot(x3d + z3d, y3d * np.cos(incl_rad)) / np.tan(incl_rad))
