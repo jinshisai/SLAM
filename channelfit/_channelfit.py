@@ -304,7 +304,9 @@ class ChannelFit():
             m[i] = interp((y, x))
         #Iout = np.array(m) / np.max(m)
         Iout = convolve(m, [self.gaussbeam], mode='same')
-        scale = self.xysum / np.sum(Iout, axis=(1, 2))
+        xysum = np.sum(Iout, axis=(1, 2))
+        scale = self.xysum / xysum
+        scale[xysum == 0] = 0
         Iout = Iout * np.moveaxis([[scale]], 2, 0)
         return Iout
 
