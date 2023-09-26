@@ -278,21 +278,16 @@ class ChannelFit():
             vlos1, vlos2 = self.get_vlos(Rc, x1), self.get_vlos(Rc, x2)
         else:
             vlos1, vlos2 = self.vlos1, self.vlos2
-        def vlos_to_Iout(vlos_in):
+        def vlos_to_Iout(vlos_in, x_in):
             vlos = vlos_in * np.sqrt(Mstar)  # Don't use *=. It changes self.vlos.
             v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
-            v = np.moveaxis(v, 1, 0)  # layer, v, y, x
             iv = v / cs / dv_prof + n_prof // 2 + 0.5  # 0.5 is for rounding
-            iv = iv.astype('int').clip(0, n_prof)
-            Iout = prof[iv]
+            Iout = prof[iv.astype('int').clip(0, n_prof)]
+            powcor = [np.hypot(x_in, self.Ynest)**(pI)] * len(self.v_valid)
+            Iout = Iout * np.where(np.isnan(powcor), 1, powcor)
             return Iout
-        powcor = [np.hypot(x1, self.Ynest)**(pI)] * len(self.v_valid)
-        powcor[np.isnan(powcor)] = 1
-        Iout1 = vlos_to_Iout(vlos1) * np.moveaxis(powcor, 0, 1)
-        powcor = [np.hypot(x2, self.Ynest)**(pI)] * len(self.v_valid)
-        powcor[np.isnan(powcor)] = 1
-        Iout2 = vlos_to_Iout(vlos2) * np.moveaxis(powcor, 0, 1)
-        Iout = Iout1 + Iout2
+        Iout = vlos_to_Iout(vlos1, x1) + vlos_to_Iout(vlos2, x2)
+        Iout = np.moveaxis(Iout, 0, 1)
         for l in range(self.nlayer - 1, 0, -1):
             Iout[l - 1][:, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[l])
