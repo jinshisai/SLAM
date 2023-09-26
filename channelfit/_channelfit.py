@@ -240,12 +240,15 @@ class ChannelFit():
         b = (1 + hdisk**2) * self.sini * self.cosi * self.Xnest
         c = (self.sini**2 - hdisk**2 * self.cosi**2) * self.Xnest**2 \
             - hdisk**2 * self.Ynest**2
-        z1 = np.full_like(self.Xnest, np.nan)
-        z2 = np.full_like(self.Xnest, np.nan)
-        D = (b / a)**2 - c / a
-        c =  D >= 0
-        z1[c] = b[c] + np.sqrt(D[c])
-        z2[c] = b[c] - np.sqrt(D[c])
+        if -1e-3 < a < 1e-3:
+            z1 = c / b / 2
+            z2 = c / b / 2
+        else:
+            z1 = np.full_like(self.Xnest, np.nan)
+            z2 = np.full_like(self.Xnest, np.nan)
+            c = (b**2 - c) >= 0
+            z1[c] = (b[c] + np.sqrt(D[c])) / a
+            z2[c] = (b[c] - np.sqrt(D[c])) / a
         x1 = self.Xnest * self.cosi + z1 * self.sini
         x2 = self.Xnest * self.cosi + z2 * self.sini
         return x1, x2
