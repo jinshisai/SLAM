@@ -259,6 +259,7 @@ class ChannelFit():
         erad = Xnest * self.signminor / r
         vlos = vp * erot + vr * erad
         vlos = vlos * self.sini * vunit
+        vlos[np.isnan(vlos)] = 0
         return vlos
 
         
@@ -286,11 +287,11 @@ class ChannelFit():
             Iout = prof[iv]
             return Iout
         powcor = [np.hypot(x1, self.Ynest)**(pI)] * len(self.v_valid)
-        powcor = np.moveaxis(powcor, 0, 1)
-        Iout1 = vlos_to_Iout(vlos1) * powcor
+        powcor[np.isnan(powcor)] = 1
+        Iout1 = vlos_to_Iout(vlos1) * np.moveaxis(powcor, 0, 1)
         powcor = [np.hypot(x2, self.Ynest)**(pI)] * len(self.v_valid)
-        powcor = np.moveaxis(powcor, 0, 1)
-        Iout2 = vlos_to_Iout(vlos2) * powcor
+        powcor[np.isnan(powcor)] = 1
+        Iout2 = vlos_to_Iout(vlos2) * np.moveaxis(powcor, 0, 1)
         Iout = Iout1 + Iout2
         for l in range(self.nlayer - 1, 0, -1):
             Iout[l - 1][:, self.nq1:self.nq3, self.nq1:self.nq3] \
