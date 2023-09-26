@@ -185,6 +185,7 @@ class ChannelFit():
         
         m = makemom01(self.data_valid, self.v_valid, sigma)
         self.mom0 = m['mom0']
+        self.sum = np.sum(self.mom0) / self.dv
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
         self.sigma_mom0 = m['sigma_mom0']
@@ -300,9 +301,7 @@ class ChannelFit():
             m[i] = interp((y, x))
         #Iout = np.array(m) / np.max(m)
         Iout = convolve(m, [self.gaussbeam], mode='same')
-        mom0 = np.nansum(Iout, axis=0) * self.dv
-        Iout = np.where((self.mom0 > 3 * self.sigma_mom0),
-                        Iout * self.mom0 / mom0, 0)
+        Iout = Iout * self.sum / np.sum(Iout)
         return Iout
 
                         
