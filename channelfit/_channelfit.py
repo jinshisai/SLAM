@@ -185,7 +185,7 @@ class ChannelFit():
         
         m = makemom01(self.data_valid, self.v_valid, sigma)
         self.mom0 = m['mom0']
-        self.sum = np.sum(self.mom0) / self.dv
+        self.xysum = np.sum(self.data_valid, axis=(1, 2))
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
         self.sigma_mom0 = m['sigma_mom0']
@@ -304,7 +304,7 @@ class ChannelFit():
             m[i] = interp((y, x))
         #Iout = np.array(m) / np.max(m)
         Iout = convolve(m, [self.gaussbeam], mode='same')
-        Iout = Iout * self.sum / np.sum(Iout)
+        Iout = Iout * self.xysum / np.sum(Iout, axis=(1, 2))
         return Iout
 
                         
@@ -471,7 +471,9 @@ class ChannelFit():
                      offmajor: float, offminor: float, offvsys: float,
                      filename: str = 'modelmom01.png', pa: float = None):
         d = self.cubemodel(Mstar, Rc, cs, hdisk, pI, offmajor, offminor, offvsys)
-        mom1 = makemom01(d, self.v_valid, self.sigma)['mom1']
+        m = makemom01(d, self.v_valid, self.sigma)
+        mom0 = ['mom0']
+        mom1 = ['mom1']
         levels = np.arange(1, 20) * 6 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
@@ -481,7 +483,7 @@ class ChannelFit():
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
                           vmin=-vplot, vmax=vplot)
         fig.colorbar(m, ax=ax, label=r'Model mom1 (km s$^{-1}$)')
-        ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
+        ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         if pa is not None:
             r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
             ax.plot(r * self.sinpa, r * self.cospa, 'k:')
@@ -523,7 +525,11 @@ class ChannelFit():
                         filename: str = 'residualmom01.png',
                         pa: float = None):
         d = self.cubemodel(Mstar, Rc, cs, hdisk, pI, offmajor, offminor, offvsys)
-        mom1 = self.mom1 - makemom01(d, self.v_valid, self.sigma)['mom1']
+        m = makemom01(d, self.v_valid, self.sigma)
+        mom0 = m['mom0']
+        mom1 = m['mom1']
+        mom0 = self.mom0 - mom0
+        mom1 = self.mom1 - mom1
         levels = np.arange(1, 20) * 6 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
@@ -533,7 +539,7 @@ class ChannelFit():
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
                           vmin=-vplot, vmax=vplot)
         fig.colorbar(m, ax=ax, label=r'Obs. $-$ model mom1 (km s$^{-1}$)')
-        ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
+        ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         if pa is not None:
             r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
             ax.plot(r * self.sinpa, r * self.cospa, 'k:')
