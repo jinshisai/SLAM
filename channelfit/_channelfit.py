@@ -285,8 +285,12 @@ class ChannelFit():
             iv = iv.astype('int').clip(0, n_prof)
             Iout = prof[iv]
             return Iout
-        Iout1 = vlos_to_Iout(vlos1) * np.hypot(x1, self.Ynest)**(pI)
-        Iout2 = vlos_to_Iout(vlos2) * np.hypot(x2, self.Ynest)**(pI)
+        powcor = [np.hypot(x1, self.Ynest)**(pI)] * len(self.v_valid)
+        powcor = np.moveaxis(powcor, 0, 1)
+        Iout1 = vlos_to_Iout(vlos1) * powcor
+        powcor = [np.hypot(x2, self.Ynest)**(pI)] * len(self.v_valid)
+        powcor = np.moveaxis(powcor, 0, 1)
+        Iout2 = vlos_to_Iout(vlos2) * powcor
         Iout = Iout1 + Iout2
         for l in range(self.nlayer - 1, 0, -1):
             Iout[l - 1][:, self.nq1:self.nq3, self.nq1:self.nq3] \
