@@ -201,8 +201,8 @@ class ChannelFit():
         self.nlayer = nlayer  # down to dpix / 2**(nlayer-1)
         xnest = [None] * nlayer
         ynest = [None] * nlayer
-        erot = [None] * nlayer
-        erad = [None] * nlayer
+        Xnest = [None] * nlayer
+        Ynest = [None] * nlayer
         Rnest = [None] * nlayer
         for l in range(nlayer):
             n = npixnest // 2 + 0.5
@@ -211,13 +211,13 @@ class ChannelFit():
             R = np.hypot(X, Y)
             xnest[l] = s
             ynest[l] = s
-            erot[l] = Y * self.signmajor / R
-            erad[l] = X * self.signminor / R
+            Xnest[l] = X
+            Ynest[l] = Y
             Rnest[l] = R
         self.xnest = np.array(xnest)
         self.ynest = np.array(ynest)
-        self.erot = np.array(erot)
-        self.erad = np.array(erad)
+        self.Xnest = np.array(Xnest)
+        self.Ynest = np.array(Ynest)
         self.Rnest = np.array(Rnest)
         print('-------- nested grid --------')
         for l in range(len(xnest)):
@@ -236,27 +236,27 @@ class ChannelFit():
 
     def get_xdisk(self, hdisk: float = 0.1):
         a = self.cosi**2 - hdisk**2 * self.sini**2
-        b = (1 + hdisk**2) * self.sini * self.cosi * self.xnest
-        c = (self.sini**2 - hdisk**2 * self.cosi**2) * self.xnest**2 \
-            - hdisk**2 * self.ynest**2
-        z1 = np.full_like(self.xnest, np.nan)
-        z2 = np.full_like(self.xnest, np.nan)
+        b = (1 + hdisk**2) * self.sini * self.cosi * self.Xnest
+        c = (self.sini**2 - hdisk**2 * self.cosi**2) * self.Xnest**2 \
+            - hdisk**2 * self.Ynest**2
+        z1 = np.full_like(self.Xnest, np.nan)
+        z2 = np.full_like(self.Xnest, np.nan)
         D = (b / a)**2 - c / a
         c =  D >= 0
         z1[c] = b[c] + np.sqrt(D[c])
         z2[c] = b[c] - np.sqrt(D[c])
-        x1 = self.xnest * self.cosi + z1 * self.sini
-        x2 = self.xnest * self.cosi + z2 * self.sini
+        x1 = self.Xnest * self.cosi + z1 * self.sini
+        x2 = self.Xnest * self.cosi + z2 * self.sini
         return x1, x2
         
-    def get_vlos(self, Rc: float, xnest: np.ndarray) -> np.ndarray:
-        r = np.hypot(xnest, self.ynest)
+    def get_vlos(self, Rc: float, Xnest: np.ndarray) -> np.ndarray:
+        r = np.hypot(Xnest, self.Ynest)
         vp = np.sqrt(Rc) / r
         vr = -r**(-1/2) * np.sqrt(2 - Rc / r)
         vp[r < Rc] = r[r < Rc]**(-1/2)
         vr[r < Rc] = 0
-        erot = self.ynest * self.signmajor / r
-        erad = xnest * self.signminor / r
+        erot = self.Ynest * self.signmajor / r
+        erad = Xnest * self.signminor / r
         vlos = vp * erot + vr * erad
         vlos = vlos * self.sini * vunit
         return vlos
