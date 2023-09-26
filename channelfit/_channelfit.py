@@ -287,11 +287,10 @@ class ChannelFit():
             Iout = Iout * np.where(np.isnan(powcor), 1, powcor)
             return Iout
         Iout = vlos_to_Iout(vlos1, x1) + vlos_to_Iout(vlos2, x2)
-        Iout = np.moveaxis(Iout, 0, 1)
         for l in range(self.nlayer - 1, 0, -1):
-            Iout[l - 1][:, self.nq1:self.nq3, self.nq1:self.nq3] \
-                = avefour(Iout[l])
-        Iout = Iout[0]  # v, y, x
+            Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
+                = avefour(Iout[:, l, :, :])
+        Iout = Iout[:, 0, :, :]  # v, y, x
         y = self.xmajor - offmajor
         x = self.xminor - offminor
         m = [None] * len(Iout)
