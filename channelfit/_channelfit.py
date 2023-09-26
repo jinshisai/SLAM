@@ -246,7 +246,7 @@ class ChannelFit():
         else:
             z1 = np.full_like(self.Xnest, np.nan)
             z2 = np.full_like(self.Xnest, np.nan)
-            c = (b**2 - c) >= 0
+            c = (D := b**2 - c) >= 0
             z1[c] = (b[c] + np.sqrt(D[c])) / a
             z2[c] = (b[c] - np.sqrt(D[c])) / a
         x1 = self.Xnest * self.cosi + z1 * self.sini
