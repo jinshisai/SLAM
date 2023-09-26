@@ -304,7 +304,8 @@ class ChannelFit():
             m[i] = interp((y, x))
         #Iout = np.array(m) / np.max(m)
         Iout = convolve(m, [self.gaussbeam], mode='same')
-        Iout = Iout * self.xysum / np.sum(Iout, axis=(1, 2))
+        scale = self.xysum / np.sum(Iout, axis=(1, 2))
+        Iout = Iout * np.moveaxis([[scale]], 2, 0)
         return Iout
 
                         
@@ -472,8 +473,8 @@ class ChannelFit():
                      filename: str = 'modelmom01.png', pa: float = None):
         d = self.cubemodel(Mstar, Rc, cs, hdisk, pI, offmajor, offminor, offvsys)
         m = makemom01(d, self.v_valid, self.sigma)
-        mom0 = ['mom0']
-        mom1 = ['mom1']
+        mom0 = m['mom0']
+        mom1 = m['mom1']
         levels = np.arange(1, 20) * 6 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
