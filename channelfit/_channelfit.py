@@ -299,7 +299,7 @@ class ChannelFit():
             interp = RGI((self.ynest[0], self.xnest[0]), c,
                          bounds_error=False, fill_value=0)
             m[i] = interp((y, x))
-        #m = np.array(m) / np.max(m)
+        #Iout = np.array(m) / np.max(m)
         Iout = convolve(m, [self.gaussbeam], mode='same')
         mom0 = np.nansum(Iout, axis=0) * self.dv
         Iout = np.where((self.mom0 > 3 * self.sigma_mom0),
