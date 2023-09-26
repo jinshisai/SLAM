@@ -166,10 +166,11 @@ class ChannelFit():
         self.cospa = np.cos(pa_rad)
         self.sinpa = np.sin(pa_rad)
         self.sini = np.sin(incl_rad)
+        self.cosi = np.cos(incl_rad)
         self.deproj = 1 / np.cos(incl_rad)
         xminor, xmajor = rot(*np.meshgrid(self.x, self.y), pa_rad)
         self.xmajor = xmajor
-        self.xminor = xminor * self.deproj
+        self.xminor = xminor
         
         self.v_nanblue = v[v < vlim[0]]
         self.v_blue = v[(vlim[0] <= v) * (v <= vlim[1])]
@@ -232,40 +233,67 @@ class ChannelFit():
         self.pixperbeam = np.sum(gaussbeam)
         self.gaussbeam = gaussbeam / self.pixperbeam
 
+
+    def get_xdisk(self, hdisk: float = 0.1):
+        a = self.cosi**2 - hdisk**2 * self.sini**2
+        b = (1 + hdisk**2) * self.sini * self.cosi * self.xnest
+        c = (self.sini**2 - hdisk**2 * self.cosi**2) * self.xnest**2 \
+            - hdisk**2 * self.ynest**2
+        z1 = np.full_like(self.xnest, np.nan)
+        z2 = np.full_like(self.xnest, np.nan)
+        D = (b / a)**2 - c / a
+        c =  D >= 0
+        z1[c] = b[c] + np.sqrt(D[c])
+        z2[c] = b[c] - np.sqrt(D[c])
+        x1 = self.xnest * self.cosi + z1 * self.sini
+        x2 = self.xnest * self.cosi + z2 * self.sini
+        return x1, x2
         
-    def get_vlos(self, Rc: float) -> np.ndarray:
-        vkep = self.Rnest**(-1/2)
-        vjrot = np.sqrt(Rc) / self.Rnest
-        vr = -self.Rnest**(-1/2) * np.sqrt(2 - Rc / self.Rnest)
-        vr[self.Rnest < Rc] = 0
-        vrot = np.where(self.Rnest < Rc, vkep, vjrot)
-        vlos = vrot * self.erot + vr * self.erad
+    def get_vlos(self, Rc: float, xnest: np.ndarray) -> np.ndarray:
+        r = np.hypot(xnest, self.ynest)
+        vp = np.sqrt(Rc) / r
+        vr = -r**(-1/2) * np.sqrt(2 - Rc / r)
+        vp[r < Rc] = r[r < Rc]**(-1/2)
+        vr[r < Rc] = 0
+        erot = self.ynest * self.signmajor / r
+        erad = xnest * self.signminor / r
+        vlos = vp * erot + vr * erad
         vlos = vlos * self.sini * vunit
         return vlos
 
         
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
+                  hdisk: float,
                   offmajor: float, offminor: float, offvsys: float):
         if self.cs_fixed is None:
             prof, n_prof, dv_prof = boxgauss(self.dv / cs)
         else:
             prof, n_prof, dv_prof = self.prof, self.n_prof, self.dv_prof
-        if self.Rc_fixed is None:
-            vlos = self.get_vlos(Rc)
+        if self.hdisk_fixed is None:
+            x1, x2 = self.get_xdisk(hdisk)
         else:
-            vlos = self.vlos
-        vlos = vlos * np.sqrt(Mstar)  # Don't use *=. It changes self.vlos.
-        v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
-        v = np.moveaxis(v, 1, 0)  # layer, v, y, x
-        iv = v / cs / dv_prof + n_prof // 2 + 0.5  # 0.5 is for rounding
-        iv = iv.astype('int').clip(0, n_prof)
-        Iout = prof[iv]
+            x1, x2 = self.x1, self.x2
+        if self.Rc_fixed is None or self.hdisk_fixed is None:
+            vlos1, vlos2 = self.get_vlos(Rc, x1), self.get_vlos(Rc, x2)
+        else:
+            vlos1, vlos2 = self.vlos1, self.vlos2
+        def vlos_to_Iout(vlos_in):
+            vlos = vlos_in * np.sqrt(Mstar)  # Don't use *=. It changes self.vlos.
+            v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
+            v = np.moveaxis(v, 1, 0)  # layer, v, y, x
+            iv = v / cs / dv_prof + n_prof // 2 + 0.5  # 0.5 is for rounding
+            iv = iv.astype('int').clip(0, n_prof)
+            Iout = prof[iv]
+            return Iout
+        Iout1 = vlos_to_Iout(vlos1)
+        Iout2 = vlos_to_Iout(vlos2)
+        Iout = Iout1 + Iout2
         for l in range(self.nlayer - 1, 0, -1):
             Iout[l - 1][:, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[l])
         Iout = Iout[0]  # v, y, x
         y = self.xmajor - offmajor
-        x = self.xminor - offminor * self.deproj
+        x = self.xminor - offminor
         m = [None] * len(Iout)
         for i, c in enumerate(Iout):
             interp = RGI((self.ynest[0], self.xnest[0]), c,
@@ -282,12 +310,14 @@ class ChannelFit():
     def fitting(self, Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
                 cs_range: list = [0.01, 1],
+                hdisk_range: list = [0.01, 1],
                 offmajor_range: list = [-100, 100],
                 offminor_range: list = [-100, 100],
                 offvsys_range: list = [-0.2, 0.2],
                 Mstar_fixed: float = None,
                 Rc_fixed: float = None,
                 cs_fixed: float = None,
+                hdisk_fixed: float = None,
                 offmajor_fixed: float = None,
                 offminor_fixed: float = None,
                 offvsys_fixed: float = None,
@@ -299,16 +329,20 @@ class ChannelFit():
         self.cs_fixed = cs_fixed        
         if cs_fixed is not None:            
             self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
+        self.hdisk_fixed = hdisk_fixed
+        if hdisk_fixed is not None:
+            self.x1, self.x2 = self.get_xdisk(hdisk_fixed)
         self.Rc_fixed = Rc_fixed
-        if Rc_fixed is not None:
-            self.vlos = self.get_vlos(Rc_fixed)
+        if Rc_fixed is not None and hdisk_fixed is not None:
+            self.vlos1 = self.get_vlos(Rc_fixed, self.x1)
+            self.vlos2 = self.get_vlos(Rc_fixed, self.x2)
         
-        p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
+        p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed, hdisk_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed])
         if None in p_fixed:
             c = (q := p_fixed[:3]) != None
             p_fixed[:3][c] = np.log10(q[c].astype('float'))
-            labels = np.array(['log Mstar', 'log Rc', 'log cs',
+            labels = np.array(['log Mstar', 'log Rc', 'log cs', 'hdisk',
                                'offmajor', 'offminor', 'offvsys'])
             labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
@@ -332,6 +366,7 @@ class ChannelFit():
             plim = np.array([np.log10(Mstar_range),
                              np.log10(Rc_range),
                              np.log10(cs_range),
+                             hdisk_range,
                              offmajor_range, offminor_range, offvsys_range])
             plim = plim[p_fixed == None].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
@@ -363,7 +398,7 @@ class ChannelFit():
         print('popt :', ', '.join([f'{t:.2e}' for t in self.popt]))
         print('------------------------')
         np.savetxt(filename+'.popt.txt', [self.popt, self.plow, self.pmid, self.phigh])
-        k = ['Mstar', 'Rc', 'cs', 'offmajor', 'offminor', 'offvsys']
+        k = ['Mstar', 'Rc', 'cs', 'hdisk', 'offmajor', 'offminor', 'offvsys']
         self.popt = dict(zip(k, self.popt))
         self.plow = dict(zip(k, self.plow))
         self.pmid = dict(zip(k, self.pmid))
@@ -371,7 +406,7 @@ class ChannelFit():
  
    
     def modeltofits(self, Mstar: float = None, Rc: float = None,
-                    cs: float = None,
+                    cs: float = None, hdisk: float = None,
                     offmajor: float = None, offminor: float = None,
                     offvsys: float = None,
                     filehead: str = 'best'):
@@ -388,7 +423,7 @@ class ChannelFit():
         #nv = h['NAXIS3']
         self.cs_fixed = None
         self.Rc_fixed = None
-        if None in (p := [Mstar, Rc, cs, offmajor, offminor, offvsys]):
+        if None in (p := [Mstar, Rc, cs, hdisk, offmajor, offminor, offvsys]):
             m = self.cubemodel(**self.popt)
         else:
             m = self.cubemodel(*p)
@@ -426,10 +461,10 @@ class ChannelFit():
         tofits(model, 'model')
         tofits(self.data - model, 'residual')
         
-    def plotmodelmom(self, Mstar: float, Rc: float, cs: float,
+    def plotmodelmom(self, Mstar: float, Rc: float, cs: float, hdisk: float,
                      offmajor: float, offminor: float, offvsys: float,
                      filename: str = 'modelmom01.png', pa: float = None):
-        d = self.cubemodel(Mstar, Rc, cs, offmajor, offminor, offvsys)
+        d = self.cubemodel(Mstar, Rc, cs, hdisk, offmajor, offminor, offvsys)
         mom1 = makemom01(d, self.v_valid, self.sigma)['mom1']
         levels = np.arange(1, 20) * 6 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
@@ -476,11 +511,11 @@ class ChannelFit():
         fig.savefig(filename)
         plt.close()
 
-    def plotresidualmom(self, Mstar: float, Rc: float, cs: float,
+    def plotresidualmom(self, Mstar: float, Rc: float, cs: float, hdisk: float,
                         offmajor: float, offminor: float, offvsys: float,
                         filename: str = 'residualmom01.png',
                         pa: float = None):
-        d = self.cubemodel(Mstar, Rc, cs, offmajor, offminor, offvsys)
+        d = self.cubemodel(Mstar, Rc, cs, hdisk, offmajor, offminor, offvsys)
         mom1 = self.mom1 - makemom01(d, self.v_valid, self.sigma)['mom1']
         levels = np.arange(1, 20) * 6 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
