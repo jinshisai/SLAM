@@ -255,10 +255,14 @@ class ChannelFit():
         
     def get_vlos(self, Rc: float, Xnest: np.ndarray) -> np.ndarray:
         r = np.hypot(Xnest, self.Ynest)
-        vp = np.sqrt(Rc) / r
-        vr = -r**(-1/2) * np.sqrt(2 - Rc / r)
-        vp[r < Rc] = r[r < Rc]**(-1/2)
-        vr[r < Rc] = 0
+        vp = r**(-1/2)
+        vr = r * 0
+        c = r > Rc
+        if self.envelope:
+            vp[c] = np.sqrt(Rc) / r[c]
+            vr[c] = -r[c]**(-1/2) * np.sqrt(2 - Rc / r[c])
+        else:
+            vp[c] = 0
         erot = self.Ynest * self.signmajor / r
         erad = Xnest * self.signminor / r
         vlos = vp * erot + vr * erad
@@ -337,11 +341,13 @@ class ChannelFit():
                 offmajor_fixed: float = None,
                 offminor_fixed: float = None,
                 offvsys_fixed: float = None,
+                envelope: bool = True,
                 filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True,
                 kwargs_emcee_corner: dict = {}):
 
+        self.envelope = envelope
         self.cs_fixed = cs_fixed        
         if cs_fixed is not None:            
             self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
@@ -426,7 +432,7 @@ class ChannelFit():
     def modeltofits(self, Mstar: float = None, Rc: float = None,
                     cs: float = None, hdisk: float = None, pI: float = None,
                     offmajor: float = None, offminor: float = None,
-                    offvsys: float = None,
+                    offvsys: float = None, envelope: bool = None,
                     filehead: str = 'best'):
         w = wcs.WCS(naxis=3)
         h = fits.open(self.fitsname)[0].header
@@ -442,6 +448,8 @@ class ChannelFit():
         self.cs_fixed = None
         self.Rc_fixed = None
         self.hdisk_fixed = None
+        if envelope is not None:
+            self.envelope = envelope
         k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI',
              'offmajor', 'offminor', 'offvsys']
         p = [Mstar, Rc, cs, hdisk, pI, offmajor, offminor, offvsys]
@@ -490,11 +498,19 @@ class ChannelFit():
         tofits(concat(m0), 'beforeconvolving')
         tofits(concat(m1), 'beforescaling')
         
-    def plotmodelmom(self, Mstar: float, Rc: float, cs: float,
-                     hdisk: float, pI: float, 
-                     offmajor: float, offminor: float, offvsys: float,
+    def plotmodelmom(self, Mstar: float = None, Rc: float = None,
+                     cs: float = None, hdisk: float = None, pI: float = None, 
+                     offmajor: float = None, offminor: float = None,
+                     offvsys: float = None, envelope: bool = None,
                      filename: str = 'modelmom01.png', pa: float = None):
-        d = self.cubemodel(Mstar, Rc, cs, hdisk, pI, offmajor, offminor, offvsys)
+        if envelope is not None:
+            self.envelope = envelope
+        k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI',
+             'offmajor', 'offminor', 'offvsys']
+        p = [Mstar, Rc, cs, hdisk, pI, offmajor, offminor, offvsys]
+        if not (None in p):
+            self.popt = dict(zip(k, p))
+        d = self.cubemodel(**self.popt)
         m = makemom01(d, self.v_valid, self.sigma)
         mom0 = m['mom0']
         mom1 = m['mom1']
@@ -543,12 +559,20 @@ class ChannelFit():
         fig.savefig(filename)
         plt.close()
 
-    def plotresidualmom(self, Mstar: float, Rc: float, cs: float,
-                        hdisk: float, pI: float, 
-                        offmajor: float, offminor: float, offvsys: float,
+    def plotresidualmom(self, Mstar: float = None, Rc: float = None,
+                        cs: float = None, hdisk: float = None, pI: float = None,
+                        offmajor: float = None, offminor: float = None,
+                        offvsys: float = None, envelope: bool = None,
                         filename: str = 'residualmom01.png',
                         pa: float = None):
-        d = self.cubemodel(Mstar, Rc, cs, hdisk, pI, offmajor, offminor, offvsys)
+        if envelope is not None:
+            self.envelope = envelope
+        k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI',
+             'offmajor', 'offminor', 'offvsys']
+        p = [Mstar, Rc, cs, hdisk, pI, offmajor, offminor, offvsys]
+        if not (None in p):
+            self.popt = dict(zip(k, p))
+        d = self.cubemodel(**self.popt)
         m = makemom01(d, self.v_valid, self.sigma)
         mom0 = m['mom0']
         mom1 = m['mom1']
