@@ -316,6 +316,8 @@ class ChannelFit():
             scale = self.xypeak / xypeak
             scale[xypeak == 0] = 0
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
+        else:
+            Iout = Iout / np.max(Iout)
         return Iout
 
                         
