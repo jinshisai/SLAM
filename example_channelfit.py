@@ -20,12 +20,16 @@ if __name__ == '__main__':
     chan = ChannelFit()
     chan.gridondisk(cubefits=cubefits, center=center, pa=pa, incl=incl,
                     vsys=vsys, dist=dist, sigma=sigma,
-                    rmax=rmax, vlim=vlim)
+                    rmax=rmax, vlim=vlim, nlayer=1)
     chan.fitting(Mstar_range=[0.01, 10.0],
                  Rc_fixed=1e5,
                  cs_fixed=0.1,
+                 hdisk_fixed=0,
+                 pI_fixed=0,
                  offmajor_fixed=0, offminor_fixed=0, offvsys_fixed=0,
-                 nwalkers_per_ndim=4, nburnin=1, nsteps=100,
+                 kwargs_emcee_corner={'nwalkers_per_ndim':8,
+                                      'nburnin':100,
+                                      'nsteps':100},
                  filename=filehead)
     #p = chan.popt
     #chan.modeltofits(**p, filehead=filehead)
