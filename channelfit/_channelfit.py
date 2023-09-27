@@ -185,8 +185,7 @@ class ChannelFit():
         
         m = makemom01(self.data_valid, self.v_valid, sigma)
         self.mom0 = m['mom0']
-        d = np.where(self.data_valid > 3 * self.sigma, self.data_valid, 0)
-        self.xymed = np.median(d, axis=(1, 2))
+        self.xypeak = np.max(d, axis=(1, 2))
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
         self.sigma_mom0 = m['sigma_mom0']
@@ -308,9 +307,9 @@ class ChannelFit():
         if convolving:
             Iout = convolve(Iout, [self.gaussbeam], mode='same')
         if scaling:
-            xymed = np.median(Iout, axis=(1, 2))
-            scale = self.xymed / xymed
-            scale[xymed == 0] = 0
+            xypeak = np.max(Iout, axis=(1, 2))
+            scale = self.xypeak / xypeak
+            scale[xypeak == 0] = 0
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
         if not convolving or not scaling:    
             xypeak = np.max(Iout, axis=(1, 2))
