@@ -304,17 +304,19 @@ class ChannelFit():
             interp = RGI((self.ynest[0], self.xnest[0]), c,
                          bounds_error=False, fill_value=0)
             m[i] = interp((y, x))
+        Iout = np.array(m)
         if convolving:
-            Iout = convolve(m, [self.gaussbeam], mode='same')
-        else:
-            Iout = np.array(m) / np.max(m)
+            Iout = convolve(Iout, [self.gaussbeam], mode='same')
         if scaling:
             xysum = np.sum(Iout, axis=(1, 2))
             scale = self.xysum / xysum
             scale[xysum == 0] = 0
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
-        else:
-            Iout = np.array(Iout) / np.max(Iout)
+        if not convolving or not scaling:    
+            xypeak = np.max(Iout, axis=(1, 2))
+            scale = 1 / xypeak
+            scale[xypeak == 0] = 0
+            Iout = Iout * np.moveaxis([[scale]], 2, 0)
         return Iout
 
                         
