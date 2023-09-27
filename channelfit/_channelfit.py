@@ -314,7 +314,7 @@ class ChannelFit():
             scale[xysum == 0] = 0
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
         else:
-            Iout = np.array(m) / np.max(m)
+            Iout = np.array(Iout) / np.max(Iout)
         return Iout
 
                         
