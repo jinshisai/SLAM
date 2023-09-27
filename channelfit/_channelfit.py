@@ -446,7 +446,7 @@ class ChannelFit():
             self.popt = dict(zip(k, p))
         m = self.cubemodel(**self.popt)
         m0 = self.cubemodel(**self.popt, convolving=False, scaling=False)
-        m1 = self.cubemodel(**self.popt, convolving=False, scaling=True)
+        m1 = self.cubemodel(**self.popt, convolving=True, scaling=False)
         
         def concat(m):
             if len(self.v_red) > 0:
