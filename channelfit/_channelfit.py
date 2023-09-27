@@ -185,7 +185,7 @@ class ChannelFit():
         
         m = makemom01(self.data_valid, self.v_valid, sigma)
         self.mom0 = m['mom0']
-        self.xypeak = np.max(d, axis=(1, 2))
+        self.xypeak = np.max(self.data_valid, axis=(1, 2))
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
         self.sigma_mom0 = m['sigma_mom0']
