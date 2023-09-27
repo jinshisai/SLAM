@@ -809,7 +809,7 @@ class PVAnalysis():
                       outname: str = 'pvanalysis',
                       rangelevel: float = 0.8,
                       show_corner: bool = False,
-                      with_dynesty: bool = False) -> dict:
+                      calc_evidence: bool = False) -> dict:
         """Fit the derived edge/ridge positions/velocities with a double power law function by using emcee.
 
 
@@ -864,7 +864,7 @@ class PVAnalysis():
                          'ridge':[[np.nan] * 5, [np.nan] * 5]}
             return -1
 
-        labels = np.array(['Rb', 'Vb', 'p_in', 'dp', 'Vsys'])
+        labels = np.array(['Rb', 'Vb', 'p_in', 'dp', 'dVsys'])
         include = [True, include_dp or (fixed_dp != 0), include_pin,
                    include_dp, include_vsys]
         labels = labels[include]
@@ -889,16 +889,12 @@ class PVAnalysis():
                        + np.sum(((v1 - wpow_v_custom(x0, *p)) / dv1)**2)
                 return -0.5 * chi2
             plim = plim[:, include]
-            if with_dynesty:
-                popt, perr = dynesty_corner(plim, lnprob, args=args, 
-                    labels=labels, show_corner=show_corner, return_evidence=True)
-            else:
-                popt, perr = emcee_corner(plim, lnprob, args=args,
-                                          labels=labels, rangelevel=rangelevel,
-                                          figname=outname+'.corner'+ext+'.png',
-                                          show_corner=show_corner,
-                                          ndata=len(args[0]) + len(args[3]),
-                                          calc_evidence=True)
+            popt, perr = emcee_corner(plim, lnprob, args=args,
+                                      labels=labels, rangelevel=rangelevel,
+                                      figname=outname+'.corner'+ext+'.png',
+                                      show_corner=show_corner,
+                                      ndata=len(args[0]) + len(args[3]),
+                                      calc_evidence=calc_evidence)
             e = 'edge' if ext == '_e' else 'ridge'
             print(f'\033[1A\033[33C[{e}]')
             (qopt := q0 * 1)[np.isnan(q0)] = popt
