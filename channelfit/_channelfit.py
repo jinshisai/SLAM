@@ -270,7 +270,8 @@ class ChannelFit():
         
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   hdisk: float, pI: float,
-                  offmajor: float, offminor: float, offvsys: float):
+                  offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
+                  convolving: bool = True, scaling: bool = True):
         if self.cs_fixed is None:
             prof, n_prof, dv_prof = boxgauss(self.dv / cs)
         else:
@@ -303,12 +304,17 @@ class ChannelFit():
             interp = RGI((self.ynest[0], self.xnest[0]), c,
                          bounds_error=False, fill_value=0)
             m[i] = interp((y, x))
-        #Iout = np.array(m) / np.max(m)
-        Iout = convolve(m, [self.gaussbeam], mode='same')
-        xysum = np.sum(Iout, axis=(1, 2))
-        scale = self.xysum / xysum
-        scale[xysum == 0] = 0
-        Iout = Iout * np.moveaxis([[scale]], 2, 0)
+        if convolving:
+            Iout = convolve(m, [self.gaussbeam], mode='same')
+        else:
+            Iout = np.array(m) / np.max(m)
+        if scaling:
+            xysum = np.sum(Iout, axis=(1, 2))
+            scale = self.xysum / xysum
+            scale[xysum == 0] = 0
+            Iout = Iout * np.moveaxis([[scale]], 2, 0)
+        else:
+            Iout = np.array(m) / np.max(m)
         return Iout
 
                         
@@ -432,32 +438,40 @@ class ChannelFit():
         #nv = h['NAXIS3']
         self.cs_fixed = None
         self.Rc_fixed = None
-        if None in (p := [Mstar, Rc, cs, hdisk, pI, offmajor, offminor, offvsys]):
-            m = self.cubemodel(**self.popt)
-        else:
-            m = self.cubemodel(*p)
-        if len(self.v_red) > 0:
-            m_blue = m[self.v_valid < np.min(self.v_red)]
-        else:
-            m_blue = m * 1
-            m_red = np.full((0, ny, nx), np.nan)
-        if len(self.v_blue) > 0:
-            m_red = m[np.max(self.v_blue) < self.v_valid]
-        else:
-            m_red = m * 1
-            m_blue = np.full((0, ny, nx), np.nan)
-        nanblue = np.full((len(self.v_nanblue), ny, nx), np.nan)
-        nanmid = np.full((len(self.v_nanmid), ny, nx), np.nan)
-        nanred = np.full((len(self.v_nanred), ny, nx), np.nan)
-        model = nanblue
-        if len(m_blue) > 0:
-            model = np.append(model, m_blue, axis=0)
-        if len(nanmid) > 0:
-            model = np.append(model, nanmid, axis=0)
-        if len(m_red) > 0:
-            model = np.append(model, m_red, axis=0)
-        if len(nanred) > 0:
-            model = np.append(model, nanred, axis=0)
+        self.hdisk_fixed = None
+        k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI',
+             'offmajor', 'offminor', 'offvsys']
+        p = [Mstar, Rc, cs, hdisk, pI, offmajor, offminor, offvsys]
+        if not (None in p):
+            self.popt = dict(zip(k, p))
+        m = self.cubemodel(**self.popt)
+        m0 = self.cubemodel(**self.popt, convolving=False, scaling=False)
+        m1 = self.cubemodel(**self.popt, convolving=False, scaling=True)
+        
+        def concat(m):
+            if len(self.v_red) > 0:
+                m_blue = m[self.v_valid < np.min(self.v_red)]
+            else:
+                m_blue = m * 1
+                m_red = np.full((0, ny, nx), np.nan)
+            if len(self.v_blue) > 0:
+                m_red = m[np.max(self.v_blue) < self.v_valid]
+            else:
+                m_red = m * 1
+                m_blue = np.full((0, ny, nx), np.nan)
+            nanblue = np.full((len(self.v_nanblue), ny, nx), np.nan)
+            nanmid = np.full((len(self.v_nanmid), ny, nx), np.nan)
+            nanred = np.full((len(self.v_nanred), ny, nx), np.nan)
+            model = nanblue
+            if len(m_blue) > 0:
+                model = np.append(model, m_blue, axis=0)
+            if len(nanmid) > 0:
+                model = np.append(model, nanmid, axis=0)
+            if len(m_red) > 0:
+                model = np.append(model, m_red, axis=0)
+            if len(nanred) > 0:
+                model = np.append(model, nanred, axis=0)
+            return model
                 
         def tofits(d: np.ndarray, ext: str):
             header = w.to_header()
@@ -467,8 +481,11 @@ class ChannelFit():
                     hdu.header[k]=h[k]
             hdu = fits.HDUList([hdu])
             hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
-        tofits(model, 'model')
+            
+        tofits((model := concat(m)), 'model')
         tofits(self.data - model, 'residual')
+        tofits(concat(m0), 'beforeconvolving')
+        tofits(concat(m1), 'beforescaling')
         
     def plotmodelmom(self, Mstar: float, Rc: float, cs: float,
                      hdisk: float, pI: float, 
