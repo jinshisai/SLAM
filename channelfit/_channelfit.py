@@ -304,16 +304,16 @@ class ChannelFit():
                          bounds_error=False, fill_value=0)
             m[i] = interp((y, x))
         Iout = np.array(m)
+        if not scaling:
+            xypeak = np.max(Iout, axis=(1, 2))
+            scale = 1 / xypeak
+            scale[xypeak == 0] = 0
+            Iout = Iout * np.moveaxis([[scale]], 2, 0)
         if convolving:
             Iout = convolve(Iout, [self.gaussbeam], mode='same')
         if scaling:
             xypeak = np.max(Iout, axis=(1, 2))
             scale = self.xypeak / xypeak
-            scale[xypeak == 0] = 0
-            Iout = Iout * np.moveaxis([[scale]], 2, 0)
-        if not convolving or not scaling:    
-            xypeak = np.max(Iout, axis=(1, 2))
-            scale = 1 / xypeak
             scale[xypeak == 0] = 0
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
         return Iout
