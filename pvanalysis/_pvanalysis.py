@@ -893,10 +893,12 @@ class PVAnalysis():
                                       labels=labels, rangelevel=rangelevel,
                                       figname=outname+'.corner'+ext+'.png',
                                       show_corner=show_corner,
-                                      ndata=len(args[0]) + len(args[3]),
-                                      calc_evidence=calc_evidence)
-            e = 'edge' if ext == '_e' else 'ridge'
-            print(f'\033[1A\033[33C[{e}]')
+                                      ndata=len(args[0]) + len(args[3]))
+            if calc_evidence:
+                dynesty_corner(plim, lnprob, args=args,
+                    figname=None, show_corner=False, return_evidence=True)
+                e = 'edge' if ext == '_e' else 'ridge'
+                print(f'\033[1A\033[33C[{e}]')
             (qopt := q0 * 1)[np.isnan(q0)] = popt
             (qerr := q0 * 0)[np.isnan(q0)] = perr
             res[:] = [qopt, qerr]

@@ -19,21 +19,17 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
                  labels: list = None, rangelevel: float = 0.8,
                  figname: str = None, show_corner: bool = False,
                  ncore: int = 1,
-                 calc_evidence: bool = False,
                  simpleoutput: bool = True):
     ndim = len(bounds[0])
     nwalkers = ndim * nwalkers_per_ndim
     plim = np.array(bounds)
-    
+
     def lnL(p, *args):
         if np.all((plim[0] < p) * (p < plim[1])):
             return log_prob_fn(p, *args)
         else:
             return -np.inf
-    
-    def ptform(u):
-        return plim[0] + (plim[1] - plim[0]) * u
-                
+
     def gelman_rubin(samples):
         nsteps = len(samples[0])
         B = np.std(np.mean(samples, axis=1), axis=0)
@@ -80,14 +76,6 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
         if not figname is None: plt.savefig(figname)
         if show_corner: plt.show()
         plt.close()
-    if calc_evidence:
-        sampler = DNS(loglikelihood=log_prob_fn, logl_args=args,
-                      prior_transform=ptform, ndim=ndim)
-        sampler.run_nested(print_progress=False)
-        results = sampler.results
-        evidence = np.exp(results.logz[-1])
-        evid_err = evidence * results.logzerr[-1]
-        print(f'Evidence: {evidence:.2e} +/- {evid_err:.2e}')
     if simpleoutput:
         return [pmid, perr]
     else:
@@ -123,12 +111,13 @@ def dynesty_corner(bounds,
     #dresults = dsampler.results
     results = dsampler.results
     #results = dyfunc.merge_runs([sresults, dresults])
-    cfig, caxes = dyplot.cornerplot(results, labels=labels, quantiles=[0.16, 0.5, 0.84])
-    if figname is not None: cfig.savefig(figname)
-    if show_corner:
-        plt.show()
-    else:
-        plt.close()
+    if (figname is not None) & (show_corner == True):
+        cfig, caxes = dyplot.cornerplot(results, labels=labels, quantiles=[0.16, 0.5, 0.84])
+        if figname is not None: cfig.savefig(figname)
+        if show_corner:
+            plt.show()
+        else:
+            plt.close()
     # Compute 16%--84% quantiles
     weights = results.importance_weights()
     quantiles = [dyfunc.quantile(samps, [0.16, 0.5, 0.84], weights=weights)
