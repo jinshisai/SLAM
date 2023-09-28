@@ -176,8 +176,7 @@ class ChannelFit():
         self.v_red = v[(vlim[2] <= v) * (v <= vlim[3])]
         self.v_nanred = v[vlim[3] < v]
         self.v_valid0 = np.r_[self.v_blue, self.v_red]
-        self.v_valid1 = np.array([np.mean(self.v_blue, axis=0),
-                                  np.mean(self.v_red, axis=0)])
+        self.v_valid1 = np.array([np.mean(self.v_blue), np.mean(self.v_red)])
 
         self.data_blue = self.data[(vlim[0] <= v) * (v <= vlim[1])]
         self.data_red = self.data[(vlim[2] <= v) * (v <= vlim[3])]
