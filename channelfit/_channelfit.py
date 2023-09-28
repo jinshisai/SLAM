@@ -54,8 +54,7 @@ def boxgauss(dv_over_cs: float) -> tuple:
     return p, n - 1, d
     
 def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
-    dmasked = d * 1
-    dmasked[np.isnan(dmasked)] = 0
+    dmasked = np.nan_to_num(d)
     dv = np.min(v[1:] - v[:-1])
     mom0 = np.sum(d, axis=0) * dv
     sigma_mom0 = sigma * dv * np.sqrt(len(d))
@@ -263,10 +262,8 @@ class ChannelFit():
         else:
             vp[c] = 0
         erot = self.Ynest * self.signmajor / r
-        erad = Xnest * self.signminor / r
-        vlos = vp * erot + vr * erad
-        vlos = vlos * self.sini * vunit
-        vlos[np.isnan(vlos)] = 0
+        erad = np.nan_to_num(Xnest) * self.signminor / r
+        vlos = (vp * erot + vr * erad) * self.sini * vunit
         return vlos
 
         
@@ -292,7 +289,7 @@ class ChannelFit():
             iv = v / cs / d_prof + n_prof // 2 + 0.5  # 0.5 is for rounding
             Iout = prof[iv.astype('int').clip(0, n_prof)]
             corr = [np.hypot(x_in, self.Ynest)**(pI)] * len(self.v_valid)
-            Iout = Iout * np.where(np.isnan(corr), 0, corr)
+            Iout = Iout * np.nan_to_num(corr)
             return Iout
         Iout = vlos_to_Iout(vlos1, x1) + vlos_to_Iout(vlos2, x2)
         for l in range(self.nlayer - 1, 0, -1):
