@@ -274,9 +274,9 @@ class ChannelFit():
                   offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
                   convolving: bool = True, scaling: bool = True):
         if self.cs_fixed is None:
-            prof, n_prof, dv_prof = boxgauss(self.dv / cs)
+            prof, n_prof, d_prof = boxgauss(self.dv / cs)
         else:
-            prof, n_prof, dv_prof = self.prof, self.n_prof, self.dv_prof
+            prof, n_prof, d_prof = self.prof, self.n_prof, self.d_prof
         if self.hdisk_fixed is None:
             x1, x2 = self.get_xdisk(hdisk)
         else:
@@ -288,7 +288,7 @@ class ChannelFit():
         def vlos_to_Iout(vlos_in, x_in):
             vlos = vlos_in * np.sqrt(Mstar)  # Don't use *=. It changes self.vlos.
             v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
-            iv = v / cs / dv_prof + n_prof // 2 + 0.5  # 0.5 is for rounding
+            iv = v / cs / d_prof + n_prof // 2 + 0.5  # 0.5 is for rounding
             Iout = prof[iv.astype('int').clip(0, n_prof)]
             corr = [np.hypot(x_in, self.Ynest)**(pI)] * len(self.v_valid)
             Iout = Iout * np.where(np.isnan(corr), 0, corr)
@@ -349,7 +349,7 @@ class ChannelFit():
         self.envelope = envelope
         self.cs_fixed = cs_fixed        
         if cs_fixed is not None:            
-            self.prof, self.n_prof, self.dv_prof = boxgauss(self.dv / cs_fixed)
+            self.prof, self.n_prof, self.d_prof = boxgauss(self.dv / cs_fixed)
         self.hdisk_fixed = hdisk_fixed
         if hdisk_fixed is not None:
             self.x1, self.x2 = self.get_xdisk(hdisk_fixed)
