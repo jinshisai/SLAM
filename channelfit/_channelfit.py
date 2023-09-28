@@ -381,6 +381,7 @@ class ChannelFit():
             if combine:
                 self.data_valid = self.data_valid1
                 self.v_valid = self.v_valid1
+                self.dv = self.dv * len(self.v_valid0)
                 self.sigma = self.sigma / np.sqrt(len(self.v_valid0))
             else:
                 self.data_valid = self.data_valid0
@@ -402,9 +403,11 @@ class ChannelFit():
                              offmajor_range, offminor_range, offvsys_range])
             plim = plim[p_fixed == None].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
-            self.data_valid = self.data_valid0
-            self.v_valid = self.v_valid0
-            self.sigma = self.sigma * np.sqrt(len(self.v_valid0))
+            if combine:
+                self.data_valid = self.data_valid0
+                self.v_valid = self.v_valid0
+                self.dv = self.dv / len(self.v_valid0)
+                self.sigma = self.sigma * np.sqrt(len(self.v_valid0))
             popt = p_fixed.copy()
             popt[p_fixed == None] = mcmc[0]
             popt[:3] = 10**popt[:3]
