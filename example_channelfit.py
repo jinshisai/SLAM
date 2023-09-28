@@ -31,9 +31,9 @@ if __name__ == '__main__':
                                       'nburnin':100,
                                       'nsteps':100},
                  filename=filehead)
-    #p = chan.popt
-    #chan.modeltofits(**p, filehead=filehead)
-    #chan.plotmodelmom(**p, pa=pa, filename=filehead+'.modelmom01.png')
-    #chan.plotobsmom(pa=pa, filename=filehead+'.obsmom01.png')
-    #chan.plotresidualmom(**p, pa=pa, filename=filehead+'.residualmom01.png')
+    p = chan.popt
+    chan.modeltofits(**p, filehead=filehead)
+    chan.plotmodelmom(**p, pa=pa, filename=filehead+'.modelmom01.png')
+    chan.plotobsmom(pa=pa, filename=filehead+'.obsmom01.png')
+    chan.plotresidualmom(**p, pa=pa, filename=filehead+'.residualmom01.png')
 '-------------------------------------'
