@@ -185,7 +185,7 @@ class ChannelFit():
         self.data_valid1 = np.array([np.mean(self.data_blue, axis=0),
                                      np.mean(self.data_red, axis=0)]) 
         
-        m = makemom01(self.data_valid, self.v_valid, sigma)
+        m = makemom01(self.data_valid0, self.v_valid0, sigma)
         self.mom0 = m['mom0']
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
