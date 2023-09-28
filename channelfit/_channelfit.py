@@ -225,9 +225,10 @@ class ChannelFit():
                   + f' {npixnest:d}')
         print('-----------------------------')
         
-        xb = (np.arange(npixnest + 1) - npixnest // 2) * self.dx
-        yb = (np.arange(npixnest + 1) - npixnest // 2) * self.dy
-        xb, yb = rot(*np.meshgrid(xb, yb), np.radians(self.bpa))
+        xb = (np.arange(npixnest + 1) - npixnest // 2) * dpix
+        yb = (np.arange(npixnest + 1) - npixnest // 2) * dpix
+        bpa_on_disk = self.bpa - pa
+        xb, yb = rot(*np.meshgrid(xb, yb), np.radians(bpa_on_disk))
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
         self.pixperbeam = np.sum(gaussbeam)
         self.gaussbeam = gaussbeam / self.pixperbeam
@@ -298,6 +299,13 @@ class ChannelFit():
             Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[:, l, :, :])
         Iout = Iout[:, 0, :, :]  # v, y, x
+        if not scaling:
+            xypeak = np.max(Iout, axis=(1, 2))
+            scale = 1 / xypeak
+            scale[xypeak == 0] = 0
+            Iout = Iout * np.moveaxis([[scale]], 2, 0)
+        if convolving:
+            Iout = convolve(Iout, [self.gaussbeam], mode='same')
         y = self.xmajor - offmajor
         x = self.xminor - offminor
         m = [None] * len(Iout)
@@ -306,13 +314,6 @@ class ChannelFit():
                          bounds_error=False, fill_value=0)
             m[i] = interp((y, x))
         Iout = np.array(m)
-        if not scaling:
-            xypeak = np.max(Iout, axis=(1, 2))
-            scale = 1 / xypeak
-            scale[xypeak == 0] = 0
-            Iout = Iout * np.moveaxis([[scale]], 2, 0)
-        if convolving:
-            Iout = convolve(Iout, [self.gaussbeam], mode='same')
         if scaling:
             gf = np.sum(Iout * self.data_valid, axis=(1, 2))
             ff = np.sum(Iout * Iout, axis=(1, 2))
