@@ -42,7 +42,7 @@ def avefour(a: np.ndarray) -> np.ndarray:
 
 def boxgauss(dv_over_cs: float) -> tuple:
     clipsigma = 3. + dv_over_cs  # in the unit of cs
-    dv = min([2, dv_over_cs]) / 10.
+    dv = min([2.35482, dv_over_cs]) / 10.  # 2.35482 ~ sqrt(8ln2)
     ndv = 2 * int(dv_over_cs / 2. / dv + 0.5) + 1  # 0.5 is for rounding
     n = 2 * int(clipsigma / dv + 0.5) + 1
     v = np.linspace(-clipsigma, clipsigma, n)
