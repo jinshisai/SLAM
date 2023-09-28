@@ -18,7 +18,7 @@ from astropy import constants, units, wcs
 from astropy.coordinates import SkyCoord
 from scipy.signal import convolve
 from scipy.interpolate import RegularGridInterpolator as RGI
-from scipy.interpolate import interp1d
+from scipy.special import erf
 import warnings
 from tqdm import tqdm
 from utils import emcee_corner
@@ -41,18 +41,17 @@ def avefour(a: np.ndarray) -> np.ndarray:
     return b
 
 def boxgauss(dv_over_cs: float) -> tuple:
-    clipsigma = 3. + dv_over_cs  # in the unit of cs
-    dv = min([2.35482, dv_over_cs]) / 10.  # 2.35482 ~ sqrt(8ln2)
-    ndv = 2 * int(dv_over_cs / 2. / dv + 0.5) + 1  # 0.5 is for rounding
-    n = 2 * int(clipsigma / dv + 0.5) + 1
-    v = np.linspace(-clipsigma, clipsigma, n)
-    g = np.exp(-0.5 * v**2)
-    #g /= np.sum(g)
-    n = n - ndv
-    p = np.sum([g[i:i + n + 1] for i in range(ndv)], axis=0)  # n = len(p) - 1
-    #p /= ndv
-    p[0] = p[n] = 0
-    return p, n, dv
+    w = max([2.35482, dv_over_cs])  # 2.35482 ~ sqrt(8ln2)
+    w_per_vmax = 2  # in the unit of max(FWHM, dv)
+    d_per_w = 10
+    vmax = w * w_per_vmax
+    d = w / d_per_w
+    n = 2 * int(w_per_vmax * d_per_w) + 1  # 0.5 is for rounding
+    v = np.linspace(-vmax, vmax, n)
+    p = erf((v + dv_over_cs / 2) / np.sqrt(2)) \
+        - erf((v - dv_over_cs / 2) / np.sqrt(2))
+    p[0] = p[n - 1] = 0
+    return p, n - 1, d
     
 def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     dmasked = d * 1
