@@ -288,8 +288,8 @@ class ChannelFit():
             v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
             iv = v / cs / d_prof + n_prof // 2 + 0.5  # 0.5 is for rounding
             Iout = prof[iv.astype('int').clip(0, n_prof)]
-            corr = [np.hypot(x_in, self.Ynest)**(pI)] * len(self.v_valid)
-            Iout = Iout * np.nan_to_num(corr)
+            if pI != 0:
+                Iout = Iout * np.hypot(np.nan_to_num(x_in), self.Ynest)**pI
             return Iout
         Iout = vlos_to_Iout(vlos1, x1) + vlos_to_Iout(vlos2, x2)
         for l in range(self.nlayer - 1, 0, -1):
