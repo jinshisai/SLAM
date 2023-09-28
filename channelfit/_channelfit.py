@@ -175,11 +175,15 @@ class ChannelFit():
         self.v_nanmid = v[(vlim[1] < v) * (v < vlim[2])]
         self.v_red = v[(vlim[2] <= v) * (v <= vlim[3])]
         self.v_nanred = v[vlim[3] < v]
-        self.v_valid = np.r_[self.v_blue, self.v_red]
+        self.v_valid0 = np.r_[self.v_blue, self.v_red]
+        self.v_valid1 = np.array([np.mean(self.v_blue, axis=0),
+                                  np.mean(self.v_red, axis=0)])
 
         self.data_blue = self.data[(vlim[0] <= v) * (v <= vlim[1])]
         self.data_red = self.data[(vlim[2] <= v) * (v <= vlim[3])]
-        self.data_valid = np.append(self.data_blue, self.data_red, axis=0) 
+        self.data_valid0 = np.append(self.data_blue, self.data_red, axis=0) 
+        self.data_valid1 = np.array([np.mean(self.data_blue, axis=0),
+                                     np.mean(self.data_red, axis=0)]) 
         
         m = makemom01(self.data_valid, self.v_valid, sigma)
         self.mom0 = m['mom0']
@@ -339,6 +343,7 @@ class ChannelFit():
                 offminor_fixed: float = None,
                 offvsys_fixed: float = None,
                 envelope: bool = True,
+                combine: bool = False,
                 filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True,
@@ -374,6 +379,12 @@ class ChannelFit():
                 total *= kwargs['nburnin'] + kwargs['nsteps'] + 2
                 bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
+            if combine:
+                self.data_valid = self.data_valid1
+                self.v_valid = self.v_valid1
+            else:
+                self.data_valid = self.data_valid0
+                self.v_valid = self.v_valid0
             def lnprob(p):
                 if progressbar:
                     bar.update(1)
