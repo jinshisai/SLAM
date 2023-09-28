@@ -227,7 +227,7 @@ class ChannelFit():
                   + f' {npixnest:d}')
         print('-----------------------------')
         
-        ngauss = int((self.bmaj / dpix + 0.5) * 1.5)
+        ngauss = int(self.bmaj / dpix * 1.5 + 0.5)  # 0.5 is for rounding
         xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         bpa_on_disk = self.bpa - pa
