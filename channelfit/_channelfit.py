@@ -134,12 +134,13 @@ class ChannelFit():
         x = x[startpix::xskip]
         h['CRPIX1'] = (crpix - startpix) // xskip
         h['CDELT1'] = h['CDELT1'] * xskip
+        d = d[:, :, startpix::xskip]
         crpix = int(h['CRPIX2']) - 1
         startpix = crpix % yskip
         y = y[startpix::yskip]
         h['CRPIX2'] = (crpix - startpix) // yskip
         h['CDELT2'] = h['CDELT2'] * yskip
-        d = d[:, yskip // 2::yskip, xskip // 2::xskip]
+        d = d[:, startpix::yskip, :]
         v = v + h['CRVAL3']
         x = (x - cx) * 3600. * dist  # au
         y = (y - cy) * 3600. * dist  # au
