@@ -195,7 +195,7 @@ class ChannelFit():
         # 2d nested grid on the disk plane.
         # x and y are minor and major axis coordinates before projection.
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
-        npix = max([len(self.x), len(self.y)])
+        npix = int(2 * rmax / dpix + 0.5)
         npixnest = int(2**(np.ceil(np.log2(npix))))
         self.nq1 = npixnest // 4
         self.nq3 = self.nq1 + npixnest // 2
@@ -235,6 +235,11 @@ class ChannelFit():
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
         self.pixperbeam = np.sum(gaussbeam)
         self.gaussbeam = gaussbeam / self.pixperbeam
+        
+        r_need = rmax * np.sqrt(1 + np.abs(np.sin(2 * pa_rad))) + self.bmaj
+        n_need = int(r_need / dpix + 0.5)
+        self.ineed0 = npixnest // 2 - n_need
+        self.ineed1 = npixnest // 2 + n_need
 
 
     def get_xdisk(self, hdisk: float = 0.1):
@@ -300,6 +305,7 @@ class ChannelFit():
             Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[:, l, :, :])
         Iout = Iout[:, 0, :, :]  # v, y, x
+        Iout = Iout[:, self.ineed0:self.ineed1, self.ineed0:self.ineed1]
         if not scaling:
             xypeak = np.max(Iout, axis=(1, 2))
             scale = 1 / xypeak
@@ -309,12 +315,11 @@ class ChannelFit():
             Iout = convolve(Iout, [self.gaussbeam], mode='same')
         y = self.xmajor - offmajor
         x = self.xminor - offminor
-        m = [None] * len(Iout)
         for i, c in enumerate(Iout):
-            interp = RGI((self.ynest[0], self.xnest[0]), c,
+            interp = RGI((self.ynest[0][self.ineed0:self.ineed1],
+                          self.xnest[0][self.ineed0:self.ineed1]), c,
                          bounds_error=False, fill_value=0)
-            m[i] = interp((y, x))
-        Iout = np.array(m)
+            Iout[i] = interp((y, x))
         if scaling:
             gf = np.sum(Iout * self.data_valid, axis=(1, 2))
             ff = np.sum(Iout * Iout, axis=(1, 2))
