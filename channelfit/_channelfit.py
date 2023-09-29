@@ -256,8 +256,8 @@ class ChannelFit():
         print('-----------------------------')
         
         ngauss = int(self.bmaj / dpix * 1.5 + 0.5)  # 0.5 is for rounding
-        xb = (np.arange(2 * ngauss) - ngauss + 1) * dpix
-        yb = (np.arange(2 * ngauss) - ngauss + 1) * dpix
+        xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
+        yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         bpa_on_disk = self.bpa - pa
         xb, yb = rot(*np.meshgrid(xb, yb), np.radians(bpa_on_disk))
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
