@@ -16,8 +16,7 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy import constants, units, wcs
 from astropy.coordinates import SkyCoord
-#from scipy.signal import convolve
-from scipy.ndimage import convolve
+from scipy.signal import convolve
 from scipy.interpolate import RegularGridInterpolator as RGI
 from scipy.interpolate import interp1d
 from scipy.special import erf
@@ -340,8 +339,7 @@ class ChannelFit():
             scale[xypeak == 0] = 0
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
         if convolving:
-            #Iout = convolve(Iout, [self.gaussbeam], mode='same')
-            Iout = convolve(Iout, [self.gaussbeam], mode='constant')
+            Iout = convolve(Iout, [self.gaussbeam], mode='same')
         y = self.xmajor - offmajor
         x = self.xminor - offminor
         x0 = self.xnest[0][self.ineed0:self.ineed1]
