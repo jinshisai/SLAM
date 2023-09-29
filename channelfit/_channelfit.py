@@ -372,6 +372,7 @@ class ChannelFit():
                 offmajor_range: list = [-100, 100],
                 offminor_range: list = [-100, 100],
                 offvsys_range: list = [-0.2, 0.2],
+                incl_range: list = [-45, 45],
                 Mstar_fixed: float = None,
                 Rc_fixed: float = None,
                 cs_fixed: float = None,
@@ -381,6 +382,7 @@ class ChannelFit():
                 offmajor_fixed: float = None,
                 offminor_fixed: float = None,
                 offvsys_fixed: float = None,
+                incl_fixed: float = None,
                 envelope: bool = True,
                 combine: bool = False,
                 filename: str = 'channelfit',
@@ -389,6 +391,9 @@ class ChannelFit():
                 kwargs_emcee_corner: dict = {}):
 
         self.envelope = envelope
+        if incl_fixed is not None:
+            self.sini = np.sin(np.radians(incl_fixed))
+            self.cosi = np.cos(np.radians(incl_fixed))
         self.cs_fixed = cs_fixed        
         if cs_fixed is not None:            
             self.prof, self.n_prof, self.d_prof = boxgauss(self.dv / cs_fixed)
@@ -403,12 +408,14 @@ class ChannelFit():
         
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             hdisk_fixed, pI_fixed, Rin_fixed,
-                            offmajor_fixed, offminor_fixed, offvsys_fixed])
+                            offmajor_fixed, offminor_fixed, offvsys_fixed,
+                            incl_fixed])
         if None in p_fixed:
             c = (q := p_fixed[:3]) != None
             p_fixed[:3][c] = np.log10(q[c].astype('float'))
             labels = np.array(['log Mstar', 'log Rc', 'log cs', 'hdisk', 'pI',
-                               'Rin', 'offmajor', 'offminor', 'offvsys'])
+                               'Rin', 'offmajor', 'offminor', 'offvsys',
+                               'incl'])
             labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
                        'labels': labels, 'rangelevel':None,
@@ -430,6 +437,9 @@ class ChannelFit():
             def lnprob(p):
                 if progressbar:
                     bar.update(1)
+                if incl_fixed is None:
+                    self.sini = np.sin(np.radians(p[-1]))
+                    self.cosi = np.cos(np.radians(p[-1]))
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
                 q[:3] = 10**q[:3]
@@ -440,7 +450,8 @@ class ChannelFit():
                              np.log10(Rc_range),
                              np.log10(cs_range),
                              hdisk_range, pI_range, Rin_range,
-                             offmajor_range, offminor_range, offvsys_range])
+                             offmajor_range, offminor_range, offvsys_range,
+                             incl_range])
             plim = plim[p_fixed == None].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
             if combine:
@@ -489,7 +500,8 @@ class ChannelFit():
                     cs: float = None, hdisk: float = None,
                     pI: float = None, Rin: float = None,
                     offmajor: float = None, offminor: float = None,
-                    offvsys: float = None, envelope: bool = None,
+                    offvsys: float = None, incl: float = None,
+                    envelope: bool = None,
                     filehead: str = 'best'):
         w = wcs.WCS(naxis=3)
         h = self.header
@@ -504,6 +516,9 @@ class ChannelFit():
         self.cs_fixed = None
         self.Rc_fixed = None
         self.hdisk_fixed = None
+        if incl is not None:
+            self.sini = np.sin(np.radians(incl))
+            self.cosi = np.cos(np.radians(incl))
         if envelope is not None:
             self.envelope = envelope
         k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
@@ -558,8 +573,12 @@ class ChannelFit():
                      cs: float = None, hdisk: float = None,
                      pI: float = None, Rin: float = None,
                      offmajor: float = None, offminor: float = None,
-                     offvsys: float = None, envelope: bool = None,
+                     offvsys: float = None, incl: float = None,
+                     envelope: bool = None,
                      filename: str = 'modelmom01.png', pa: float = None):
+        if incl is not None:
+            self.sini = np.sin(np.radians(incl))
+            self.cosi = np.cos(np.radians(incl))
         if envelope is not None:
             self.envelope = envelope
         k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
@@ -620,9 +639,13 @@ class ChannelFit():
                         cs: float = None, hdisk: float = None,
                         pI: float = None, Rin: float = None,
                         offmajor: float = None, offminor: float = None,
-                        offvsys: float = None, envelope: bool = None,
+                        offvsys: float = None, incl: float = None,
+                        envelope: bool = None,
                         filename: str = 'residualmom01.png',
                         pa: float = None):
+        if incl is not None:
+            self.sini = np.sin(np.radians(incl))
+            self.cosi = np.cos(np.radians(incl))
         if envelope is not None:
             self.envelope = envelope
         k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
