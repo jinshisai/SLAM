@@ -338,8 +338,7 @@ class ChannelFit():
         for l in range(self.nlayer - 1, 0, -1):
             Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[:, l, :, :])
-        Iout = Iout[:, 0, :, :]  # v, y, x
-        Iout = Iout[:, self.ineed0:self.ineed1, self.ineed0:self.ineed1]
+        Iout = Iout[:, 0, self.ineed0:self.ineed1, self.ineed0:self.ineed1]  # v, y, x
         if not scaling:
             xypeak = np.max(Iout, axis=(1, 2))
             scale = 1 / xypeak
