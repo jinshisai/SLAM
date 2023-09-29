@@ -223,7 +223,7 @@ class ChannelFit():
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         i, j = self.bmaj / dpix, self.bmin / dpix
         print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
-        r_need = rmax * np.sqrt(1 + np.abs(np.sin(2 * pa_rad))) + self.bmaj
+        r_need = rmax * np.sqrt(1 + np.abs(np.sin(2 * pa_rad))) + self.bmaj * 1.5
         npix = int(2 * r_need / dpix + 0.5)
         npixnest = int(2**(np.ceil(np.log2(npix))))
         self.nq1 = npixnest // 4
@@ -256,8 +256,8 @@ class ChannelFit():
         print('-----------------------------')
         
         ngauss = int(self.bmaj / dpix * 1.5 + 0.5)  # 0.5 is for rounding
-        xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
-        yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
+        xb = (np.arange(2 * ngauss) - ngauss) * dpix
+        yb = (np.arange(2 * ngauss) - ngauss) * dpix
         bpa_on_disk = self.bpa - pa
         xb, yb = rot(*np.meshgrid(xb, yb), np.radians(bpa_on_disk))
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
