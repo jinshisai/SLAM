@@ -131,12 +131,14 @@ class ChannelFit():
         v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
         crpix = int(h['CRPIX1']) - 1
         startpix = crpix % xskip
-        self.newcrpix1 = (crpix - startpix) // xskip
         x = x[startpix::xskip]
+        h['CRPIX1'] = (crpix - startpix) // xskip
+        h['CDELT1'] = h['CDELT1'] * xskip
         crpix = int(h['CRPIX2']) - 1
         startpix = crpix % yskip
-        self.newcrpix2 = (crpix - startpix) // yskip
         y = y[startpix::yskip]
+        h['CRPIX2'] = (crpix - startpix) // yskip
+        h['CDELT2'] = h['CDELT2'] * yskip
         d = d[:, yskip // 2::yskip, xskip // 2::xskip]
         v = v + h['CRVAL3']
         x = (x - cx) * 3600. * dist  # au
@@ -167,6 +169,7 @@ class ChannelFit():
         self.data, self.header, self.sigma = d, h, sigma
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
+        self.header = h
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
 
@@ -479,9 +482,7 @@ class ChannelFit():
                     offvsys: float = None, envelope: bool = None,
                     filehead: str = 'best'):
         w = wcs.WCS(naxis=3)
-        h = fits.open(self.fitsname)[0].header
-        h['CRPIX1'] = self.newcrpix1
-        h['CRPIX2'] = self.newcrpix2
+        h = self.header
         h['NAXIS1'] = len(self.x)
         h['NAXIS2'] = len(self.y)
         #h['NAXIS3'] = len(self.v)
