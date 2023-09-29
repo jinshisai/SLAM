@@ -485,13 +485,12 @@ class ChannelFit():
         h = self.header
         h['NAXIS1'] = len(self.x)
         h['NAXIS2'] = len(self.y)
-        #h['NAXIS3'] = len(self.v)
+        h['NAXIS3'] = len(self.v)
         h['CRPIX1'] = h['CRPIX1'] - self.offpix[0]
         h['CRPIX2'] = h['CRPIX2'] - self.offpix[1]
-        #h['CRPIX3'] = h['CRPIX3'] - self.offpix[2]
+        h['CRPIX3'] = h['CRPIX3'] - self.offpix[2]
         nx = h['NAXIS1']
         ny = h['NAXIS2']
-        #nv = h['NAXIS3']
         self.cs_fixed = None
         self.Rc_fixed = None
         self.hdisk_fixed = None
