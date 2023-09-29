@@ -170,7 +170,6 @@ class ChannelFit():
         self.data, self.header, self.sigma = d, h, sigma
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
-        self.header = h
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
 
