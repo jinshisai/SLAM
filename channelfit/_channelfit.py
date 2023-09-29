@@ -173,12 +173,12 @@ class ChannelFit():
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
 
-    def gridondisk(self, cubefits: str = None,
-                   pa: float = 0, incl: float = 90, dist: float = 1,
-                   center: str = None, vsys: float = 0,
-                   rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
-                   sigma: float = None, nlayer: int = 4,
-                   xskip: int = 1, yskip: int = 1):
+    def makegrid(self, cubefits: str = None,
+                 pa: float = 0, incl: float = 90, dist: float = 1,
+                 center: str = None, vsys: float = 0,
+                 rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
+                 sigma: float = None, nlayer: int = 4,
+                 xskip: int = 1, yskip: int = 1):
         if not (cubefits is None):
             self.read_cubefits(cubefits, center, dist, vsys,
                                rmax, rmax, vlim[0], vlim[3],
@@ -187,12 +187,10 @@ class ChannelFit():
             v = self.v
         self.incl0 = incl
         pa_rad = np.radians(pa)
-        incl_rad = np.radians(incl)
         self.cospa = np.cos(pa_rad)
         self.sinpa = np.sin(pa_rad)
-        self.sini = np.sin(incl_rad)
-        self.cosi = np.cos(incl_rad)
-        self.deproj = 1 / np.cos(incl_rad)
+        self.sini = np.sin(np.radians(incl))
+        self.cosi = np.cos(np.radians(incl))
         xminor, xmajor = rot(*np.meshgrid(self.x, self.y), pa_rad)
         self.xmajor = xmajor
         self.xminor = xminor
@@ -259,8 +257,8 @@ class ChannelFit():
         ngauss = int(self.bmaj / dpix * 1.3 + 0.5)  # 0.5 is for rounding
         xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
-        bpa_on_disk = self.bpa - pa
-        xb, yb = rot(*np.meshgrid(xb, yb), np.radians(bpa_on_disk))
+        bpa_on_disk = np.radians(self.bpa) - pa_rad
+        xb, yb = rot(*np.meshgrid(xb, yb), bpa_on_disk)
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
         self.pixperbeam = np.sum(gaussbeam)
         self.gaussbeam = gaussbeam / self.pixperbeam
@@ -579,7 +577,7 @@ class ChannelFit():
                      offmajor: float = None, offminor: float = None,
                      offvsys: float = None, incl: float = None,
                      envelope: bool = None,
-                     filename: str = 'modelmom01.png', pa: float = None):
+                     filename: str = 'modelmom01.png'):
         if incl is not None:
             self.update_incl(incl)
         if envelope is not None:
@@ -603,10 +601,9 @@ class ChannelFit():
                           vmin=-vplot, vmax=vplot)
         fig.colorbar(m, ax=ax, label=r'Model mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
-        if pa is not None:
-            r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
-            ax.plot(r * self.sinpa, r * self.cospa, 'k:')
-            ax.plot(r * self.cospa, -r * self.sinpa,'k:')
+        r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
+        ax.plot(r * self.sinpa, r * self.cospa, 'k:')
+        ax.plot(r * self.cospa, -r * self.sinpa,'k:')
         ax.set_xlabel('R.A. offset (au)')
         ax.set_ylabel('Dec. offset (au)')
         ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
@@ -615,7 +612,7 @@ class ChannelFit():
         fig.savefig(filename)
         plt.close()
 
-    def plotobsmom(self, filename: str = 'obsmom01.png', pa: float = None):
+    def plotobsmom(self, filename: str = 'obsmom01.png'):
         levels = np.arange(1, 20) * 6 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
@@ -626,10 +623,9 @@ class ChannelFit():
                           vmin=-vplot, vmax=vplot)
         fig.colorbar(m, ax=ax, label=r'Obs. mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
-        if pa is not None:
-            r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
-            ax.plot(r * self.sinpa, r * self.cospa, 'k:')
-            ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
+        r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
+        ax.plot(r * self.sinpa, r * self.cospa, 'k:')
+        ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
         ax.set_xlabel('R.A. offset (au)')
         ax.set_ylabel('Dec. offset (au)')
         ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
@@ -644,8 +640,7 @@ class ChannelFit():
                         offmajor: float = None, offminor: float = None,
                         offvsys: float = None, incl: float = None,
                         envelope: bool = None,
-                        filename: str = 'residualmom01.png',
-                        pa: float = None):
+                        filename: str = 'residualmom01.png'):
         if incl is not None:
             self.update_incl(incl)
         if envelope is not None:
@@ -671,10 +666,9 @@ class ChannelFit():
                           vmin=-vplot, vmax=vplot)
         fig.colorbar(m, ax=ax, label=r'Obs. $-$ model mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
-        if pa is not None:
-            r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
-            ax.plot(r * self.sinpa, r * self.cospa, 'k:')
-            ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
+        r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
+        ax.plot(r * self.sinpa, r * self.cospa, 'k:')
+        ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
         ax.set_xlabel('R.A. offset (au)')
         ax.set_ylabel('Dec. offset (au)')
         ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
