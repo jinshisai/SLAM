@@ -185,6 +185,7 @@ class ChannelFit():
                                xskip, yskip, sigma)
             self.fitsname = cubefits
             v = self.v
+        self.incl0 = incl
         pa_rad = np.radians(pa)
         incl_rad = np.radians(incl)
         self.cospa = np.cos(pa_rad)
@@ -305,6 +306,11 @@ class ChannelFit():
         return vlos
 
         
+    def update_incl(self, incl):
+        self.sini = np.sin(np.radians(self.incl0 + incl))
+        self.cosi = np.cos(np.radians(self.incl0 + incl))
+        
+        
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   hdisk: float, pI: float, Rin: float,
                   offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
@@ -392,8 +398,7 @@ class ChannelFit():
 
         self.envelope = envelope
         if incl_fixed is not None:
-            self.sini = np.sin(np.radians(incl_fixed))
-            self.cosi = np.cos(np.radians(incl_fixed))
+            self.update_incl(incl_fixed)
         self.cs_fixed = cs_fixed        
         if cs_fixed is not None:            
             self.prof, self.n_prof, self.d_prof = boxgauss(self.dv / cs_fixed)
@@ -438,8 +443,7 @@ class ChannelFit():
                 if progressbar:
                     bar.update(1)
                 if incl_fixed is None:
-                    self.sini = np.sin(np.radians(p[-1]))
-                    self.cosi = np.cos(np.radians(p[-1]))
+                    self.update_incl(p[-1])
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
                 q[:3] = 10**q[:3]
@@ -517,8 +521,7 @@ class ChannelFit():
         self.Rc_fixed = None
         self.hdisk_fixed = None
         if incl is not None:
-            self.sini = np.sin(np.radians(incl))
-            self.cosi = np.cos(np.radians(incl))
+            self.update_incl(incl)
         if envelope is not None:
             self.envelope = envelope
         k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
@@ -577,8 +580,7 @@ class ChannelFit():
                      envelope: bool = None,
                      filename: str = 'modelmom01.png', pa: float = None):
         if incl is not None:
-            self.sini = np.sin(np.radians(incl))
-            self.cosi = np.cos(np.radians(incl))
+            self.update_incl(incl)
         if envelope is not None:
             self.envelope = envelope
         k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
@@ -644,8 +646,7 @@ class ChannelFit():
                         filename: str = 'residualmom01.png',
                         pa: float = None):
         if incl is not None:
-            self.sini = np.sin(np.radians(incl))
-            self.cosi = np.cos(np.radians(incl))
+            self.update_incl(incl)
         if envelope is not None:
             self.envelope = envelope
         k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
