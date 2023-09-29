@@ -315,11 +315,13 @@ class ChannelFit():
             Iout = convolve(Iout, [self.gaussbeam], mode='same')
         y = self.xmajor - offmajor
         x = self.xminor - offminor
+        m = [None] * len(Iout)
         for i, c in enumerate(Iout):
             interp = RGI((self.ynest[0][self.ineed0:self.ineed1],
                           self.xnest[0][self.ineed0:self.ineed1]), c,
                          bounds_error=False, fill_value=0)
-            Iout[i] = interp((y, x))
+            m[i] = interp((y, x))
+        Iout = np.array(m)
         if scaling:
             gf = np.sum(Iout * self.data_valid, axis=(1, 2))
             ff = np.sum(Iout * Iout, axis=(1, 2))
