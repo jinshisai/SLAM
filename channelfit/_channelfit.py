@@ -221,6 +221,8 @@ class ChannelFit():
         # 2d nested grid on the disk plane.
         # x and y are minor and major axis coordinates before projection.
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
+        i, j = self.bmaj / dpix, self.bmin / dpix
+        print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
         r_need = rmax * np.sqrt(1 + np.abs(np.sin(2 * pa_rad))) + self.bmaj
         npix = int(2 * r_need / dpix + 0.5)
         npixnest = int(2**(np.ceil(np.log2(npix))))
