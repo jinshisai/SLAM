@@ -223,7 +223,7 @@ class ChannelFit():
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         i, j = self.bmaj / dpix, self.bmin / dpix
         print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
-        r_need = rmax * np.sqrt(1 + np.abs(np.sin(2 * pa_rad))) + self.bmaj * 1.5
+        r_need = rmax * np.sqrt(1 + np.abs(np.sin(2 * pa_rad))) + self.bmaj * 1.3
         npix = int(2 * r_need / dpix + 0.5)
         npixnest = int(2**(np.ceil(np.log2(npix))))
         self.nq1 = npixnest // 4
@@ -255,7 +255,7 @@ class ChannelFit():
                   + f' {npixnest:d}')
         print('-----------------------------')
         
-        ngauss = int(self.bmaj / dpix * 1.5 + 0.5)  # 0.5 is for rounding
+        ngauss = int(self.bmaj / dpix * 1.3 + 0.5)  # 0.5 is for rounding
         xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         bpa_on_disk = self.bpa - pa
@@ -573,7 +573,7 @@ class ChannelFit():
         fig.colorbar(m, ax=ax, label=r'Model mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         if pa is not None:
-            r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
+            r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
             ax.plot(r * self.sinpa, r * self.cospa, 'k:')
             ax.plot(r * self.cospa, -r * self.sinpa,'k:')
         ax.set_xlabel('R.A. offset (au)')
@@ -596,7 +596,7 @@ class ChannelFit():
         fig.colorbar(m, ax=ax, label=r'Obs. mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
         if pa is not None:
-            r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
+            r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
             ax.plot(r * self.sinpa, r * self.cospa, 'k:')
             ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
         ax.set_xlabel('R.A. offset (au)')
@@ -637,7 +637,7 @@ class ChannelFit():
         fig.colorbar(m, ax=ax, label=r'Obs. $-$ model mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         if pa is not None:
-            r = np.linspace(-1, 1, 10) * self.x.max() * 1.5
+            r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
             ax.plot(r * self.sinpa, r * self.cospa, 'k:')
             ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
         ax.set_xlabel('R.A. offset (au)')
