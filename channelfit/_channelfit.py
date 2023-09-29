@@ -484,6 +484,7 @@ class ChannelFit():
             self.plow = p_fixed
             self.pmid = p_fixed
             self.phigh = p_fixed
+        self.update_incl(self.popt[-1])
         print('plow :', ', '.join([f'{t:.2e}' for t in self.plow]))
         print('pmid :', ', '.join([f'{t:.2e}' for t in self.pmid]))
         print('phigh:', ', '.join([f'{t:.2e}' for t in self.phigh]))
