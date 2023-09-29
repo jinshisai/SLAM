@@ -18,6 +18,7 @@ from astropy import constants, units, wcs
 from astropy.coordinates import SkyCoord
 from scipy.signal import convolve
 from scipy.interpolate import RegularGridInterpolator as RGI
+from scipy.interpolate import interp1d
 from scipy.special import erf
 import warnings
 from tqdm import tqdm
@@ -75,7 +76,9 @@ class ChannelFit():
                       dist: float = 1, vsys: float = 0,
                       xmax: float = 1e4, ymax: float = 1e4,
                       vmin: float = -100, vmax: float = 100,
-                      sigma: float = None) -> dict:
+                      xskip: int = 1, yskip: int = 1,
+                      sigma: float = None,
+                      centering_velocity: bool = False) -> dict:
         """
         Read a position-velocity diagram in the FITS format.
 
@@ -97,8 +100,14 @@ class ChannelFit():
             The velocity axis of the PV diagram is limited to (vmin, vmax).
         vmin : float
             The velocity axis of the PV diagram is limited to (vmin, vmax).
+        xskip : int
+            Skip xskip pixels in the x axis.
+        yskip : int
+            Skip yskip pixels in the y axis.
         sigma : float
             Standard deviation of the FITS data. None means automatic.
+        centering_velocity : bool
+            One channel has the exact velocity of vsys by interpolation.
 
         Returns
         ----------
@@ -120,18 +129,24 @@ class ChannelFit():
         x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
         y = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
         v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
+        x = x[xskip // 2::xskip]
+        y = y[yskip // 2::yskip]
+        d = d[:, yskip // 2::yskip, xskip // 2::xskip]
         v = v + h['CRVAL3']
         x = (x - cx) * 3600. * dist  # au
         y = (y - cy) * 3600. * dist  # au
         v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
         i0, i1 = np.argmin(np.abs(x - xmax)), np.argmin(np.abs(x + xmax))
         j0, j1 = np.argmin(np.abs(y + ymax)), np.argmin(np.abs(y - ymax))
+        x, y = x[i0:i1 + 1], y[j0:j1 + 1]
+        if centering_velocity:
+            f = interp1d(v, d, kind='cubic', bounds_error=False,
+                         fill_value=0, axis=0)
+            d = f(v := v - v[np.argmin(np.abs(v))])
         k0, k1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
         self.offpix = (i0, j0, k0)
-        #x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[k0:k1 + 1]
-        x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[:]
-        #d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
-        d =  d[:, j0:j1 + 1, i0:i1 + 1]
+        v = v[k0:k1 + 1]
+        d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
         dx, dy, dv = x[1] - x[0], y[1] - y[0], v[1] - v[0]
         if 'BMAJ' in h.keys():
             bmaj = h['BMAJ'] * 3600. * dist  # au
@@ -153,10 +168,12 @@ class ChannelFit():
                    pa: float = 0, incl: float = 90, dist: float = 1,
                    center: str = None, vsys: float = 0,
                    rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
-                   sigma: float = None, nlayer: int = 4):
+                   sigma: float = None, nlayer: int = 4,
+                   xskip: int = 1, yskip: int = 1):
         if not (cubefits is None):
             self.read_cubefits(cubefits, center, dist, vsys,
-                               rmax, rmax, vlim[0], vlim[3], sigma)
+                               rmax, rmax, vlim[0], vlim[3],
+                               xskip, yskip, sigma)
             self.fitsname = cubefits
             v = self.v
         pa_rad = np.radians(pa)
@@ -220,7 +237,6 @@ class ChannelFit():
         self.ynest = np.array(ynest)
         self.Xnest = np.array(Xnest)
         self.Ynest = np.array(Ynest)
-        self.Rnest = np.array(Rnest)
         print('-------- nested grid --------')
         for l in range(len(xnest)):
             print(f'x, dx, npix: +/-{xnest[l][-1]:.2f},'
