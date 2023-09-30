@@ -77,7 +77,8 @@ class ChannelFit():
 
     def read_cubefits(self, cubefits: str, center: str = None,
                       dist: float = 1, vsys: float = 0,
-                      xmax: float = 1e4, ymax: float = 1e4,
+                      xmin: float = None, xmax: float = None,
+                      ymin: float = None, ymax: float = None,
                       vmin: float = None, vmax: float = None,
                       xskip: int = 1, yskip: int = 1,
                       sigma: float = None,
@@ -95,10 +96,10 @@ class ChannelFit():
             Distance of the target, used to convert arcsec to au.
         vsys : float
             Systemic velocity of the target.
-        xmax : float
-            The R.A. axis is limited to (-xmax, xmax) in the unit of au.
-        ymax : float
-            The Dec. axis is limited to (-xmax, xmax) in the unit of au.
+        xmin, xmax : float
+            The R.A. axis is limited to (xmin, xmax) in the unit of au.
+        ymin, ymax : float
+            The Dec. axis is limited to (ymin, ymax) in the unit of au.
         vmax : float
             The velocity axis of the PV diagram is limited to (vmin, vmax).
         vmin : float
@@ -148,8 +149,10 @@ class ChannelFit():
         x = (x - cx) * 3600. * dist  # au
         y = (y - cy) * 3600. * dist  # au
         v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
-        i0, i1 = np.argmin(np.abs(x - xmax)), np.argmin(np.abs(x + xmax))
-        j0, j1 = np.argmin(np.abs(y + ymax)), np.argmin(np.abs(y - ymax))
+        i0 = 0 if xmax is None else np.argmin(np.abs(x - xmax))
+        i1 = len(x) if xmin is None else np.argmin(np.abs(x - xmin))
+        j0 = 0 if ymin is None else np.argmin(np.abs(y - ymin))
+        j1 = len(y) if ymax is None else np.argmin(np.abs(y - ymax))
         x, y = x[i0:i1 + 1], y[j0:j1 + 1]
         if centering_velocity:
             f = interp1d(v, d, kind='cubic', bounds_error=False,
@@ -185,7 +188,7 @@ class ChannelFit():
                  xskip: int = 1, yskip: int = 1):
         if not (cubefits is None):
             self.read_cubefits(cubefits, center, dist, vsys,
-                               rmax, rmax, None, None,
+                               -rmax, rmax, -rmax, rmax, None, None,
                                xskip, yskip, sigma)
             self.fitsname = cubefits
             v = self.v
