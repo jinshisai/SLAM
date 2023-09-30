@@ -335,7 +335,7 @@ class ChannelFit():
         def vlos_to_Iout(vlos_in, x_in):
             vlos = vlos_in * np.sqrt(Mstar)  # Don't use *=. It changes self.vlos.
             v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
-            iv = v / cs / d_prof + n_prof // 2 + 0.5  # 0.5 is for rounding
+            iv = v / self.dv / d_prof + n_prof // 2 + 0.5  # 0.5 is for rounding
             Iout = prof[iv.astype('int').clip(0, n_prof)]
             if pI != 0:
                 Iout = Iout * np.hypot(np.nan_to_num(x_in), self.Ynest)**pI
@@ -536,6 +536,8 @@ class ChannelFit():
         p = [Mstar, Rc, cs, hdisk, pI, Rin, offmajor, offminor, offvsys]
         if not (None in p):
             self.popt = dict(zip(k, p))
+        self.data_valid = self.data_valid0
+        self.v_valid = self.v_valid0
         m = self.cubemodel(**self.popt)
         m0 = self.cubemodel(**self.popt, convolving=False, scaling=False)
         m1 = self.cubemodel(**self.popt, scaling=False)
@@ -595,6 +597,8 @@ class ChannelFit():
         p = [Mstar, Rc, cs, hdisk, pI, Rin, offmajor, offminor, offvsys]
         if not (None in p):
             self.popt = dict(zip(k, p))
+        self.data_valid = self.data_valid0
+        self.v_valid = self.v_valid0
         d = self.cubemodel(**self.popt)
         m = makemom01(d, self.v_valid, self.sigma)
         mom0 = m['mom0']
@@ -658,6 +662,8 @@ class ChannelFit():
         p = [Mstar, Rc, cs, hdisk, pI, Rin, offmajor, offminor, offvsys]
         if not (None in p):
             self.popt = dict(zip(k, p))
+        self.data_valid = self.data_valid0
+        self.v_valid = self.v_valid0
         d = self.cubemodel(**self.popt)
         m = makemom01(d, self.v_valid, self.sigma)
         mom0 = m['mom0']

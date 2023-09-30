@@ -18,22 +18,21 @@ show_figs = True
 if __name__ == '__main__':
     filehead = cubefits.replace('.fits', '')
     chan = ChannelFit()
-    chan.gridondisk(cubefits=cubefits, center=center, pa=pa, incl=incl,
-                    vsys=vsys, dist=dist, sigma=sigma,
-                    rmax=rmax, vlim=vlim, nlayer=1)
+    chan.makegrid(cubefits=cubefits, center=center, pa=pa, incl=incl,
+                  vsys=vsys, dist=dist, sigma=sigma,
+                  rmax=rmax, vlim=vlim, nlayer=1, xskip=4, yskip=4)
     chan.fitting(Mstar_range=[0.01, 10.0],
-                 Rc_fixed=1e5,
-                 cs_fixed=0.1,
-                 hdisk_fixed=0,
-                 pI_fixed=0,
+                 #Mstar_fixed=0.1,
+                 Rc_fixed=1e5, cs_fixed=0, hdisk_fixed=0, pI_fixed=0, Rin_fixed=0,
                  offmajor_fixed=0, offminor_fixed=0, offvsys_fixed=0,
+                 incl_fixed=0,
                  kwargs_emcee_corner={'nwalkers_per_ndim':8,
                                       'nburnin':100,
                                       'nsteps':100},
                  filename=filehead)
     p = chan.popt
     chan.modeltofits(**p, filehead=filehead)
-    chan.plotmodelmom(**p, pa=pa, filename=filehead+'.modelmom01.png')
-    chan.plotobsmom(pa=pa, filename=filehead+'.obsmom01.png')
-    chan.plotresidualmom(**p, pa=pa, filename=filehead+'.residualmom01.png')
+    chan.plotmodelmom(**p, filename=filehead+'.modelmom01.png')
+    chan.plotobsmom(filename=filehead+'.obsmom01.png')
+    chan.plotresidualmom(**p, filename=filehead+'.residualmom01.png')
 '-------------------------------------'
