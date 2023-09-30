@@ -272,23 +272,24 @@ class ChannelFit():
 
 
     def get_xdisk(self, hdisk: float = 0.1):
-        a = self.cosi**2 - hdisk**2 * self.sini**2
-        b = (1 + hdisk**2) * self.sini * self.cosi * self.Xnest
-        c = (self.sini**2 - hdisk**2 * self.cosi**2) * self.Xnest**2 \
-            - hdisk**2 * self.Ynest**2
-        Xcosi = self.Xnest * self.cosi
-        if -1e-3 < a < 1e-3:
-            x1 = x2 = Xcosi + self.sini * c / b / 2
-        elif hdisk < 0.01:
-            x1 = x2 = Xcosi + self.sini * b / a
+        if hdisk < 0.01:
+            x1 = x2 = self.Xnest / self.cosi
         else:
-            z1 = np.full_like(self.Xnest, np.nan)
-            z2 = np.full_like(self.Xnest, np.nan)
-            c = (D := b**2 - a * c) >= 0
-            z1[c] = (b[c] + np.sqrt(D[c])) / a
-            z2[c] = (b[c] - np.sqrt(D[c])) / a
-            x1 = Xcosi + z1 * self.sini
-            x2 = Xcosi + z2 * self.sini
+            a = self.cosi**2 - hdisk**2 * self.sini**2
+            b = (1 + hdisk**2) * self.sini * self.cosi * self.Xnest
+            c = (self.sini**2 - hdisk**2 * self.cosi**2) * self.Xnest**2 \
+                - hdisk**2 * self.Ynest**2
+            Xcosi = self.Xnest * self.cosi
+            if -1e-3 < a < 1e-3:
+                x1 = x2 = Xcosi + self.sini * c / b / 2
+            else:
+                z1 = np.full_like(self.Xnest, np.nan)
+                z2 = np.full_like(self.Xnest, np.nan)
+                c = (D := b**2 - a * c) >= 0
+                z1[c] = (b[c] + np.sqrt(D[c])) / a
+                z2[c] = (b[c] - np.sqrt(D[c])) / a
+                x1 = Xcosi + z1 * self.sini
+                x2 = Xcosi + z2 * self.sini
         return x1, x2
         
     def get_vlos(self, Rc: float, Rin: float, Xnest: np.ndarray) -> np.ndarray:
@@ -339,7 +340,10 @@ class ChannelFit():
             if pI != 0:
                 Iout = Iout * np.hypot(np.nan_to_num(x_in), self.Ynest)**pI
             return Iout
-        Iout = vlos_to_Iout(vlos1, x1) + vlos_to_Iout(vlos2, x2)
+        if hdisk > 0.01:
+            Iout = vlos_to_Iout(vlos1, x1) + vlos_to_Iout(vlos2, x2)
+        else:
+            Iout = vlos_to_Iout(vlos1, x1) * 2
         for l in range(self.nlayer - 1, 0, -1):
             Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[:, l, :, :])
