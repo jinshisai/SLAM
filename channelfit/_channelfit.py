@@ -298,15 +298,15 @@ class ChannelFit():
     def get_vlos(self, Rc: float, Rin: float, Xnest: np.ndarray) -> np.ndarray:
         r = np.hypot(Xnest, self.Ynest)
         vp = r**(-1/2)
-        vr = r * 0
+        vr = r * 0 + 1e3
         c = r > Rc
         if self.envelope:
             vp[c] = np.sqrt(Rc) / r[c]
             vr[c] = -r[c]**(-1/2) * np.sqrt(2 - Rc / r[c])
         else:
-            vp[c] = 0
-        vp[r < Rin] = 0
-        vr[r < Rin] = 0
+            vp[c] = 1e3
+        vp[r < Rin] = 1e3
+        vr[r < Rin] = 1e3
         erot = self.Ynest * self.signmajor / r
         erad = np.nan_to_num(Xnest) * self.signminor / r
         vlos = (vp * erot + vr * erad) * self.sini * vunit
