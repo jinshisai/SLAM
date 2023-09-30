@@ -184,7 +184,7 @@ class ChannelFit():
                  xskip: int = 1, yskip: int = 1):
         if not (cubefits is None):
             self.read_cubefits(cubefits, center, dist, vsys,
-                               rmax, rmax, vlim[0], vlim[3],
+                               rmax, rmax, -100, 100,
                                xskip, yskip, sigma)
             self.fitsname = cubefits
             v = self.v
