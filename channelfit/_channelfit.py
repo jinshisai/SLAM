@@ -78,7 +78,7 @@ class ChannelFit():
     def read_cubefits(self, cubefits: str, center: str = None,
                       dist: float = 1, vsys: float = 0,
                       xmax: float = 1e4, ymax: float = 1e4,
-                      vmin: float = -100, vmax: float = 100,
+                      vmin: float = None, vmax: float = None,
                       xskip: int = 1, yskip: int = 1,
                       sigma: float = None,
                       centering_velocity: bool = False) -> dict:
@@ -155,7 +155,8 @@ class ChannelFit():
             f = interp1d(v, d, kind='cubic', bounds_error=False,
                          fill_value=0, axis=0)
             d = f(v := v - v[np.argmin(np.abs(v))])
-        k0, k1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
+        k0 = 0 if vmin is None else np.argmin(np.abs(v - vmin))
+        k1 = len(v) if vmax is None else np.argmin(np.abs(v - vmax))
         self.offpix = (i0, j0, k0)
         v = v[k0:k1 + 1]
         d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
@@ -184,7 +185,7 @@ class ChannelFit():
                  xskip: int = 1, yskip: int = 1):
         if not (cubefits is None):
             self.read_cubefits(cubefits, center, dist, vsys,
-                               rmax, rmax, -100, 100,
+                               rmax, rmax, None, None,
                                xskip, yskip, sigma)
             self.fitsname = cubefits
             v = self.v
