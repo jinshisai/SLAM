@@ -276,17 +276,19 @@ class ChannelFit():
         b = (1 + hdisk**2) * self.sini * self.cosi * self.Xnest
         c = (self.sini**2 - hdisk**2 * self.cosi**2) * self.Xnest**2 \
             - hdisk**2 * self.Ynest**2
+        Xcosi = self.Xnest * self.cosi
         if -1e-3 < a < 1e-3:
-            z1 = c / b / 2
-            z2 = c / b / 2
+            x1 = x2 = Xcosi + self.sini * c / b / 2
+        elif hdisk < 0.01:
+            x1 = x2 = Xcosi + self.sini * b / a
         else:
             z1 = np.full_like(self.Xnest, np.nan)
             z2 = np.full_like(self.Xnest, np.nan)
             c = (D := b**2 - a * c) >= 0
             z1[c] = (b[c] + np.sqrt(D[c])) / a
             z2[c] = (b[c] - np.sqrt(D[c])) / a
-        x1 = self.Xnest * self.cosi + z1 * self.sini
-        x2 = self.Xnest * self.cosi + z2 * self.sini
+            x1 = Xcosi + z1 * self.sini
+            x2 = Xcosi + z2 * self.sini
         return x1, x2
         
     def get_vlos(self, Rc: float, Rin: float, Xnest: np.ndarray) -> np.ndarray:
