@@ -193,11 +193,10 @@ class ChannelFit():
             self.fitsname = cubefits
             v = self.v
         self.incl0 = incl
+        self.update_incl(incl)
         pa_rad = np.radians(pa)
         self.cospa = np.cos(pa_rad)
         self.sinpa = np.sin(pa_rad)
-        self.sini = np.sin(np.radians(incl))
-        self.cosi = np.cos(np.radians(incl))
         xminor, xmajor = rot(*np.meshgrid(self.x, self.y), pa_rad)
         self.xmajor = xmajor
         self.xminor = xminor
