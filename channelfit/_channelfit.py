@@ -41,17 +41,20 @@ def avefour(a: np.ndarray) -> np.ndarray:
          + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
     return b
 
-def boxgauss(dv_over_cs: float) -> tuple:
-    w = max([2.35482, dv_over_cs])  # 2.35482 ~ sqrt(8ln2)
-    w_per_vmax = 2  # in the unit of max(FWHM, dv)
-    d_per_w = 10
-    vmax = w * w_per_vmax
-    d = w / d_per_w
-    n = 2 * int(w_per_vmax * d_per_w) + 1  # 0.5 is for rounding
+def boxgauss(cs_over_dv: float) -> tuple:
+    w = max([cs_over_dv * 2.35482, 1])  # 2.35482 ~ sqrt(8ln2)
+    vmax_over_w = 2  # in the unit of max(FWHM, dv)
+    w_over_d = 10
+    vmax = vmax_over_w * w
+    d = w / w_over_d
+    n = 2 * int(vmax_over_w * w_over_d) + 1
     v = np.linspace(-vmax, vmax, n)
-    p = erf((v + dv_over_cs / 2) / np.sqrt(2)) \
-        - erf((v - dv_over_cs / 2) / np.sqrt(2))
-    p[0] = p[n - 1] = 0
+    if cs_over_dv < 0.01:
+        p = (1 + np.sign(v + 0.5)) * (1 - np.sign(v - 0.5)) / 4
+    else:
+        p = erf((v + 0.5) / np.sqrt(2) / cs_over_dv) \
+            - erf((v - 0.5) / np.sqrt(2) / cs_over_dv)
+        p[0] = p[n - 1] = 0
     return p, n - 1, d
     
 def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
@@ -314,7 +317,7 @@ class ChannelFit():
                   offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
                   convolving: bool = True, scaling: bool = True):
         if self.cs_fixed is None:
-            prof, n_prof, d_prof = boxgauss(self.dv / cs)
+            prof, n_prof, d_prof = boxgauss(cs / self.dv)
         else:
             prof, n_prof, d_prof = self.prof, self.n_prof, self.d_prof
         if self.hdisk_fixed is None:
@@ -398,7 +401,7 @@ class ChannelFit():
             self.update_incl(incl_fixed)
         self.cs_fixed = cs_fixed        
         if cs_fixed is not None:            
-            self.prof, self.n_prof, self.d_prof = boxgauss(self.dv / cs_fixed)
+            self.prof, self.n_prof, self.d_prof = boxgauss(cs_fixed / self.dv)
         self.hdisk_fixed = hdisk_fixed
         if hdisk_fixed is not None:
             self.x1, self.x2 = self.get_xdisk(hdisk_fixed)
