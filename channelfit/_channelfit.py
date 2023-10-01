@@ -362,10 +362,10 @@ class ChannelFit():
             if pI != 0:
                 Iout = Iout * np.hypot(x_in, self.Ynest)**pI
             return np.nan_to_num(Iout)
-        if hdisk > 0.01:
-            Iout = vlos_to_Iout(vlos1, self.x1) + vlos_to_Iout(vlos2, self.x2)
-        else:
+        if vlos2 is None:
             Iout = vlos_to_Iout(vlos1, self.x1) * 2
+        else:
+            Iout = vlos_to_Iout(vlos1, self.x1) + vlos_to_Iout(vlos2, self.x2)
         for l in range(self.nlayer - 1, 0, -1):
             Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[:, l, :, :])
