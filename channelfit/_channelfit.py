@@ -72,9 +72,11 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
 
 class ChannelFit():
 
-    def __init__(self):
+    def __init__(self, envelope: bool = True, combine: bool = False):
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
                           'offmajor', 'offminor', 'offvsys', 'incl']
+        self.envelope = envelope
+        self.combine = combine
 
     def read_cubefits(self, cubefits: str, center: str = None,
                       dist: float = 1, vsys: float = 0,
@@ -273,6 +275,8 @@ class ChannelFit():
         n_need = int(r_need / dpix + 0.5)
         self.ineed0 = npixnest // 2 - n_need
         self.ineed1 = npixnest // 2 + n_need
+        self.xneed = self.xnest[0][self.ineed0:self.ineed1]
+        self.yneed = self.ynest[0][self.ineed0:self.ineed1]
                 
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
@@ -388,11 +392,10 @@ class ChannelFit():
             Iout = convolve(Iout, [self.gaussbeam], mode='same')
         y = self.xmajor - offmajor
         x = self.xminor - offminor
-        x0 = self.xnest[0][self.ineed0:self.ineed1]
-        y0 = self.ynest[0][self.ineed0:self.ineed1]
         m = [None] * len(Iout)
         for i, c in enumerate(Iout):
-            interp = RGI((y0, x0), c, bounds_error=False, fill_value=0)
+            interp = RGI((self.yneed, self.xneed), c,
+                         bounds_error=False, fill_value=0)
             m[i] = interp((y, x))
         Iout = np.array(m)
         if scaling:
@@ -429,14 +432,11 @@ class ChannelFit():
                 offminor_fixed: float = None,
                 offvsys_fixed: float = None,
                 incl_fixed: float = None,
-                envelope: bool = True,
-                combine: bool = False,
                 filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True,
                 kwargs_emcee_corner: dict = {}):
 
-        self.envelope = envelope
         self.incl_fixed = incl_fixed
         if incl_fixed is not None:
             self.update_incl(incl_fixed)
@@ -473,7 +473,7 @@ class ChannelFit():
                 total *= kw['nburnin'] + kw['nsteps'] + 2
                 bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
-            if combine:
+            if self.combine:
                 self.data_valid = self.data_valid1
                 self.v_valid = self.v_valid1
                 self.dv = self.dv * len(self.v_valid0) / 2
@@ -497,7 +497,7 @@ class ChannelFit():
                              incl_range])
             plim = plim[p_fixed == None].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
-            if combine:
+            if self.combine:
                 self.data_valid = self.data_valid0
                 self.v_valid = self.v_valid0
                 self.dv = self.dv / (len(self.v_valid0) / 2)
@@ -529,8 +529,7 @@ class ChannelFit():
         self.phigh = dict(zip(self.paramkeys, self.phigh))
  
    
-    def modeltofits(self, envelope: bool = None, filehead: str = 'best',
-                    **kwargs):
+    def modeltofits(self, filehead: str = 'best', **kwargs):
         w = wcs.WCS(naxis=3)
         h = self.header
         h['NAXIS1'] = len(self.x)
@@ -546,8 +545,6 @@ class ChannelFit():
         self.Rc_fixed = None
         self.Rin_fixed = None
         self.hdisk_fixed = None
-        if envelope is not None:
-            self.envelope = envelope
         if kwargs != {}:
             self.popt = kwargs
         self.data_valid = self.data_valid0
@@ -617,15 +614,15 @@ class ChannelFit():
         fig.savefig(filename)
         plt.close()
 
-    def plotmodelmom(self, envelope: bool = None,
-                     filename: str = 'modelmom01.png',
-                     **kwargs):
-        if envelope is not None:
-            self.envelope = envelope
+    def plotmodelmom(self, filename: str = 'modelmom01.png', **kwargs):
         if kwargs != {}:
             self.popt = kwargs
-        self.data_valid = self.data_valid0
-        self.v_valid = self.v_valid0
+        if self.combine:
+            self.data_valid = self.data_valid1
+            self.v_valid = self.v_valid1
+        else:
+            self.data_valid = self.data_valid0
+            self.v_valid = self.v_valid0
         d = self.cubemodel(**self.popt)
         m = makemom01(d, self.v_valid, self.sigma)
         mom0 = m['mom0']
@@ -651,15 +648,15 @@ class ChannelFit():
         fig.savefig(filename)
         plt.close()
 
-    def plotresidualmom(self, envelope: bool = None,
-                        filename: str = 'residualmom01.png',
-                        **kwargs):
-        if envelope is not None:
-            self.envelope = envelope
+    def plotresidualmom(self, filename: str = 'residualmom01.png', **kwargs):
         if kwargs != {}:
             self.popt = kwargs
-        self.data_valid = self.data_valid0
-        self.v_valid = self.v_valid0
+        if self.combine:
+            self.data_valid = self.data_valid1
+            self.v_valid = self.v_valid1
+        else:
+            self.data_valid = self.data_valid0
+            self.v_valid = self.v_valid0
         d = self.cubemodel(**self.popt)
         m = makemom01(d, self.v_valid, self.sigma)
         mom0 = m['mom0']
