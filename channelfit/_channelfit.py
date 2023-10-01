@@ -592,41 +592,24 @@ class ChannelFit():
         tofits(concat(m0), 'beforeconvolving')
         tofits(concat(m1), 'beforescaling')
         
-    def plotobsmom(self, filename: str = 'obsmom01.png'):
-        levels = np.arange(1, 20) * 6 * self.sigma_mom0
-        levels = np.sort(np.r_[-levels, levels])
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        vplot = (np.nanpercentile(self.mom1, 95) 
-                 - np.nanpercentile(self.mom1, 5)) / 2.
-        m = ax.pcolormesh(self.x, self.y, self.mom1, cmap='jet',
-                          vmin=-vplot, vmax=vplot)
-        fig.colorbar(m, ax=ax, label=r'Obs. mom1 (km s$^{-1}$)')
-        ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
-        r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
-        ax.plot(r * self.sinpa, r * self.cospa, 'k:')
-        ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
-        ax.set_xlabel('R.A. offset (au)')
-        ax.set_ylabel('Dec. offset (au)')
-        ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
-        ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
-        ax.set_aspect(1)
-        fig.savefig(filename)
-        plt.close()
-
-    def plotmodelmom(self, filename: str = 'modelmom01.png', **kwargs):
-        if kwargs != {}:
-            self.popt = kwargs
-        if self.combine:
-            self.data_valid = self.data_valid1
-            self.v_valid = self.v_valid1
-        else:
-            self.data_valid = self.data_valid0
-            self.v_valid = self.v_valid0
-        d = self.cubemodel(**self.popt)
-        m = makemom01(d, self.v_valid, self.sigma)
-        mom0 = m['mom0']
-        mom1 = m['mom1']
+    def plotmom(self, mode: str, filename: str = 'mom01.png', **kwargs):
+        if 'mod' in mode or 'res' in mode:
+            if kwargs != {}:
+                self.popt = kwargs
+            d = self.cubemodel(**self.popt)
+            m = makemom01(d, self.v_valid0, self.sigma)
+        if 'obs' in mode:
+            mom0 = self.mom0
+            mom1 = self.mom1
+            label = 'Obs.'
+        elif 'mod' in mode:
+            mom0 = m['mom0']
+            mom1 = m['mom1']
+            label = 'Model'
+        elif 'res' in mode:
+            mom0 = self.mom0 - m['mom0']
+            mom1 = self.mom1 - m['mom1']
+            label = r'Obs. $-$ model'
         levels = np.arange(1, 20) * 6 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
@@ -635,45 +618,9 @@ class ChannelFit():
                  - np.nanpercentile(self.mom1, 5)) / 2.
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
                           vmin=-vplot, vmax=vplot)
-        fig.colorbar(m, ax=ax, label=r'Model mom1 (km s$^{-1}$)')
+        fig.colorbar(m, ax=ax, label=label+r' mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
-        r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
-        ax.plot(r * self.sinpa, r * self.cospa, 'k:')
-        ax.plot(r * self.cospa, -r * self.sinpa,'k:')
-        ax.set_xlabel('R.A. offset (au)')
-        ax.set_ylabel('Dec. offset (au)')
-        ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
-        ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
-        ax.set_aspect(1)
-        fig.savefig(filename)
-        plt.close()
-
-    def plotresidualmom(self, filename: str = 'residualmom01.png', **kwargs):
-        if kwargs != {}:
-            self.popt = kwargs
-        if self.combine:
-            self.data_valid = self.data_valid1
-            self.v_valid = self.v_valid1
-        else:
-            self.data_valid = self.data_valid0
-            self.v_valid = self.v_valid0
-        d = self.cubemodel(**self.popt)
-        m = makemom01(d, self.v_valid, self.sigma)
-        mom0 = m['mom0']
-        mom1 = m['mom1']
-        mom0 = self.mom0 - mom0
-        mom1 = self.mom1 - mom1
-        levels = np.arange(1, 20) * 6 * self.sigma_mom0
-        levels = np.sort(np.r_[-levels, levels])
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        vplot = (np.nanpercentile(self.mom1, 95) 
-                 - np.nanpercentile(self.mom1, 5)) / 2.
-        m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
-                          vmin=-vplot, vmax=vplot)
-        fig.colorbar(m, ax=ax, label=r'Obs. $-$ model mom1 (km s$^{-1}$)')
-        ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
-        r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
+        r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
         ax.plot(r * self.sinpa, r * self.cospa, 'k:')
         ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
         ax.set_xlabel('R.A. offset (au)')
