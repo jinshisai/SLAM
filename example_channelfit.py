@@ -32,7 +32,7 @@ if __name__ == '__main__':
                  filename=filehead)
     p = chan.popt
     chan.modeltofits(**p, filehead=filehead)
-    chan.plotmodelmom(**p, filename=filehead+'.modelmom01.png')
-    chan.plotobsmom(filename=filehead+'.obsmom01.png')
-    chan.plotresidualmom(**p, filename=filehead+'.residualmom01.png')
+    chan.plotmom(mode='obs', **p, filename=filehead+'.obsmom01.png')
+    chan.plotmom(mode='mod', **p, filename=filehead+'.modelmom01.png')
+    chan.plotmom(mode='res', **p, filename=filehead+'.residualmom01.png')
 '-------------------------------------'
