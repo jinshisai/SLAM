@@ -403,9 +403,6 @@ class ChannelFit():
             ff = np.sum(Iout * Iout, axis=(1, 2))
             scale = gf / ff
             scale[(ff == 0) + (scale < 0)] = 0
-            ########
-            #scale = [np.mean(scale[scale > 0])] * len(scale)
-            ########
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
         else:
             Iout = Iout / np.max(Iout)
@@ -490,8 +487,7 @@ class ChannelFit():
                 chi2 = np.nansum((self.data_valid - self.cubemodel(*q))**2) \
                        / self.sigma**2 / self.pixperbeam
                 return -0.5 * chi2
-            plim = np.array([np.log10(Mstar_range),
-                             np.log10(Rc_range),
+            plim = np.array([np.log10(Mstar_range), np.log10(Rc_range),
                              cs_range, hdisk_range, pI_range, Rin_range,
                              offmajor_range, offminor_range, offvsys_range,
                              incl_range])
