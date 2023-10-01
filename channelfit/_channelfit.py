@@ -272,25 +272,7 @@ class ChannelFit():
         n_need = int(r_need / dpix + 0.5)
         self.ineed0 = npixnest // 2 - n_need
         self.ineed1 = npixnest // 2 + n_need
-        
-    def get_vlos(self, Rc: float, Rin: float, Xnest: np.ndarray) -> np.ndarray:
-        if Xnest is None:
-            return None
-        r = np.hypot(Xnest, self.Ynest)
-        vp = r**(-1/2)
-        vr = r * 0
-        c = r > Rc
-        if self.envelope:
-            vp[c] = np.sqrt(Rc) / r[c]
-            vr[c] = -r[c]**(-1/2) * np.sqrt(2 - Rc / r[c])
-        erot = self.Ynest * self.signmajor / r
-        erad = Xnest * self.signminor / r
-        vlos = (vp * erot + vr * erad) * self.sini * vunit
-        vlos[r < Rin] = np.nan
-        if not self.envelope:
-            vlos[r > Rc] = np.nan
-        return vlos
-        
+                
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
         self.sini = np.sin(i)
@@ -337,19 +319,42 @@ class ChannelFit():
             p[0] = p[n - 1] = 0
         self.prof, self.prof_n, self.prof_d = p, n - 1, d
 
-        
+    def update_getvlos(self, Rc: float, Rin: float):
+        def getvlos(x_in: np.ndarray):
+            if x_in is None:
+                return None
+            r = np.hypot(x_in, self.Ynest)
+            vp = r**(-1/2)
+            vr = r * 0
+            c = r > Rc
+            if self.envelope:
+                vp[c] = np.sqrt(Rc) / r[c]
+                vr[c] = -r[c]**(-1/2) * np.sqrt(2 - Rc / r[c])
+            erot = self.Ynest * self.signmajor / r
+            erad = x_in * self.signminor / r
+            vlos = (vp * erot + vr * erad) * self.sini * vunit
+            vlos[r < Rin] = np.nan
+            if not self.envelope:
+                vlos[r > Rc] = np.nan
+            return vlos
+        self.getvlos = getvlos
         
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   hdisk: float, pI: float, Rin: float,
                   offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
+                  incl: float = 90,
                   convolving: bool = True, scaling: bool = True):
+        if self.incl_fixed is None:
+            self.update_incl(incl)
         if self.cs_fixed is None:
             self.update_prof(cs)
         if self.hdisk_fixed is None:
             self.update_x(hdisk)
-        if self.Rc_fixed is None or self.hdisk_fixed is None or self.Rin_fixed is None:
-            vlos1 = self.get_vlos(Rc, Rin, self.x1)
-            vlos2 = self.get_vlos(Rc, Rin, self.x2)
+        if None in [self.Rc_fixed, self.Rin_fixed]:
+            self.update_getvlos(Rc, Rin)
+        if None in [self.Rc_fixed, self.hdisk_fixed, self.Rin_fixed]:
+            vlos1 = self.getvlos(self.x1)
+            vlos2 = self.getvlos(self.x2)
         else:
             vlos1, vlos2 = self.vlos1, self.vlos2
         def vlos_to_Iout(vlos_in, x_in):
@@ -428,6 +433,7 @@ class ChannelFit():
                 kwargs_emcee_corner: dict = {}):
 
         self.envelope = envelope
+        self.incl_fixed = incl_fixed
         if incl_fixed is not None:
             self.update_incl(incl_fixed)
         self.cs_fixed = cs_fixed        
@@ -438,18 +444,20 @@ class ChannelFit():
             self.update_x(hdisk_fixed)
         self.Rc_fixed = Rc_fixed
         self.Rin_fixed = Rin_fixed
-        if Rc_fixed is not None and hdisk_fixed is not None and Rin_fixed is not None:
-            self.vlos1 = self.get_vlos(Rc_fixed, Rin_fixed, self.x1)
-            self.vlos2 = self.get_vlos(Rc_fixed, Rin_fixed, self.x2)
+        if not None in [Rc_fixed, Rin_fixed]:
+            self.update_getvlos(Rc_fixed, Rin_fixed)
+        if not None in [hdisk_fixed, Rc_fixed, Rin_fixed]:
+            self.vlos1 = self.getvlos(self.x1)
+            self.vlos2 = self.getvlos(self.x2)
         
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             hdisk_fixed, pI_fixed, Rin_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed,
                             incl_fixed])
         if None in p_fixed:
-            c = (q := p_fixed[:3]) != None
-            p_fixed[:3][c] = np.log10(q[c].astype('float'))
-            labels = np.array(['log Mstar', 'log Rc', 'log cs', 'hdisk', 'pI',
+            c = (q := p_fixed[:2]) != None
+            p_fixed[:2][c] = np.log10(q[c].astype('float'))
+            labels = np.array(['log Mstar', 'log Rc', 'cs', 'hdisk', 'pI',
                                'Rin', 'offmajor', 'offminor', 'offvsys',
                                'incl'])
             labels = labels[p_fixed == None]
@@ -473,18 +481,15 @@ class ChannelFit():
             def lnprob(p):
                 if progressbar:
                     bar.update(1)
-                if incl_fixed is None:
-                    self.update_incl(p[-1])
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
-                q[:3] = 10**q[:3]
+                q[:2] = 10**q[:2]
                 chi2 = np.nansum((self.data_valid - self.cubemodel(*q))**2) \
                        / self.sigma**2 / self.pixperbeam
                 return -0.5 * chi2
             plim = np.array([np.log10(Mstar_range),
                              np.log10(Rc_range),
-                             np.log10(cs_range),
-                             hdisk_range, pI_range, Rin_range,
+                             cs_range, hdisk_range, pI_range, Rin_range,
                              offmajor_range, offminor_range, offvsys_range,
                              incl_range])
             plim = plim[p_fixed == None].T
@@ -496,16 +501,16 @@ class ChannelFit():
                 self.sigma = self.sigma * np.sqrt(len(self.v_valid0) / 2)
             popt = p_fixed.copy()
             popt[p_fixed == None] = mcmc[0]
-            popt[:3] = 10**popt[:3]
+            popt[:2] = 10**popt[:2]
             plow = p_fixed.copy()
             plow[p_fixed == None] = mcmc[1]
-            plow[:3] = 10**plow[:3]
+            plow[:2] = 10**plow[:2]
             pmid = p_fixed.copy()
             pmid[p_fixed == None] = mcmc[2]
-            pmid[:3] = 10**pmid[:3]
+            pmid[:2] = 10**pmid[:2]
             phigh = p_fixed.copy()
             phigh[p_fixed == None] = mcmc[3]
-            phigh[:3] = 10**phigh[:3]
+            phigh[:2] = 10**phigh[:2]
             self.popt = popt
             self.plow = plow
             self.pmid = pmid
@@ -515,7 +520,6 @@ class ChannelFit():
             self.plow = p_fixed
             self.pmid = p_fixed
             self.phigh = p_fixed
-        self.update_incl(self.popt[-1])
         print('plow :', ', '.join([f'{t:.2e}' for t in self.plow]))
         print('pmid :', ', '.join([f'{t:.2e}' for t in self.pmid]))
         print('phigh:', ', '.join([f'{t:.2e}' for t in self.phigh]))
@@ -525,7 +529,7 @@ class ChannelFit():
         np.savetxt(filename+'.popt.txt',
                    [self.popt, self.plow, self.pmid, self.phigh])
         k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
-             'offmajor', 'offminor', 'offvsys']
+             'offmajor', 'offminor', 'offvsys', 'incl']
         self.popt = dict(zip(k, self.popt))
         self.plow = dict(zip(k, self.plow))
         self.pmid = dict(zip(k, self.pmid))
@@ -549,16 +553,16 @@ class ChannelFit():
         h['CRPIX3'] = h['CRPIX3'] - self.offpix[2]
         nx = h['NAXIS1']
         ny = h['NAXIS2']
+        self.incl_fixed = None
         self.cs_fixed = None
         self.Rc_fixed = None
+        self.Rin_fixed = None
         self.hdisk_fixed = None
-        if incl is not None:
-            self.update_incl(incl)
         if envelope is not None:
             self.envelope = envelope
         k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
-             'offmajor', 'offminor', 'offvsys']
-        p = [Mstar, Rc, cs, hdisk, pI, Rin, offmajor, offminor, offvsys]
+             'offmajor', 'offminor', 'offvsys', 'incl']
+        p = [Mstar, Rc, cs, hdisk, pI, Rin, offmajor, offminor, offvsys, incl]
         if not (None in p):
             self.popt = dict(zip(k, p))
         self.data_valid = self.data_valid0
@@ -613,13 +617,11 @@ class ChannelFit():
                      offvsys: float = None, incl: float = None,
                      envelope: bool = None,
                      filename: str = 'modelmom01.png'):
-        if incl is not None:
-            self.update_incl(incl)
         if envelope is not None:
             self.envelope = envelope
         k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
-             'offmajor', 'offminor', 'offvsys']
-        p = [Mstar, Rc, cs, hdisk, pI, Rin, offmajor, offminor, offvsys]
+             'offmajor', 'offminor', 'offvsys', 'incl']
+        p = [Mstar, Rc, cs, hdisk, pI, Rin, offmajor, offminor, offvsys, incl]
         if not (None in p):
             self.popt = dict(zip(k, p))
         self.data_valid = self.data_valid0
@@ -678,13 +680,11 @@ class ChannelFit():
                         offvsys: float = None, incl: float = None,
                         envelope: bool = None,
                         filename: str = 'residualmom01.png'):
-        if incl is not None:
-            self.update_incl(incl)
         if envelope is not None:
             self.envelope = envelope
         k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
-             'offmajor', 'offminor', 'offvsys']
-        p = [Mstar, Rc, cs, hdisk, pI, Rin, offmajor, offminor, offvsys]
+             'offmajor', 'offminor', 'offvsys', 'incl']
+        p = [Mstar, Rc, cs, hdisk, pI, Rin, offmajor, offminor, offvsys, incl]
         if not (None in p):
             self.popt = dict(zip(k, p))
         self.data_valid = self.data_valid0
