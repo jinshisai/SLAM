@@ -340,6 +340,23 @@ class ChannelFit():
             return vlos
         self.getvlos = getvlos
         
+    def update_vlos(self):
+        self.vlos1 = self.getvlos(self.x1)
+        self.vlos2 = self.getvlos(self.x2)
+    
+    def get_Iout(self, Mstar, pI, offvsys):
+        Iout = 0
+        for vlos_in, x_in in zip([self.vlos1, self.vlos2], [self.x1, self.x2]):
+            if vlos_in is None:
+                continue
+            vlos = vlos_in * np.sqrt(Mstar)  # Don't use *=. It changes self.vlos.
+            v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
+            iv = v / self.dv / self.prof_d + self.prof_n // 2 + 0.5  # 0.5 is for rounding
+            p = self.prof[iv.astype('int').clip(0, self.prof_n)]
+            if pI != 0:
+                p = p * np.hypot(x_in, self.Ynest)**pI
+            Iout = Iout + np.nan_to_num(p)
+
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   hdisk: float, pI: float, Rin: float,
                   offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
@@ -354,24 +371,9 @@ class ChannelFit():
         if None in [self.Rc_fixed, self.Rin_fixed]:
             self.update_getvlos(Rc, Rin)
         if None in [self.Rc_fixed, self.hdisk_fixed, self.Rin_fixed]:
-            vlos1 = self.getvlos(self.x1)
-            vlos2 = self.getvlos(self.x2)
-        else:
-            vlos1, vlos2 = self.vlos1, self.vlos2
-        def vlos_to_Iout(vlos_in, x_in):
-            if vlos_in is None:
-                return None
-            vlos = vlos_in * np.sqrt(Mstar)  # Don't use *=. It changes self.vlos.
-            v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
-            iv = v / self.dv / self.prof_d + self.prof_n // 2 + 0.5  # 0.5 is for rounding
-            Iout = self.prof[iv.astype('int').clip(0, self.prof_n)]
-            if pI != 0:
-                Iout = Iout * np.hypot(x_in, self.Ynest)**pI
-            return np.nan_to_num(Iout)
-        if vlos2 is None:
-            Iout = vlos_to_Iout(vlos1, self.x1) * 2
-        else:
-            Iout = vlos_to_Iout(vlos1, self.x1) + vlos_to_Iout(vlos2, self.x2)
+            self.update_vlos()
+
+        Iout = self.get_Iout(Mstar, pI, offvsys)
         for l in range(self.nlayer - 1, 0, -1):
             Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[:, l, :, :])
@@ -448,8 +450,7 @@ class ChannelFit():
         if not None in [Rc_fixed, Rin_fixed]:
             self.update_getvlos(Rc_fixed, Rin_fixed)
         if not None in [hdisk_fixed, Rc_fixed, Rin_fixed]:
-            self.vlos1 = self.getvlos(self.x1)
-            self.vlos2 = self.getvlos(self.x2)
+            self.update_vlos()
         
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             hdisk_fixed, pI_fixed, Rin_fixed,
