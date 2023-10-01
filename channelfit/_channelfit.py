@@ -278,21 +278,21 @@ class ChannelFit():
         if hdisk < 0.01:
             x1 = x2 = self.Xnest / self.cosi
         else:
-            a = self.cosi**2 - hdisk**2 * self.sini**2
-            b = (1 + hdisk**2) * self.sini * self.cosi * self.Xnest
-            c = (self.sini**2 - hdisk**2 * self.cosi**2) * self.Xnest**2 \
-                - hdisk**2 * self.Ynest**2
             Xcosi = self.Xnest * self.cosi
+            a = self.tani**(-2) - hdisk**2
+            b = (1 + hdisk**2) * Xcosi
+            c = (self.tani**2 - hdisk**2) * Xcosi**2 \
+                - hdisk**2 * self.Ynest**2
             if -1e-3 < a < 1e-3:
-                x1 = x2 = Xcosi + self.sini * c / b / 2
+                x1 = x2 = Xcosi + c / b / 2
             else:
-                z1 = np.full_like(self.Xnest, np.nan)
-                z2 = np.full_like(self.Xnest, np.nan)
+                zsini1 = np.full_like(self.Xnest, np.nan)
+                zsini2 = np.full_like(self.Xnest, np.nan)
                 c = (D := b**2 - a * c) >= 0
-                z1[c] = (b[c] + np.sqrt(D[c])) / a
-                z2[c] = (b[c] - np.sqrt(D[c])) / a
-                x1 = Xcosi + z1 * self.sini
-                x2 = Xcosi + z2 * self.sini
+                zsini1[c] = (b[c] + np.sqrt(D[c])) / a
+                zsini2[c] = (b[c] - np.sqrt(D[c])) / a
+                x1 = Xcosi + zsini1
+                x2 = Xcosi + zsini2
         return x1, x2
         
     def get_vlos(self, Rc: float, Rin: float, Xnest: np.ndarray) -> np.ndarray:
@@ -312,9 +312,29 @@ class ChannelFit():
         return vlos
 
         
-    def update_incl(self, incl):
-        self.sini = np.sin(np.radians(self.incl0 + incl))
-        self.cosi = np.cos(np.radians(self.incl0 + incl))
+    def update_incl(self, incl: float):
+        i = np.radians(self.incl0 + incl)
+        self.sini = np.sin(i)
+        self.cosi = np.cos(i)
+        self.tani = np.tan(i)
+        
+    def update_prof(self, cs: float):
+        cs_over_dv = cs / self.dv
+        w = max([cs_over_dv * 2.35482, 1])  # 2.35482 ~ sqrt(8ln2)
+        vmax_over_w = 2  # in the unit of max(FWHM, dv)
+        w_over_d = 10
+        vmax = vmax_over_w * w
+        d = w / w_over_d
+        n = 2 * int(vmax_over_w * w_over_d) + 1
+        v = np.linspace(-vmax, vmax, n)
+        if cs_over_dv < 0.01:
+            p = (1 + np.sign(v + 0.5)) * (1 - np.sign(v - 0.5)) / 4
+        else:
+            p = erf((v + 0.5) / np.sqrt(2) / cs_over_dv) \
+                - erf((v - 0.5) / np.sqrt(2) / cs_over_dv)
+            p[0] = p[n - 1] = 0
+        self.prof, self.prof_n, self.prof_d = p, n - 1, d
+
         
         
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
@@ -322,9 +342,7 @@ class ChannelFit():
                   offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
                   convolving: bool = True, scaling: bool = True):
         if self.cs_fixed is None:
-            prof, n_prof, d_prof = boxgauss(cs / self.dv)
-        else:
-            prof, n_prof, d_prof = self.prof, self.n_prof, self.d_prof
+            self.update_prof(cs)
         if self.hdisk_fixed is None:
             x1, x2 = self.get_xdisk(hdisk)
         else:
@@ -337,10 +355,10 @@ class ChannelFit():
         def vlos_to_Iout(vlos_in, x_in):
             vlos = vlos_in * np.sqrt(Mstar)  # Don't use *=. It changes self.vlos.
             v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
-            iv = v / self.dv / d_prof + n_prof // 2 + 0.5  # 0.5 is for rounding
-            Iout = prof[iv.astype('int').clip(0, n_prof)]
+            iv = v / self.dv / self.prof_d + self.prof_n // 2 + 0.5  # 0.5 is for rounding
+            Iout = self.prof[iv.astype('int').clip(0, self.prof_n)]
             if pI != 0:
-                Iout = Iout * np.hypot(np.nan_to_num(x_in), self.Ynest)**pI
+                Iout = Iout * np.hypot(x_in, self.Ynest)**pI
             return np.nan_to_num(Iout)
         if hdisk > 0.01:
             Iout = vlos_to_Iout(vlos1, x1) + vlos_to_Iout(vlos2, x2)
@@ -408,8 +426,8 @@ class ChannelFit():
         if incl_fixed is not None:
             self.update_incl(incl_fixed)
         self.cs_fixed = cs_fixed        
-        if cs_fixed is not None:            
-            self.prof, self.n_prof, self.d_prof = boxgauss(cs_fixed / self.dv)
+        if cs_fixed is not None:
+            self.update_prof(cs_fixed)
         self.hdisk_fixed = hdisk_fixed
         if hdisk_fixed is not None:
             self.x1, self.x2 = self.get_xdisk(hdisk_fixed)
