@@ -72,8 +72,9 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
 
 class ChannelFit():
 
-    #def __init__(self):
-        
+    def __init__(self):
+        self.paramkeys = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
+                          'offmajor', 'offminor', 'offvsys', 'incl']
 
     def read_cubefits(self, cubefits: str, center: str = None,
                       dist: float = 1, vsys: float = 0,
@@ -457,17 +458,17 @@ class ChannelFit():
         if None in p_fixed:
             c = (q := p_fixed[:2]) != None
             p_fixed[:2][c] = np.log10(q[c].astype('float'))
-            labels = np.array(['log Mstar', 'log Rc', 'cs', 'hdisk', 'pI',
-                               'Rin', 'offmajor', 'offminor', 'offvsys',
-                               'incl'])
+            labels = np.array(self.paramkeys).copy()
+            labels[0] = 'log '+labels[0]
+            labels[1] = 'log '+labels[1]
             labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
                        'labels': labels, 'rangelevel':None,
                        'figname':filename+'.corner.png', 'show_corner':show}
-            kwargs = dict(kwargs0, **kwargs_emcee_corner)
+            kw = dict(kwargs0, **kwargs_emcee_corner)
             if progressbar:
-                total = kwargs['nwalkers_per_ndim'] * len(p_fixed[p_fixed == None])
-                total *= kwargs['nburnin'] + kwargs['nsteps'] + 2
+                total = kw['nwalkers_per_ndim'] * len(p_fixed[p_fixed == None])
+                total *= kw['nburnin'] + kw['nsteps'] + 2
                 bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
             if combine:
@@ -493,56 +494,41 @@ class ChannelFit():
                              offmajor_range, offminor_range, offvsys_range,
                              incl_range])
             plim = plim[p_fixed == None].T
-            mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
+            mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
             if combine:
                 self.data_valid = self.data_valid0
                 self.v_valid = self.v_valid0
                 self.dv = self.dv / (len(self.v_valid0) / 2)
                 self.sigma = self.sigma * np.sqrt(len(self.v_valid0) / 2)
-            popt = p_fixed.copy()
-            popt[p_fixed == None] = mcmc[0]
-            popt[:2] = 10**popt[:2]
-            plow = p_fixed.copy()
-            plow[p_fixed == None] = mcmc[1]
-            plow[:2] = 10**plow[:2]
-            pmid = p_fixed.copy()
-            pmid[p_fixed == None] = mcmc[2]
-            pmid[:2] = 10**pmid[:2]
-            phigh = p_fixed.copy()
-            phigh[p_fixed == None] = mcmc[3]
-            phigh[:2] = 10**phigh[:2]
-            self.popt = popt
-            self.plow = plow
-            self.pmid = pmid
-            self.phigh = phigh
+            def get_p(i: int):
+                p = p_fixed.copy()
+                p[p_fixed == None] = mcmc[i]
+                p[:2] = 10**p[:2]
+                return p
+            self.popt = get_p(0)
+            self.plow = get_p(1)
+            self.pmid = get_p(2)
+            self.phigh = get_p(3)
         else:
             self.popt = p_fixed
             self.plow = p_fixed
             self.pmid = p_fixed
             self.phigh = p_fixed
-        print('plow :', ', '.join([f'{t:.2e}' for t in self.plow]))
-        print('pmid :', ', '.join([f'{t:.2e}' for t in self.pmid]))
-        print('phigh:', ', '.join([f'{t:.2e}' for t in self.phigh]))
-        print('------------------------')
-        print('popt :', ', '.join([f'{t:.2e}' for t in self.popt]))
-        print('------------------------')
-        np.savetxt(filename+'.popt.txt',
-                   [self.popt, self.plow, self.pmid, self.phigh])
-        k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
-             'offmajor', 'offminor', 'offvsys', 'incl']
-        self.popt = dict(zip(k, self.popt))
-        self.plow = dict(zip(k, self.plow))
-        self.pmid = dict(zip(k, self.pmid))
-        self.phigh = dict(zip(k, self.phigh))
+        slist = ['plow', 'pmid', 'phigh', 'popt']
+        plist = [self.plow, self.pmid, self.phigh, self.popt]
+        for s, p in zip(slist, plist):
+            if s == 'popt': print('------------------------')
+            print(f'{s} :', ', '.join([f'{t:.2e}' for t in p]))
+            if s == 'popt': print('------------------------')
+        np.savetxt(filename+'.popt.txt', plist)
+        self.popt = dict(zip(self.paramkeys, self.popt))
+        self.plow = dict(zip(self.paramkeys, self.plow))
+        self.pmid = dict(zip(self.paramkeys, self.pmid))
+        self.phigh = dict(zip(self.paramkeys, self.phigh))
  
    
-    def modeltofits(self, Mstar: float = None, Rc: float = None,
-                    cs: float = None, hdisk: float = None,
-                    pI: float = None, Rin: float = None,
-                    offmajor: float = None, offminor: float = None,
-                    offvsys: float = None, incl: float = None,
-                    envelope: bool = None,
-                    filehead: str = 'best'):
+    def modeltofits(self, envelope: bool = None, filehead: str = 'best',
+                    **kwargs):
         w = wcs.WCS(naxis=3)
         h = self.header
         h['NAXIS1'] = len(self.x)
@@ -560,11 +546,8 @@ class ChannelFit():
         self.hdisk_fixed = None
         if envelope is not None:
             self.envelope = envelope
-        k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
-             'offmajor', 'offminor', 'offvsys', 'incl']
-        p = [Mstar, Rc, cs, hdisk, pI, Rin, offmajor, offminor, offvsys, incl]
-        if not (None in p):
-            self.popt = dict(zip(k, p))
+        if kwargs != {}:
+            self.popt = kwargs
         self.data_valid = self.data_valid0
         self.v_valid = self.v_valid0
         m = self.cubemodel(**self.popt)
@@ -610,20 +593,35 @@ class ChannelFit():
         tofits(concat(m0), 'beforeconvolving')
         tofits(concat(m1), 'beforescaling')
         
-    def plotmodelmom(self, Mstar: float = None, Rc: float = None,
-                     cs: float = None, hdisk: float = None,
-                     pI: float = None, Rin: float = None,
-                     offmajor: float = None, offminor: float = None,
-                     offvsys: float = None, incl: float = None,
-                     envelope: bool = None,
-                     filename: str = 'modelmom01.png'):
+    def plotobsmom(self, filename: str = 'obsmom01.png'):
+        levels = np.arange(1, 20) * 6 * self.sigma_mom0
+        levels = np.sort(np.r_[-levels, levels])
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        vplot = (np.nanpercentile(self.mom1, 95) 
+                 - np.nanpercentile(self.mom1, 5)) / 2.
+        m = ax.pcolormesh(self.x, self.y, self.mom1, cmap='jet',
+                          vmin=-vplot, vmax=vplot)
+        fig.colorbar(m, ax=ax, label=r'Obs. mom1 (km s$^{-1}$)')
+        ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
+        r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
+        ax.plot(r * self.sinpa, r * self.cospa, 'k:')
+        ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
+        ax.set_xlabel('R.A. offset (au)')
+        ax.set_ylabel('Dec. offset (au)')
+        ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
+        ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
+        ax.set_aspect(1)
+        fig.savefig(filename)
+        plt.close()
+
+    def plotmodelmom(self, envelope: bool = None,
+                     filename: str = 'modelmom01.png',
+                     **kwargs):
         if envelope is not None:
             self.envelope = envelope
-        k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
-             'offmajor', 'offminor', 'offvsys', 'incl']
-        p = [Mstar, Rc, cs, hdisk, pI, Rin, offmajor, offminor, offvsys, incl]
-        if not (None in p):
-            self.popt = dict(zip(k, p))
+        if kwargs != {}:
+            self.popt = kwargs
         self.data_valid = self.data_valid0
         self.v_valid = self.v_valid0
         d = self.cubemodel(**self.popt)
@@ -651,42 +649,13 @@ class ChannelFit():
         fig.savefig(filename)
         plt.close()
 
-    def plotobsmom(self, filename: str = 'obsmom01.png'):
-        levels = np.arange(1, 20) * 6 * self.sigma_mom0
-        levels = np.sort(np.r_[-levels, levels])
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        vplot = (np.nanpercentile(self.mom1, 95) 
-                 - np.nanpercentile(self.mom1, 5)) / 2.
-        m = ax.pcolormesh(self.x, self.y, self.mom1, cmap='jet',
-                          vmin=-vplot, vmax=vplot)
-        fig.colorbar(m, ax=ax, label=r'Obs. mom1 (km s$^{-1}$)')
-        ax.contour(self.x, self.y, self.mom0, colors='gray', levels=levels)
-        r = np.linspace(-1, 1, 10) * self.x.max() * 1.42
-        ax.plot(r * self.sinpa, r * self.cospa, 'k:')
-        ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
-        ax.set_xlabel('R.A. offset (au)')
-        ax.set_ylabel('Dec. offset (au)')
-        ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
-        ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
-        ax.set_aspect(1)
-        fig.savefig(filename)
-        plt.close()
-
-    def plotresidualmom(self, Mstar: float = None, Rc: float = None,
-                        cs: float = None, hdisk: float = None,
-                        pI: float = None, Rin: float = None,
-                        offmajor: float = None, offminor: float = None,
-                        offvsys: float = None, incl: float = None,
-                        envelope: bool = None,
-                        filename: str = 'residualmom01.png'):
+    def plotresidualmom(self, envelope: bool = None,
+                        filename: str = 'residualmom01.png',
+                        **kwargs):
         if envelope is not None:
             self.envelope = envelope
-        k = ['Mstar', 'Rc', 'cs', 'hdisk', 'pI', 'Rin',
-             'offmajor', 'offminor', 'offvsys', 'incl']
-        p = [Mstar, Rc, cs, hdisk, pI, Rin, offmajor, offminor, offvsys, incl]
-        if not (None in p):
-            self.popt = dict(zip(k, p))
+        if kwargs != {}:
+            self.popt = kwargs
         self.data_valid = self.data_valid0
         self.v_valid = self.v_valid0
         d = self.cubemodel(**self.popt)
