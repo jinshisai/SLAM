@@ -272,28 +272,6 @@ class ChannelFit():
         n_need = int(r_need / dpix + 0.5)
         self.ineed0 = npixnest // 2 - n_need
         self.ineed1 = npixnest // 2 + n_need
-
-
-    def get_xdisk(self, hdisk: float = 0.1):
-        if hdisk < 0.01:
-            x1 = x2 = self.Xnest / self.cosi
-        else:
-            Xcosi = self.Xnest * self.cosi
-            a = self.tani**(-2) - hdisk**2
-            b = (1 + hdisk**2) * Xcosi
-            c = (self.tani**2 - hdisk**2) * Xcosi**2 \
-                - hdisk**2 * self.Ynest**2
-            if -1e-3 < a < 1e-3:
-                x1 = x2 = Xcosi + c / b / 2
-            else:
-                zsini1 = np.full_like(self.Xnest, np.nan)
-                zsini2 = np.full_like(self.Xnest, np.nan)
-                c = (D := b**2 - a * c) >= 0
-                zsini1[c] = (b[c] + np.sqrt(D[c])) / a
-                zsini2[c] = (b[c] - np.sqrt(D[c])) / a
-                x1 = Xcosi + zsini1
-                x2 = Xcosi + zsini2
-        return x1, x2
         
     def get_vlos(self, Rc: float, Rin: float, Xnest: np.ndarray) -> np.ndarray:
         r = np.hypot(Xnest, self.Ynest)
@@ -310,7 +288,6 @@ class ChannelFit():
         if not self.envelope:
             vlos[r > Rc] = np.nan
         return vlos
-
         
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
@@ -318,6 +295,27 @@ class ChannelFit():
         self.cosi = np.cos(i)
         self.tani = np.tan(i)
         
+    def update_x(self, hdisk: float):
+        if hdisk < 0.01:
+            self.x1 = self.x2 = self.Xnest / self.cosi
+        else:
+            Xcosi = self.Xnest * self.cosi
+            a = self.tani**(-2) - hdisk**2
+            b = (1 + hdisk**2) * Xcosi
+            c = (self.tani**2 - hdisk**2) * Xcosi**2 \
+                - hdisk**2 * self.Ynest**2
+            if -1e-3 < a < 1e-3:
+                self.x1 = self.x2 = Xcosi + c / b / 2
+            else:
+                zsini1 = np.full_like(self.Xnest, np.nan)
+                zsini2 = np.full_like(self.Xnest, np.nan)
+                c = (D := b**2 - a * c) >= 0
+                sqrtD = np.sqrt(D[c])
+                zsini1[c] = (b[c] + sqrtD) / a
+                zsini2[c] = (b[c] - sqrtD) / a
+                self.x1 = Xcosi + zsini1
+                self.x2 = Xcosi + zsini2
+
     def update_prof(self, cs: float):
         cs_over_dv = cs / self.dv
         w = max([cs_over_dv * 2.35482, 1])  # 2.35482 ~ sqrt(8ln2)
@@ -344,12 +342,10 @@ class ChannelFit():
         if self.cs_fixed is None:
             self.update_prof(cs)
         if self.hdisk_fixed is None:
-            x1, x2 = self.get_xdisk(hdisk)
-        else:
-            x1, x2 = self.x1, self.x2
+            self.update_x(hdisk)
         if self.Rc_fixed is None or self.hdisk_fixed is None or self.Rin_fixed is None:
-            vlos1 = self.get_vlos(Rc, Rin, x1)
-            vlos2 = self.get_vlos(Rc, Rin, x2)
+            vlos1 = self.get_vlos(Rc, Rin, self.x1)
+            vlos2 = self.get_vlos(Rc, Rin, self.x2)
         else:
             vlos1, vlos2 = self.vlos1, self.vlos2
         def vlos_to_Iout(vlos_in, x_in):
@@ -361,9 +357,9 @@ class ChannelFit():
                 Iout = Iout * np.hypot(x_in, self.Ynest)**pI
             return np.nan_to_num(Iout)
         if hdisk > 0.01:
-            Iout = vlos_to_Iout(vlos1, x1) + vlos_to_Iout(vlos2, x2)
+            Iout = vlos_to_Iout(vlos1, self.x1) + vlos_to_Iout(vlos2, self.x2)
         else:
-            Iout = vlos_to_Iout(vlos1, x1) * 2
+            Iout = vlos_to_Iout(vlos1, self.x1) * 2
         for l in range(self.nlayer - 1, 0, -1):
             Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[:, l, :, :])
@@ -430,7 +426,7 @@ class ChannelFit():
             self.update_prof(cs_fixed)
         self.hdisk_fixed = hdisk_fixed
         if hdisk_fixed is not None:
-            self.x1, self.x2 = self.get_xdisk(hdisk_fixed)
+            self.update_x(hdisk_fixed)
         self.Rc_fixed = Rc_fixed
         self.Rin_fixed = Rin_fixed
         if Rc_fixed is not None and hdisk_fixed is not None and Rin_fixed is not None:
