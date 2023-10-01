@@ -274,6 +274,8 @@ class ChannelFit():
         self.ineed1 = npixnest // 2 + n_need
         
     def get_vlos(self, Rc: float, Rin: float, Xnest: np.ndarray) -> np.ndarray:
+        if Xnest is None:
+            return None
         r = np.hypot(Xnest, self.Ynest)
         vp = r**(-1/2)
         vr = r * 0
@@ -297,7 +299,8 @@ class ChannelFit():
         
     def update_x(self, hdisk: float):
         if hdisk < 0.01:
-            self.x1 = self.x2 = self.Xnest / self.cosi
+            self.x1 = self.Xnest / self.cosi
+            self.x2 = None
         else:
             Xcosi = self.Xnest * self.cosi
             a = self.tani**(-2) - hdisk**2
@@ -305,7 +308,8 @@ class ChannelFit():
             c = (self.tani**2 - hdisk**2) * Xcosi**2 \
                 - hdisk**2 * self.Ynest**2
             if -1e-3 < a < 1e-3:
-                self.x1 = self.x2 = Xcosi + c / b / 2
+                self.x1 = Xcosi + c / b / 2
+                self.x2 = None
             else:
                 zsini1 = np.full_like(self.Xnest, np.nan)
                 zsini2 = np.full_like(self.Xnest, np.nan)
