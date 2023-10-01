@@ -356,6 +356,7 @@ class ChannelFit():
             if pI != 0:
                 p = p * np.hypot(x_in, self.Ynest)**pI
             Iout = Iout + np.nan_to_num(p)
+        return Iout
 
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   hdisk: float, pI: float, Rin: float,
