@@ -353,6 +353,8 @@ class ChannelFit():
         else:
             vlos1, vlos2 = self.vlos1, self.vlos2
         def vlos_to_Iout(vlos_in, x_in):
+            if vlos_in is None:
+                return None
             vlos = vlos_in * np.sqrt(Mstar)  # Don't use *=. It changes self.vlos.
             v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
             iv = v / self.dv / self.prof_d + self.prof_n // 2 + 0.5  # 0.5 is for rounding
