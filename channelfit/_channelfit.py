@@ -406,7 +406,8 @@ class ChannelFit():
             #Iout = Iout * np.moveaxis([[scale]], 2, 0)
             gf = np.sum(Iout * self.data_valid)
             ff = np.sum(Iout * Iout)
-            Iout = Iout * gf / ff
+            scale = 0 if ff == 0 else gf / ff
+            Iout = Iout * scale
         else:
             Iout = Iout / np.max(Iout)
         return Iout
