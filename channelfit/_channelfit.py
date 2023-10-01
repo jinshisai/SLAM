@@ -399,11 +399,14 @@ class ChannelFit():
             m[i] = interp((y, x))
         Iout = np.array(m)
         if scaling:
+            #gf = np.sum(Iout * self.data_valid, axis=(1, 2))
+            #ff = np.sum(Iout * Iout, axis=(1, 2))
+            #scale = gf / ff
+            #scale[(ff == 0) + (scale < 0)] = 0
+            #Iout = Iout * np.moveaxis([[scale]], 2, 0)
             gf = np.sum(Iout * self.data_valid, axis=(1, 2))
             ff = np.sum(Iout * Iout, axis=(1, 2))
-            scale = gf / ff
-            scale[(ff == 0) + (scale < 0)] = 0
-            Iout = Iout * np.moveaxis([[scale]], 2, 0)
+            Iout = Iout * gf / ff
         else:
             Iout = Iout / np.max(Iout)
         return Iout
