@@ -405,8 +405,10 @@ class ChannelFit():
             m[i] = interp((y, x))
         Iout = np.array(m)
         if scaling:
-            gf = np.sum(Iout * self.data_valid, axis=(1, 2))
-            ff = np.sum(Iout * Iout, axis=(1, 2))
+            #gf = np.sum(Iout * self.data_valid, axis=(1, 2))
+            #ff = np.sum(Iout * Iout, axis=(1, 2))
+            gf = np.max(self.data_valid, axis=(1, 2))
+            ff = np.max(Iout, axis=(1, 2))
             scale = gf / ff
             scale[(ff == 0) + (scale < 0)] = 0
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
@@ -537,7 +539,6 @@ class ChannelFit():
         self.pmid = dict(zip(self.paramkeys, self.pmid))
         self.phigh = dict(zip(self.paramkeys, self.phigh))
  
-   
     def modeltofits(self, filehead: str = 'best', **kwargs):
         w = wcs.WCS(naxis=3)
         h = self.header
