@@ -182,7 +182,6 @@ class ChannelFit():
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
-
     def makegrid(self, cubefits: str = None,
                  pa: float = 0, incl: float = 90, dist: float = 1,
                  center: str = None, vsys: float = 0,
@@ -419,8 +418,7 @@ class ChannelFit():
         else:
             Iout = Iout / np.max(Iout)
         return Iout
-
-                        
+                  
     def fitting(self, Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
                 cs_range: list = [0.01, 1],
