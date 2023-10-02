@@ -325,7 +325,6 @@ class ChannelFit():
         v = np.linspace(-vmax, vmax, n)
         if cs_over_dv < 0.01:
             p = (1 + np.sign(v + 0.5)) * (1 - np.sign(v - 0.5)) / 4
-            print(p)
         else:
             p = erf((v + 0.5) / np.sqrt(2) / cs_over_dv) \
                 - erf((v - 0.5) / np.sqrt(2) / cs_over_dv)
