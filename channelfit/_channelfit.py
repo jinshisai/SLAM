@@ -284,10 +284,13 @@ class ChannelFit():
         self.cosi = np.cos(i)
         self.tani = np.tan(i)
         
-    def update_xdisk(self, h1: float, h2: float):
+    def update_xdisk(self, h1: float, h2: float = -1):
         x = [None] * 4
         for i, hdisk in zip([0, 2], [h1, h2]):
-            if hdisk < 0.01:
+            if hdisk == -1:
+                x1 = None
+                x2 = None
+            elif hdisk < 0.01:
                 x1 = self.Xnest / self.cosi
                 x2 = None
             else:
