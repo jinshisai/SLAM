@@ -292,7 +292,7 @@ class ChannelFit():
                 x2 = None
             elif hdisk < 0.01:
                 x1 = self.Xnest / self.cosi
-                x2 = None
+                x2 = self.Xnest / self.cosi
             else:
                 Xcosi = self.Xnest * self.cosi
                 a = self.tani**(-2) - hdisk**2
