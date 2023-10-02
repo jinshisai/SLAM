@@ -400,7 +400,7 @@ class ChannelFit():
         x = self.xminor - offminor
         m = [None] * len(Iout)
         for i, c in enumerate(Iout):
-            interp = RGI((self.yneed, self.xneed), c,
+            interp = RGI((self.yneed, self.xneed), c, method='cubic',
                          bounds_error=False, fill_value=0)
             m[i] = interp((y, x))
         Iout = np.array(m)
