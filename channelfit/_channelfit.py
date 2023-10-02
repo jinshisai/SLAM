@@ -318,13 +318,14 @@ class ChannelFit():
         cs_over_dv = cs / self.dv
         w = max([cs_over_dv * 2.35482, 1])  # 2.35482 ~ sqrt(8ln2)
         vmax_over_w = 2  # in the unit of max(FWHM, dv)
-        w_over_d = 10
+        w_over_d = 11
         vmax = vmax_over_w * w
         d = w / w_over_d
         n = 2 * int(vmax_over_w * w_over_d) + 1
         v = np.linspace(-vmax, vmax, n)
         if cs_over_dv < 0.01:
             p = (1 + np.sign(v + 0.5)) * (1 - np.sign(v - 0.5)) / 4
+            print(p)
         else:
             p = erf((v + 0.5) / np.sqrt(2) / cs_over_dv) \
                 - erf((v - 0.5) / np.sqrt(2) / cs_over_dv)
