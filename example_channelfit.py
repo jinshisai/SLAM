@@ -23,7 +23,8 @@ if __name__ == '__main__':
                   rmax=rmax, vlim=vlim, nlayer=1, xskip=4, yskip=4)
     chan.fitting(Mstar_range=[0.01, 10.0],
                  #Mstar_fixed=0.1,
-                 Rc_fixed=1e5, cs_fixed=0, hdisk_fixed=0, pI_fixed=0, Rin_fixed=0,
+                 Rc_fixed=1e5, cs_fixed=0, h1_fixed=0, h2_fixed=0,
+                 pI_fixed=0, Rin_fixed=0,
                  offmajor_fixed=0, offminor_fixed=0, offvsys_fixed=0,
                  incl_fixed=0,
                  kwargs_emcee_corner={'nwalkers_per_ndim':8,
