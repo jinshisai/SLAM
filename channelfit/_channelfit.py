@@ -287,7 +287,7 @@ class ChannelFit():
     def update_xdisk(self, h1: float, h2: float = -1):
         x = [None] * 4
         for i, hdisk in zip([0, 2], [h1, h2]):
-            if hdisk == -1:
+            if hdisk < 0:
                 x1 = None
                 x2 = None
             elif hdisk < 0.01:
