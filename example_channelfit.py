@@ -28,12 +28,13 @@ if __name__ == '__main__':
                  offmajor_fixed=0, offminor_fixed=0, offvsys_fixed=0,
                  incl_fixed=0,
                  kwargs_emcee_corner={'nwalkers_per_ndim':8,
-                                      'nburnin':100,
-                                      'nsteps':100},
+                                      'nburnin':10,
+                                      'nsteps':10},
                  filename=filehead)
     p = chan.popt
     chan.modeltofits(**p, filehead=filehead)
     chan.plotmom(mode='obs', **p, filename=filehead+'.obsmom01.png')
     chan.plotmom(mode='mod', **p, filename=filehead+'.modelmom01.png')
     chan.plotmom(mode='res', **p, filename=filehead+'.residualmom01.png')
+    chan.equivelocity(**p, filename=filehead+'.equivel.png')
 '-------------------------------------'

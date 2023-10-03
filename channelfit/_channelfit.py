@@ -639,3 +639,45 @@ class ChannelFit():
         fig.savefig(filename)
         plt.close()
 
+    def equivelocity(self, filename: str = 'equivel.png', **kwargs):
+        if kwargs != {}:
+            self.popt = kwargs
+        m = self.popt['Mstar']
+        h1 = self.popt['h1']
+        h2 = self.popt['h2']
+        incl = self.incl0 + self.popt['incl']
+        irad = np.radians(incl)
+        sini = np.sin(irad)
+        cosi = np.cos(irad)
+        y = np.linspace(self.x.min(), self.x.max(), 1000)
+        v, y = np.meshgrid(self.v_valid, y)
+        y[y * np.sign(v) < 0] = np.nan
+        r = (m / (v / sini / vunit / y)**2)**(1/3)
+        x = np.sqrt(r**2 - y**2)
+        xcosi = x * cosi
+        rsini = r * sini
+        x = [xcosi + h1 * rsini,
+             xcosi - h1 * rsini,
+             xcosi + h2 * rsini,
+             xcosi - h2 * rsini,
+             -xcosi + h1 * rsini,
+             -xcosi - h1 * rsini,
+             -xcosi + h2 * rsini,
+             -xcosi - h2 * rsini,
+        ]
+        rmax = np.nanmax([np.hypot(xx, y) for xx in x])
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        for i in range(8):
+            for xx, yy in zip(x[i], y):
+                m = ax.scatter(xx, yy, c=self.v_valid, cmap='jet', s=1,
+                               vmin=self.v.min(), vmax=self.v.max())
+        fig.colorbar(m, ax=ax, label=r'$V_{\rm los}$ (km s$^{-1}$)')
+        ax.set_xlabel('major offset (au)')
+        ax.set_ylabel('minor offset (au)')
+        ax.set_xlim(-rmax * 1.01, rmax * 1.01)
+        ax.set_ylim(-rmax * 1.01, rmax * 1.01)
+        ax.set_aspect(1)
+        fig.savefig(filename)
+        plt.close()
+        
