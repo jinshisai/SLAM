@@ -410,15 +410,16 @@ class ChannelFit():
                   offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
                   incl: float = 90,
                   convolving: bool = True, scaling: bool = 'uniform'):
-        if self.incl_fixed is None:
+        if self.free['incl']:
             self.update_incl(incl)
-        if self.cs_fixed is None:
+        if self.free['cs']:
             self.update_prof(cs)
-        if None in [self.h1_fixed, self.h2_fixed]:
+        if self.free['h1'] or self.free['h2']:
             self.update_xdisk(h1, h2)
-        if None in [self.Rc_fixed, self.Rin_fixed]:
+        if self.free['Rc'] or self.free['Rin']:
             self.update_getvlos(Rc, Rin)
-        if None in [self.h1_fixed, self.h2_fixed, self.Rc_fixed, self.Rin_fixed]:
+        if self.free['h1'] or self.free['h2'] \
+            or self.free['Rc'] or self.free['Rin']:
             self.update_vlos()
 
         Iout = self.get_Iout(Mstar, pI, offvsys)
@@ -462,27 +463,24 @@ class ChannelFit():
                 scaling: str = 'uniform',
                 kwargs_emcee_corner: dict = {}):
 
-        self.incl_fixed = incl_fixed
-        if incl_fixed is not None:
-            self.update_incl(incl_fixed)
-        self.cs_fixed = cs_fixed        
-        if cs_fixed is not None:
-            self.update_prof(cs_fixed)
-        self.h1_fixed = h1_fixed
-        self.h2_fixed = h2_fixed
-        if not None in [h1_fixed, h2_fixed]:
-            self.update_xdisk(h1_fixed, h2_fixed)
-        self.Rc_fixed = Rc_fixed
-        self.Rin_fixed = Rin_fixed
-        if not None in [Rc_fixed, Rin_fixed]:
-            self.update_getvlos(Rc_fixed, Rin_fixed)
-        if not None in [h1_fixed, h2_fixed, Rc_fixed, Rin_fixed]:
-            self.update_vlos()
-        
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             h1_fixed, h2_fixed, pI_fixed, Rin_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed,
                             incl_fixed])
+        self.free = dict(zip(self.paramkeys, [p is None for p in p_fixed]))
+
+        if not self.free['incl']:
+            self.update_incl(incl_fixed)
+        if not self.free['cs']:
+            self.update_prof(cs_fixed)
+        if not (self.free['h1'] or self.free['h2']):
+            self.update_xdisk(h1_fixed, h2_fixed)
+        if not (self.free['Rc'] or self.free['Rin']):
+            self.update_getvlos(Rc_fixed, Rin_fixed)
+        if not (self.free['h1'] or self.free['h2'] 
+                or self.free['Rc'] or self.free['Rin']):
+            self.update_vlos()
+        
         if None in p_fixed:
             c = (q := p_fixed[:2]) != None
             p_fixed[:2][c] = np.log10(q[c].astype('float'))
@@ -565,11 +563,8 @@ class ChannelFit():
         h['CRPIX3'] = h['CRPIX3'] - self.offpix[2]
         nx = h['NAXIS1']
         ny = h['NAXIS2']
-        self.incl_fixed = None
-        self.cs_fixed = None
-        self.Rc_fixed = None
-        self.Rin_fixed = None
-        self.hdisk_fixed = None
+        for k in self.free.keys():
+            self.free[k] = True
         if kwargs != {}:
             self.popt = kwargs
         self.data_valid = self.data_valid0
