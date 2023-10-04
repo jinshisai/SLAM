@@ -663,6 +663,8 @@ class ChannelFit():
         m = self.popt['Mstar']
         h1 = self.popt['h1']
         h2 = self.popt['h2']
+        if h1 < 0: h1 = np.nan
+        if h2 < 0: h2 = np.nan
         incl = self.incl0 + self.popt['incl']
         irad = np.radians(incl)
         sini = np.sin(irad)
