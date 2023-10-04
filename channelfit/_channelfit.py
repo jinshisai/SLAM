@@ -371,7 +371,7 @@ class ChannelFit():
                   h1: float, h2: float, pI: float, Rin: float,
                   offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
                   incl: float = 90,
-                  convolving: bool = True, scaling: bool = True):
+                  convolving: bool = True, scaling: bool = 'chi2'):
         if self.incl_fixed is None:
             self.update_incl(incl)
         if self.cs_fixed is None:
@@ -388,7 +388,7 @@ class ChannelFit():
             Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
                 = avefour(Iout[:, l, :, :])
         Iout = Iout[:, 0, self.ineed0:self.ineed1, self.ineed0:self.ineed1]  # v, y, x
-        if not scaling:
+        if not type(scaling) is str:
             xypeak = np.max(Iout, axis=(1, 2))
             scale = 1 / xypeak
             scale[xypeak == 0] = 0
@@ -403,18 +403,19 @@ class ChannelFit():
                          bounds_error=False, fill_value=0)
             m[i] = interp((y, x))
         Iout = np.array(m)
-        if scaling:
-            #gf = np.sum(Iout * self.data_valid, axis=(1, 2))
-            #ff = np.sum(Iout * Iout, axis=(1, 2))
-            gf = np.max(self.data_valid, axis=(1, 2))
-            ff = np.max(Iout, axis=(1, 2))
+        if type(scaling) is str:
+            if scaling == 'chi2':
+                gf = np.sum(Iout * self.data_valid, axis=(1, 2))
+                ff = np.sum(Iout * Iout, axis=(1, 2))
+            elif scaling == 'peak':
+                gf = np.max(self.data_valid, axis=(1, 2))
+                ff = np.max(Iout, axis=(1, 2))
+            elif scaling == 'uniform':
+                gf = np.full_like(self.v_valid, np.sum(Iout * self.data_valid))
+                ff = np.full_like(self.v_valid, np.sum(Iout * Iout))
             scale = gf / ff
             scale[(ff == 0) + (scale < 0)] = 0
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
-            #gf = np.sum(Iout * self.data_valid)
-            #ff = np.sum(Iout * Iout)
-            #scale = 0 if ff == 0 else gf / ff
-            #Iout = Iout * scale
         else:
             Iout = Iout / np.max(Iout)
         return Iout
