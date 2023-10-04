@@ -427,10 +427,10 @@ class ChannelFit():
             self.update_vlos()
 
         Iout = self.get_Iout(Mstar, pI, offvsys)
-        if not scaling:
-            Iout = self.peaktounity(Iout)
         if convolving:
             Iout = convolve(Iout, [self.gaussbeam], mode='same')
+        else:
+            Iout = self.peaktounity(Iout)
         Iout = self.rgi2d(offmajor, offminor, Iout)
         if scaling:
             scale = self.get_scale(Iout)
