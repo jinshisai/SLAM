@@ -353,7 +353,7 @@ class ChannelFit():
     def update_vlos(self):
         self.vlos = [self.getvlos(x) for x in self.xdisk]
     
-    def get_Iout(self, Mstar, pI, offvsys):
+    def get_Iout(self, Mstar: float, pI: float, offvsys: float) -> np.ndarray:
         Iout = 0
         for vlos_in, x_in in zip(self.vlos, self.xdisk):
             if vlos_in is None:
@@ -365,13 +365,34 @@ class ChannelFit():
             if pI != 0:
                 p = p * np.hypot(x_in, self.Ynest)**(-pI)
             Iout = Iout + np.nan_to_num(p)
+        for l in range(self.nlayer - 1, 0, -1):
+            Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
+                = avefour(Iout[:, l, :, :])
+        Iout = Iout[:, 0, self.ineed0:self.ineed1, self.ineed0:self.ineed1]  # v, y, x
         return Iout
+
+    def get_scale(self, Iout, scaling: str = 'uniform',
+                  output: bool = False) -> np.ndarray:
+        if scaling == 'chi2':
+            gf = np.sum(Iout * self.data_valid, axis=(1, 2))
+            ff = np.sum(Iout * Iout, axis=(1, 2))
+        elif scaling == 'peak':
+            gf = np.max(self.data_valid, axis=(1, 2))
+            ff = np.max(Iout, axis=(1, 2))
+        elif scaling == 'uniform':
+            gf = np.full_like(self.v_valid, np.sum(Iout * self.data_valid))
+            ff = np.full_like(self.v_valid, np.sum(Iout * Iout))
+        scale = gf / ff
+        scale[(ff == 0) + (scale < 0)] = 0
+        if output:
+            print(list(np.round(scale / np.max(scale), decimals=2)))
+        return scale
 
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   h1: float, h2: float, pI: float, Rin: float,
                   offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
                   incl: float = 90,
-                  convolving: bool = True, scaling: bool = 'chi2'):
+                  convolving: bool = True, scaling: bool = 'uniform'):
         if self.incl_fixed is None:
             self.update_incl(incl)
         if self.cs_fixed is None:
@@ -384,10 +405,6 @@ class ChannelFit():
             self.update_vlos()
 
         Iout = self.get_Iout(Mstar, pI, offvsys)
-        for l in range(self.nlayer - 1, 0, -1):
-            Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
-                = avefour(Iout[:, l, :, :])
-        Iout = Iout[:, 0, self.ineed0:self.ineed1, self.ineed0:self.ineed1]  # v, y, x
         if not type(scaling) is str:
             xypeak = np.max(Iout, axis=(1, 2))
             scale = 1 / xypeak
@@ -404,17 +421,7 @@ class ChannelFit():
             m[i] = interp((y, x))
         Iout = np.array(m)
         if type(scaling) is str:
-            if scaling == 'chi2':
-                gf = np.sum(Iout * self.data_valid, axis=(1, 2))
-                ff = np.sum(Iout * Iout, axis=(1, 2))
-            elif scaling == 'peak':
-                gf = np.max(self.data_valid, axis=(1, 2))
-                ff = np.max(Iout, axis=(1, 2))
-            elif scaling == 'uniform':
-                gf = np.full_like(self.v_valid, np.sum(Iout * self.data_valid))
-                ff = np.full_like(self.v_valid, np.sum(Iout * Iout))
-            scale = gf / ff
-            scale[(ff == 0) + (scale < 0)] = 0
+            scale = self.get_scale(Iout, scaling=scaling)
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
         else:
             Iout = Iout / np.max(Iout)
@@ -445,7 +452,7 @@ class ChannelFit():
                 filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True,
-                scaling: str = 'chi2',
+                scaling: str = 'uniform',
                 kwargs_emcee_corner: dict = {}):
 
         self.incl_fixed = incl_fixed

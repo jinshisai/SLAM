@@ -30,11 +30,13 @@ if __name__ == '__main__':
                  kwargs_emcee_corner={'nwalkers_per_ndim':8,
                                       'nburnin':10,
                                       'nsteps':10},
+                 scaling='chi2',
                  filename=filehead)
     p = chan.popt
     chan.modeltofits(**p, filehead=filehead)
     chan.plotmom(mode='obs', **p, filename=filehead+'.obsmom01.png')
     chan.plotmom(mode='mod', **p, filename=filehead+'.modelmom01.png')
     chan.plotmom(mode='res', **p, filename=filehead+'.residualmom01.png')
-    chan.equivelocity(**p, filename=filehead+'.equivel.png')
+    #chan.get_scale(chan.cubemodel(**p), scaling='chi2', output=True)
+    #chan.equivelocity(**p, filename=filehead+'.equivel.png')
 '-------------------------------------'
