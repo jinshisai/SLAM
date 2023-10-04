@@ -445,7 +445,7 @@ class ChannelFit():
                 filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True,
-                scaling: str = None,
+                scaling: str = 'chi2',
                 kwargs_emcee_corner: dict = {}):
 
         self.incl_fixed = incl_fixed
