@@ -194,7 +194,6 @@ class ChannelFit():
             self.read_cubefits(cubefits, center, dist, vsys,
                                -rmax, rmax, -rmax, rmax, None, None,
                                xskip, yskip, sigma)
-            self.fitsname = cubefits
             v = self.v
         self.incl0 = incl
         self.update_incl(incl)
