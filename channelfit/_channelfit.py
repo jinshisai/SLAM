@@ -391,7 +391,8 @@ class ChannelFit():
             gf = np.max(self.data_valid, axis=(1, 2))
             ff = np.max(Iout, axis=(1, 2))
         elif self.scaling == 'mom0':
-            gf = self.mom0
+            gf = self.mom0 * 1
+            gf[gf < self.sigma_mom0 * 3] = 0
             ff = np.sum(Iout, axis=0) * self.dv
         elif self.scaling == 'uniform':
             gf = np.full_like(self.v_valid, np.sum(Iout * self.data_valid))
