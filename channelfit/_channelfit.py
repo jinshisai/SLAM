@@ -682,7 +682,6 @@ class ChannelFit():
              -xcosi + h2 * rsini,
              -xcosi - h2 * rsini,
         ]
-        rmax = np.nanmax([np.hypot(xx, y) for xx in x])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         for i in range(8):
@@ -692,8 +691,8 @@ class ChannelFit():
         fig.colorbar(m, ax=ax, label=r'$V_{\rm los}$ (km s$^{-1}$)')
         ax.set_xlabel('major offset (au)')
         ax.set_ylabel('minor offset (au)')
-        ax.set_xlim(-rmax * 1.01, rmax * 1.01)
-        ax.set_ylim(-rmax * 1.01, rmax * 1.01)
+        ax.set_xlim(-ymax * 1.01, ymax * 1.01)
+        ax.set_ylim(-ymax * 1.01, ymax * 1.01)
         ax.set_aspect(1)
         fig.savefig(filename)
         plt.close()
