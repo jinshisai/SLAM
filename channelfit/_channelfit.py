@@ -363,7 +363,7 @@ class ChannelFit():
             iv = v / self.dv / self.prof_d + self.prof_n // 2 + 0.5  # 0.5 is for rounding
             p = self.prof[iv.astype('int').clip(0, self.prof_n)]
             if pI != 0:
-                p = p * np.hypot(x_in, self.Ynest)**pI
+                p = p * np.hypot(x_in, self.Ynest)**(-pI)
             Iout = Iout + np.nan_to_num(p)
         return Iout
 
