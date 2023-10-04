@@ -661,11 +661,16 @@ class ChannelFit():
         irad = np.radians(incl)
         sini = np.sin(irad)
         cosi = np.cos(irad)
-        y = np.linspace(self.x.min(), self.x.max(), 1000)
-        v, y = np.meshgrid(self.v_valid, y)
-        y[y * np.sign(v) < 0] = np.nan
-        r = (m / (v / sini / vunit / y)**2)**(1/3)
-        x = np.sqrt(r**2 - y**2)
+        def getxy(ymax):
+            y = np.linspace(-ymax, ymax, 128)
+            v, y = np.meshgrid(self.v_valid, y)
+            y[y * np.sign(v) < 0] = np.nan
+            r = (m / (v / sini / vunit / y)**2)**(1/3)
+            x = np.sqrt(r**2 - y**2)
+            return x, y, r
+        x, y, _ = getxy(np.max(np.abs(self.x)))
+        ymax = np.max(np.abs(y[~np.isnan(x)]))
+        x, y, r = getxy(ymax)
         xcosi = x * cosi
         rsini = r * sini
         x = [xcosi + h1 * rsini,
