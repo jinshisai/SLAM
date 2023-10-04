@@ -389,6 +389,9 @@ class ChannelFit():
         elif scaling == 'peak':
             gf = np.max(self.data_valid, axis=(1, 2))
             ff = np.max(Iout, axis=(1, 2))
+        elif scaling == 'mom0':
+            gf = self.mom0
+            ff = np.sum(Iout, axis=0) * self.dv
         elif scaling == 'uniform':
             gf = np.full_like(self.v_valid, np.sum(Iout * self.data_valid))
             ff = np.full_like(self.v_valid, np.sum(Iout * Iout))
@@ -430,7 +433,10 @@ class ChannelFit():
         Iout = self.rgi2d(offmajor, offminor, Iout)
         if type(scaling) is str:
             scale = self.get_scale(Iout, scaling=scaling)
-            Iout = Iout * np.moveaxis([[scale]], 2, 0)
+            if scaling == 'mom0':
+                Iout = Iout * scale
+            else:
+                Iout = Iout * np.moveaxis([[scale]], 2, 0)
         else:
             Iout = Iout / np.max(Iout)
         return Iout
