@@ -72,11 +72,13 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
 
 class ChannelFit():
 
-    def __init__(self, envelope: bool = True, combine: bool = False):
+    def __init__(self, envelope: bool = True, combine: bool = False,
+                 scaling: str = 'uniform'):
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2', 'pI', 'Rin',
                           'offmajor', 'offminor', 'offvsys', 'incl']
         self.envelope = envelope
         self.combine = combine
+        self.scaling = scaling
 
     def read_cubefits(self, cubefits: str, center: str = None,
                       dist: float = 1, vsys: float = 0,
@@ -381,18 +383,17 @@ class ChannelFit():
         Iout = np.array(m)
         return Iout
 
-    def get_scale(self, Iout, scaling: str = 'uniform',
-                  output: bool = False) -> np.ndarray:
-        if scaling == 'chi2':
+    def get_scale(self, Iout, output: bool = False) -> np.ndarray:
+        if self.scaling == 'chi2':
             gf = np.sum(Iout * self.data_valid, axis=(1, 2))
             ff = np.sum(Iout * Iout, axis=(1, 2))
-        elif scaling == 'peak':
+        elif self.scaling == 'peak':
             gf = np.max(self.data_valid, axis=(1, 2))
             ff = np.max(Iout, axis=(1, 2))
-        elif scaling == 'mom0':
+        elif self.scaling == 'mom0':
             gf = self.mom0
             ff = np.sum(Iout, axis=0) * self.dv
-        elif scaling == 'uniform':
+        elif self.scaling == 'uniform':
             gf = np.full_like(self.v_valid, np.sum(Iout * self.data_valid))
             ff = np.full_like(self.v_valid, np.sum(Iout * Iout))
         scale = gf / ff
@@ -412,7 +413,7 @@ class ChannelFit():
                   h1: float, h2: float, pI: float, Rin: float,
                   offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
                   incl: float = 90,
-                  convolving: bool = True, scaling: bool = 'uniform'):
+                  convolving: bool = True, scaling: bool = True):
         if self.free['incl']:
             self.update_incl(incl)
         if self.free['cs']:
@@ -426,14 +427,14 @@ class ChannelFit():
             self.update_vlos()
 
         Iout = self.get_Iout(Mstar, pI, offvsys)
-        if not type(scaling) is str:
+        if not scaling:
             Iout = self.peaktounity(Iout)
         if convolving:
             Iout = convolve(Iout, [self.gaussbeam], mode='same')
         Iout = self.rgi2d(offmajor, offminor, Iout)
-        if type(scaling) is str:
-            scale = self.get_scale(Iout, scaling=scaling)
-            if scaling == 'mom0':
+        if scaling:
+            scale = self.get_scale(Iout)
+            if self.scaling == 'mom0':
                 Iout = Iout * scale
             else:
                 Iout = Iout * np.moveaxis([[scale]], 2, 0)
@@ -466,7 +467,6 @@ class ChannelFit():
                 filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True,
-                scaling: str = 'uniform',
                 kwargs_emcee_corner: dict = {}):
 
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
@@ -517,7 +517,7 @@ class ChannelFit():
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
                 q[:2] = 10**q[:2]
-                model = self.cubemodel(*q, scaling=scaling)
+                model = self.cubemodel(*q)
                 chi2 = np.nansum((self.data_valid - model)**2) \
                        / self.sigma**2 / self.pixperbeam
                 return -0.5 * chi2
