@@ -371,6 +371,16 @@ class ChannelFit():
         Iout = Iout[:, 0, self.ineed0:self.ineed1, self.ineed0:self.ineed1]  # v, y, x
         return Iout
 
+    def rgi2d(self, offmajor: float, offminor:float,
+              I_in: np.ndarray) -> np.ndarray:
+        m = [None] * len(I_in)
+        for i, c in enumerate(I_in):
+            interp = RGI((self.yneed, self.xneed), c, method='linear',
+                         bounds_error=False, fill_value=0)
+            m[i] = interp((self.xmajor - offmajor, self.xminor - offminor))
+        Iout = np.array(m)
+        return Iout
+
     def get_scale(self, Iout, scaling: str = 'uniform',
                   output: bool = False) -> np.ndarray:
         if scaling == 'chi2':
@@ -387,6 +397,13 @@ class ChannelFit():
         if output:
             print(list(np.round(scale / np.max(scale), decimals=2)))
         return scale
+
+    def peaktounity(self, I_in: np.ndarray) -> np.ndarray:
+        xypeak = np.max(I_in, axis=(1, 2))
+        scale = 1 / xypeak
+        scale[xypeak == 0] = 0
+        Iout = I_in * np.moveaxis([[scale]], 2, 0)
+        return Iout
 
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   h1: float, h2: float, pI: float, Rin: float,
@@ -406,20 +423,10 @@ class ChannelFit():
 
         Iout = self.get_Iout(Mstar, pI, offvsys)
         if not type(scaling) is str:
-            xypeak = np.max(Iout, axis=(1, 2))
-            scale = 1 / xypeak
-            scale[xypeak == 0] = 0
-            Iout = Iout * np.moveaxis([[scale]], 2, 0)
+            Iout = self.peaktounity(Iout)
         if convolving:
             Iout = convolve(Iout, [self.gaussbeam], mode='same')
-        y = self.xmajor - offmajor
-        x = self.xminor - offminor
-        m = [None] * len(Iout)
-        for i, c in enumerate(Iout):
-            interp = RGI((self.yneed, self.xneed), c, method='linear',
-                         bounds_error=False, fill_value=0)
-            m[i] = interp((y, x))
-        Iout = np.array(m)
+        Iout = self.rgi2d(offmajor, offminor, Iout)
         if type(scaling) is str:
             scale = self.get_scale(Iout, scaling=scaling)
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
