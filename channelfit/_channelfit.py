@@ -234,7 +234,7 @@ class ChannelFit():
         r_need = rmax * np.sqrt(1 + np.abs(np.sin(2 * pa_rad))) + self.bmaj * 1.1
         npix = int(2 * r_need / dpix + 0.5)
         npixnest = int(2**(np.ceil(np.log2(npix))))
-        self.nq1 = npixnest // 4
+        self.nq1 = npixnest // 2 - npixnest // 2 // 2
         self.nq3 = self.nq1 + npixnest // 2
         self.nlayer = nlayer  # down to dpix / 2**(nlayer-1)
         xnest = [None] * nlayer
@@ -243,7 +243,7 @@ class ChannelFit():
         Ynest = [None] * nlayer
         Rnest = [None] * nlayer
         for l in range(nlayer):
-            n = npixnest // 2 + 0.5
+            n = npixnest // 2 - 0.5
             s = np.linspace(-n, n, npixnest) * dpix / 2**l
             X, Y = np.meshgrid(s, s)
             R = np.hypot(X, Y)
