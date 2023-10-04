@@ -445,6 +445,7 @@ class ChannelFit():
                 filename: str = 'channelfit',
                 show: bool = False,
                 progressbar: bool = True,
+                scaling: str = None,
                 kwargs_emcee_corner: dict = {}):
 
         self.incl_fixed = incl_fixed
@@ -498,7 +499,8 @@ class ChannelFit():
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
                 q[:2] = 10**q[:2]
-                chi2 = np.nansum((self.data_valid - self.cubemodel(*q))**2) \
+                model = self.cubemodel(*q, scaling=scaling)
+                chi2 = np.nansum((self.data_valid - model)**2) \
                        / self.sigma**2 / self.pixperbeam
                 return -0.5 * chi2
             plim = np.array([np.log10(Mstar_range), np.log10(Rc_range),
