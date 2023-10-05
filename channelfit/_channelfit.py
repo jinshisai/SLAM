@@ -204,6 +204,9 @@ class ChannelFit():
         xminor, xmajor = np.meshgrid(self.x, self.y)
         self.xmajor = xmajor
         self.xminor = xminor
+        xminor, xmajor = rot(xminor, xmajor, pa_rad)
+        self.signmajor = np.sign(np.nansum(self.mom1 * self.Ynest))
+        self.signminor = np.sign(np.nansum(self.mom1 * self.Xnest)) * (-1)
         
         self.v_nanblue = v[v < vlim[0]]
         self.v_blue = v[(vlim[0] <= v) * (v <= vlim[1])]
@@ -257,8 +260,6 @@ class ChannelFit():
         self.Xnest = np.array(Xnest)
         self.Ynest = np.array(Ynest)
         self.Xnest, self.Ynest = rot(self.Xnest, self.Ynest, pa_rad)
-        self.signmajor = np.sign(np.nansum(self.mom1 * self.Ynest))
-        self.signminor = np.sign(np.nansum(self.mom1 * self.Xnest)) * (-1)
         print('-------- nested grid --------')
         for l in range(len(xnest)):
             print(f'x, dx, npix: +/-{xnest[l][-1]:.2f},'
