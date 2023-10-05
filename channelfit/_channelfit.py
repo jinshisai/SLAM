@@ -57,7 +57,7 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
 class ChannelFit():
 
     def __init__(self, envelope: bool = True, combine: bool = False,
-                 scaling: str = 'uniform', gaussmargin: float = 3):
+                 scaling: str = 'uniform', gaussmargin: float = 1.5):
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2', 'pI', 'Rin',
                           'offmajor', 'offminor', 'offvsys', 'incl']
         self.envelope = envelope
