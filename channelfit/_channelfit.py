@@ -215,12 +215,14 @@ class ChannelFit():
         # x and y are minor and major axis coordinates before projection.
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         i, j = self.bmaj / dpix, self.bmin / dpix
-        print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
+        if j > 10:
+            print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
+            print('')
         r_need = rmax + self.gaussmargin * self.bmaj
         npix = int(2 * r_need / dpix + 0.5)
-        npixnest = int(2**(np.ceil(np.log2(npix))))
-        self.nq1 = npixnest // 2 - npixnest // 2 // 2
-        self.nq3 = self.nq1 + npixnest // 2
+        npix = int(4 * np.ceil(npix / 4))
+        self.nq1 = npix // 2 - npix // 2 // 2
+        self.nq3 = self.nq1 + npix // 2
         self.nlayer = nlayer  # down to dpix / 2**(nlayer-1)
         xnest = [None] * nlayer
         ynest = [None] * nlayer
@@ -228,8 +230,8 @@ class ChannelFit():
         Ynest = [None] * nlayer
         Rnest = [None] * nlayer
         for l in range(nlayer):
-            n = npixnest // 2 - 0.5
-            s = np.linspace(-n, n, npixnest) * dpix / 2**l
+            n = npix // 2 - 0.5
+            s = np.linspace(-n, n, npix) * dpix / 2**l
             X, Y = np.meshgrid(s, s)
             R = np.hypot(X, Y)
             xnest[l] = s
@@ -246,7 +248,7 @@ class ChannelFit():
         for l in range(len(xnest)):
             print(f'x, dx, npix: +/-{xnest[l][-1]:.2f},'
                   + f' {xnest[l][1]-xnest[l][0]:.2f} au,'
-                  + f' {npixnest:d}')
+                  + f' {npix:d}')
         print('-----------------------------')
         
         ngauss = int(self.gaussmargin * self.bmaj / dpix + 0.5)  # 0.5 is for rounding
@@ -259,8 +261,8 @@ class ChannelFit():
         self.gaussbeam = gaussbeam / self.pixperbeam
         
         n_need = int(r_need / dpix + 0.5)
-        self.ineed0 = npixnest // 2 - n_need
-        self.ineed1 = npixnest // 2 + n_need
+        self.ineed0 = npix // 2 - n_need
+        self.ineed1 = npix // 2 + n_need
         self.xneed = self.xnest[0][self.ineed0:self.ineed1]
         self.yneed = self.ynest[0][self.ineed0:self.ineed1]
                 
