@@ -384,7 +384,7 @@ class ChannelFit():
         for i, c in enumerate(I_in):
             interp = RGI((self.yneed, self.xneed), c, method='linear',
                          bounds_error=False, fill_value=0)
-            xoff, yoff = rot(offmajor, offminor, -self.pa_rad)
+            xoff, yoff = rot(offminor, offmajor, -self.pa_rad)
             m[i] = interp((self.xmajor - yoff, self.xminor - xoff))
         Iout = np.array(m)
         return Iout
