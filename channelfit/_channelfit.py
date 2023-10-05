@@ -200,7 +200,8 @@ class ChannelFit():
         pa_rad = np.radians(pa)
         self.cospa = np.cos(pa_rad)
         self.sinpa = np.sin(pa_rad)
-        xminor, xmajor = rot(*np.meshgrid(self.x, self.y), pa_rad)
+        #xminor, xmajor = rot(*np.meshgrid(self.x, self.y), pa_rad)
+        xminor, xmajor = np.meshgrid(self.x, self.y)
         self.xmajor = xmajor
         self.xminor = xminor
         
@@ -231,7 +232,8 @@ class ChannelFit():
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         i, j = self.bmaj / dpix, self.bmin / dpix
         print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
-        r_need = rmax * np.sqrt(1 + np.abs(np.sin(2 * pa_rad))) + self.bmaj * 1.1
+        #r_need = rmax * np.sqrt(1 + np.abs(np.sin(2 * pa_rad))) + self.bmaj * 1.1
+        r_need = rmax + self.bmaj * 1.1
         npix = int(2 * r_need / dpix + 0.5)
         npixnest = int(2**(np.ceil(np.log2(npix))))
         self.nq1 = npixnest // 2 - npixnest // 2 // 2
@@ -256,6 +258,7 @@ class ChannelFit():
         self.ynest = np.array(ynest)
         self.Xnest = np.array(Xnest)
         self.Ynest = np.array(Ynest)
+        self.Ynest, self.Xnest = rot(self.Ynest, self.Xnest, pa_rad)
         print('-------- nested grid --------')
         for l in range(len(xnest)):
             print(f'x, dx, npix: +/-{xnest[l][-1]:.2f},'
@@ -266,7 +269,8 @@ class ChannelFit():
         ngauss = int(self.bmaj / dpix * 1.1 + 0.5)  # 0.5 is for rounding
         xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
-        bpa_on_disk = np.radians(self.bpa) - pa_rad
+        #bpa_on_disk = np.radians(self.bpa) - pa_rad
+        bpa_on_disk = np.radians(self.bpa)
         xb, yb = rot(*np.meshgrid(xb, yb), bpa_on_disk)
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
         self.pixperbeam = np.sum(gaussbeam)
