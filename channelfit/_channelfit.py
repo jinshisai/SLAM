@@ -202,9 +202,7 @@ class ChannelFit():
         self.cospa = np.cos(pa_rad)
         self.sinpa = np.sin(pa_rad)
         #xminor, xmajor = rot(*np.meshgrid(self.x, self.y), pa_rad)
-        xminor, xmajor = np.meshgrid(self.x, self.y)
-        self.xmajor = xmajor
-        self.xminor = xminor
+        self.X, self.Y = np.meshgrid(self.x, self.y)
         
         self.v_nanblue = v[v < vlim[0]]
         self.v_blue = v[(vlim[0] <= v) * (v <= vlim[1])]
@@ -385,7 +383,7 @@ class ChannelFit():
             interp = RGI((self.yneed, self.xneed), c, method='linear',
                          bounds_error=False, fill_value=0)
             xoff, yoff = rot(offminor, offmajor, -self.pa_rad)
-            m[i] = interp((self.xmajor - yoff, self.xminor - xoff))
+            m[i] = interp((self.Y - yoff, self.X - xoff))
         Iout = np.array(m)
         return Iout
 
