@@ -204,9 +204,6 @@ class ChannelFit():
         xminor, xmajor = np.meshgrid(self.x, self.y)
         self.xmajor = xmajor
         self.xminor = xminor
-        xminor, xmajor = rot(xminor, xmajor, pa_rad)
-        self.signmajor = np.sign(np.nansum(self.mom1 * self.Ynest))
-        self.signminor = np.sign(np.nansum(self.mom1 * self.Xnest)) * (-1)
         
         self.v_nanblue = v[v < vlim[0]]
         self.v_blue = v[(vlim[0] <= v) * (v <= vlim[1])]
@@ -227,6 +224,9 @@ class ChannelFit():
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
         self.sigma_mom0 = m['sigma_mom0']
+        xminor, xmajor = rot(xminor, xmajor, pa_rad)
+        self.signmajor = np.sign(np.nansum(self.mom1 * self.Ynest))
+        self.signminor = np.sign(np.nansum(self.mom1 * self.Xnest)) * (-1)
         
         # 2d nested grid on the disk plane.
         # x and y are minor and major axis coordinates before projection.
