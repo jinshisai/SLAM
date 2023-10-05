@@ -57,13 +57,12 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
 class ChannelFit():
 
     def __init__(self, envelope: bool = True, combine: bool = False,
-                 scaling: str = 'uniform', gaussmargin: float = 1.6):
+                 scaling: str = 'uniform'):
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2', 'pI', 'Rin',
                           'offmajor', 'offminor', 'offvsys', 'incl']
         self.envelope = envelope
         self.combine = combine
         self.scaling = scaling
-        self.gaussmargin = gaussmargin
 
     def read_cubefits(self, cubefits: str, center: str = None,
                       dist: float = 1, vsys: float = 0,
@@ -174,7 +173,8 @@ class ChannelFit():
                  center: str = None, vsys: float = 0,
                  rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
                  sigma: float = None, nlayer: int = 4,
-                 xskip: int = 1, yskip: int = 1, autoskip: bool = False):
+                 xskip: int = 1, yskip: int = 1, autoskip: bool = False,
+                 gaussmargin: float = 1.6):
         if not (cubefits is None):
             j = 20
             while j > 10 and autoskip:
@@ -221,7 +221,7 @@ class ChannelFit():
         
         # 2d nested grid on the disk plane.
         # x and y are minor and major axis coordinates before projection.
-        r_need = rmax + self.gaussmargin * self.bmaj
+        r_need = rmax + gaussmargin * self.bmaj
         npix = int(2 * r_need / dpix + 0.5)
         npix = int(4 * np.ceil(npix / 4))
         self.nq1 = npix // 2 - npix // 2 // 2
@@ -254,7 +254,7 @@ class ChannelFit():
                   + f' {npix:d}')
         print('-----------------------------')
         
-        ngauss = int(self.gaussmargin * self.bmaj / dpix + 0.5)  # 0.5 is for rounding
+        ngauss = int(gaussmargin * self.bmaj / dpix + 0.5)  # 0.5 is for rounding
         xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         bpa_on_disk = np.radians(self.bpa)
