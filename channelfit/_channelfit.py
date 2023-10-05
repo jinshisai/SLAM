@@ -174,11 +174,20 @@ class ChannelFit():
                  center: str = None, vsys: float = 0,
                  rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
                  sigma: float = None, nlayer: int = 4,
-                 xskip: int = 1, yskip: int = 1):
+                 xskip: int = 1, yskip: int = 1, autoskip: bool = False):
         if not (cubefits is None):
-            self.read_cubefits(cubefits, center, dist, vsys,
-                               -rmax, rmax, -rmax, rmax, None, None,
-                               xskip, yskip, sigma)
+            j = 20
+            while j > 10 and autoskip:
+                self.read_cubefits(cubefits, center, dist, vsys,
+                                   -rmax, rmax, -rmax, rmax, None, None,
+                                   xskip, yskip, sigma)
+                dpix = min([np.abs(self.dx), np.abs(self.dy)])
+                i, j = self.bmaj / dpix, self.bmin / dpix
+                if j > 10:
+                    print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
+                    print(f'Adopt xskip={xskip:d} and yskip={yskip:d}.')
+                    xskip = xskip + 1
+                    yskip = yskip + 1
             v = self.v
         self.incl0 = incl
         self.update_incl(incl)
@@ -213,11 +222,6 @@ class ChannelFit():
         
         # 2d nested grid on the disk plane.
         # x and y are minor and major axis coordinates before projection.
-        dpix = min([np.abs(self.dx), np.abs(self.dy)])
-        i, j = self.bmaj / dpix, self.bmin / dpix
-        if j > 10:
-            print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
-            print('xskip and yskip can be higher.')
         r_need = rmax + self.gaussmargin * self.bmaj
         npix = int(2 * r_need / dpix + 0.5)
         npix = int(4 * np.ceil(npix / 4))
