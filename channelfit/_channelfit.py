@@ -225,8 +225,8 @@ class ChannelFit():
         self.mom2 = m['mom2']
         self.sigma_mom0 = m['sigma_mom0']
         xminor, xmajor = rot(xminor, xmajor, pa_rad)
-        self.signmajor = np.sign(np.nansum(self.mom1 * self.Ynest))
-        self.signminor = np.sign(np.nansum(self.mom1 * self.Xnest)) * (-1)
+        self.signmajor = np.sign(np.nansum(self.mom1 * xmajor))
+        self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
         
         # 2d nested grid on the disk plane.
         # x and y are minor and major axis coordinates before projection.
