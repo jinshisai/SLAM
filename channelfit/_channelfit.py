@@ -40,22 +40,6 @@ def avefour(a: np.ndarray) -> np.ndarray:
     b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
          + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
     return b
-
-def boxgauss(cs_over_dv: float) -> tuple:
-    w = max([cs_over_dv * 2.35482, 1])  # 2.35482 ~ sqrt(8ln2)
-    vmax_over_w = 2  # in the unit of max(FWHM, dv)
-    w_over_d = 10
-    vmax = vmax_over_w * w
-    d = w / w_over_d
-    n = 2 * int(vmax_over_w * w_over_d) + 1
-    v = np.linspace(-vmax, vmax, n)
-    if cs_over_dv < 0.01:
-        p = (1 + np.sign(v + 0.5)) * (1 - np.sign(v - 0.5)) / 4
-    else:
-        p = erf((v + 0.5) / np.sqrt(2) / cs_over_dv) \
-            - erf((v - 0.5) / np.sqrt(2) / cs_over_dv)
-        p[0] = p[n - 1] = 0
-    return p, n - 1, d
     
 def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     dmasked = np.nan_to_num(d)
@@ -73,12 +57,13 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
 class ChannelFit():
 
     def __init__(self, envelope: bool = True, combine: bool = False,
-                 scaling: str = 'uniform'):
+                 scaling: str = 'uniform', gaussmargin: float = 3):
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2', 'pI', 'Rin',
                           'offmajor', 'offminor', 'offvsys', 'incl']
         self.envelope = envelope
         self.combine = combine
         self.scaling = scaling
+        self.gaussmargin = gaussmargin
 
     def read_cubefits(self, cubefits: str, center: str = None,
                       dist: float = 1, vsys: float = 0,
@@ -231,7 +216,7 @@ class ChannelFit():
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         i, j = self.bmaj / dpix, self.bmin / dpix
         print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
-        r_need = rmax + self.bmaj * 1.1
+        r_need = rmax + self.gaussmargin * self.bmaj
         npix = int(2 * r_need / dpix + 0.5)
         npixnest = int(2**(np.ceil(np.log2(npix))))
         self.nq1 = npixnest // 2 - npixnest // 2 // 2
@@ -264,7 +249,7 @@ class ChannelFit():
                   + f' {npixnest:d}')
         print('-----------------------------')
         
-        ngauss = int(self.bmaj / dpix * 1.1 + 0.5)  # 0.5 is for rounding
+        ngauss = int(self.gaussmargin * self.bmaj / dpix + 0.5)  # 0.5 is for rounding
         xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         bpa_on_disk = np.radians(self.bpa)
