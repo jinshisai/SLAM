@@ -185,9 +185,8 @@ class ChannelFit():
                 i, j = self.bmaj / dpix, self.bmin / dpix
                 if j > 10:
                     print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
+                    xskip, yskip = xskip + 1, yskip + 1
                     print(f'Adopt xskip={xskip:d} and yskip={yskip:d}.')
-                    xskip = xskip + 1
-                    yskip = yskip + 1
             v = self.v
         self.incl0 = incl
         self.update_incl(incl)
