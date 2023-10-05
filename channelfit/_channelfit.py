@@ -201,7 +201,6 @@ class ChannelFit():
         self.pa_rad = pa_rad
         self.cospa = np.cos(pa_rad)
         self.sinpa = np.sin(pa_rad)
-        #xminor, xmajor = rot(*np.meshgrid(self.x, self.y), pa_rad)
         self.X, self.Y = np.meshgrid(self.x, self.y)
         
         self.v_nanblue = v[v < vlim[0]]
@@ -223,16 +222,15 @@ class ChannelFit():
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
         self.sigma_mom0 = m['sigma_mom0']
-        xminor, xmajor = rot(self.X, self.Y, pa_rad)
-        self.signmajor = np.sign(np.nansum(self.mom1 * xmajor))
-        self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
+        X, Y = rot(self.X, self.Y, pa_rad)
+        self.signmajor = np.sign(np.nansum(self.mom1 * Y))
+        self.signminor = np.sign(np.nansum(self.mom1 * X)) * (-1)
         
         # 2d nested grid on the disk plane.
         # x and y are minor and major axis coordinates before projection.
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         i, j = self.bmaj / dpix, self.bmin / dpix
         print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
-        #r_need = rmax * np.sqrt(1 + np.abs(np.sin(2 * pa_rad))) + self.bmaj * 1.1
         r_need = rmax + self.bmaj * 1.1
         npix = int(2 * r_need / dpix + 0.5)
         npixnest = int(2**(np.ceil(np.log2(npix))))
@@ -269,7 +267,6 @@ class ChannelFit():
         ngauss = int(self.bmaj / dpix * 1.1 + 0.5)  # 0.5 is for rounding
         xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
-        #bpa_on_disk = np.radians(self.bpa) - pa_rad
         bpa_on_disk = np.radians(self.bpa)
         xb, yb = rot(*np.meshgrid(xb, yb), bpa_on_disk)
         gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
