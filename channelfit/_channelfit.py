@@ -217,7 +217,7 @@ class ChannelFit():
         i, j = self.bmaj / dpix, self.bmin / dpix
         if j > 10:
             print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
-            print('')
+            print('xskip and yskip can be higher.')
         r_need = rmax + self.gaussmargin * self.bmaj
         npix = int(2 * r_need / dpix + 0.5)
         npix = int(4 * np.ceil(npix / 4))
