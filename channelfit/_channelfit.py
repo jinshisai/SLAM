@@ -223,7 +223,7 @@ class ChannelFit():
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
         self.sigma_mom0 = m['sigma_mom0']
-        xminor, xmajor = rot(xminor, xmajor, pa_rad)
+        xminor, xmajor = rot(self.X, self.Y, pa_rad)
         self.signmajor = np.sign(np.nansum(self.mom1 * xmajor))
         self.signminor = np.sign(np.nansum(self.mom1 * xminor)) * (-1)
         
