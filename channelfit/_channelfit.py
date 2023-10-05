@@ -198,6 +198,7 @@ class ChannelFit():
         self.incl0 = incl
         self.update_incl(incl)
         pa_rad = np.radians(pa)
+        self.pa_rad = pa_rad
         self.cospa = np.cos(pa_rad)
         self.sinpa = np.sin(pa_rad)
         #xminor, xmajor = rot(*np.meshgrid(self.x, self.y), pa_rad)
@@ -383,7 +384,8 @@ class ChannelFit():
         for i, c in enumerate(I_in):
             interp = RGI((self.yneed, self.xneed), c, method='linear',
                          bounds_error=False, fill_value=0)
-            m[i] = interp((self.xmajor - offmajor, self.xminor - offminor))
+            xoff, yoff = rot(offmajor, offminor, -self.pa_rad)
+            m[i] = interp((self.xmajor - yoff, self.xminor - xoff))
         Iout = np.array(m)
         return Iout
 
