@@ -189,7 +189,6 @@ class ChannelFit():
                 ibmin = self.bmin / dpix
                 print(f'Adopt xskip={iskip:d} and yskip={iskip:d}.')
                 print(f'Beam minor axis is {ibmin:.1f} pixels.')
-                iskip += 1
             v = self.v
         self.incl0 = incl
         self.update_incl(incl)
