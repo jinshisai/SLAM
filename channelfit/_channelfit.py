@@ -176,17 +176,20 @@ class ChannelFit():
                  xskip: int = 1, yskip: int = 1, autoskip: bool = False,
                  gaussmargin: float = 1.6):
         if not (cubefits is None):
-            j = 20
-            while j > 10 and autoskip:
+            self.read_cubefits(cubefits, center, dist, vsys,
+                               -rmax, rmax, -rmax, rmax, None, None,
+                               xskip, yskip, sigma)
+            dpix = min([np.abs(self.dx), np.abs(self.dy)])
+            if autoskip:
+                iskip = int(self.bmin / (dpix / xskip) / 5)
                 self.read_cubefits(cubefits, center, dist, vsys,
                                    -rmax, rmax, -rmax, rmax, None, None,
-                                   xskip, yskip, sigma)
+                                   iskip, iskip, sigma)
                 dpix = min([np.abs(self.dx), np.abs(self.dy)])
-                i, j = self.bmaj / dpix, self.bmin / dpix
-                if j > 10:
-                    print(f'(bmaj, bmin) = ({i:.1f}, {j:.1f}) pixels')
-                    xskip, yskip = xskip + 1, yskip + 1
-                    print(f'Adopt xskip={xskip:d} and yskip={yskip:d}.')
+                ibmin = self.bmin / dpix
+                print(f'Adopt xskip={iskip:d} and yskip={iskip:d}.')
+                print(f'Beam minor axis is {ibmin:.1f} pixels.')
+                iskip += 1
             v = self.v
         self.incl0 = incl
         self.update_incl(incl)

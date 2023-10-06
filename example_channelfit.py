@@ -10,7 +10,6 @@ dist = 139  # pc
 sigma = 2e-3  # Jy/beam; None means automatic calculation.
 rmax = 1 * dist  # au
 vlim = (-2.52, -0.9, 0.9, 2.52)  # km/s
-show_figs = True
 '------------------------'
 
 
@@ -20,7 +19,7 @@ if __name__ == '__main__':
     chan = ChannelFit(scaling='chi2')
     chan.makegrid(cubefits=cubefits, center=center, pa=pa, incl=incl,
                   vsys=vsys, dist=dist, sigma=sigma,
-                  rmax=rmax, vlim=vlim, nlayer=1, xskip=4, yskip=4)
+                  rmax=rmax, vlim=vlim, nlayer=1, autoskip=True)
     chan.fitting(Mstar_range=[0.01, 10.0],
                  #Mstar_fixed=0.1,
                  Rc_fixed=1e5, cs_fixed=0, h1_fixed=0, h2_fixed=0,
