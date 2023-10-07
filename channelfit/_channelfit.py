@@ -56,10 +56,11 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
 
 class ChannelFit():
 
-    def __init__(self, envelope: bool = True, combine: bool = False,
-                 scaling: str = 'uniform'):
+    def __init__(self, disk: bool = True, envelope: bool = True,
+                 combine: bool = False, scaling: str = 'uniform'):
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2', 'pI', 'Rin',
                           'offmajor', 'offminor', 'offvsys', 'incl']
+        self.disk = disk
         self.envelope = envelope
         self.combine = combine
         self.scaling = scaling
@@ -329,9 +330,9 @@ class ChannelFit():
             if x_in is None:
                 return None
             r = np.hypot(x_in, self.Ynest)
+            c = r > Rc
             vp = r**(-1/2)
             vr = r * 0
-            c = r > Rc
             if self.envelope:
                 vp[c] = np.sqrt(Rc) / r[c]
                 vr[c] = -r[c]**(-1/2) * np.sqrt(2 - Rc / r[c])
@@ -340,7 +341,9 @@ class ChannelFit():
             vlos = (vp * erot + vr * erad) * self.sini * vunit
             vlos[r < Rin] = np.nan
             if not self.envelope:
-                vlos[r > Rc] = np.nan
+                vlos[c] = np.nan
+            if not self.disk:
+                vlos[~c] = np.nan
             return vlos
         self.getvlos = getvlos
         
