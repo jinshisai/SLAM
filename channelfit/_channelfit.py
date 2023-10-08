@@ -58,7 +58,8 @@ class ChannelFit():
 
     def __init__(self, disk: bool = True, envelope: bool = True,
                  combine: bool = False, scaling: str = 'uniform'):
-        self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2', 'pI', 'Rin',
+        self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2',
+                          'pI', 'Rin', 'Ienv',
                           'offmajor', 'offminor', 'offvsys', 'incl']
         self.disk = disk
         self.envelope = envelope
@@ -350,17 +351,22 @@ class ChannelFit():
     def update_vlos(self):
         self.vlos = [self.getvlos(x) for x in self.xdisk]
     
-    def get_Iout(self, Mstar: float, pI: float, offvsys: float) -> np.ndarray:
+    def get_Iout(self, Mstar: float, Rc: float, pI: float,
+                 Ienv: float, offvsys: float) -> np.ndarray:
         Iout = 0
         for vlos_in, x_in in zip(self.vlos, self.xdisk):
             if vlos_in is None:
                 continue
-            vlos = vlos_in * np.sqrt(Mstar)  # Don't use *=. It changes self.vlos.
+            vlos = vlos_in * np.sqrt(Mstar)
             v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
             iv = v / self.dv / self.prof_d + self.prof_n // 2 + 0.5  # 0.5 is for rounding
             p = self.prof[iv.astype('int').clip(0, self.prof_n)]
+            r = np.hypot(x_in, self.Ynest)
+            indisk = r > Rc
+            p[indisk] = p[indisk] / (Ienv + 1)
+            p[~indisk] = p[~indisk] * Ienv / (Ienv + 1)
             if pI != 0:
-                p = p * np.hypot(x_in, self.Ynest)**(-pI)
+                p = p * r**(-pI)
             Iout = Iout + np.nan_to_num(p)
         for l in range(self.nlayer - 1, 0, -1):
             Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
@@ -407,7 +413,7 @@ class ChannelFit():
         return Iout
 
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
-                  h1: float, h2: float, pI: float, Rin: float,
+                  h1: float, h2: float, pI: float, Rin: float, Ienv: float, 
                   offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
                   incl: float = 90,
                   convolving: bool = True, scaling: bool = True):
@@ -423,7 +429,7 @@ class ChannelFit():
             or self.free['Rc'] or self.free['Rin']:
             self.update_vlos()
 
-        Iout = self.get_Iout(Mstar, pI, offvsys)
+        Iout = self.get_Iout(Mstar, Rc, pI, Ienv, offvsys)
         if convolving:
             Iout = convolve(Iout, [self.gaussbeam], mode='same')
         else:
@@ -446,6 +452,7 @@ class ChannelFit():
                 h2_range: list = [0.01, 1],
                 pI_range: list = [-2, 2],
                 Rin_range: list = [0, 1000],
+                Ienv_range: list = [0.01, 100],
                 offmajor_range: list = [-100, 100],
                 offminor_range: list = [-100, 100],
                 offvsys_range: list = [-0.2, 0.2],
@@ -457,6 +464,7 @@ class ChannelFit():
                 h2_fixed: float = None,
                 pI_fixed: float = None,
                 Rin_fixed: float = None,
+                Ienv_fixed: float = None,
                 offmajor_fixed: float = None,
                 offminor_fixed: float = None,
                 offvsys_fixed: float = None,
@@ -467,7 +475,8 @@ class ChannelFit():
                 kwargs_emcee_corner: dict = {}):
 
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
-                            h1_fixed, h2_fixed, pI_fixed, Rin_fixed,
+                            h1_fixed, h2_fixed, pI_fixed,
+                            Rin_fixed, Ienv_fixed,
                             offmajor_fixed, offminor_fixed, offvsys_fixed,
                             incl_fixed])
         self.free = dict(zip(self.paramkeys, [p is None for p in p_fixed]))
@@ -485,11 +494,12 @@ class ChannelFit():
             self.update_vlos()
         
         if None in p_fixed:
-            c = (q := p_fixed[:2]) != None
-            p_fixed[:2][c] = np.log10(q[c].astype('float'))
+            c = (q := p_fixed[[0, 1, 7]]) != None
+            p_fixed[[0, 1, 7]][c] = np.log10(q[c].astype('float'))
             labels = np.array(self.paramkeys).copy()
             labels[0] = 'log'+labels[0]
             labels[1] = 'log'+labels[1]
+            labels[7] = 'log'+labels[7]
             labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
                        'labels': labels, 'rangelevel':None,
@@ -513,13 +523,14 @@ class ChannelFit():
                     bar.update(1)
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
-                q[:2] = 10**q[:2]
+                q[[0, 1, 7]] = 10**q[[0, 1, 7]]
                 model = self.cubemodel(*q)
                 chi2 = np.nansum((self.data_valid - model)**2) \
                        / self.sigma**2 / self.pixperbeam
                 return -0.5 * chi2
             plim = np.array([np.log10(Mstar_range), np.log10(Rc_range),
-                             cs_range, h1_range, h2_range, pI_range, Rin_range,
+                             cs_range, h1_range, h2_range,
+                             pI_range, Rin_range, np.log10(Ienv_range),
                              offmajor_range, offminor_range, offvsys_range,
                              incl_range])
             plim = plim[p_fixed == None].T
@@ -532,7 +543,7 @@ class ChannelFit():
             def get_p(i: int):
                 p = p_fixed.copy()
                 p[p_fixed == None] = mcmc[i]
-                p[:2] = 10**p[:2]
+                p[[0, 1, 7]] = 10**p[[0, 1, 7]]
                 return p
             self.popt = get_p(0)
             self.plow = get_p(1)
