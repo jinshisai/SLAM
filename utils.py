@@ -59,7 +59,7 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
                 converge = False
         p0 = samples[:, -1, :]
     if not converge:
-        print('\nWARNING: emcee did not converge (Gelman-Rubin > 1.25).\n')
+        print(f'\nWARNING: emcee did not converge (Gelman-Rubin={GR:.2f} > 1.25).\n')
     #lnp = sampler.get_log_prob()  # emcee 3.1.1
     lnp = sampler.lnprobability  # emcee 2.2.1
     popt = samples[np.unravel_index(np.argmax(lnp), lnp.shape)]
