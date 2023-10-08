@@ -14,7 +14,7 @@ def gauss1d(x, amp, mean, fwhm):
 
 def emcee_corner(bounds, log_prob_fn, args: list = [],
                  nwalkers_per_ndim: int = 16,
-                 nburnin: int = 2000, nsteps: int = 2000,
+                 nburnin: int = 100, nsteps: int = 10000,
                  gr_check: bool = False, ndata: int = 1000,
                  labels: list = None, rangelevel: float = 0.8,
                  figname: str = None, show_corner: bool = False,
@@ -40,8 +40,8 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
         return np.min(R)
 
     p0 = plim[0] + (plim[1] - plim[0]) * np.random.rand(nwalkers, ndim)
-    converge = True
     for n in [nburnin, nsteps]:
+        converge = True
         if ncore > 1:
             with Pool(ncore) as pool:
                 sampler = emcee.EnsembleSampler(nwalkers, ndim, log_prob_fn,
