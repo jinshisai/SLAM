@@ -497,9 +497,7 @@ class ChannelFit():
             c = (q := p_fixed[[0, 1, 7]]) != None
             p_fixed[[0, 1, 7]][c] = np.log10(q[c].astype('float'))
             labels = np.array(self.paramkeys).copy()
-            labels[0] = 'log'+labels[0]
-            labels[1] = 'log'+labels[1]
-            labels[7] = 'log'+labels[7]
+            labels[[0, 1, 7]] = ['log'+labels[i] for i in [0, 1, 7]]
             labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
                        'labels': labels, 'rangelevel':None,
