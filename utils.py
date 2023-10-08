@@ -14,7 +14,7 @@ def gauss1d(x, amp, mean, fwhm):
 
 def emcee_corner(bounds, log_prob_fn, args: list = [],
                  nwalkers_per_ndim: int = 16,
-                 nburnin: int = 100, nsteps: int = 10000,
+                 nburnin: int = 2000, nsteps: int = 2000,
                  gr_check: bool = False, ndata: int = 1000,
                  labels: list = None, rangelevel: float = 0.8,
                  figname: str = None, show_corner: bool = False,
@@ -37,7 +37,7 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
         V = (nsteps - 1) / nsteps * W + (nwalkers + 1) / (nwalkers - 1) * B
         d = ndata - ndim - 1
         R = np.sqrt((d + 3) / (d + 1) * V / W)
-        return np.min(R)
+        return R
 
     p0 = plim[0] + (plim[1] - plim[0]) * np.random.rand(nwalkers, ndim)
     for n in [nburnin, nsteps]:
@@ -55,11 +55,12 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
         samples = sampler.chain  # emcee 2.2.1
         if gr_check:
             GR = gelman_rubin(samples)
-            if GR > 1.25:
+            if np.max(GR) > 1.25:
                 converge = False
         p0 = samples[:, -1, :]
     if not converge:
-        print(f'\nWARNING: emcee did not converge (Gelman-Rubin={GR:.2f} > 1.25).\n')
+        print('\nWARNING: emcee did not converge (Gelman-Rubin =',
+              np.round(GR, 2), '> 1.25).\n')
     #lnp = sampler.get_log_prob()  # emcee 3.1.1
     lnp = sampler.lnprobability  # emcee 2.2.1
     popt = samples[np.unravel_index(np.argmax(lnp), lnp.shape)]
