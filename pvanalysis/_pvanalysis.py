@@ -23,7 +23,7 @@ from pvanalysis.analysis_tools import (doublepower_r,
                                        doublepower_v,
                                        doublepower_v_error,
                                        doublepower_r_error)
-from utils import emcee_corner
+from utils import emcee_corner, dynesty_corner
 
 
 # Constants (in cgs)
@@ -808,7 +808,8 @@ class PVAnalysis():
                       fixed_dp: float = 0,
                       outname: str = 'pvanalysis',
                       rangelevel: float = 0.8,
-                      show_corner: bool = False) -> dict:
+                      show_corner: bool = False,
+                      calc_evidence: bool = False) -> dict:
         """Fit the derived edge/ridge positions/velocities with a double power law function by using emcee.
 
 
@@ -863,7 +864,7 @@ class PVAnalysis():
                          'ridge':[[np.nan] * 5, [np.nan] * 5]}
             return -1
 
-        labels = np.array(['Rb', 'Vb', 'p_in', 'dp', 'Vsys'])
+        labels = np.array(['Rb', 'Vb', 'p_in', 'dp', 'dVsys'])
         include = [True, include_dp or (fixed_dp != 0), include_pin,
                    include_dp, include_vsys]
         labels = labels[include]
@@ -892,10 +893,12 @@ class PVAnalysis():
                                       labels=labels, rangelevel=rangelevel,
                                       figname=outname+'.corner'+ext+'.png',
                                       show_corner=show_corner,
-                                      ndata=len(args[0]) + len(args[3]),
-                                      calc_evidence=True)
-            e = 'edge' if ext == '_e' else 'ridge'
-            print(f'\033[1A\033[33C[{e}]')
+                                      ndata=len(args[0]) + len(args[3]))
+            if calc_evidence:
+                dynesty_corner(plim, lnprob, args=args,
+                    figname=None, show_corner=False, return_evidence=True)
+                e = 'edge' if ext == '_e' else 'ridge'
+                print(f'\033[1A\033[33C[{e}]')
             (qopt := q0 * 1)[np.isnan(q0)] = popt
             (qerr := q0 * 0)[np.isnan(q0)] = perr
             res[:] = [qopt, qerr]
@@ -1084,7 +1087,11 @@ class PVAnalysis():
             drb, dvb, dpin, ddp, dvsys = popt[1]
             params = [*popt[0], *popt[1]]
             print(f'R_b   = {rb:.2f} +/- {drb:.2f} au')
+            if ddp == 0:
+                print('!!! Rb is NOT a break (disk) radius in the single-power fitting. !!!')
             print(f'V_b   = {vb:.3f} +/- {dvb:.3f} km/s')
+            if ddp == 0:
+                print('!!! Vb is a middle velocity in the single-power fitting. !!!')
             print(f'p_in  = {pin:.3f} +/- {dpin:.3f}')
             print(f'dp    = {dp:.3f} +/- {ddp:.3f}')
             print(f'v_sys = {self.vsys + vsys:.3f} +/- {dvsys:.3f}')
