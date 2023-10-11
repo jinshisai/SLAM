@@ -550,12 +550,10 @@ class ChannelFit():
             self.plow = p_fixed
             self.pmid = p_fixed
             self.phigh = p_fixed
-        slist = ['plow', 'pmid', 'phigh', 'popt']
-        plist = [self.plow, self.pmid, self.phigh, self.popt]
-        for s, p in zip(slist, plist):
-            if s == 'popt': print('------------------------')
-            print(f'{s} :', ', '.join([f'{t:.2e}' for t in p]))
-            if s == 'popt': print('------------------------')
+        plist = [self.popt, self.plow, self.pmid, self.phigh]
+        print('------------------------')
+        print(f'popt :', ', '.join([f'{p:.2e}' for p in self.popt]))
+        print('------------------------')
         np.savetxt(filename+'.popt.txt', plist)
         self.popt = dict(zip(self.paramkeys, self.popt))
         self.plow = dict(zip(self.paramkeys, self.plow))
