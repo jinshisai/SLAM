@@ -1,3 +1,4 @@
 sphinx>=1.7.0
 jupyter
 nbsphinx
+sphinx_rtd_theme
