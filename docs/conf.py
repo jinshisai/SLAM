@@ -9,7 +9,7 @@
 project = 'SLAM'
 copyright = '2023, Y.Aso & J.Sai'
 author = 'Y.Aso & J.Sai'
-release = 'v1.0.0'
+release = 'v1.2.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
