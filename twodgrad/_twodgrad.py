@@ -47,8 +47,10 @@ class TwoDGrad():
 
     def read_cubefits(self, cubefits: str, center: str = None,
                       dist: float = 1, vsys: float = 0,
-                      xmax: float = 1e4, ymax: float = 1e4,
-                      vmin: float = -100, vmax: float = 100,
+                      xmin: float = None, xmax: float = None,
+                      ymin: float = None, ymax: float = None,
+                      vmin: float = None, vmax: float = None,
+                      xskip: int = 1, yskip: int = 1,
                       sigma: float = None,
                       centering_velocity: bool = False) -> dict:
         """
@@ -64,14 +66,18 @@ class TwoDGrad():
             Distance of the target, used to convert arcsec to au.
         vsys : float
             Systemic velocity of the target.
-        xmax : float
-            The R.A. axis is limited to (-xmax, xmax) in the unit of au.
-        ymax : float
-            The Dec. axis is limited to (-xmax, xmax) in the unit of au.
+        xmin, xmax : float
+            The R.A. axis is limited to (xmin, xmax) in the unit of au.
+        ymin, ymax : float
+            The Dec. axis is limited to (ymin, ymax) in the unit of au.
         vmax : float
             The velocity axis of the PV diagram is limited to (vmin, vmax).
         vmin : float
             The velocity axis of the PV diagram is limited to (vmin, vmax).
+        xskip : int
+            Skip xskip pixels in the x axis.
+        yskip : int
+            Skip yskip pixels in the y axis.
         sigma : float
             Standard deviation of the FITS data. None means automatic.
         centering_velocity : bool
@@ -97,18 +103,33 @@ class TwoDGrad():
         x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
         y = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
         v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
+        crpix = int(h['CRPIX1']) - 1
+        startpix = crpix % xskip
+        x = x[startpix::xskip]
+        h['CRPIX1'] = (crpix - startpix) // xskip + 1
+        h['CDELT1'] = h['CDELT1'] * xskip
+        d = d[:, :, startpix::xskip]
+        crpix = int(h['CRPIX2']) - 1
+        startpix = crpix % yskip
+        y = y[startpix::yskip]
+        h['CRPIX2'] = (crpix - startpix) // yskip + 1
+        h['CDELT2'] = h['CDELT2'] * yskip
+        d = d[:, startpix::yskip, :]
         v = v + h['CRVAL3']
         x = (x - cx) * 3600. * dist  # au
         y = (y - cy) * 3600. * dist  # au
         v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
-        i0, i1 = np.argmin(np.abs(x - xmax)), np.argmin(np.abs(x + xmax))
-        j0, j1 = np.argmin(np.abs(y + ymax)), np.argmin(np.abs(y - ymax))
+        i0 = 0 if xmax is None else np.argmin(np.abs(x - xmax))
+        i1 = len(x) if xmin is None else np.argmin(np.abs(x - xmin))
+        j0 = 0 if ymin is None else np.argmin(np.abs(y - ymin))
+        j1 = len(y) if ymax is None else np.argmin(np.abs(y - ymax))
         x, y = x[i0:i1 + 1], y[j0:j1 + 1]
         if centering_velocity:
             f = interp1d(v, d, kind='cubic', bounds_error=False,
                          fill_value=0, axis=0)
             d = f(v := v - v[np.argmin(np.abs(v))])
-        k0, k1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
+        k0 = 0 if vmin is None else np.argmin(np.abs(v - vmin))
+        k1 = len(v) if vmax is None else np.argmin(np.abs(v - vmax))
         self.offpix = (i0, j0, k0)
         v = v[k0:k1 + 1]
         d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
@@ -127,7 +148,6 @@ class TwoDGrad():
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
-
 
     def get_mom1grad(self, cutoff: float = 5, vmask: list = [0, 0],
                      weights: np.ndarray = 1):

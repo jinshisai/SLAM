@@ -26,7 +26,9 @@ filehead = cubefits.replace('.fits', '')
 tdg = TwoDGrad()
 tdg.read_cubefits(cubefits=cubefits, center=center,
                   vsys=vsys, dist=dist, sigma=sigma,
-                  xmax=xmax, ymax=ymax, vmax=vmax, vmin=vmin,
+                  xmin=-xmax, xmax=xmax,
+                  ymin=-ymax, ymax=ymax,
+                  vmin=vmin, vmax=vmax,
                   centering_velocity=True)
 tdg.get_2Dcenter(cutoff=cutoff, vmask=vmask,
                  minrelerr=minrelerr, minabserr=minabserr, method=method)
