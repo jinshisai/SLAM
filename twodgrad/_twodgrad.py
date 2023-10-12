@@ -387,7 +387,7 @@ class TwoDGrad():
             #Mstar = np.exp(a[1] + 2 * lnv0) * unit / np.sin(np.radians(incl))**2
             #Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
             #dMstar = Mstar * 2 * lnv0 * da[1]
-            Mstar = np.exp(b1 / all + 2 * (a01 / a11 + lnv0)) \
+            Mstar = np.exp(b1 / a11 + 2 * (a01 / a11 + lnv0)) \
                     * unit / np.sin(np.radians(incl))**2
             Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
             dMstar = np.sqrt(1 / a11) * Mstar
