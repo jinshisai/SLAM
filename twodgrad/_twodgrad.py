@@ -374,24 +374,24 @@ class TwoDGrad():
             a11 = np.sum(weights)
             b0 = np.sum(lnr * lnv * weights)
             b1 = np.sum(lnr * weights)
-            #if a00 * a11 - a01 * a10 != 0:
-            #    ainv = np.linalg.inv([[a00, a01], [a10, a11]])
-            #    a = np.dot([b0, b1], ainv)
-            #    da = np.sqrt(np.diag(ainv))
-            #else:
-            #    a = [np.nan, np.nan]
-            #    da = [np.nan, np.nan]
-            #    print('Power-law fitting failed.')
-            #p = 1 / a[0]
-            #dp = da[0] / a[0]**2
-            #Mstar = np.exp(a[1] + 2 * lnv0) * unit / np.sin(np.radians(incl))**2
-            #Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-            #dMstar = Mstar * 2 * lnv0 * da[1]
-            Mstar = np.exp(b1 / a11 + 2 * (a01 / a11 + lnv0)) \
-                    * unit / np.sin(np.radians(incl))**2
+            if a00 * a11 - a01 * a10 != 0:
+                ainv = np.linalg.inv([[a00, a01], [a10, a11]])
+                a = np.dot([b0, b1], ainv)
+                da = np.sqrt(np.diag(ainv))
+            else:
+                a = [np.nan, np.nan]
+                da = [np.nan, np.nan]
+                print('Power-law fitting failed.')
+            p = 1 / a[0]
+            dp = da[0] / a[0]**2
+            Mstar = np.exp(a[1] + 2 * lnv0) * unit / np.sin(np.radians(incl))**2
             Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-            dMstar = np.sqrt(1 / a11) * Mstar
-            p, dp = -0.5, 0.0
+            dMstar = Mstar * 2 * lnv0 * da[1]
+            #p, dp = -0.5, 0.0
+            #Mstar = np.exp(b1 / a11 + 2 * (a01 / a11 + lnv0)) \
+            #        * unit / np.sin(np.radians(incl))**2
+            #Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
+            #dMstar = np.sqrt(1 / a11) * Mstar
             self.power = p
             self.Mstar = Mstar
             print(f'Power law index: p = {p:.3} +/- {dp:.3}')
