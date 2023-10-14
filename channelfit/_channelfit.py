@@ -115,9 +115,12 @@ class ChannelFit():
         if center is None:
             cx, cy = 0, 0
         else:
-            coord = SkyCoord(center, frame='icrs')
-            cx = coord.ra.degree - h['CRVAL1']
-            cy = coord.dec.degree - h['CRVAL2']
+            c0 = SkyCoord('00h00m00s 00d00m00s', frame='icrs')
+            c1 = [h['CRVAL1'] * units.degree, h['CRVAL2'] * units.degree]
+            c1 = c0.spherical_offsets_by(*c1)
+            c3 = c1.spherical_offsets_to(SkyCoord(center, frame='icrs'))
+            cx = c3[0].degree
+            cy = c3[1].degree
         if sigma is None:
             sigma = np.mean([np.nanstd(d[:2]), np.std(d[-2:])])
             print(f'sigma = {sigma:.3e}')
