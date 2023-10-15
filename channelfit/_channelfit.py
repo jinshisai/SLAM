@@ -60,7 +60,7 @@ class ChannelFit():
                  combine: bool = False, scaling: str = 'uniform'):
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2',
                           'pI', 'Rin', 'Ienv',
-                          'offmajor', 'offminor', 'offvsys', 'incl']
+                          'xoff', 'yoff', 'voff', 'incl']
         self.disk = disk
         self.envelope = envelope
         self.combine = combine
@@ -375,13 +375,12 @@ class ChannelFit():
         Iout = Iout[:, 0, self.ineed0:self.ineed1, self.ineed0:self.ineed1]  # v, y, x
         return Iout
 
-    def rgi2d(self, offmajor: float, offminor:float,
+    def rgi2d(self, xoff: float, yoff:float,
               I_in: np.ndarray) -> np.ndarray:
         m = [None] * len(I_in)
         for i, c in enumerate(I_in):
             interp = RGI((self.yneed, self.xneed), c, method='linear',
                          bounds_error=False, fill_value=0)
-            xoff, yoff = rot(offminor, offmajor, -self.pa_rad)
             m[i] = interp((self.Y - yoff, self.X - xoff))
         Iout = np.array(m)
         return Iout
@@ -415,7 +414,7 @@ class ChannelFit():
 
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   h1: float, h2: float, pI: float, Rin: float, Ienv: float, 
-                  offmajor: float = 0, offminor: float = 0, offvsys: float = 0,
+                  xoff: float = 0, yoff: float = 0, voff: float = 0,
                   incl: float = 90,
                   convolving: bool = True, scaling: bool = True):
         if self.free['incl']:
@@ -430,12 +429,12 @@ class ChannelFit():
             or self.free['Rc'] or self.free['Rin']:
             self.update_vlos()
 
-        Iout = self.get_Iout(Mstar, Rc, pI, Ienv, offvsys)
+        Iout = self.get_Iout(Mstar, Rc, pI, Ienv, voff)
         if convolving:
             Iout = convolve(Iout, [self.gaussbeam], mode='same')
         else:
             Iout = self.peaktounity(Iout)
-        Iout = self.rgi2d(offmajor, offminor, Iout)
+        Iout = self.rgi2d(xoff, yoff, Iout)
         if scaling:
             scale = self.get_scale(Iout)
             if self.scaling == 'mom0':
@@ -454,9 +453,9 @@ class ChannelFit():
                 pI_range: list = [-2, 2],
                 Rin_range: list = [0, 1000],
                 Ienv_range: list = [0.01, 100],
-                offmajor_range: list = [-100, 100],
-                offminor_range: list = [-100, 100],
-                offvsys_range: list = [-0.2, 0.2],
+                xoff_range: list = [-100, 100],
+                yoff_range: list = [-100, 100],
+                voff_range: list = [-0.2, 0.2],
                 incl_range: list = [-45, 45],
                 Mstar_fixed: float = None,
                 Rc_fixed: float = None,
@@ -466,9 +465,9 @@ class ChannelFit():
                 pI_fixed: float = None,
                 Rin_fixed: float = None,
                 Ienv_fixed: float = None,
-                offmajor_fixed: float = None,
-                offminor_fixed: float = None,
-                offvsys_fixed: float = None,
+                xoff_fixed: float = None,
+                yoff_fixed: float = None,
+                voff_fixed: float = None,
                 incl_fixed: float = None,
                 filename: str = 'channelfit',
                 show: bool = False,
@@ -478,7 +477,7 @@ class ChannelFit():
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
                             h1_fixed, h2_fixed, pI_fixed,
                             Rin_fixed, Ienv_fixed,
-                            offmajor_fixed, offminor_fixed, offvsys_fixed,
+                            xoff_fixed, yoff_fixed, voff_fixed,
                             incl_fixed])
         self.free = dict(zip(self.paramkeys, [p is None for p in p_fixed]))
 
@@ -530,7 +529,7 @@ class ChannelFit():
             plim = np.array([np.log10(Mstar_range), np.log10(Rc_range),
                              cs_range, h1_range, h2_range,
                              pI_range, Rin_range, np.log10(Ienv_range),
-                             offmajor_range, offminor_range, offvsys_range,
+                             xoff_range, yoff_range, voff_range,
                              incl_range])
             plim = plim[p_fixed == None].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)

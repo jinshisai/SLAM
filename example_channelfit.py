@@ -24,7 +24,7 @@ if __name__ == '__main__':
                  #Mstar_fixed=0.1,
                  Rc_fixed=1e5, cs_fixed=0, h1_fixed=0, h2_fixed=0,
                  pI_fixed=0, Rin_fixed=0,
-                 offmajor_fixed=0, offminor_fixed=0, offvsys_fixed=0,
+                 xoff_fixed=0, yoff_fixed=0, voff_fixed=0,
                  incl_fixed=0,
                  kwargs_emcee_corner={'nwalkers_per_ndim':8,
                                       'nburnin':10,
