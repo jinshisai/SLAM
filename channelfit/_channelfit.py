@@ -542,7 +542,6 @@ class ChannelFit():
             def get_p(i: int):
                 p = p_fixed.copy()
                 p[p_fixed == None] = mcmc[i]
-                p[[0, 1, 7]] = 10**p[[0, 1, 7]]
                 return p
             self.popt = get_p(0)
             self.plow = get_p(1)
