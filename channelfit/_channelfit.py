@@ -501,7 +501,7 @@ class ChannelFit():
             labels = np.array(self.paramkeys).copy()
             labels[ilog] = ['log'+labels[i] for i in ilog]
             labels = labels[notfixed]
-            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
+            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':200, 'nsteps':500,
                        'labels': labels, 'rangelevel':None,
                        'figname':filename+'.corner.png', 'show_corner':show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
