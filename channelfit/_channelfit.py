@@ -494,17 +494,19 @@ class ChannelFit():
             self.update_vlos()
         
         if None in p_fixed:
-            c = (q := p_fixed[[0, 1, 7]]) != None
-            p_fixed[[0, 1, 7]][c] = np.log10(q[c].astype('float'))
+            notfixed = p_fixed == None
+            ilog = np.array([0, 1, 7])
+            i = ilog[p_fixed[ilog] != None]
+            p_fixed[i] = np.log10(p_fixed[i].astype('float'))
             labels = np.array(self.paramkeys).copy()
-            labels[[0, 1, 7]] = ['log'+labels[i] for i in [0, 1, 7]]
-            labels = labels[p_fixed == None]
+            labels[ilog] = ['log'+labels[i] for i in ilog]
+            labels = labels[notfixed]
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':1000, 'nsteps':1000,
                        'labels': labels, 'rangelevel':None,
                        'figname':filename+'.corner.png', 'show_corner':show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
             if progressbar:
-                total = kw['nwalkers_per_ndim'] * len(p_fixed[p_fixed == None])
+                total = kw['nwalkers_per_ndim'] * len(p_fixed[notfixed])
                 total *= kw['nburnin'] + kw['nsteps'] + 2
                 bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
@@ -520,8 +522,8 @@ class ChannelFit():
                 if progressbar:
                     bar.update(1)
                 q = p_fixed.copy()
-                q[p_fixed == None] = p
-                q[[0, 1, 7]] = 10**q[[0, 1, 7]]
+                q[notfixed] = p
+                q[ilog] = 10**q[ilog]
                 model = self.cubemodel(*q)
                 chi2 = np.nansum((self.data_valid - model)**2) \
                        / self.sigma**2 / self.pixperbeam
@@ -531,7 +533,7 @@ class ChannelFit():
                              pI_range, Rin_range, np.log10(Ienv_range),
                              xoff_range, yoff_range, voff_range,
                              incl_range])
-            plim = plim[p_fixed == None].T
+            plim = plim[notfixed].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
             if self.combine:
                 self.data_valid = self.data_valid0
@@ -540,8 +542,8 @@ class ChannelFit():
                 self.sigma = self.sigma * np.sqrt(len(self.v_valid0) / 2)
             def get_p(i: int):
                 p = p_fixed.copy()
-                p[p_fixed == None] = mcmc[i]
-                p[[0, 1, 7]] = 10**p[[0, 1, 7]]
+                p[notfixed] = mcmc[i]
+                p[ilog] = 10**p[ilog]
                 return p
             self.popt = get_p(0)
             self.plow = get_p(1)
