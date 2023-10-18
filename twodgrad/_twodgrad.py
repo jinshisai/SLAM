@@ -352,6 +352,7 @@ class TwoDGrad():
         self.Vkep = np.nan
         self.vmid = np.nan
         self.Mstar = np.nan
+        self.popt = np.nan
         if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
             print('No point to calculate Rkep, Vkep, and Mstar.')
         else:
