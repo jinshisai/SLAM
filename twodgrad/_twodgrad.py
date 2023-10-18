@@ -22,6 +22,8 @@ from scipy.optimize import curve_fit
 from scipy.optimize import differential_evolution as diffevo
 from scipy.interpolate import interp1d
 
+from utils import emcee_corner
+from pvanalysis.analysis_tools import doublepower_r
 
 GG = constants.G.si.value
 M_sun = constants.M_sun.si.value
@@ -151,6 +153,7 @@ class TwoDGrad():
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
+
 
     def get_mom1grad(self, cutoff: float = 5, vmask: list = [0, 0],
                      weights: np.ndarray = 1):
@@ -356,53 +359,37 @@ class TwoDGrad():
             v, x, y, dx, dy = self.v[c], xc[c], yc[c], dxc[c], dyc[c]
             sin_g = np.sin(np.radians(self.pa_grad))
             cos_g = np.cos(np.radians(self.pa_grad))
-            r = np.abs(x * sin_g + y * cos_g)
-            v = np.abs(v)
-            Rkep = np.max(r) / 0.760  # Appendix A in Aso+15_ApJ_812_27
-            Vkep = np.min(v)
-            print(f'Max r = {Rkep:.1f} au at v={Vkep:.2f} km/s'
+            r = x * sin_g + y * cos_g
+            dr = np.hypot(dx * sin_g, dy * cos_g)
+            s_model = np.sign(np.sum(r * v))
+            Rkep = np.max(np.abs(r)) / 0.760  # Appendix A in Aso+15_ApJ_812_27
+            Vkep = np.min(np.abs(v))
+            print(f'Max r = {Rkep:.1f} au at v = {Vkep:.2f} km/s'
                   + ' (1/0.76 corrected)')
             self.Rkep = Rkep
             self.Vkep = Vkep
-            lnr = np.log(r)
-            dr = np.hypot(dx * sin_g, dy * cos_g)
-            dlnr = dr / r
-            lnv0 = np.mean(np.log(v))
-            v0 = np.exp(lnv0)
-            self.vmid = v0
-            lnv = np.log(v) - lnv0
-            weights = 1 / dlnr**2
-            a00 = np.sum(lnv**2 * weights)
-            a01 = a10 = np.sum(lnv * weights)
-            a11 = np.sum(weights)
-            b0 = np.sum(lnr * lnv * weights)
-            b1 = np.sum(lnr * weights)
-            if kepler:
-                p, dp = -0.5, 0.0
-                Mstar = np.exp(b1 / a11 + 2 * (a01 / a11 + lnv0)) \
-                        * unit / np.sin(np.radians(incl))**2
-                Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-                dMstar = np.sqrt(1 / a11) * Mstar
-            else:
-                if a00 * a11 - a01 * a10 != 0:
-                    ainv = np.linalg.inv([[a00, a01], [a10, a11]])
-                    a = np.dot([b0, b1], ainv)
-                    da = np.sqrt(np.diag(ainv))
-                else:
-                    a = [np.nan, np.nan]
-                    da = [np.nan, np.nan]
-                    print('Power-law fitting failed.')
-                p = 1 / a[0]
-                dp = da[0] / a[0]**2
-                Mstar = np.exp(a[1] + 2 * lnv0) \
-                        * unit / np.sin(np.radians(incl))**2
-                Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-                dMstar = Mstar * 2 * lnv0 * da[1]
-            self.power = p
+            def lnprob(p):
+                r_break, v_break, dp = p
+                r_model = doublepower_r(v=v, r_break=r_break, v_break=v_break,
+                                        p_in=0.5, dp=dp, vsys=0)
+                chi2 = np.sum(((r - s_model * r_model) / dr)**2)
+                return -0.5 * chi2
+            plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0],
+                             [np.max(np.abs(r)), np.max(np.abs(v)), 10]])
+            popt, perr = emcee_corner(plim, lnprob,
+                                      nwalkers_per_ndim=16,
+                                      nburnin= 2000, nsteps=2000,
+                                      labels=['Vb (km/s)', 'Rb (au)', 'dp'],
+                                      rangelevel=0.8, simpleoutput=True)
+            rb, vb, dp = popt
+            drb, dvb, ddp = perr
+            Mstar = rb * vb**2 * unit / np.sin(np.radians(incl))**2
+            Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
+            dMstar = Mstar * np.sqrt((drb / rb)**2 + (2 * dvb / vb)**2)
+            self.popt = popt
             self.Mstar = Mstar
-            print(f'Power law index: p = {p:.3} +/- {dp:.3}')
-            print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun at v={v0:.2f} km/s'
-                  + ' (1/0.76 corrected)')
+            print(f'pout = {dp+0.5:.3} +/- {ddp:.3}')
+            print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun (1/0.76 corrected)')
         
 
     def make_moment01(self, vmask: list = [0, 0]):
@@ -529,9 +516,9 @@ class TwoDGrad():
         ax.plot(xn[w > 0], v[w > 0], 'ro', zorder=1)
         ax.plot(xn[w > 0], v[w > 0], 'wo', zorder=1, markersize=4)
         if ~np.isnan(self.Mstar):
-            vp = v[w > 0][~np.isnan(x[w > 0])]
-            rp = self.Mstar / unit * np.sin(np.radians(self.incl))**2 * 0.760 \
-                 / self.vmid**2 * (vp / self.vmid)**(1 / self.power)
+            vp = np.abs(v[~np.isnan(x)])
+            r_break, v_break, dp = self.popt
+            rp = doublepower_r(vp, r_break, v_break, 0.5, dp, 0)
             ax.plot(rp, vp, 'm-', zorder=4)
         ax.set_xscale('log')
         ax.set_yscale('log')
