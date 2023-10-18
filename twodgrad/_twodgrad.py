@@ -267,7 +267,7 @@ class TwoDGrad():
             sy2 = np.nanmean(y**2)
             sd2 = np.nanmean(d**2)
             a = x**2 / sx2 + y**2 / sy2 + d**2 / sd2
-            return a > 12.0  # 8, 12, 14 covers 95, 99, 99.7%
+            return a > 7.82  # 7.82, 11.35, 13.94 covers 95, 99, 99.7%
 
         def chi2(x, x_in, y_in, dx_in, dy_in):
             xoff, yoff, pa = x
