@@ -342,7 +342,8 @@ class TwoDGrad():
         self.kepler = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
         
 
-    def calc_mstar(self, incl: float = 90, kepler: bool = True):
+    def calc_mstar(self, incl: float = 90,
+                   minabserr: float = 0.1, minrelerr: float = 0.01):
         self.incl = incl
         xc = self.kepler['xc'] * 1
         yc = self.kepler['yc'] * 1
@@ -361,6 +362,8 @@ class TwoDGrad():
             cos_g = np.cos(np.radians(self.pa_grad))
             r = x * sin_g + y * cos_g
             dr = np.hypot(dx * sin_g, dy * cos_g)
+            dr = np.max([dr, minrelerr * np.abs(r),
+                         [minabserr * self.bmaj] * len(dr)], axis=0)
             s_model = np.sign(np.sum(r * v))
             Rkep = np.max(np.abs(r)) / 0.760  # Appendix A in Aso+15_ApJ_812_27
             Vkep = np.min(np.abs(v))
