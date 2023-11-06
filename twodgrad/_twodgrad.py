@@ -241,7 +241,7 @@ class TwoDGrad():
         self.center = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
         
         
-    def filtering(self, pa0: float = 0.0):
+    def filtering(self, pa0: float = 0.0, fixcenter: bool = False):
         xc = self.center['xc'] * 1
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
@@ -261,8 +261,12 @@ class TwoDGrad():
                 return np.full_like(x_in, False)
             x0 = x_in - xoff
             y0 = y_in - yoff
-            x = x0 + x0[::-1]
-            y = y0 + y0[::-1]
+            if fixcenter:
+                x = x0 * 0
+                y = y0 * 0
+            else:
+                x = x0 + x0[::-1]
+                y = y0 + y0[::-1]
             parad = np.radians(pa)
             d = x0 * np.cos(parad) - y0 * np.sin(parad)
             d = (d - d[::-1]) / 2
@@ -270,7 +274,10 @@ class TwoDGrad():
             sy2 = np.clip(np.nanmean(y**2), 1e-10, None)
             sd2 = np.clip(np.nanmean(d**2), 1e-10, None)
             a = x**2 / sx2 + y**2 / sy2 + d**2 / sd2
-            return a > 7.82  # 7.82, 11.35, 13.94 covers 95, 99, 99.7%
+            if fixcenter:
+                return a > 3.84  # 3.84, 6.65, 8.81 covers 95, 99, 99.7%
+            else:
+                return a > 7.82  # 7.82, 11.35, 13.94 covers 95, 99, 99.7%
 
         def chi2(x, x_in, y_in, dx_in, dy_in):
             xoff, yoff, pa = x
@@ -314,9 +321,11 @@ class TwoDGrad():
             if np.all(np.isnan(xc) | np.isnan(yc)):
                 print('No point survived.')
                 break
-            bounds = [[self.x.min(), self.x.max()],
-                      [self.y.min(), self.y.max()],
-                      [pa0 - 90.0, pa0 + 90.0]]
+            xmin = -1e-6 if fixcenter else self.x.min()
+            ymin = -1e-6 if fixcenter else self.y.min()
+            xmax = 1e-6 if fixcenter else self.x.max()
+            ymax = 1e-6 if fixcenter else self.y.max()
+            bounds = [[xmin, xmax], [ymin, ymax], [pa0 - 90.0, pa0 + 90.0]]
             res = diffevo(func=chi2, bounds=bounds,
                           args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
             xoff, yoff, pa_grad = res.x
