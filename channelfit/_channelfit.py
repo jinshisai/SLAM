@@ -679,7 +679,7 @@ class ChannelFit():
             label = r'Obs. $-$ model'
         elif 'clean' in mode:
             mom0 = self.cleancomponent
-            mom1 = np.where(mom0 > 0, self.mom1, np.nan)
+            mom1 = np.where(mom0 > 0, m['mom1'], np.nan)
             label = r'Clean Component'
         levels = np.nanmax(mom0) / 10 if 'clean' in mode else 6 * self.sigma_mom0
         levels = np.arange(1, 20) * levels
