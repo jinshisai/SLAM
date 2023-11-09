@@ -660,7 +660,7 @@ class ChannelFit():
         tofits(concat(m1), 'beforescaling')
         
     def plotmom(self, mode: str, filename: str = 'mom01.png', **kwargs):
-        if 'mod' in mode or 'res' in mode:
+        if 'mod' in mode or 'res' in mode or 'clean' in mode:
             if kwargs != {}:
                 self.popt = kwargs
             d = self.cubemodel(**self.popt)
