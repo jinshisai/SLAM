@@ -471,7 +471,7 @@ class ChannelFit():
             Iout = convolve(Iunif, [self.gaussbeam], mode='same')
         else:
             Iout = self.peaktounity(Iunif)
-        if scaling != 'mom0':
+        if self.scaling != 'mom0':
             Iout = self.rgi2d(xoff, yoff, Iout)
         if scaling:
             if self.scaling != 'mom0':
