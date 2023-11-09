@@ -412,12 +412,12 @@ class ChannelFit():
 
     def rgi2d(self, xoff: float, yoff:float,
               I_in: np.ndarray) -> np.ndarray:
-        m = [None] * len(I_in)
+        Iout = [None] * len(I_in)
         for i, c in enumerate(I_in):
             interp = RGI((self.yneed, self.xneed), c, method='linear',
                          bounds_error=False, fill_value=0)
-            m[i] = interp((self.Y - yoff, self.X - xoff))
-        Iout = np.array(m)
+            Iout[i] = interp((self.Y - yoff, self.X - xoff))
+        Iout = np.array(Iout)
         return Iout
 
     def get_scale(self, Iout, output: bool = False) -> np.ndarray:
@@ -461,7 +461,7 @@ class ChannelFit():
             self.update_vlos()
 
         Iunif = self.get_Iunif(Mstar, Rc, pI, Ienv, voff)
-        if scaling == 'mom0':
+        if self.scaling == 'mom0':
             Iunif = self.rgi2d(xoff, yoff, Iunif)
             mom0unif = np.sum(Iunif, axis=0) * self.dv
             mom0unif[mom0unif < 0] = np.nan
