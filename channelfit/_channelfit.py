@@ -53,28 +53,29 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     mom1[mom0 < 3 * sigma_mom0] = np.nan
     return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
     
-def clean(data: np.ndarray, beam: np.ndarray, cutoff: float,
-          gain: float = 0.01) -> np.ndarray:
+def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
+          threshold: float = 3, gain: float = 0.01) -> np.ndarray:
     shape = np.shape(data)
     cleancomponent = data * 0
     cleanresidual = data * 1
     rms0 = 10000
     for i in range(1000000):
-        if (peak := np.nanmax(cleanresidual)) < cutoff:
-            print('Cutoff achieved in CLEAN.')
-            break
-        if (rms := np.sqrt(np.nanmean(cleanresidual**2))) > rms0:
-            print('RMS increased in CLEAN.')
-            break
-        if i == 1000000 - 1:
-            print('1000000 steps achived in CLEAN.')
-            break
-        rms0 = rms
         ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
         cc = np.zeros_like(cleanresidual)
         cc[ip, jp] = peak * gain
+        if i == 1000000 - 1:
+            print('1000000 iterations achived in CLEAN.')
+            break
+        if (peak := np.nanmax(cleanresidual)) < threshold * sigma:
+            print('Threshold achieved in CLEAN.')
+            break
+        newresidual = cleanresidual - convolve(cc, beam, mode='same')
+        if (rms := np.sqrt(np.nanmean(newresidual**2))) > rms0:
+            print(f'RMS increased at {rms / sigma:.2e}sigma in CLEAN.')
+            break
         cleancomponent = cleancomponent + cc
-        cleanresidual = cleanresidual - convolve(cc, beam, mode='same')
+        cleanresidual = newresidual
+        rms0 = rms
     return cleancomponent, cleanresidual
         
     
@@ -301,7 +302,8 @@ class ChannelFit():
         self.yneed = self.ynest[0][self.ineed0:self.ineed1]
 
         if self.scaling == 'mom0':
-            cc, cr = clean(self.mom0, self.gaussbeam, self.sigma_mom0 * 3)
+            cc, cr = clean(data=self.mom0, beam=self.gaussbeam,
+                           sigma=self.sigma_mom0, threshold=3)
             self.cleancomponent = cc
             self.cleanresidual = cr
                 
