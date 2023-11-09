@@ -678,7 +678,11 @@ class ChannelFit():
             mom0 = self.mom0 - m['mom0']
             mom1 = self.mom1 - m['mom1']
             label = r'Obs. $-$ model'
-        levels = np.arange(1, 20) * 6 * self.sigma_mom0
+        elif 'clean' in mode:
+            mom0 = self.cleancomponent
+            mom1 = np.where(mom0 > 0, self.mom1, np.nan)
+            label = r'Clean Component'
+        levels = np.arange(1, 20) * np.nanmax(mom0) / 10
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
