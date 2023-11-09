@@ -72,11 +72,11 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         cc = np.zeros_like(cleanresidual)
         cc[ip, jp] = peak * gain
         newresidual = cleanresidual - convolve(cc, beam, mode='same')
-        if (rms := np.sqrt(np.nanmean(newresidual**2))) > rms0:
-            print('RMS increased in CLEAN. '
-                  f'(rms={rms / sigma:.2f}sigma, '
-                  f'peak={peak / sigma:.2f}sigma)')
-            break
+        #if (rms := np.sqrt(np.nanmean(newresidual**2))) > rms0:
+        #    print('RMS increased in CLEAN. '
+        #          f'(rms={rms / sigma:.2f}sigma, '
+        #          f'peak={peak / sigma:.2f}sigma)')
+        #    break
         cleancomponent = cleancomponent + cc
         cleanresidual = newresidual
         rms0 = rms
