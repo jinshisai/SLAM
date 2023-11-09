@@ -82,7 +82,6 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         #    rms0 = rms
         cleancomponent = cleancomponent + cc
         cleanresidual = newresidual
-        
     cleancomponent = cleancomponent + cleanresidual / np.sum(beam)
     return cleancomponent
         
