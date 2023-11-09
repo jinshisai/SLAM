@@ -298,7 +298,7 @@ class ChannelFit():
         yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         bpa_on_disk = np.radians(self.bpa)
         xb, yb = rot(*np.meshgrid(xb, yb), bpa_on_disk)
-        gaussbeam = np.exp(-((yb / self.bmaj)**2 + (xb / self.bmin)**2))
+        gaussbeam = np.exp(-(yb / self.bmaj)**2 - (xb / self.bmin)**2)
         self.pixperbeam = np.sum(gaussbeam)
         self.gaussbeam = gaussbeam
         
