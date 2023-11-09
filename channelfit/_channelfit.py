@@ -53,7 +53,31 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     mom1[mom0 < 3 * sigma_mom0] = np.nan
     return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
     
-
+def clean(data: np.ndarray, beam: np.ndarray, cutoff: float,
+          gain: float = 0.01) -> np.ndarray:
+    shape = np.shape(data)
+    cleancomponent = data * 0
+    cleanresidual = data * 1
+    rms0 = 10000
+    for i in range(1000000):
+        if (peak := np.nanmax(cleanresidual)) < cutoff:
+            print('Cutoff achieved in CLEAN.')
+            break
+        if (rms := np.sqrt(np.nanmean(cleanresidual**2))) > rms0:
+            print('RMS increased in CLEAN.')
+            break
+        if i == 1000000 - 1:
+            print('1000000 steps achived in CLEAN.')
+            break
+        rms0 = rms
+        ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
+        cc = np.zeros_like(cleanresidual)
+        cc[ip, jp] = peak * gain
+        cleancomponent = cleancomponent + cc
+        cleanresidual = cleanresidual - convolve(cc, beam, mode='same')
+    return cleancomponent, cleanresidual
+        
+    
 class ChannelFit():
 
     def __init__(self, disk: bool = True, envelope: bool = True,
@@ -275,6 +299,11 @@ class ChannelFit():
         self.ineed1 = npix // 2 + n_need
         self.xneed = self.xnest[0][self.ineed0:self.ineed1]
         self.yneed = self.ynest[0][self.ineed0:self.ineed1]
+
+        if self.scaling == 'mom0':
+            cc, cr = clean(self.mom0, self.gaussbeam, self.sigma_mom0 * 3)
+            self.cleancomponent = cc
+            self.cleanresidual = cr
                 
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
@@ -354,9 +383,9 @@ class ChannelFit():
     def update_vlos(self):
         self.vlos = [self.getvlos(x) for x in self.xdisk]
     
-    def get_Iout(self, Mstar: float, Rc: float, pI: float,
+    def get_Iunif(self, Mstar: float, Rc: float, pI: float,
                  Ienv: float, offvsys: float) -> np.ndarray:
-        Iout = 0
+        Iunif = 0
         for vlos_in, x_in in zip(self.vlos, self.xdisk):
             if vlos_in is None:
                 continue
@@ -368,12 +397,12 @@ class ChannelFit():
             p = np.where(r < Rc, p, p * Ienv) / (Ienv + 1)
             if pI != 0:
                 p = p * r**(-pI)
-            Iout = Iout + np.nan_to_num(p)
+            Iunif = Iunif + np.nan_to_num(p)
         for l in range(self.nlayer - 1, 0, -1):
-            Iout[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
-                = avefour(Iout[:, l, :, :])
-        Iout = Iout[:, 0, self.ineed0:self.ineed1, self.ineed0:self.ineed1]  # v, y, x
-        return Iout
+            Iunif[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
+                = avefour(Iunif[:, l, :, :])
+        Iunif = Iunif[:, 0, self.ineed0:self.ineed1, self.ineed0:self.ineed1]  # v, y, x
+        return Iunif
 
     def rgi2d(self, xoff: float, yoff:float,
               I_in: np.ndarray) -> np.ndarray:
@@ -392,10 +421,6 @@ class ChannelFit():
         elif self.scaling == 'peak':
             gf = np.max(self.data_valid, axis=(1, 2))
             ff = np.max(Iout, axis=(1, 2))
-        elif self.scaling == 'mom0':
-            gf = self.mom0 * 1
-            gf[gf < self.sigma_mom0 * 3] = 0
-            ff = np.sum(Iout, axis=0) * self.dv
         elif self.scaling == 'uniform':
             gf = np.full_like(self.v_valid, np.sum(Iout * self.data_valid))
             ff = np.full_like(self.v_valid, np.sum(Iout * Iout))
@@ -429,17 +454,22 @@ class ChannelFit():
             or self.free['Rc'] or self.free['Rin']:
             self.update_vlos()
 
-        Iout = self.get_Iout(Mstar, Rc, pI, Ienv, voff)
+        Iunif = self.get_Iunif(Mstar, Rc, pI, Ienv, voff)
+        if scaling == 'mom0':
+            Iunif = self.rgi2d(xoff, yoff, Iunif)
+            mom0unif = np.sum(Iunif, axis=0) * self.dv
+            mom0unif[mom0unif < 0] = np.nan
+            Iunif = self.cleancomponent * Iunif / mom0unif
+            Iunif = np.nan_to_num(Iunif)
         if convolving:
-            Iout = convolve(Iout, [self.gaussbeam], mode='same')
+            Iout = convolve(Iunif, [self.gaussbeam], mode='same')
         else:
-            Iout = self.peaktounity(Iout)
-        Iout = self.rgi2d(xoff, yoff, Iout)
+            Iout = self.peaktounity(Iunif)
+        if scaling != 'mom0':
+            Iout = self.rgi2d(xoff, yoff, Iout)
         if scaling:
-            scale = self.get_scale(Iout)
-            if self.scaling == 'mom0':
-                Iout = Iout * scale
-            else:
+            if self.scaling != 'mom0':
+                scale = self.get_scale(Iout)
                 Iout = Iout * np.moveaxis([[scale]], 2, 0)
         else:
             Iout = Iout / np.max(Iout)
