@@ -58,7 +58,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     shape = np.shape(data)
     cleancomponent = data * 0
     cleanresidual = data * 1
-    rms0 = 10000
+    rms0, rms = 10000 * sigma, 10000 * sigma
     for i in range(1000000):
         if i == 1000000 - 1:
             print('1000000 iterations achived in CLEAN.')
@@ -80,7 +80,8 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         cleancomponent = cleancomponent + cc
         cleanresidual = newresidual
         rms0 = rms
-    return cleancomponent, cleanresidual
+    cleancomponent = cleancomponent + cleanresidual / np.sum(beam)
+    return cleancomponent
         
     
 class ChannelFit():
@@ -306,10 +307,8 @@ class ChannelFit():
         self.yneed = self.ynest[0][self.ineed0:self.ineed1]
 
         if self.scaling == 'mom0':
-            cc, cr = clean(data=self.mom0, beam=self.gaussbeam,
-                           sigma=self.sigma_mom0, threshold=3)
-            self.cleancomponent = cc
-            self.cleanresidual = cr
+            self.cleancomponent = clean(data=self.mom0, beam=self.gaussbeam,
+                                        sigma=self.sigma_mom0, threshold=3)
                 
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
