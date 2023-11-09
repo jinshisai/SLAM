@@ -64,14 +64,18 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
             print('1000000 iterations achived in CLEAN.')
             break
         if (peak := np.nanmax(cleanresidual)) < threshold * sigma:
-            print('Threshold achieved in CLEAN.')
+            print('Threshold achieved in CLEAN. '
+                  f'(rms={rms / sigma:.2f}sigma, '
+                  f'peak={peak / sigma:.2f}sigma)')
             break
         ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
         cc = np.zeros_like(cleanresidual)
         cc[ip, jp] = peak * gain
         newresidual = cleanresidual - convolve(cc, beam, mode='same')
         if (rms := np.sqrt(np.nanmean(newresidual**2))) > rms0:
-            print(f'RMS increased at {rms / sigma:.2e}sigma in CLEAN.')
+            print('RMS increased in CLEAN. '
+                  f'(rms={rms / sigma:.2f}sigma, '
+                  f'peak={peak / sigma:.2f}sigma)')
             break
         cleancomponent = cleancomponent + cc
         cleanresidual = newresidual
