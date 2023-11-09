@@ -60,15 +60,15 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     cleanresidual = data * 1
     rms0 = 10000
     for i in range(1000000):
-        ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
-        cc = np.zeros_like(cleanresidual)
-        cc[ip, jp] = peak * gain
         if i == 1000000 - 1:
             print('1000000 iterations achived in CLEAN.')
             break
         if (peak := np.nanmax(cleanresidual)) < threshold * sigma:
             print('Threshold achieved in CLEAN.')
             break
+        ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
+        cc = np.zeros_like(cleanresidual)
+        cc[ip, jp] = peak * gain
         newresidual = cleanresidual - convolve(cc, beam, mode='same')
         if (rms := np.sqrt(np.nanmean(newresidual**2))) > rms0:
             print(f'RMS increased at {rms / sigma:.2e}sigma in CLEAN.')
