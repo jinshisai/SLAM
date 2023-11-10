@@ -296,8 +296,7 @@ class ChannelFit():
         ngauss = int(gaussmargin * self.bmaj / dpix + 0.5)  # 0.5 is for rounding
         xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
-        bpa_on_disk = np.radians(self.bpa)
-        xb, yb = rot(*np.meshgrid(xb, yb), bpa_on_disk)
+        xb, yb = rot(*np.meshgrid(xb, yb), np.radians(self.bpa))
         gaussbeam = np.exp(-(yb / self.bmaj)**2 - (xb / self.bmin)**2)
         self.pixperbeam = np.sum(gaussbeam)
         self.gaussbeam = gaussbeam
@@ -311,6 +310,7 @@ class ChannelFit():
         if self.scaling == 'mom0':
             self.cleancomponent = clean(data=self.mom0, beam=self.gaussbeam,
                                         sigma=self.sigma_mom0, threshold=3)
+            self.gaussbeam = self.gaussbeam[:, ::-1]
                 
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
