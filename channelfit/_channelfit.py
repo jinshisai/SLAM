@@ -682,19 +682,22 @@ class ChannelFit():
             mom1 = self.mom1 - m['mom1']
             label = r'Obs. $-$ model'
         elif 'clean' in mode:
-            mom0 = self.cleancomponent
-            mom1 = np.where(mom0 > 0, m['mom1'], np.nan)
+            mom0 = self.cleancomponent * self.pixperbeam
+            mom1 = self.cleancomponent * self.pixperbeam / self.sigma_mom0
             label = r'Clean Component'
-        levels = np.nanmax(mom0) / 10 if 'clean' in mode else 6 * self.sigma_mom0
+        levels = 6 * self.sigma_mom0
         levels = np.arange(1, 20) * levels
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         vplot = (np.nanpercentile(self.mom1, 95) 
                  - np.nanpercentile(self.mom1, 5)) / 2.
+        vmin = mom1.min() if 'clean' in mode else -vplot
+        vmax = mom1.max() if 'clean' in mode else vplot
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
-                          vmin=-vplot, vmax=vplot)
-        fig.colorbar(m, ax=ax, label=label+r' mom1 (km s$^{-1}$)')
+                          vmin=vmin, vmax=vmax)
+        s = r' / $\sigma$' if 'clean' in mode else r' mom1 (km s$^{-1}$)'
+        fig.colorbar(m, ax=ax, label=label + s)
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
         ax.plot(r * self.sinpa, r * self.cospa, 'k:')
