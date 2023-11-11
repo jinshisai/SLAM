@@ -63,10 +63,10 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     print()
     for i in range(1000000):
         if i == 1000000 - 1:
-            print('1000000 iterations achived in CLEAN.')
+            print('\n1000000 iterations achived in CLEAN.')
             break
         if (peak := np.nanmax(cleanresidual)) < threshold * sigma:
-            print('Threshold achieved in CLEAN. '
+            print('\nThreshold achieved in CLEAN. '
                   f'(rms={rms / sigma:.2f}sigma, '
                   f'peak={peak / sigma:.2f}sigma)')
             break
@@ -85,7 +85,6 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         #    rms0 = rms
         cleancomponent = cleancomponent + cc
         cleanresidual = newresidual
-    print()
     cleancomponent = cleancomponent + cleanresidual / np.sum(beam)
     return cleancomponent
         
