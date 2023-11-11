@@ -706,7 +706,7 @@ class ChannelFit():
 
     def plotclean(self, filename: str = 'clean.png'):
         cc = self.cleancomponent / self.sigma_mom0
-        cr = self.cleanresidual / self.sigma_mom0 * self.pixperbeam
+        cr = self.cleanresidual / self.sigma_mom0
         for c, vmin, vmax, s in zip([cc, cr], [cc.min(), -3], [cc.max(), 3],
                                     ['component', 'residual']):
             fig = plt.figure()
