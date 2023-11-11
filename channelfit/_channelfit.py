@@ -60,7 +60,6 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     cleanresidual = data * 1
     beamarea = np.sum(beam)  # pixel/beam
     rms0, rms = 10000 * sigma, 10000 * sigma
-    print()
     for i in range(1000000):
         if i == 1000000 - 1:
             print('\n1000000 iterations achived in CLEAN.')
