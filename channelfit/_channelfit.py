@@ -85,7 +85,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         cleancomponent = cleancomponent + cc
         cleanresidual = newresidual
     cleancomponent = cleancomponent + cleanresidual / np.sum(beam)
-    return cleancomponent
+    return cleancomponent, cleanresidual
         
     
 class ChannelFit():
@@ -310,8 +310,9 @@ class ChannelFit():
         self.yneed = self.ynest[0][self.ineed0:self.ineed1]
 
         if self.scaling == 'mom0':
-            self.cleancomponent = clean(data=self.mom0, beam=self.gaussbeam,
-                                        sigma=self.sigma_mom0, threshold=3)
+            c = clean(data=self.mom0, beam=self.gaussbeam,
+                      sigma=self.sigma_mom0, threshold=3)
+            self.cleancomponent, self.cleanresidual = c
             self.gaussbeam = self.gaussbeam[:, ::-1]
                 
     def update_incl(self, incl: float):
@@ -681,10 +682,6 @@ class ChannelFit():
             mom0 = self.mom0 - m['mom0']
             mom1 = self.mom1 - m['mom1']
             label = r'Obs. $-$ model'
-        elif 'clean' in mode:
-            mom0 = self.cleancomponent * self.pixperbeam
-            mom1 = self.cleancomponent * self.pixperbeam / self.sigma_mom0
-            label = r'Clean Component'
         levels = 6 * self.sigma_mom0
         levels = np.arange(1, 20) * levels
         levels = np.sort(np.r_[-levels, levels])
@@ -692,12 +689,9 @@ class ChannelFit():
         ax = fig.add_subplot(1, 1, 1)
         vplot = (np.nanpercentile(self.mom1, 95) 
                  - np.nanpercentile(self.mom1, 5)) / 2.
-        vmin = mom1.min() if 'clean' in mode else -vplot
-        vmax = mom1.max() if 'clean' in mode else vplot
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
-                          vmin=vmin, vmax=vmax)
-        s = r' / $\sigma$' if 'clean' in mode else r' mom1 (km s$^{-1}$)'
-        fig.colorbar(m, ax=ax, label=label + s)
+                          vmin=-vplot, vmax=vplot)
+        fig.colorbar(m, ax=ax, label=label + r' mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
         ax.plot(r * self.sinpa, r * self.cospa, 'k:')
@@ -709,6 +703,26 @@ class ChannelFit():
         ax.set_aspect(1)
         fig.savefig(filename)
         plt.close()
+
+    def plotclean(self, filename: str = 'clean.png'):
+        cc = self.cleancomponent / self.sigma_mom0
+        cr = self.cleanresidual / self.sigma_mom0 * self.pixperbeam
+        for c, vmin, vmax, s in zip([cc, cr], [cc.min(), -3], [cc.max(), 3],
+                                    ['component', 'residual']):
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 1, 1)
+            m = ax.pcolormesh(self.x, self.y, c, cmap='jet', vmin=vmin, vmax=vmax)
+            fig.colorbar(m, ax=ax, label=f'CLEAN {s} / ' + r'$\sigma$')
+            r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
+            ax.plot(r * self.sinpa, r * self.cospa, 'k:')
+            ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
+            ax.set_xlabel('R.A. offset (au)')
+            ax.set_ylabel('Dec. offset (au)')
+            ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
+            ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
+            ax.set_aspect(1)
+            fig.savefig(filename.replace('.png', '') + f'.clean{s}.png')
+            plt.close()
 
     def equivelocity(self, filename: str = 'equivel.png', **kwargs):
         if kwargs != {}:
