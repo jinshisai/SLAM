@@ -54,7 +54,7 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
     
 def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
-          threshold: float = 3, gain: float = 0.01) -> np.ndarray:
+          threshold: float = 3, gain: float = 0.05) -> np.ndarray:
     shape = np.shape(data)
     cleancomponent = data * 0
     cleanresidual = data * 1
