@@ -708,7 +708,7 @@ class ChannelFit():
     def plotclean(self, filename: str = 'clean.png'):
         cc = self.cleancomponent / self.sigma_mom0
         cr = self.cleanresidual / self.sigma_mom0
-        for c, vmin, vmax, s in zip([cc, cr], [cc.min(), -3], [cc.max(), 3],
+        for c, vmin, vmax, s in zip([cc, cr], [cc.min(), -6], [cc.max(), 6],
                                     ['component', 'residual']):
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
