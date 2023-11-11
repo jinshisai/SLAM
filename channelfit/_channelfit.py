@@ -54,7 +54,7 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
     
 def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
-          threshold: float = 3, gain: float = 0.05) -> np.ndarray:
+          threshold: float = 3, gain: float = 0.01) -> np.ndarray:
     shape = np.shape(data)
     cleancomponent = data * 0
     cleanresidual = data * 1
@@ -64,15 +64,15 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         if i == 1000000 - 1:
             print('\n1000000 iterations achived in CLEAN.')
             break
-        if (peak := np.nanmax(cleanresidual)) < threshold * sigma:
+        if (peak := np.nanmax(np.abs(cleanresidual))) < threshold * sigma:
             print('\nThreshold achieved in CLEAN. '
                   f'(rms={rms / sigma:.2f}sigma, '
                   f'peak={peak / sigma:.2f}sigma)')
             break
         print(f'\rCLEAN reached {peak / sigma:.2f}sigma.  ', end='')
-        ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
+        ip, jp = np.unravel_index(np.nanargmax(np.abs(cleanresidual)), shape)
         cc = np.zeros_like(cleanresidual)
-        cc[ip, jp] = gain * peak / beamarea  # Jy/pixel
+        cc[ip, jp] = gain * cleanresidual[ip, jp] / beamarea  # Jy/pixel
         newresidual = cleanresidual - convolve(cc, beam, mode='same')
         rms = np.sqrt(np.nanmean(newresidual**2))
         #if rms > rms0:
