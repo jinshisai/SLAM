@@ -59,19 +59,20 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     cleancomponent = data * 0
     cleanresidual = data * 1
     beamarea = np.sum(beam)  # pixel/beam
+    cc0 = np.zeros_like(data)
     rms0, rms = 10000 * sigma, 10000 * sigma
     for i in range(1000000):
         if i == 1000000 - 1:
             print('\n1000000 iterations achived in CLEAN.')
             break
-        if (peak := np.nanmax(np.abs(cleanresidual))) < threshold * sigma:
+        if (peak := np.nanmax(cleanresidual)) < threshold * sigma:
             print('\nThreshold achieved in CLEAN. '
                   f'(rms={rms / sigma:.2f}sigma, '
                   f'peak={peak / sigma:.2f}sigma)')
             break
         print(f'\rCLEAN reached {peak / sigma:.2f}sigma.  ', end='')
-        ip, jp = np.unravel_index(np.nanargmax(np.abs(cleanresidual)), shape)
-        cc = np.zeros_like(cleanresidual)
+        ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
+        cc = cc0 * 1
         cc[ip, jp] = gain * cleanresidual[ip, jp] / beamarea  # Jy/pixel
         newresidual = cleanresidual - convolve(cc, beam, mode='same')
         rms = np.sqrt(np.nanmean(newresidual**2))
