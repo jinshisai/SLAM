@@ -60,6 +60,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     cleanresidual = data * 1
     beamarea = np.sum(beam)  # pixel/beam
     rms0, rms = 10000 * sigma, 10000 * sigma
+    print()
     for i in range(1000000):
         if i == 1000000 - 1:
             print('1000000 iterations achived in CLEAN.')
@@ -69,6 +70,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
                   f'(rms={rms / sigma:.2f}sigma, '
                   f'peak={peak / sigma:.2f}sigma)')
             break
+        print(f'\rCLEAN reached {peak / sigma:.1f}sigma.')
         ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
         cc = np.zeros_like(cleanresidual)
         cc[ip, jp] = gain * peak / beamarea  # Jy/pixel
