@@ -70,7 +70,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
                   f'(rms={rms / sigma:.2f}sigma, '
                   f'peak={peak / sigma:.2f}sigma)')
             break
-        print(f'\rCLEAN reached {peak / sigma:.1f}sigma.', end='')
+        print(f'\rCLEAN reached {peak / sigma:.2f}sigma.', end='')
         ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
         cc = np.zeros_like(cleanresidual)
         cc[ip, jp] = gain * peak / beamarea  # Jy/pixel
@@ -85,6 +85,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         #    rms0 = rms
         cleancomponent = cleancomponent + cc
         cleanresidual = newresidual
+    print()
     cleancomponent = cleancomponent + cleanresidual / np.sum(beam)
     return cleancomponent
         
