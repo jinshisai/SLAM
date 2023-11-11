@@ -58,6 +58,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     shape = np.shape(data)
     cleancomponent = data * 0
     cleanresidual = data * 1
+    beamarea = np.sum(beam)  # pixel / beam
     rms0, rms = 10000 * sigma, 10000 * sigma
     for i in range(1000000):
         if i == 1000000 - 1:
@@ -70,7 +71,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
             break
         ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
         cc = np.zeros_like(cleanresidual)
-        cc[ip, jp] = peak * gain
+        cc[ip, jp] = gain * peak / beamarea
         newresidual = cleanresidual - convolve(cc, beam, mode='same')
         rms = np.sqrt(np.nanmean(newresidual**2))
         #if rms > rms0:
