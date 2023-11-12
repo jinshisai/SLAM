@@ -312,7 +312,7 @@ class ChannelFit():
 
         if self.scaling == 'mom0':
             c = clean(data=self.mom0, beam=self.gaussbeam,
-                      sigma=self.sigma_mom0, threshold=3)
+                      sigma=self.sigma_mom0, threshold=2)
             self.cleancomponent, self.cleanresidual = c
             self.gaussbeam = self.gaussbeam[:, ::-1]
                 
@@ -683,7 +683,7 @@ class ChannelFit():
             mom0 = self.mom0 - m['mom0']
             mom1 = self.mom1 - m['mom1']
             label = r'Obs. $-$ model'
-        levels = 6 * self.sigma_mom0
+        levels = (3 if 'res' in mode else 6) * self.sigma_mom0
         levels = np.arange(1, 20) * levels
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
