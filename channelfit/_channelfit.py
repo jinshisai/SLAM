@@ -327,7 +327,7 @@ class ChannelFit():
         s, t = rot(s * bmin / 2, t * bmaj / 2, -np.radians(bpa))
         f = RGI((y, x[::-1]), self.mom0[:, ::-1], method='linear',
                 bounds_error=False, fill_value=0)
-        d = f((t, x))
+        d = f((t, s))
         xig = np.linspace(-3, 3, 7)
         g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2)
         gsum = np.sum(g)
