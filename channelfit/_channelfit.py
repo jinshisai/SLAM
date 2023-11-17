@@ -329,7 +329,8 @@ class ChannelFit():
         f = RGI((y, x[::-1]), self.mom0[:, ::-1], method='linear',
                 bounds_error=False, fill_value=0)
         d = f((t, s))
-        xig = np.linspace(-8, 8, 17)
+        gmax = int(np.ceil(bpix * 1.6))
+        xig = np.linspace(-gmax, gmax, 2 * gmax + 1)
         g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2 / (bpix / 2)**2)
         gsum = np.sum(g)
         xmodel = xi[::bpix]
@@ -353,6 +354,7 @@ class ChannelFit():
         pixorg = np.abs((x[1] - x[0]) * (y[1] - y[0]))
         pixnew = bmaj / bpix * bmin / bpix
         deconv = f((t, s)) / pixnew * pixorg
+        deconv = deconv / np.max(deconv) * np.max(self.mom0)
         self.cleancomponent = deconv
                 
     def update_incl(self, incl: float):
