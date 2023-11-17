@@ -319,8 +319,9 @@ class ChannelFit():
     def deconvolve(self):
         x, y = self.x, self.y
         bmaj, bmin, bpa = self.bmaj, self.bmin, self.bpa
-        imax = int(np.max([np.abs(x).max(), np.abs(y).max()]) / (bmin / 5))
-        xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / 5
+        pixperb = 6
+        imax = int(np.max([np.abs(x).max(), np.abs(y).max()]) / (bmin / pixperb))
+        xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / pixperb
         yi = np.linspace(-imax, imax, 2 * imax + 1)
         Xi, Yi = np.meshgrid(xi, yi)
         s, t = rot(Xi, Yi, np.radians(bpa))
@@ -329,12 +330,12 @@ class ChannelFit():
                 bounds_error=False, fill_value=0)
         d = f((t, s))
         xig = np.linspace(-8, 8, 17)
-        g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2 / (5 / 2)**2)
+        g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2 / (pixperb / 2)**2)
         gsum = np.sum(g)
-        xmodel = xi[::5]
-        ymodel = yi[::5]
+        xmodel = xi[::pixperb]
+        ymodel = yi[::pixperb]
         npar = len(xmodel)
-        par0 = np.ravel(np.abs(d[::5, ::5]) / gsum)
+        par0 = np.ravel(np.abs(d[::pixperb, ::pixperb]) / gsum)
         def model(x, *par):
             f = np.reshape(par, (npar, npar))
             f = RGI((ymodel, xmodel), f, method='linear',
@@ -350,7 +351,7 @@ class ChannelFit():
         s, t = rot(s, t, -np.radians(bpa))
         s, t = rot(s * 2 / bmin, t * 2 / bmaj, np.radians(bpa))
         pixorg = np.abs((x[1] - x[0]) * (y[1] - y[0]))
-        pixnew = bmaj / 5 * bmin / 5
+        pixnew = bmaj / pixperb * bmin / pixperb
         deconv = f((t, s)) / pixnew * pixorg
         self.cleancomponent = deconv
                 
