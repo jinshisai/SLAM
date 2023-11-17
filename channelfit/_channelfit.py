@@ -336,15 +336,16 @@ class ChannelFit():
         n = np.r_[-n[-1:0:-1], n] + imax
         xmodel = xi[n]
         ymodel = yi[n]
+        nx, ny = len(xmodel), len(ymodel)
         i, j = np.meshgrid(n, n)
         par0 = np.ravel(d[i, j] / gsum)
         def model(x, *par):
-            f = np.reshape(par, (n, n))
+            f = np.reshape(par, (nx, ny))
             f = RGI((ymodel, xmodel), f, method='linear',
                     bounds_error=False, fill_value=0)
             f = convolve(f(tuple(x)), g, mode='same')
             return np.ravel(f)
-        bounds = [np.zeros(n * n), par0.clip(self.sigma / gsum, None) * 10]
+        bounds = [np.zeros(nx * ny), par0.clip(self.sigma / gsum, None) * 10]
         popt, _ = curve_fit(model, np.array([Yi, Xi]), np.ravel(d),
                             p0=par0, bounds=bounds)
         f = RGI((ymodel, xmodel), np.reshape(popt, (n, n)), method='linear',
