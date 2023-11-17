@@ -354,7 +354,8 @@ class ChannelFit():
         pixorg = np.abs((x[1] - x[0]) * (y[1] - y[0]))
         pixnew = bmaj / bpix * bmin / bpix
         deconv = f((t, s)) / pixnew * pixorg
-        deconv = deconv / np.max(deconv) * np.max(self.mom0)
+        conv = convolve(deconv, self.gaussbeam, mode='same')
+        deconv = deconv / np.max(conv) * np.max(self.mom0)
         self.cleancomponent = deconv
                 
     def update_incl(self, incl: float):
