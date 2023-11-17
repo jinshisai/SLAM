@@ -319,23 +319,23 @@ class ChannelFit():
     def deconvolve(self):
         x, y = self.x, self.y
         bmaj, bmin, bpa = self.bmaj, self.bmin, self.bpa
-        pixperb = 6
-        imax = int(np.max([np.abs(x).max(), np.abs(y).max()]) / (bmin / pixperb))
-        xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / pixperb
+        bpix = 6
+        imax = int(np.max([np.abs(x).max(), np.abs(y).max()]) / (bmin / bpix))
+        xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / bpix
         yi = np.linspace(-imax, imax, 2 * imax + 1)
         Xi, Yi = np.meshgrid(xi, yi)
         s, t = rot(Xi, Yi, np.radians(bpa))
-        s, t = rot(s * bmin / 2, t * bmaj / 2, -np.radians(bpa))
+        s, t = rot(s * bmin / bpix, t * bmaj / bpix, -np.radians(bpa))
         f = RGI((y, x[::-1]), self.mom0[:, ::-1], method='linear',
                 bounds_error=False, fill_value=0)
         d = f((t, s))
         xig = np.linspace(-8, 8, 17)
-        g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2 / (pixperb / 2)**2)
+        g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2 / (bpix / 2)**2)
         gsum = np.sum(g)
-        xmodel = xi[::pixperb]
-        ymodel = yi[::pixperb]
+        xmodel = xi[::bpix]
+        ymodel = yi[::bpix]
         npar = len(xmodel)
-        par0 = np.ravel(np.abs(d[::pixperb, ::pixperb]) / gsum)
+        par0 = np.ravel(np.abs(d[::bpix, ::bpix]) / gsum)
         def model(x, *par):
             f = np.reshape(par, (npar, npar))
             f = RGI((ymodel, xmodel), f, method='linear',
@@ -349,9 +349,9 @@ class ChannelFit():
                 method='linear', bounds_error=False, fill_value=0)
         s, t = np.meshgrid(x, y)
         s, t = rot(s, t, -np.radians(bpa))
-        s, t = rot(s * 2 / bmin, t * 2 / bmaj, np.radians(bpa))
+        s, t = rot(s * bpix / bmin, t * bpix / bmaj, np.radians(bpa))
         pixorg = np.abs((x[1] - x[0]) * (y[1] - y[0]))
-        pixnew = bmaj / pixperb * bmin / pixperb
+        pixnew = bmaj / bpix * bmin / bpix
         deconv = f((t, s)) / pixnew * pixorg
         self.cleancomponent = deconv
                 
