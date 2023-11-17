@@ -331,7 +331,7 @@ class ChannelFit():
         xig = np.linspace(-3, 3, 7)
         g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2)
         gsum = np.sum(g)
-        npar = 2
+        npar = imax
         n = np.r_[(np.arange(npar) / npar * imax).astype(int), imax]
         n = np.r_[-n[-1:0:-1], n] + imax
         xmodel = xi[n]
@@ -353,7 +353,10 @@ class ChannelFit():
         s, t = np.meshgrid(x, y)
         s, t = rot(s, t, -np.radians(bpa))
         s, t = rot(s * 2 / bmin, t * 2 / bmaj, np.radians(bpa))
-        self.cleancomponent = f((t, s))
+        pixorg = np.abs((x[1] - x[0]) * (y[1] - y[0]))
+        pixnew = bmaj / 2 * bmin / 2
+        deconv = f((t, s)) / pixnew * pixorg
+        self.cleancomponent = deconv
                 
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
