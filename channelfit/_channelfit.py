@@ -348,7 +348,7 @@ class ChannelFit():
         bounds = [np.zeros(nx * ny), par0.clip(self.sigma / gsum, None) * 10]
         popt, _ = curve_fit(model, np.array([Yi, Xi]), np.ravel(d),
                             p0=par0, bounds=bounds)
-        f = RGI((ymodel, xmodel), np.reshape(popt, (n, n)), method='linear',
+        f = RGI((ymodel, xmodel), np.reshape(popt, (nx, ny)), method='linear',
                 bounds_error=False, fill_value=0)
         s, t = np.meshgrid(x, y)
         s, t = rot(s, t, -np.radians(bpa))
