@@ -336,7 +336,8 @@ class ChannelFit():
         n = np.r_[-n[-1:0:-1], n] + imax
         xmodel = xi[n]
         ymodel = yi[n]
-        par0 = np.ravel(d[*np.meshgrid(n, n)] / gsum)
+        i, j = np.meshgrid(n, n)
+        par0 = np.ravel(d[i, j] / gsum)
         def model(x, *par):
             f = np.reshape(par, (n, n))
             f = RGI((ymodel, xmodel), f, method='linear',
