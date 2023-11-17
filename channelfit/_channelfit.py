@@ -330,9 +330,7 @@ class ChannelFit():
         f = RGI((y, x[::-1]), self.mom0[:, ::-1], method='linear',
                 bounds_error=False, fill_value=0)
         d = f((t, s))
-        gmax = int(np.ceil(hpix * 3.2))
-        xig = np.linspace(-gmax, gmax, 2 * gmax + 1)
-        g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2 / hpix**2)
+        g = np.exp2(-(Xi**2 + Yi**2) / hpix**2)
         gsum = np.sum(g)
         xmodel = xi[::hpix]
         ymodel = yi[::hpix]
