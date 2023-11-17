@@ -318,8 +318,9 @@ class ChannelFit():
 
     def deconvolve(self):
         x, y = self.x, self.y
+        dx, dy = np.abs(self.dx), np.abs(self.dy)
         bmaj, bmin, bpa = self.bmaj, self.bmin, self.bpa
-        bpix = 6
+        bpix = np.ceil(bmaj / dx)
         imax = int(np.max([np.abs(x).max(), np.abs(y).max()]) / (bmin / bpix))
         xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / bpix
         yi = np.linspace(-imax, imax, 2 * imax + 1)
@@ -351,7 +352,7 @@ class ChannelFit():
         s, t = np.meshgrid(x, y)
         s, t = rot(s, t, -np.radians(bpa))
         s, t = rot(s * bpix / bmin, t * bpix / bmaj, np.radians(bpa))
-        pixorg = np.abs((x[1] - x[0]) * (y[1] - y[0]))
+        pixorg = dx * dy
         pixnew = bmaj / bpix * bmin / bpix
         deconv = f((t, s)) / pixnew * pixorg
         conv = convolve(deconv, self.gaussbeam, mode='same')
