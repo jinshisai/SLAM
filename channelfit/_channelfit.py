@@ -319,8 +319,8 @@ class ChannelFit():
     def deconvolve(self):
         x, y = self.x, self.y
         bmaj, bmin, bpa = self.bmaj, self.bmin, self.bpa
-        imax = int(np.max([np.abs(x).max(), np.abs(y).max()]) / (bmin / 2))
-        xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / 2
+        imax = int(np.max([np.abs(x).max(), np.abs(y).max()]) / (bmin / 5))
+        xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / 5
         yi = np.linspace(-imax, imax, 2 * imax + 1)
         Xi, Yi = np.meshgrid(xi, yi)
         s, t = rot(Xi, Yi, np.radians(bpa))
@@ -328,19 +328,16 @@ class ChannelFit():
         f = RGI((y, x[::-1]), self.mom0[:, ::-1], method='linear',
                 bounds_error=False, fill_value=0)
         d = f((t, s))
-        xig = np.linspace(-3, 3, 7)
+        xig = np.linspace(-8, 8, 17)
         g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2)
         gsum = np.sum(g)
-        npar = imax
-        n = np.r_[(np.arange(npar) / npar * imax).astype(int), imax]
-        n = np.r_[-n[-1:0:-1], n] + imax
-        xmodel = xi[n]
-        ymodel = yi[n]
-        nx, ny = len(xmodel), len(ymodel)
-        i, j = np.meshgrid(n, n)
-        par0 = np.ravel(np.abs(d[i, j]) / gsum)
+        xmodel = xi[::5]
+        ymodel = yi[::5]
+        npar = len(xmodel)
+        nx, ny = len(xi), len(yi)
+        par0 = np.ravel(np.abs(d[::5, ::5]) / gsum)
         def model(x, *par):
-            f = np.reshape(par, (nx, ny))
+            f = np.reshape(par, (npar, npar))
             f = RGI((ymodel, xmodel), f, method='linear',
                     bounds_error=False, fill_value=0)
             f = convolve(f(tuple(x)), g, mode='same')
@@ -348,13 +345,13 @@ class ChannelFit():
         bounds = np.transpose([[0, par0.max() / gsum * 10]] * (nx * ny))
         popt, _ = curve_fit(model, np.array([Yi, Xi]), np.ravel(d),
                             p0=par0, bounds=bounds)
-        f = RGI((ymodel, xmodel), np.reshape(popt, (nx, ny)), method='linear',
-                bounds_error=False, fill_value=0)
+        f = RGI((ymodel, xmodel), np.reshape(popt, (npar, npar)),
+                method='linear', bounds_error=False, fill_value=0)
         s, t = np.meshgrid(x, y)
         s, t = rot(s, t, -np.radians(bpa))
         s, t = rot(s * 2 / bmin, t * 2 / bmaj, np.radians(bpa))
         pixorg = np.abs((x[1] - x[0]) * (y[1] - y[0]))
-        pixnew = bmaj / 2 * bmin / 2
+        pixnew = bmaj / 5 * bmin / 5
         deconv = f((t, s)) / pixnew * pixorg
         self.cleancomponent = deconv
                 
