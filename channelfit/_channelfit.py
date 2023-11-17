@@ -88,43 +88,6 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         cleanresidual = newresidual
     cleancomponent = cleancomponent + cleanresidual / np.sum(beam)
     return cleancomponent, cleanresidual
-
-def deconvolve(data: np.ndarray, x: np.ndarray ,y: np.ndarray, 
-               bmaj: float, bmin: float, bpa: float,
-               sigma: float = 1) -> np.ndarray:
-    imax = int(np.max([np.abs(x).max(), np.abs(y).max()]) / (bmin / 2))
-    xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / 2
-    yi = np.linspace(-imax, imax, 2 * imax + 1)
-    Xi, Yi = np.meshgrid(xi, yi)
-    s, t = rot(Xi, Yi, np.radians(bpa))
-    s, t = rot(s * bmin / 2, t * bmaj / 2, -np.radians(bpa))
-    f = RGI((y, x[::-1]), data[:, ::-1], method='linear',
-            bounds_error=False, fill_value=0)
-    d = f((t, x))
-    xig = np.linspace(-3, 3, 7)
-    g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2)
-    gsum = np.sum(g)
-    npar = 2
-    n = np.r_[(np.arange(npar) / npar * imax).astype(int), imax]
-    n = np.r_[-n[-1:0:-1], n] + imax
-    xmodel = xi[n]
-    ymodel = yi[n]
-    par0 = np.ravel(d[*np.meshgrid(n, n)] / gsum)
-    def model(x, *par):
-        f = np.reshape(par, (n, n))
-        f = RGI((ymodel, xmodel), f, method='linear',
-                bounds_error=False, fill_value=0)
-        f = convolve(f(x), g, mode='same')
-        return np.ravel(f)
-    bounds = [np.zeros(n * n), par0.clip(sigma / gsum, None) * 10]
-    popt, _ = curve_fit(model, (Xi, Yi), np.ravel(d), bounds, x0=par0)
-    f = RGI((ymodel, xmodel), np.reshape(popt, (n, n)), method='linear',
-            bounds_error=False, fill_value=0)
-    s, t = np.meshgrid(x, y)
-    s, t = rot(s, t, -np.radians(bpa))
-    s, t = rot(s * 2 / bmin, t * 2 / bmaj, np.radians(bpa))
-    djyperpix = f((t, s))
-    return djyperpix
     
 class ChannelFit():
 
@@ -352,6 +315,42 @@ class ChannelFit():
                       sigma=self.sigma_mom0, threshold=2)
             self.cleancomponent, self.cleanresidual = c
             self.gaussbeam = self.gaussbeam[:, ::-1]
+
+    def deconvolve(self):
+        x, y = self.x, self.y
+        bmaj, bmin, bpa = self.bmaj, self.bmin, self.bpa
+        imax = int(np.max([np.abs(x).max(), np.abs(y).max()]) / (bmin / 2))
+        xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / 2
+        yi = np.linspace(-imax, imax, 2 * imax + 1)
+        Xi, Yi = np.meshgrid(xi, yi)
+        s, t = rot(Xi, Yi, np.radians(bpa))
+        s, t = rot(s * bmin / 2, t * bmaj / 2, -np.radians(bpa))
+        f = RGI((y, x[::-1]), self.mom0[:, ::-1], method='linear',
+                bounds_error=False, fill_value=0)
+        d = f((t, x))
+        xig = np.linspace(-3, 3, 7)
+        g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2)
+        gsum = np.sum(g)
+        npar = 2
+        n = np.r_[(np.arange(npar) / npar * imax).astype(int), imax]
+        n = np.r_[-n[-1:0:-1], n] + imax
+        xmodel = xi[n]
+        ymodel = yi[n]
+        par0 = np.ravel(d[*np.meshgrid(n, n)] / gsum)
+        def model(x, *par):
+            f = np.reshape(par, (n, n))
+            f = RGI((ymodel, xmodel), f, method='linear',
+                    bounds_error=False, fill_value=0)
+            f = convolve(f(x), g, mode='same')
+            return np.ravel(f)
+        bounds = [np.zeros(n * n), par0.clip(self.sigma / gsum, None) * 10]
+        popt, _ = curve_fit(model, (Xi, Yi), np.ravel(d), bounds, x0=par0)
+        f = RGI((ymodel, xmodel), np.reshape(popt, (n, n)), method='linear',
+                bounds_error=False, fill_value=0)
+        s, t = np.meshgrid(x, y)
+        s, t = rot(s, t, -np.radians(bpa))
+        s, t = rot(s * 2 / bmin, t * 2 / bmaj, np.radians(bpa))
+        self.cleancomponent = f((t, s))
                 
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
