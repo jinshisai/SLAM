@@ -322,7 +322,7 @@ class ChannelFit():
         bmaj, bmin, bpa = self.bmaj, self.bmin, self.bpa
         hpix = int(np.ceil(bmaj / 2 / dx))
         majpix, minpix = bmaj / 2 / hpix, bmin / 2 / hpix
-        imax = int(np.max([np.abs(x).max(), np.abs(y).max()]) / minpix)
+        imax = int(np.max(np.abs(x)) / minpix)
         xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / 2 / hpix
         yi = np.linspace(-imax, imax, 2 * imax + 1)
         Xi, Yi = np.meshgrid(xi, yi)
