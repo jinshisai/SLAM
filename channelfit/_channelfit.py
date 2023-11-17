@@ -321,12 +321,13 @@ class ChannelFit():
         dx, dy = np.abs(self.dx), np.abs(self.dy)
         bmaj, bmin, bpa = self.bmaj, self.bmin, self.bpa
         hpix = int(np.ceil(bmaj / 2 / dx))
-        imax = int(np.max([np.abs(x).max(), np.abs(y).max()]) / (bmin / 2 / hpix))
+        majpix, minpix = bmaj / 2 / hpix, bmin / 2 / hpix
+        imax = int(np.max([np.abs(x).max(), np.abs(y).max()]) / minpix)
         xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / 2 / hpix
         yi = np.linspace(-imax, imax, 2 * imax + 1)
         Xi, Yi = np.meshgrid(xi, yi)
         s, t = rot(Xi, Yi, np.radians(bpa))
-        s, t = rot(s * bmin / 2 / hpix, t * bmaj / 2 / hpix, -np.radians(bpa))
+        s, t = rot(s * minpix, t * majpix, -np.radians(bpa))
         f = RGI((y, x[::-1]), self.mom0[:, ::-1], method='linear',
                 bounds_error=False, fill_value=0)
         d = f((t, s))
@@ -349,10 +350,8 @@ class ChannelFit():
                 method='linear', bounds_error=False, fill_value=0)
         s, t = np.meshgrid(x, y)
         s, t = rot(s, t, -np.radians(bpa))
-        s, t = rot(s * 2 * hpix / bmin, t * 2 * hpix / bmaj, np.radians(bpa))
-        pixorg = dx * dy
-        pixnew = bmaj / 2 / hpix * bmin / 2 / hpix
-        deconv = f((t, s)) / pixnew * pixorg
+        s, t = rot(s / minpix, t / majpix, np.radians(bpa))
+        deconv = f((t, s)) / (majpix * minpix) * (dx * dy)
         self.cleancomponent = deconv
                 
     def update_incl(self, incl: float):
