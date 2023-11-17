@@ -329,7 +329,7 @@ class ChannelFit():
                 bounds_error=False, fill_value=0)
         d = f((t, s))
         xig = np.linspace(-8, 8, 17)
-        g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2)
+        g = np.exp2(-np.hypot(*np.meshgrid(xig, xig))**2 / (5 / 2)**2)
         gsum = np.sum(g)
         xmodel = xi[::5]
         ymodel = yi[::5]
