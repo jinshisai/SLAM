@@ -342,9 +342,10 @@ class ChannelFit():
             f = RGI((ymodel, xmodel), f, method='linear',
                     bounds_error=False, fill_value=0)
             f = convolve(f(tuple(x)), g, mode='same')
-            return np.ravel(f)
+            return np.ravel(f[::hpix, ::hpix])
         bounds = np.transpose([[0, par0.max() * 10]] * (npar * npar))
-        popt, _ = curve_fit(model, np.array([Yi, Xi]), np.ravel(d),
+        popt, _ = curve_fit(model, np.array([Yi, Xi]),
+                            np.ravel(d[::hpix, ::hpix]),
                             p0=par0, bounds=bounds)
         f = RGI((ymodel, xmodel), np.reshape(popt, (npar, npar)),
                 method='linear', bounds_error=False, fill_value=0)
