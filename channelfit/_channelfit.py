@@ -320,7 +320,7 @@ class ChannelFit():
         x, y = self.x, self.y
         dx, dy = np.abs(self.dx), np.abs(self.dy)
         bmaj, bmin, bpa = self.bmaj, self.bmin, self.bpa
-        hpix = int(np.ceil(bmaj / 2 / dx))
+        hpix = 1  # int(np.ceil(bmaj / 2 / dx))
         majpix, minpix = bmaj / 2 / hpix, bmin / 2 / hpix
         imax = int(np.max(np.abs(x)) / (bmin / 2)) * hpix
         xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / 2 / hpix
