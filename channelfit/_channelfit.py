@@ -352,7 +352,10 @@ class ChannelFit():
         s, t = rot(s, t, -np.radians(bpa))
         s, t = rot(s / minpix, t / majpix, np.radians(bpa))
         deconv = f((t, s)) / (majpix * minpix) * (dx * dy)
-        self.cleancomponent = deconv
+        conv = convolve(deconv, self.gaussbeam, mode='same')
+        fac = np.max(self.mom0) / np.max(conv)
+        print(f'mom0 correction factor = {fac:.2e}')
+        self.cleancomponent = deconv * fac
                 
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
