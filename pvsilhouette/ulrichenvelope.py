@@ -185,9 +185,8 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
 
     # integrate along Z axis
     nv = len(v)
-    delv = np.mean(v[1:] - v[:-1])
+    delv = v[1] - v[0]
     ve = np.hstack([v - delv * 0.5, v[-1] + 0.5 * delv])
-    #start = time.time()
     #I_cube = np.array([[[
     #    np.nansum(rho[i,j, np.where((ve[k] <= vlos[i,j,:]) & (vlos[i,j,:] < ve[k+1]))])
     #    if len(np.where((ve[k] <= vlos[i,j,:]) & (vlos[i,j,:] < ve[k+1]))[0]) != 0
@@ -204,9 +203,6 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
     #    np.nansum(np.where((ve[i] <= vlos) & (vlos < ve[i+1]), rho, np.nan), axis=2).T
     #    for i in range(nv)
     #    ])
-    #end = time.time()
-    #print(end - start, ' s')
-    #print(I_cube.shape)
 
     # convolution along the spectral direction
     if linewidth is not None:
