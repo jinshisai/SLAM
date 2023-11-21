@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from astropy import constants, units
 from scipy.signal import convolve
 
@@ -187,14 +188,22 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
     delv = np.mean(v[1:] - v[:-1])
     ve = np.hstack([v - delv * 0.5, v[-1] + 0.5 * delv])
     #start = time.time()
-    I_cube = np.array([[[
-        np.nansum(rho[i,j, np.where((ve[k] <= vlos[i,j,:]) & (vlos[i,j,:] < ve[k+1]))])
-        if len(np.where((ve[k] <= vlos[i,j,:]) & (vlos[i,j,:] < ve[k+1]))[0]) != 0
-        else 0.
-        for i in range(nx)]
-        for j in range(ny)]
-        for k in range(nv)
-        ])
+    #I_cube = np.array([[[
+    #    np.nansum(rho[i,j, np.where((ve[k] <= vlos[i,j,:]) & (vlos[i,j,:] < ve[k+1]))])
+    #    if len(np.where((ve[k] <= vlos[i,j,:]) & (vlos[i,j,:] < ve[k+1]))[0]) != 0
+    #    else 0.
+    #    for i in range(nx)]
+    #    for j in range(ny)]
+    #    for k in range(nv)
+    #    ])
+    I_cube = np.zeros((nv, ny, nx))
+    for i in range(nv):
+        _rho = np.where((ve[i] <= vlos) & (vlos < ve[i+1]), rho, np.nan)
+        I_cube[i,:,:] = np.nansum(_rho, axis=2).T
+    #I_cube = np.array([
+    #    np.nansum(np.where((ve[i] <= vlos) & (vlos < ve[i+1]), rho, np.nan), axis=2).T
+    #    for i in range(nv)
+    #    ])
     #end = time.time()
     #print(end - start, ' s')
     #print(I_cube.shape)
@@ -209,7 +218,6 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
         xb, yb = rot(*np.meshgrid(xin, yin), np.radians(bpa - pa))
         gaussbeam = np.exp(-(yb /(2. * bmin / 2.35))**2. - (xb / (2. * bmaj / 2.35))**2.)
         I_cube = convolve(I_cube, np.array([gaussbeam]), mode='same')
-
 
     # output
     I_pv = I_cube[:,ny//2,:]

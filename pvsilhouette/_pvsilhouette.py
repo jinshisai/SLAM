@@ -413,7 +413,7 @@ class PVSilhouette():
         if None in p_fixed:
             labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$', r'log f'])
             labels = labels[p_fixed == None]
-            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':100, 'nsteps':500,
+            kwargs0 = {'nwalkers_per_ndim':10, 'nburnin':10, 'nsteps':50, # 16, 100, 500
                        'rangelevel':None, 'labels':labels,
                        'figname':figname+'.corner.png', 'show_corner':show}
             kwargs = dict(kwargs0, **kwargs_emcee_corner)
