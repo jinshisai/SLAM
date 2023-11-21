@@ -1,5 +1,6 @@
 import numpy as np
 from astropy import constants, units
+from scipy.signal import convolve
 
 
 au = units.au.to('m')
@@ -86,7 +87,8 @@ def XYZ2xyz(incl, phi, X, Y, Z):
     #z[r2D < 1] = np.nan
     return x, y, z
 
-def losvel(elos, r, t, p, alphainfall: float = 1, kepler: bool = False):
+def losvel(elos, r, t, p, alphainfall: float = 1, 
+    kepler: bool = False, withkepler: bool = True):
     """Line-of-sight velocity with a given vector, elos,
        which points to the observer in the envelople coordinate.
     """
@@ -94,7 +96,7 @@ def losvel(elos, r, t, p, alphainfall: float = 1, kepler: bool = False):
     if kepler:
         vr, vt, vp = kepvel(r.ravel(), t.ravel())
     else:
-        vr, vt, vp, _ = velrho(r.ravel(), t.ravel(), alphainfall)
+        vr, vt, vp, _ = velrho(r.ravel(), t.ravel(), alphainfall, withkepler)
     er, et, ep = rotbase(t.ravel(), p.ravel())
     e = np.moveaxis(np.full((len(r.ravel()), 3), elos), -1, 0)
     vlos = -vr * np.sum(er * e, axis=0) \
@@ -103,7 +105,7 @@ def losvel(elos, r, t, p, alphainfall: float = 1, kepler: bool = False):
     return np.reshape(vlos, shape)
 
 def velmax(r: np.ndarray, Mstar: float, Rc: float,
-           alphainfall: float = 1, incl: float = 90):
+           alphainfall: float = 1, incl: float = 90, withkepler: bool = True):
     irad = np.radians(incl)
     vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
     X, Z = np.meshgrid(r / Rc, r / Rc)  # X is inner, second axis
@@ -112,16 +114,111 @@ def velmax(r: np.ndarray, Mstar: float, Rc: float,
     a = {}
     x, y, z = XYZ2xyz(irad, 0, X, zero, Z)
     r, t, p = xyz2rtp(x, y, z)
-    vlos = losvel(elos, r, t, p, alphainfall)
+    vlos = losvel(elos, r, t, p, alphainfall, False, withkepler)
     #vlos[(t < np.pi / 4 ) + (np.pi * 3 / 4 < t)] = 0  # remove outflow cavity
     vlosmax = np.nanmax(vlos, axis=0)
     vlosmin = np.nanmin(vlos, axis=0)
     a['major'] = {'vlosmax':vlosmax * vunit, 'vlosmin':vlosmin * vunit}
     x, y, z = XYZ2xyz(irad, 0, zero, X, Z)
     r, t, p = xyz2rtp(x, y, z)
-    vlos = losvel(elos, r, t, p, alphainfall)
+    vlos = losvel(elos, r, t, p, alphainfall, False, withkepler)
     #vlos[(t < np.pi / 4 ) + (np.pi * 3 / 4 < t)] = 0  # remove outflow cavity
     vlosmax = np.nanmax(vlos, axis=0)
     vlosmin = np.nanmin(vlos, axis=0)
     a['minor'] = {'vlosmax':vlosmax * vunit, 'vlosmin':vlosmin * vunit}
     return a
+
+
+def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray, 
+    Mstar: float, Rc: float, 
+    alphainfall: float = 1., incl: float = 89., fscale: float = 1.,
+    pa: float = 0., beam: list = None, linewidth: float = None, rout: float=None,
+    axis: str = 'major'):
+    """
+    Generate a mock Position-Velocity (PV) diagram.
+
+    XYZ: plane of sky coordinates with X axis as a major axis and Z axis as a line of sight.
+    """
+    # parameters/units
+    if (incl > 89.) & (incl <= 90.):
+        incl = 89.
+    elif (incl > 90.) & (incl < 91.):
+        incl = 91.
+    irad = np.radians(incl)
+    vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
+    elos = [0, -np.sin(irad), np.cos(irad)] # line of sight vector
+    nz, nx = len(zin), len(xin)
+
+    # grid
+    if beam is None:
+        X, Z = np.meshgrid(xin/Rc, zin/Rc, indexing='ij') # in units of Rc
+        Y = np.zeros_like(X)
+        ny = 1
+    else:
+        if len(beam) == 3:
+            bmaj, bmin, bpa = beam
+            dely = bmin * 0.2
+            yin = np.arange(-int(bmaj / dely * 2.), int(bmaj/dely * 2.) + 1, 1) * dely
+        else:
+            print('ERROR\tmockpvd: beam must be given as [bmaj, bmin, bpa].')
+            return 0
+
+        ny = len(yin)
+        X, Y, Z = np.meshgrid(xin/Rc, yin/Rc, zin/Rc, indexing='ij')
+
+    # along which axis
+    x, y, z = XYZ2xyz(irad, 0., X, Y, Z) if axis == 'major' else XYZ2xyz(irad, 0., Y, X, Z)
+    r, t, p = xyz2rtp(x, y, z)
+
+    # get density and velocity
+    _, _, _, rho = velrho(r, t, alphainfall, withkepler=False)
+    #print(np.nanmax(rho))
+    #print(r[np.where(rho == np.nanmax(rho))], t[np.where(rho == np.nanmax(rho))])
+    rho /= np.nanmax(rho)   # normalize
+    if len(rho.shape) != 3: rho = rho.reshape(nx, ny, nz) # in 3D
+    vlos = losvel(elos, r, t, p, alphainfall, kepler=False, withkepler=False) * vunit
+    if len(vlos.shape) != 3: vlos = vlos.reshape(nx, ny, nz) # in 3D
+
+    # outer edge
+    if rout is not None: rho[np.where(r.reshape(nx, ny, nz) > rout/Rc)] = np.nan
+
+    # integrate along Z axis
+    nv = len(v)
+    delv = np.mean(v[1:] - v[:-1])
+    ve = np.hstack([v - delv * 0.5, v[-1] + 0.5 * delv])
+    #start = time.time()
+    I_cube = np.array([[[
+        np.nansum(rho[i,j, np.where((ve[k] <= vlos[i,j,:]) & (vlos[i,j,:] < ve[k+1]))])
+        if len(np.where((ve[k] <= vlos[i,j,:]) & (vlos[i,j,:] < ve[k+1]))[0]) != 0
+        else 0.
+        for i in range(nx)]
+        for j in range(ny)]
+        for k in range(nv)
+        ])
+    #end = time.time()
+    #print(end - start, ' s')
+    #print(I_cube.shape)
+
+    # convolution along the spectral direction
+    if linewidth is not None:
+        gaussbeam = np.exp(-(v /(2. * linewidth / 2.35))**2.)
+        I_cube = convolve(I_cube, np.array([[gaussbeam]]).T, mode='same')
+
+    # beam convolution
+    if beam is not None:
+        xb, yb = rot(*np.meshgrid(xin, yin), np.radians(bpa - pa))
+        gaussbeam = np.exp(-(yb /(2. * bmin / 2.35))**2. - (xb / (2. * bmaj / 2.35))**2.)
+        I_cube = convolve(I_cube, np.array([gaussbeam]), mode='same')
+
+
+    # output
+    I_pv = I_cube[:,ny//2,:]
+    I_pv /= np.nanmax(I_pv) # normalize
+    I_pv *= fscale # scaling
+    return I_pv
+
+
+def rot(x, y, pa):
+    s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
+    t = x * np.sin(pa) + y * np.cos(pa)  # along major axis
+    return np.array([s, t])
