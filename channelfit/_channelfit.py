@@ -743,6 +743,9 @@ class ChannelFit():
         plt.close()
 
     def plotclean(self, filename: str = 'clean.png'):
+        if not(hasattr(self, 'cleancomponent') and hasattr(self, 'cleanresidual')):
+            print('No CLEAN component and residual generated.')
+            return 
         cc = self.cleancomponent / self.sigma_mom0
         cr = self.cleanresidual / self.sigma_mom0
         for c, vmin, vmax, s in zip([cc, cr], [cc.min(), -6], [cc.max(), 6],
