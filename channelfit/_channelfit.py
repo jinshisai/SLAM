@@ -319,40 +319,40 @@ class ChannelFit():
     def deconvolve(self):
         x, y = self.x, self.y
         dx, dy = np.abs(self.dx), np.abs(self.dy)
-        bmaj, bmin, bpa = self.bmaj, self.bmin, self.bpa
-        hpix = 1  # int(np.ceil(bmaj / 2 / dx))
-        majpix, minpix = bmaj / 2 / hpix, bmin / 2 / hpix
-        imax = int(np.max(np.abs(x)) / (bmin / 2)) * hpix
-        xi = np.linspace(-imax, imax, 2 * imax + 1)  # 1 pixel = FWHM / 2 / hpix
-        yi = np.linspace(-imax, imax, 2 * imax + 1)
+        hbmaj, hbmin, bpa = self.bmaj / 2, self.bmin / 2, self.bpa
+        xhpix = int(np.floor(hbmin / dx))
+        yhpix = int(np.floor(hbmaj / dy))
+        xi = x[::-1]
+        yi = y
         Xi, Yi = np.meshgrid(xi, yi)
         s, t = rot(Xi, Yi, np.radians(bpa))
-        s, t = rot(s * minpix, t * majpix, -np.radians(bpa))
+        #s, t = rot(s * minpix, t * majpix, -np.radians(bpa))
         f = RGI((y, x[::-1]), self.mom0[:, ::-1], method='linear',
                 bounds_error=False, fill_value=0)
         d = f((t, s))
-        g = np.exp2(-(Xi**2 + Yi**2) / hpix**2)
+        g = np.exp2(-((Xi / hbmin)**2 + (Yi / hbmaj)**2))
         gsum = np.sum(g)
-        xmodel = xi[::hpix]
-        ymodel = yi[::hpix]
-        npar = len(xmodel)
-        par0 = np.ravel(np.abs(d[::hpix, ::hpix]) / gsum)
+        xmodel = xi[::xhpix]
+        ymodel = yi[::yhpix]
+        xnpar = len(xmodel)
+        ynpar = len(ymodel)
+        par0 = np.ravel(np.abs(d[::yhpix, ::xhpix]) / gsum)
         def model(x, *par):
-            f = np.reshape(par, (npar, npar))
+            f = np.reshape(par, (ynpar, xnpar))
             f = RGI((ymodel, xmodel), f, method='linear',
                     bounds_error=False, fill_value=0)
             f = convolve(f(tuple(x)), g, mode='same')
-            return np.ravel(f[::hpix, ::hpix])
-        bounds = np.transpose([[0, par0.max() * 10]] * (npar * npar))
-        popt, _ = curve_fit(model, np.array([Yi, Xi]),
-                            np.ravel(d[::hpix, ::hpix]),
+            return np.ravel(f[::yhpix, ::xhpix])
+        bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
+        popt, _ = curve_fit(model, [Yi, Xi],
+                            np.ravel(d[::yhpix, ::xhpix]),
                             p0=par0, bounds=bounds)
-        f = RGI((ymodel, xmodel), np.reshape(popt, (npar, npar)),
+        f = RGI((ymodel, xmodel), np.reshape(popt, (ynpar, xnpar)),
                 method='linear', bounds_error=False, fill_value=0)
         s, t = np.meshgrid(x, y)
         s, t = rot(s, t, -np.radians(bpa))
-        s, t = rot(s / minpix, t / majpix, np.radians(bpa))
-        deconv = f((t, s)) / (majpix * minpix) * (dx * dy)
+        #s, t = rot(s / minpix, t / majpix, np.radians(bpa))
+        deconv = f((t, s))
         conv = convolve(deconv, self.gaussbeam, mode='same')
         fac = np.max(self.mom0) / np.max(conv)
         print(f'mom0 correction factor = {fac:.2e}')
