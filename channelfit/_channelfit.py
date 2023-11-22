@@ -89,6 +89,52 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     cleancomponent = cleancomponent + cleanresidual / np.sum(beam)
     return cleancomponent, cleanresidual
     
+def deconvolve(data, x, y, bmaj, bmin, bpa, beammap = None):
+    dx, dy = np.abs(x[1] - x[0]), np.abs(y[1] - y[0])
+    hbmaj, hbmin, bpa = bmaj / 2, bmin / 2, bpa
+    xhpix = int(np.floor(hbmin / dx))
+    yhpix = int(np.floor(hbmaj / dy))
+    nx = int(np.floor((len(x) - 1) / 2 / xhpix) * 2 * xhpix + 1)
+    ny = int(np.floor((len(y) - 1) / 2 / yhpix) * 2 * yhpix + 1)
+    xi = x[nx-1::-1]
+    yi = y[:ny]
+    Xi, Yi = np.meshgrid(xi, yi)
+    s, t = rot(Xi, Yi, np.radians(bpa))
+    #s, t = rot(s * minpix, t * majpix, -np.radians(bpa))
+    f = RGI((y, x[::-1]), data[:, ::-1], method='linear',
+            bounds_error=False, fill_value=0)
+    d = f((t, s))
+    g = np.exp2(-((Xi / hbmin)**2 + (Yi / hbmaj)**2))
+    gsum = np.sum(g)
+    xmodel = xi[::xhpix]
+    ymodel = yi[::yhpix]
+    xnpar = len(xmodel)
+    ynpar = len(ymodel)
+    par0 = np.ravel(np.abs(d[::yhpix, ::xhpix]) / gsum)
+    def model(x, *par):
+        f = RGI((ymodel, xmodel), np.reshape(par, (ynpar, xnpar)),
+                method='linear', bounds_error=False, fill_value=0)
+        f = convolve(f(tuple(x)), g, mode='same')
+        return np.ravel(f)
+    bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
+    popt, _ = curve_fit(model, [Yi, Xi], np.ravel(d),
+                        p0=par0, bounds=bounds)
+    f = RGI((ymodel, xmodel), np.reshape(popt, (ynpar, xnpar)),
+            method='linear', bounds_error=False, fill_value=0)
+    ff = convolve(f((Yi, Xi)), g, mode='same')
+    fac1 = np.max(d) / np.max(ff)
+    print(f'Original correction factor = {fac1:.2e}')
+    s, t = np.meshgrid(x, y)
+    s, t = rot(s, t, -np.radians(bpa))
+    #s, t = rot(s / minpix, t / majpix, np.radians(bpa))
+    deconv = f((t, s))
+    fact = 1
+    if beammap is not None:
+        conv = convolve(deconv, beammap, mode='same')
+        fac = np.max(data) / np.max(conv)
+        print(f'mom0 correction factor = {fac:.2e}')
+    return deconv * fac
+
 class ChannelFit():
 
     def __init__(self, disk: bool = True, envelope: bool = True,
@@ -315,51 +361,10 @@ class ChannelFit():
                       sigma=self.sigma_mom0, threshold=2)
             self.cleancomponent, self.cleanresidual = c
             self.gaussbeam = self.gaussbeam[:, ::-1]
-
-    def deconvolve(self):
-        x, y = self.x, self.y
-        dx, dy = np.abs(self.dx), np.abs(self.dy)
-        hbmaj, hbmin, bpa = self.bmaj / 2, self.bmin / 2, self.bpa
-        xhpix = int(np.floor(hbmin / dx))
-        yhpix = int(np.floor(hbmaj / dy))
-        nx = int(np.floor((len(x) - 1) / 2 / xhpix) * 2 * xhpix + 1)
-        ny = int(np.floor((len(y) - 1) / 2 / yhpix) * 2 * yhpix + 1)
-        xi = x[nx-1::-1]
-        yi = y[:ny]
-        Xi, Yi = np.meshgrid(xi, yi)
-        s, t = rot(Xi, Yi, np.radians(bpa))
-        #s, t = rot(s * minpix, t * majpix, -np.radians(bpa))
-        f = RGI((y, x[::-1]), self.mom0[:, ::-1], method='linear',
-                bounds_error=False, fill_value=0)
-        d = f((t, s))
-        g = np.exp2(-((Xi / hbmin)**2 + (Yi / hbmaj)**2))
-        gsum = np.sum(g)
-        xmodel = xi[::xhpix]
-        ymodel = yi[::yhpix]
-        xnpar = len(xmodel)
-        ynpar = len(ymodel)
-        par0 = np.ravel(np.abs(d[::yhpix, ::xhpix]) / gsum)
-        def model(x, *par):
-            f = RGI((ymodel, xmodel), np.reshape(par, (ynpar, xnpar)),
-                    method='linear', bounds_error=False, fill_value=0)
-            f = convolve(f(tuple(x)), g, mode='same')
-            return np.ravel(f)
-        bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
-        popt, _ = curve_fit(model, [Yi, Xi], np.ravel(d),
-                            p0=par0, bounds=bounds)
-        f = RGI((ymodel, xmodel), np.reshape(popt, (ynpar, xnpar)),
-                method='linear', bounds_error=False, fill_value=0)
-        ff = convolve(f((Yi, Xi)), g, mode='same')
-        fac1 = np.max(d) / np.max(ff)
-        print(f'Original correction factor = {fac1:.2e}')
-        s, t = np.meshgrid(x, y)
-        s, t = rot(s, t, -np.radians(bpa))
-        #s, t = rot(s / minpix, t / majpix, np.radians(bpa))
-        deconv = f((t, s))
-        conv = convolve(deconv, self.gaussbeam, mode='same')
-        fac = np.max(self.mom0) / np.max(conv)
-        print(f'mom0 correction factor = {fac:.2e}')
-        self.cleancomponent = deconv * fac
+            d = deconvolve(x=self.x, y=self.y, data=self.mom0,
+                           bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
+                           beammap=self.gaussbeam)
+            self.cleancomponent = d
                 
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
