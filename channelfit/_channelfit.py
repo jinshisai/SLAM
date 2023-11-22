@@ -322,8 +322,10 @@ class ChannelFit():
         hbmaj, hbmin, bpa = self.bmaj / 2, self.bmin / 2, self.bpa
         xhpix = int(np.floor(hbmin / dx))
         yhpix = int(np.floor(hbmaj / dy))
-        xi = x[::-1]
-        yi = y
+        nx = int(np.floor((len(x) - 1) / 2 / xhpix) * 2 * xhpix + 1)
+        ny = int(np.floor((len(y) - 1) / 2 / yhpix) * 2 * yhpix + 1)
+        xi = x[nx::-1]
+        yi = y[:ny]
         Xi, Yi = np.meshgrid(xi, yi)
         s, t = rot(Xi, Yi, np.radians(bpa))
         #s, t = rot(s * minpix, t * majpix, -np.radians(bpa))
