@@ -89,13 +89,15 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     cleancomponent = cleancomponent + cleanresidual / np.sum(beam)
     return cleancomponent, cleanresidual
     
-def deconvolve(data, x, y, bmaj, bmin, bpa, beammap = None):
+def deconvolve(data, x, y, bmaj, bmin, bpa):
     dx, dy = np.abs(x[1] - x[0]), np.abs(y[1] - y[0])
     xhpix = int(np.floor(bmin / 2 / dx))
     yhpix = int(np.floor(bmaj / 2 / dy))
     nx = int(np.floor((len(x) - 1) / 2 / xhpix) * 2 * xhpix + 1)
     ny = int(np.floor((len(y) - 1) / 2 / yhpix) * 2 * yhpix + 1)
-    xi, yi = x[nx-1::-1], y[:ny]
+    nx0 = (len(x) - nx) // 2
+    ny0 = (len(y) - ny) // 2
+    xi, yi = x[nx - 1 + nx0::-1], y[ny0:ny]
     Xi, Yi = np.meshgrid(xi, yi)
     s, t = rot(Xi, Yi, np.radians(bpa))
     f = RGI((y, x[::-1]), data[:, ::-1], method='linear',
