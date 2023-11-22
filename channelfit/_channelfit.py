@@ -350,8 +350,7 @@ class ChannelFit():
             self.cleancomponent, self.cleanresidual = c
             self.gaussbeam = self.gaussbeam[:, ::-1]
             d = deconvolve(x=self.x, y=self.y, data=self.mom0,
-                           bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
-                           beammap=self.gaussbeam)
+                           bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa)
             self.cleancomponent = d
                 
     def update_incl(self, incl: float):
