@@ -182,6 +182,9 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
 
     # outer edge
     if rout is not None: rho[np.where(r.reshape(nx, ny, nz) > rout/Rc)] = np.nan
+    # for test
+    #dx = np.abs(x[1] - x[0])
+    #rho[np.where( ((1. - dx) > r.reshape(nx, ny, nz)) | ((1. + dx) < r.reshape(nx, ny, nz)))] = np.nan
 
     # integrate along Z axis
     nv = len(v)

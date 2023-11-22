@@ -353,7 +353,7 @@ class PVSilhouette():
                 progressbar: bool = True,
                 kwargs_emcee_corner: dict = {},
                 pa_maj = None,
-                beam = None):
+                beam = None, p0 = None):
         # Observed pv diagrams
         majobs = self.dpvmajor.copy()
         minobs = self.dpvminor.copy()
@@ -408,12 +408,25 @@ class PVSilhouette():
             minor = minor[:, ::minquad] * fscale
             return major, minor
 
+
+        # chi2 fitting
+        #from scipy.optimize import least_squares
+        #f_lsfit = lambda params: calcchi2(*makemodel(*params))
+        #plim = np.array([Mstar_range, Rc_range, alphainfall_range, fscale_range])
+        #print('Run fitting..')
+        #res = least_squares(f_lsfit, p0, bounds=plim.T)
+        #popt = res.x #[ x for x in res.x]
+        #print('Done.')
+        #print(popt)
+        #return popt
+
+
         # Fitting
         p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed, fscale_fixed])
         if None in p_fixed:
             labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$', r'log f'])
             labels = labels[p_fixed == None]
-            kwargs0 = {'nwalkers_per_ndim':10, 'nburnin':200, 'nsteps':500, # 16, 100, 500
+            kwargs0 = {'nwalkers_per_ndim':2, 'nburnin':250, 'nsteps':250, # 16, 100, 500
                        'rangelevel':None, 'labels':labels,
                        'figname':figname+'.corner.png', 'show_corner':show}
             kwargs = dict(kwargs0, **kwargs_emcee_corner)

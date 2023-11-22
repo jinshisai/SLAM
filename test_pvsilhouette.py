@@ -27,15 +27,14 @@ pvsil = PVSilhouette()
 pvsil.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
              dist=dist, vsys=vsys, rmax=rmax, vmin=vlim[0], vmax=vlim[1],
              sigma=sigma)
-print(pvsil.dpvmajor.shape, pvsil.beam)
+
 pvsil.fit_mockpvd(incl=incl, Mstar_range=[0.01, 10], Rc_range=[1, 1000],
               alphainfall_range=[0.01, 1], fscale_range = [0.01, 100.],
               Mstar_fixed=None, Rc_fixed=None, alphainfall_fixed=None,
               fscale_fixed = None, cutoff=5, show=show_figs, 
-              figname=filehead, vmask=vmask, pa_maj=pa)
+              figname=filehead, vmask=vmask, pa_maj=pa, p0=[0.15, 15., 0.7, 2.])
 
 d = mockpvd(pvsil.x, pvsil.x, pvsil.v, 1., 100., 
         linewidth = 0.2, beam = pvsil.beam,
         incl=incl, rout=np.nanmax(pvsil.x), axis='major', pa = pa)
-print(d.shape)
 '-------------------------------------'
