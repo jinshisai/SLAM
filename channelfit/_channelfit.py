@@ -324,7 +324,7 @@ class ChannelFit():
         yhpix = int(np.floor(hbmaj / dy))
         nx = int(np.floor((len(x) - 1) / 2 / xhpix) * 2 * xhpix + 1)
         ny = int(np.floor((len(y) - 1) / 2 / yhpix) * 2 * yhpix + 1)
-        xi = x[nx::-1]
+        xi = x[nx-1::-1]
         yi = y[:ny]
         Xi, Yi = np.meshgrid(xi, yi)
         s, t = rot(Xi, Yi, np.radians(bpa))
@@ -340,17 +340,18 @@ class ChannelFit():
         ynpar = len(ymodel)
         par0 = np.ravel(np.abs(d[::yhpix, ::xhpix]) / gsum)
         def model(x, *par):
-            f = np.reshape(par, (ynpar, xnpar))
-            f = RGI((ymodel, xmodel), f, method='linear',
-                    bounds_error=False, fill_value=0)
+            f = RGI((ymodel, xmodel), np.reshape(par, (ynpar, xnpar)),
+                    method='linear', bounds_error=False, fill_value=0)
             f = convolve(f(tuple(x)), g, mode='same')
-            return np.ravel(f[::yhpix, ::xhpix])
+            return np.ravel(f)
         bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
-        popt, _ = curve_fit(model, [Yi, Xi],
-                            np.ravel(d[::yhpix, ::xhpix]),
+        popt, _ = curve_fit(model, [Yi, Xi], np.ravel(d),
                             p0=par0, bounds=bounds)
         f = RGI((ymodel, xmodel), np.reshape(popt, (ynpar, xnpar)),
                 method='linear', bounds_error=False, fill_value=0)
+        ff = convolve(f((Yi, Xi)), g, mode='same')
+        fac1 = np.max(d) / np.max(ff)
+        print(f'Original correction factor = {fac1:.2e}')
         s, t = np.meshgrid(x, y)
         s, t = rot(s, t, -np.radians(bpa))
         #s, t = rot(s / minpix, t / majpix, np.radians(bpa))
