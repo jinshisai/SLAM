@@ -91,20 +91,17 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     
 def deconvolve(data, x, y, bmaj, bmin, bpa, beammap = None):
     dx, dy = np.abs(x[1] - x[0]), np.abs(y[1] - y[0])
-    hbmaj, hbmin, bpa = bmaj / 2, bmin / 2, bpa
-    xhpix = int(np.floor(hbmin / dx))
-    yhpix = int(np.floor(hbmaj / dy))
+    xhpix = int(np.floor(bmin / 2 / dx))
+    yhpix = int(np.floor(bmaj / 2 / dy))
     nx = int(np.floor((len(x) - 1) / 2 / xhpix) * 2 * xhpix + 1)
     ny = int(np.floor((len(y) - 1) / 2 / yhpix) * 2 * yhpix + 1)
-    xi = x[nx-1::-1]
-    yi = y[:ny]
+    xi, yi = x[nx-1::-1], y[:ny]
     Xi, Yi = np.meshgrid(xi, yi)
     s, t = rot(Xi, Yi, np.radians(bpa))
-    #s, t = rot(s * minpix, t * majpix, -np.radians(bpa))
     f = RGI((y, x[::-1]), data[:, ::-1], method='linear',
             bounds_error=False, fill_value=0)
     d = f((t, s))
-    g = np.exp2(-((Xi / hbmin)**2 + (Yi / hbmaj)**2))
+    g = np.exp2(-4 * ((Xi / bmin)**2 + (Yi / bmaj)**2))
     gsum = np.sum(g)
     xmodel = xi[::xhpix]
     ymodel = yi[::yhpix]
@@ -121,19 +118,8 @@ def deconvolve(data, x, y, bmaj, bmin, bpa, beammap = None):
                         p0=par0, bounds=bounds)
     f = RGI((ymodel, xmodel), np.reshape(popt, (ynpar, xnpar)),
             method='linear', bounds_error=False, fill_value=0)
-    ff = convolve(f((Yi, Xi)), g, mode='same')
-    fac1 = np.max(d) / np.max(ff)
-    print(f'Original correction factor = {fac1:.2e}')
-    s, t = np.meshgrid(x, y)
-    s, t = rot(s, t, -np.radians(bpa))
-    #s, t = rot(s / minpix, t / majpix, np.radians(bpa))
-    deconv = f((t, s))
-    fact = 1
-    if beammap is not None:
-        conv = convolve(deconv, beammap, mode='same')
-        fac = np.max(data) / np.max(conv)
-        print(f'mom0 correction factor = {fac:.2e}')
-    return deconv * fac
+    s, t = rot(*np.meshgrid(x, y), -np.radians(bpa))
+    return f((t, s))
 
 class ChannelFit():
 
