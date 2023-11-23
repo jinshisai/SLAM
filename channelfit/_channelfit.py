@@ -110,7 +110,7 @@ def deconvolve(data, x, y, bmaj, bmin, bpa):
     s, t = rot(Xi, Yi, np.radians(bpa))
     d = f((t, s))
     s, t = rot(*np.meshgrid(xmodel, ymodel), np.radians(bpa))
-    par0 = np.ravel(f((t, s))) / gsum
+    par0 = np.ravel(f((t, s))).clip(0, None) / gsum
     def model(x, *par):
         f = RGI((ymodel, xmodel), np.reshape(par, (ynpar, xnpar)),
                 method='linear', bounds_error=False, fill_value=0)
