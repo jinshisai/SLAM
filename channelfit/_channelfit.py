@@ -96,8 +96,8 @@ def deconvolve(data, x, y, bmaj, bmin, bpa):
     dy = np.abs(y[1] - y[0])
     xskip = int(np.floor(bmin / 2 / dx))
     yskip = int(np.floor(bmaj / 2 / dy))
-    nxh = int(np.floor((nx - 1) / 2 / xskip))
-    nyh = int(np.floor((ny - 1) / 2 / yskip))
+    nxh = int(np.floor((nx - 1) / 2 / xskip)) * xskip
+    nyh = int(np.floor((ny - 1) / 2 / yskip)) * yskip
     nxnew = 2 * nxh + 1
     nynew = 2 * nyh + 1
     xoff = int((nx - nxnew) / 2)
@@ -105,9 +105,9 @@ def deconvolve(data, x, y, bmaj, bmin, bpa):
     xi = x[::-1]
     yi = y
     di = data[:, ::-1]
-    xi = xi[xoff:nxnew]
-    yi = yi[yoff:nynew]
-    di = di[yoff:nynew, xoff:nxnew]
+    xi = xi[xoff:nxnew + xoff]
+    yi = yi[yoff:nynew + yoff]
+    di = di[yoff:nynew + yoff, xoff:nxnew + xoff]
     Xi, Yi = np.meshgrid(xi, yi)
     Xg = (Xi - xi[nxh]) / (bmin / 2)
     Yg = (Yi - yi[nyh]) / (bmaj / 2)
