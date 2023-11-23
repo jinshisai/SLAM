@@ -90,39 +90,48 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     return cleancomponent, cleanresidual
     
 def deconvolve(data, x, y, bmaj, bmin, bpa):
-    xi, yi = x[::-1], y
+    nx = len(x)
+    ny = len(y)
+    dx = np.abs(x[1] - x[0])
+    dy = np.abs(y[1] - y[0])
+    xskip = int(np.floor(bmin / 2 / dx))
+    yskip = int(np.floor(bmaj / 2 / dy))
+    nxh = int(np.floor((nx - 1) / 2 / xskip))
+    nyh = int(np.floor((ny - 1) / 2 / yskip))
+    nxnew = 2 * nxh + 1
+    nynew = 2 * nyh + 1
+    xoff = int((nx - nxnew) / 2)
+    yoff = int((ny - nynew) / 2)
+    xi = x[::-1]
+    yi = y
+    di = data[:, ::-1]
+    xi = xi[xoff:nxnew]
+    yi = yi[yoff:nynew]
+    di = di[yoff:nynew, xoff:nxnew]
     Xi, Yi = np.meshgrid(xi, yi)
-    g = np.exp2(-4 * ((Xi / bmin)**2 + (Yi / bmaj)**2))
+    Xg = (Xi - xi[nxh]) / (bmin / 2)
+    Yg = (Yi - yi[nyh]) / (bmaj / 2)
+    g = np.exp2(-Xg**2 - Yg**2)
     gsum = np.sum(g)
-    rmax = np.max([np.max(np.abs(x)), np.max(np.abs(y))])
-    nxmodel = int(np.ceil(rmax / (bmin / 2)))
-    nymodel = int(np.ceil(rmax / (bmaj / 2)))
-    xmaxmodel = nxmodel * bmin
-    ymaxmodel = nymodel * bmaj
-    xmodel = np.linspace(-xmaxmodel, xmaxmodel, 2 * nxmodel + 1)
-    ymodel = np.linspace(-ymaxmodel, ymaxmodel, 2 * nymodel + 1)
-    xmodel[nxmodel] = 0
-    ymodel[nymodel] = 0
+    xmodel = xi[::xskip]
+    ymodel = yi[::yskip]
     xnpar = len(xmodel)
     ynpar = len(ymodel)
-    f = RGI((yi, xi), data[:, ::-1], method='linear',
-            bounds_error=False, fill_value=0)
-    s, t = rot(Xi, Yi, np.radians(bpa))
-    d = f((t, s))
-    s, t = rot(*np.meshgrid(xmodel, ymodel), np.radians(bpa))
-    par0 = np.ravel(f((t, s))).clip(0, None) / gsum
     def model(x, *par):
         f = RGI((ymodel, xmodel), np.reshape(par, (ynpar, xnpar)),
                 method='linear', bounds_error=False, fill_value=0)
         f = convolve(f(tuple(x)), g, mode='same')
         return np.ravel(f)
+    f = RGI((yi, xi), di, method='linear',
+            bounds_error=False, fill_value=0)
+    drot = f(rot(Yi, Xi, -np.radians(bpa)))
+    par0 = np.clip(di[::yskip, ::xskip], 0, None) / gsum
     bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
-    popt, _ = curve_fit(model, [Yi, Xi], np.ravel(d),
+    popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
                         p0=par0, bounds=bounds)
     f = RGI((ymodel, xmodel), np.reshape(popt, (ynpar, xnpar)),
             method='linear', bounds_error=False, fill_value=0)
-    s, t = rot(*np.meshgrid(x, y), -np.radians(bpa))
-    return f((t, s))
+    return f(rot(*np.meshgrid(y, x), np.radians(bpa)))
 
 class ChannelFit():
 
