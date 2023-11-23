@@ -356,6 +356,7 @@ class ChannelFit():
                            bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa)
             self.cleancomponent = d
             self.cleanresidual = self.mom0 - convolve(d, self.gaussbeam, mode='same')
+            print('Found a deconvolved solution.')
                 
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
