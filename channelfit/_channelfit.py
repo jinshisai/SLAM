@@ -344,14 +344,17 @@ class ChannelFit():
         self.xneed = self.xnest[0][self.ineed0:self.ineed1]
         self.yneed = self.ynest[0][self.ineed0:self.ineed1]
 
-        if self.scaling == 'mom0':
+        if self.scaling == 'mom0clean':
+            self.gaussbeam = self.gaussbeam[:, ::-1]
             c = clean(data=self.mom0, beam=self.gaussbeam,
                       sigma=self.sigma_mom0, threshold=2)
             self.cleancomponent, self.cleanresidual = c
+        if self.scaling == 'mom0fitting':
             self.gaussbeam = self.gaussbeam[:, ::-1]
             d = deconvolve(x=self.x, y=self.y, data=self.mom0,
                            bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa)
             self.cleancomponent = d
+            self.cleanresidual = self.mom0 - convolve(d, self.gaussbeam, mode='same')
                 
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
@@ -503,7 +506,7 @@ class ChannelFit():
             self.update_vlos()
 
         Iunif = self.get_Iunif(Mstar, Rc, pI, Ienv, voff)
-        if self.scaling == 'mom0':
+        if 'mom0' in self.scaling:
             Iunif = self.rgi2d(xoff, yoff, Iunif)
             mom0unif = np.sum(Iunif, axis=0) * self.dv
             mom0unif[mom0unif < 0] = np.nan
@@ -513,10 +516,10 @@ class ChannelFit():
             Iout = convolve(Iunif, [self.gaussbeam], mode='same')
         else:
             Iout = self.peaktounity(Iunif)
-        if self.scaling != 'mom0':
+        if not ('mom0' in self.scaling):
             Iout = self.rgi2d(xoff, yoff, Iout)
         if scaling:
-            if self.scaling != 'mom0':
+            if not ('mom0' in self.scaling):
                 scale = self.get_scale(Iout)
                 Iout = Iout * np.moveaxis([[scale]], 2, 0)
         else:
