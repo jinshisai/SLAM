@@ -124,14 +124,14 @@ def deconvolve(data, x, y, bmaj, bmin, bpa):
         return np.ravel(f)
     f = RGI((yi, xi), di, method='linear',
             bounds_error=False, fill_value=0)
-    drot = f(rot(Yi, Xi, -np.radians(bpa)))
+    drot = f(tuple(rot(Yi, Xi, -np.radians(bpa))))
     par0 = np.clip(di[::yskip, ::xskip], 0, None) / gsum
     bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
     popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
                         p0=par0, bounds=bounds)
     f = RGI((ymodel, xmodel), np.reshape(popt, (ynpar, xnpar)),
             method='linear', bounds_error=False, fill_value=0)
-    return f(rot(*np.meshgrid(y, x), np.radians(bpa)))
+    return f(tuple(rot(*np.meshgrid(y, x), np.radians(bpa))))
 
 class ChannelFit():
 
