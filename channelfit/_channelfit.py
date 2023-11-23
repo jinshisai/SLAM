@@ -125,7 +125,7 @@ def deconvolve(data, x, y, bmaj, bmin, bpa):
     f = RGI((yi, xi), di, method='linear',
             bounds_error=False, fill_value=0)
     drot = f(tuple(rot(Yi, Xi, -np.radians(bpa))))
-    par0 = np.clip(di[::yskip, ::xskip], 0, None) / gsum
+    par0 = np.ravel(di[::yskip, ::xskip]).clip(0, None) / gsum
     bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
     popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
                         p0=par0, bounds=bounds)
