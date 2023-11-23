@@ -90,26 +90,27 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     return cleancomponent, cleanresidual
     
 def deconvolve(data, x, y, bmaj, bmin, bpa):
-    dx, dy = np.abs(x[1] - x[0]), np.abs(y[1] - y[0])
-    xhpix = int(np.floor(bmin / 2 / dx))
-    yhpix = int(np.floor(bmaj / 2 / dy))
-    nx = int(np.floor((len(x) - 1) / 2 / xhpix) * 2 * xhpix + 1)
-    ny = int(np.floor((len(y) - 1) / 2 / yhpix) * 2 * yhpix + 1)
-    nx0 = (len(x) - nx) // 2
-    ny0 = (len(y) - ny) // 2
-    xi, yi = x[nx - 1 + nx0::-1], y[ny0:ny]
+    xi, yi = x[::-1], y
     Xi, Yi = np.meshgrid(xi, yi)
-    s, t = rot(Xi, Yi, np.radians(bpa))
-    f = RGI((y, x[::-1]), data[:, ::-1], method='linear',
-            bounds_error=False, fill_value=0)
-    d = f((t, s))
     g = np.exp2(-4 * ((Xi / bmin)**2 + (Yi / bmaj)**2))
     gsum = np.sum(g)
-    xmodel = xi[::xhpix]
-    ymodel = yi[::yhpix]
+    rmax = np.max([np.max(np.abs(x)), np.max(np.abs(y))])
+    nxmodel = int(np.ceil(rmax / (bmin / 2)))
+    nymodel = int(np.ceil(rmax / (bmaj / 2)))
+    xmaxmodel = nxmodel * bmin
+    ymaxmodel = nymodel * bmaj
+    xmodel = np.linspace(-xmaxmodel, xmaxmodel, 2 * nxmodel + 1)
+    ymodel = np.linspace(-ymaxmodel, ymaxmodel, 2 * nymodel + 1)
+    xmodel[nxmodel] = 0
+    ymodel[nymodel] = 0
     xnpar = len(xmodel)
     ynpar = len(ymodel)
-    par0 = np.ravel(np.abs(d[::yhpix, ::xhpix]) / gsum)
+    f = RGI((yi, xi), data[:, ::-1], method='linear',
+            bounds_error=False, fill_value=0)
+    s, t = rot(Xi, Yi, np.radians(bpa))
+    d = f((t, s))
+    s, t = rot(*np.meshgrid(xmodel, ymodel), np.radians(bpa))
+    par0 = np.ravel(f((t, s))) / gsum
     def model(x, *par):
         f = RGI((ymodel, xmodel), np.reshape(par, (ynpar, xnpar)),
                 method='linear', bounds_error=False, fill_value=0)
