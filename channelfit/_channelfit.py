@@ -90,7 +90,8 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     cleancomponent = cleancomponent + cleanresidual / np.sum(beam)
     return cleancomponent, cleanresidual
     
-def deconvolve(data, x, y, bmaj, bmin, bpa):
+def deconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
+               bmaj: float, bmin: float, bpa: float) -> np.ndarray:
     nx = len(x)
     ny = len(y)
     dx = np.abs(x[1] - x[0])
