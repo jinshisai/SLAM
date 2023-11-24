@@ -131,9 +131,11 @@ def deconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
     popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
                         p0=par0, bounds=bounds)
-    f = RGI((ymodel, xmodel), np.reshape(popt, (ynpar, xnpar)),
+    zmodel = np.reshape(popt, (ynpar, xnpar))
+    f = RGI((ymodel, xmodel), zmodel,
             method='linear', bounds_error=False, fill_value=0)
-    return f(tuple(rot(*np.meshgrid(x, y), -np.radians(bpa)))[::-1])
+    model = f(tuple(rot(*np.meshgrid(x, y), -np.radians(bpa)))[::-1])
+    return model, xmodel, ymodel, zmodel
 
 class ChannelFit():
 
@@ -365,7 +367,7 @@ class ChannelFit():
             self.gaussbeam = self.gaussbeam[:, ::-1]
             d = deconvolve(x=self.x, y=self.y, data=self.mom0,
                            bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa)
-            self.cleancomponent = d
+            self.cleancomponent, self.xdecon, self.ydecon, self.zdecon = d
             self.cleanresidual = self.mom0 - convolve(d, self.gaussbeam, mode='same')
             print('Found a deconvolved solution.')
                 
@@ -788,6 +790,30 @@ class ChannelFit():
             ax.set_aspect(1)
             fig.savefig(filename.replace('.png', '') + f'.clean{s}.png')
             plt.close()
+
+    def plotdeconvolution(self, filename: str = 'deconvolution.png'):
+        if not(hasattr(self, 'xdecon') and hasattr(self, 'ydecon') and hasattr(self, 'zdecon')):
+            print('No deconvolution solution generated.')
+            return 
+        x, y, z = self.xdecon, self.ydecon, self.zdecon / self.sigma
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        m = ax.pcolormesh(x, y, z, cmap='jet', vmin=z.min(), vmax=z.max())
+        fig.colorbar(m, ax=ax, label=f'Deconvolution / ' + r'$\sigma$')
+        r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
+        ax.plot(r * self.sinpa, r * self.cospa, 'k:')
+        ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
+        bpos = np.max(self.x) - 0.7 * self.bmaj
+        e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
+                    angle=0, facecolor='gray')
+        ax.add_patch(e)
+        ax.set_xlabel('Beam major offset (au)')
+        ax.set_ylabel('Beam minor offset (au)')
+        ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
+        ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
+        ax.set_aspect(1)
+        fig.savefig(filename.replace('.png', '') + f'.deconvolution.png')
+        plt.close()
 
     def equivelocity(self, filename: str = 'equivel.png', **kwargs):
         if kwargs != {}:
