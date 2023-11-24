@@ -368,7 +368,7 @@ class ChannelFit():
             d = deconvolve(x=self.x, y=self.y, data=self.mom0,
                            bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa)
             self.cleancomponent, self.xdecon, self.ydecon, self.zdecon = d
-            self.cleanresidual = self.mom0 - convolve(d, self.gaussbeam, mode='same')
+            self.cleanresidual = self.mom0 - convolve(d[0], self.gaussbeam, mode='same')
             print('Found a deconvolved solution.')
                 
     def update_incl(self, incl: float):
