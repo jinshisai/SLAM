@@ -13,6 +13,7 @@ Note. FITS files with multiple beams are not supported. The dynamic range for xl
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse
 from astropy.io import fits
 from astropy import constants, units, wcs
 from astropy.coordinates import SkyCoord
@@ -748,6 +749,10 @@ class ChannelFit():
         r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
         ax.plot(r * self.sinpa, r * self.cospa, 'k:')
         ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
+        bpos = np.max(self.x) - 0.7 * self.bmaj
+        e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
+                    angle=self.bpa * np.sign(self.dx), facecolor='gray')
+        ax.add_patch(e)
         ax.set_xlabel('R.A. offset (au)')
         ax.set_ylabel('Dec. offset (au)')
         ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
@@ -771,6 +776,10 @@ class ChannelFit():
             r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
             ax.plot(r * self.sinpa, r * self.cospa, 'k:')
             ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
+            bpos = np.max(self.x) - 0.7 * self.bmaj
+            e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
+                        angle=self.bpa * np.sign(self.dx), facecolor='gray')
+            ax.add_patch(e)
             ax.set_xlabel('R.A. offset (au)')
             ax.set_ylabel('Dec. offset (au)')
             ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
