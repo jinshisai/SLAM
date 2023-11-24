@@ -126,7 +126,7 @@ def deconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         return np.ravel(f)
     f = RGI((yi, xi), di, method='linear',
             bounds_error=False, fill_value=0)
-    drot = f(tuple(rot(Xi, Yi, np.radians(bpa)))[::-1])
+    drot = f(tuple(rot(Xi, Yi, -np.radians(bpa)))[::-1])
     par0 = np.ravel(di[::yskip, ::xskip]).clip(0, None) / gsum
     bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
     popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
@@ -134,7 +134,7 @@ def deconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     zmodel = np.reshape(popt, (ynpar, xnpar))
     f = RGI((ymodel, xmodel), zmodel,
             method='linear', bounds_error=False, fill_value=0)
-    model = f(tuple(rot(*np.meshgrid(x, y), -np.radians(bpa)))[::-1])
+    model = f(tuple(rot(*np.meshgrid(x, y), np.radians(bpa)))[::-1])
     return model, xmodel, ymodel, zmodel
 
 class ChannelFit():
