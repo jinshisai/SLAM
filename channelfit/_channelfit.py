@@ -801,8 +801,10 @@ class ChannelFit():
         m = ax.pcolormesh(x, y, z, cmap='jet', vmin=z.min(), vmax=z.max())
         fig.colorbar(m, ax=ax, label=f'Deconvolution / ' + r'$\sigma$')
         r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
-        ax.plot(r * self.sinpa, r * self.cospa, 'k:')
-        ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
+        pa = self.pa_rad - np.radians(self.bpa)
+        sinpa, cospa = np.sin(pa), np.cos(pa)
+        ax.plot(r * sinpa, r * cospa, 'k:')
+        ax.plot(r * cospa, -r * sinpa, 'k:')
         bpos = np.max(self.x) - 0.7 * self.bmaj
         e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
                     angle=0, facecolor='gray')
