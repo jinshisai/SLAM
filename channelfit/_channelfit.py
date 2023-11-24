@@ -423,12 +423,12 @@ class ChannelFit():
         self.prof, self.prof_n, self.prof_d = p, n - 1, d
 
     def update_getvlos(self, Rc: float, Rin: float):
-        def getvlos(x_in: np.ndarray):
+        def getvlos(x_in: np.ndarray, h_in: float):
             if x_in is None:
                 return None
             r = np.hypot(x_in, self.Ynest)
             c = r > Rc
-            vp = r**(-1/2)
+            vp = r**(-1/2) * (1 + h_in**2)**(-3/2)
             vr = r * 0
             if self.envelope:
                 vp[c] = np.sqrt(Rc) / r[c]
@@ -444,8 +444,8 @@ class ChannelFit():
             return vlos
         self.getvlos = getvlos
         
-    def update_vlos(self):
-        self.vlos = [self.getvlos(x) for x in self.xdisk]
+    def update_vlos(self, h1: float, h2: float):
+        self.vlos = [self.getvlos(x, h) for x, h in zip(self.xdisk, [h1, h2])]
     
     def get_Iunif(self, Mstar: float, Rc: float, pI: float,
                  Ienv: float, offvsys: float) -> np.ndarray:
@@ -516,7 +516,7 @@ class ChannelFit():
             self.update_getvlos(Rc, Rin)
         if self.free['h1'] or self.free['h2'] \
             or self.free['Rc'] or self.free['Rin']:
-            self.update_vlos()
+            self.update_vlos(h1, h2)
 
         Iunif = self.get_Iunif(Mstar, Rc, pI, Ienv, voff)
         if 'mom0' in self.scaling:
@@ -585,7 +585,7 @@ class ChannelFit():
             self.update_getvlos(Rc_fixed, Rin_fixed)
         if not (self.free['h1'] or self.free['h2'] 
                 or self.free['Rc'] or self.free['Rin']):
-            self.update_vlos()
+            self.update_vlos(h1_fixed, h2_fixed)
         
         if None in p_fixed:
             notfixed = p_fixed == None
