@@ -447,7 +447,7 @@ class ChannelFit():
         self.getvlos = getvlos
         
     def update_vlos(self, h1: float, h2: float):
-        self.vlos = [self.getvlos(x, h) for x, h in zip(self.xdisk, [h1, h2])]
+        self.vlos = [self.getvlos(x, h) for x, h in zip(self.xdisk, [h1, h1, h2, h2])]
     
     def get_Iunif(self, Mstar: float, Rc: float, pI: float,
                  Ienv: float, offvsys: float) -> np.ndarray:
