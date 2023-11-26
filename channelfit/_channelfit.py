@@ -809,8 +809,8 @@ class ChannelFit():
         e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
                     angle=0, facecolor='gray')
         ax.add_patch(e)
-        ax.set_xlabel('Beam major offset (au)')
-        ax.set_ylabel('Beam minor offset (au)')
+        ax.set_xlabel('Beam minor offset (au)')
+        ax.set_ylabel('Beam major offset (au)')
         ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
         ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
         ax.set_aspect(1)
