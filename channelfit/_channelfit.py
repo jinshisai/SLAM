@@ -148,7 +148,7 @@ def fftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     yg = np.linspace(-nyh * dy, nyh * dy, ny)
     xg, yg = rot(*np.meshgrid(xg, yg), np.radians(bpa))
     g = np.exp2(-4 * ((yg / bmaj)**2 + (xg / bmin)**2))
-    dnew = np.fft.fft2(np.fft.ifft2(d) / np.fft.ifft2(g))
+    dnew = np.real(np.fft.fft2(np.fft.ifft2(d) / np.fft.ifft2(g)))
     if len(x) % 2 == 0:
         dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
     if len(y) % 2 == 0:
