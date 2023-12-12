@@ -88,10 +88,10 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         cleancomponent = cleancomponent + cc
         cleanresidual = newresidual
     cleancomponent = cleancomponent + cleanresidual / np.sum(beam)
-    return cleancomponent, cleanresidual
+    return cleancomponent
     
-def deconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
-               bmaj: float, bmin: float, bpa: float) -> np.ndarray:
+def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
+                    bmaj: float, bmin: float, bpa: float) -> tuple:
     nx = len(x)
     ny = len(y)
     dx = np.abs(x[1] - x[0])
@@ -136,6 +136,24 @@ def deconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
             method='linear', bounds_error=False, fill_value=0)
     model = f(tuple(rot(*np.meshgrid(x, y), np.radians(bpa)))[::-1])
     return model, xmodel, ymodel, zmodel
+
+def fftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
+                  bmaj: float, bmin: float, bpa: float, cutoff: float) -> np.ndarray:
+    d = data[int(len(y) % 2 == 0):, int(len(x) % 2 == 0):]
+    d[d < cutoff] = 0
+    ny, nx = np.shape(d)
+    nyh, nxh = (ny - 1) // 2, (nx - 1) // 2
+    dx, dy = x[1] - x[0], y[1] - y[0]
+    xg = np.linspace(-nxh * dx, nxh * dx, nx)
+    yg = np.linspace(-nyh * dy, nyh * dy, ny)
+    xg, yg = rot(*np.meshgrid(xg, yg), np.radians(bpa))
+    g = np.exp2(-4 * ((yg / bmaj)**2 + (xg / bmin)**2))
+    dnew = np.fft.fft2(np.fft.ifft2(d) / np.fft.ifft2(g))
+    if len(x) % 2 == 0:
+        dnew = np.concatenate(np.zeros((np.shape(dnew)[0], 1)), dnew, axis=1)
+    if len(y) % 2 == 0:
+        dnew = np.concatenate(np.zeros((1, np.shape(dnew)[1])), dnew, axis=0)
+    return dnew
 
 class ChannelFit():
 
@@ -358,18 +376,25 @@ class ChannelFit():
         self.xneed = self.xnest[0][self.ineed0:self.ineed1]
         self.yneed = self.ynest[0][self.ineed0:self.ineed1]
 
+        if 'mom0' in self.scaling:
+            self.gaussbeam = self.gaussbeam[:, ::-1]
         if self.scaling == 'mom0clean':
-            self.gaussbeam = self.gaussbeam[:, ::-1]
-            c = clean(data=self.mom0, beam=self.gaussbeam,
-                      sigma=self.sigma_mom0, threshold=2)
-            self.cleancomponent, self.cleanresidual = c
+            self.mom0decon = clean(data=self.mom0, beam=self.gaussbeam,
+                                   sigma=self.sigma_mom0, threshold=2)
         if self.scaling == 'mom0fitting':
-            self.gaussbeam = self.gaussbeam[:, ::-1]
-            d = deconvolve(x=self.x, y=self.y, data=self.mom0,
-                           bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa)
-            self.cleancomponent, self.xdecon, self.ydecon, self.zdecon = d
-            self.cleanresidual = self.mom0 - convolve(d[0], self.gaussbeam, mode='same')
+            d = modeldeconvolve(x=self.x, y=self.y, data=self.mom0,
+                                bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa)
+            self.mom0decon, self.xdecon, self.ydecon, self.zdecon = d
             print('Found a deconvolved solution.')
+        if self.scaling == 'mom0fft':
+            self.mom0decon = fftdeconvolve(x=self.x, y=self.y, data=self.mom0,
+                                           bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
+                                           cutoff=3 * self.sigma_mom0)
+            print('Divided in the Fourier space.')
+        if 'mom0' in self.scaling:
+            c = convolve(self.mom0decon, self.gaussbeam, mode='same')
+            self.resdecon = self.mom0 - c
+
                 
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
@@ -525,7 +550,7 @@ class ChannelFit():
             Iunif = self.rgi2d(xoff, yoff, Iunif)
             mom0unif = np.sum(Iunif, axis=0) * self.dv
             mom0unif[mom0unif < 0] = np.nan
-            Iunif = self.cleancomponent * Iunif / mom0unif
+            Iunif = self.mom0decon * Iunif / mom0unif
             Iunif = np.nan_to_num(Iunif)
         if convolving:
             Iout = convolve(Iunif, [self.gaussbeam], mode='same')
@@ -765,11 +790,11 @@ class ChannelFit():
         plt.close()
 
     def plotclean(self, filename: str = 'clean.png'):
-        if not(hasattr(self, 'cleancomponent') and hasattr(self, 'cleanresidual')):
+        if not(hasattr(self, 'mom0decon') and hasattr(self, 'resdecon')):
             print('No CLEAN component and residual generated.')
             return 
-        cc = self.cleancomponent / self.sigma_mom0
-        cr = self.cleanresidual / self.sigma_mom0
+        cc = self.mom0decon / self.sigma_mom0
+        cr = self.resdecon / self.sigma_mom0
         for c, vmin, vmax, s in zip([cc, cr], [cc.min(), -6], [cc.max(), 6],
                                     ['component', 'residual']):
             fig = plt.figure()
