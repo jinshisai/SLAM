@@ -148,8 +148,8 @@ def fftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     dx, dy = x[1] - x[0], y[1] - y[0]
     xg = np.linspace(-nxh * dx, nxh * dx, nx)
     yg = np.linspace(-nyh * dy, nyh * dy, ny)
-    xg, yg = rot(*np.meshgrid(xg, yg), np.radians(bpa))
-    g = np.exp2(-4 * ((yg / bmaj)**2 + (xg / bmin)**2))
+    s, t = rot(*np.meshgrid(xg, yg), np.radians(bpa))
+    g = np.exp2(-4 * ((t / bmaj)**2 + (s / bmin)**2))
     u = np.fft.fftshift(np.fft.fftfreq(nx, d=dx))
     v = np.fft.fftshift(np.fft.fftfreq(ny, d=dy))
     u, v = np.meshgrid(u, v)
