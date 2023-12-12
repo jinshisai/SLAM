@@ -155,6 +155,7 @@ def fftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     u, v = np.meshgrid(u, v)
     phase0 = 2 * np.pi * (u * (xg[-1] + dx) + v * (yg[-1] + dy))
     FTg = np.fft.fftshift(np.fft.fft2(g)) * np.exp(-1j * phase0)
+    FTg = np.real(FTg) + 1j * 0
     phase0 = 2 * np.pi * (u * (xd[-1] + dx) + v * (yd[-1] + dy))
     FTd = np.fft.fftshift(np.fft.fft2(d)) * np.exp(-1j * phase0)
     FTdnew = FTd / FTg * np.exp(1j * phase0)
