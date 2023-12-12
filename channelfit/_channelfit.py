@@ -150,9 +150,9 @@ def fftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     g = np.exp2(-4 * ((yg / bmaj)**2 + (xg / bmin)**2))
     dnew = np.fft.fft2(np.fft.ifft2(d) / np.fft.ifft2(g))
     if len(x) % 2 == 0:
-        dnew = np.concatenate(np.zeros((np.shape(dnew)[0], 1)), dnew, axis=1)
+        dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
     if len(y) % 2 == 0:
-        dnew = np.concatenate(np.zeros((1, np.shape(dnew)[1])), dnew, axis=0)
+        dnew = np.concatenate((np.zeros((1, np.shape(dnew)[1])), dnew), axis=0)
     return dnew
 
 class ChannelFit():
