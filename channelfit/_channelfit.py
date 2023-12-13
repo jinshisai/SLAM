@@ -150,15 +150,18 @@ def fftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     yg = np.linspace(-nyh * dy, nyh * dy, ny)
     s, t = rot(*np.meshgrid(xg, yg), np.radians(bpa))
     g = np.exp2(-4 * ((t / bmaj)**2 + (s / bmin)**2))
+    gh = np.exp2(-4 * ((t / (bmaj / 2))**2 + (s / (bmin / 2))**2))
     u = np.fft.fftshift(np.fft.fftfreq(nx, d=dx))
     v = np.fft.fftshift(np.fft.fftfreq(ny, d=dy))
     u, v = np.meshgrid(u, v)
     phase0 = 2 * np.pi * (u * (xg[-1] + dx) + v * (yg[-1] + dy))
     FTg = np.fft.fftshift(np.fft.fft2(g)) * np.exp(-1j * phase0)
+    FTgh = np.fft.fftshift(np.fft.fft2(gh)) * np.exp(-1j * phase0)
     FTg = np.real(FTg) + 1j * 0
+    FTgh = np.real(FTgh) + 1j * 0
     phase0 = 2 * np.pi * (u * (xd[-1] + dx) + v * (yd[-1] + dy))
     FTd = np.fft.fftshift(np.fft.fft2(d)) * np.exp(-1j * phase0)
-    FTdnew = FTd / FTg * np.exp(1j * phase0)
+    FTdnew = FTd / FTg * FTgh * np.exp(1j * phase0)
     dnew = np.real(np.fft.ifft2(np.fft.ifftshift(FTdnew)))
     if len(x) % 2 == 0:
         dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
