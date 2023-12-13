@@ -809,8 +809,9 @@ class ChannelFit():
             return 
         cc = self.mom0decon / self.sigma_mom0
         cr = self.resdecon / self.sigma_mom0
-        ccmax = np.max(np.abs(cc))
-        for c, vmin, vmax, s in zip([cc, cr], [-ccmax, -6], [ccmax, 6],
+        ccmax = np.max(cc)
+        ccmin = np.min(cc)
+        for c, vmin, vmax, s in zip([cc, cr], [ccmin, -6], [ccmax, 6],
                                     ['component', 'residual']):
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
