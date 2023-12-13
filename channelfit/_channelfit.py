@@ -138,11 +138,11 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     return model, xmodel, ymodel, zmodel
 
 def fftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
-                  bmaj: float, bmin: float, bpa: float, cutoff: float) -> np.ndarray:
+                  bmaj: float, bmin: float, bpa: float,
+                  sigma: float, threshold: float = 3) -> np.ndarray:
     xd = x[int(len(x) % 2 == 0):]
     yd = y[int(len(y) % 2 == 0):]
     d = data[int(len(y) % 2 == 0):, int(len(x) % 2 == 0):]
-    d[d < cutoff] = 0
     ny, nx = np.shape(d)
     nyh, nxh = (ny - 1) // 2, (nx - 1) // 2
     dx, dy = x[1] - x[0], y[1] - y[0]
@@ -150,19 +150,19 @@ def fftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     yg = np.linspace(-nyh * dy, nyh * dy, ny)
     s, t = rot(*np.meshgrid(xg, yg), np.radians(bpa))
     g = np.exp2(-4 * ((t / bmaj)**2 + (s / bmin)**2))
-    gh = np.exp2(-4 * ((t / (bmaj / 2))**2 + (s / (bmin / 2))**2))
     u = np.fft.fftshift(np.fft.fftfreq(nx, d=dx))
     v = np.fft.fftshift(np.fft.fftfreq(ny, d=dy))
     u, v = np.meshgrid(u, v)
     phase0 = 2 * np.pi * (u * (xg[-1] + dx) + v * (yg[-1] + dy))
     FTg = np.fft.fftshift(np.fft.fft2(g)) * np.exp(-1j * phase0)
-    FTgh = np.fft.fftshift(np.fft.fft2(gh)) * np.exp(-1j * phase0)
-    FTg = np.real(FTg) + 1j * 0
-    FTgh = np.real(FTgh) + 1j * 0
+    rFTg = np.real(FTg)
+    FTg = rFTg + 1j * 0
+    FTg[rFTg < np.max(rFTg) * 1e-2] = 1 + 1j * 0
     phase0 = 2 * np.pi * (u * (xd[-1] + dx) + v * (yd[-1] + dy))
     FTd = np.fft.fftshift(np.fft.fft2(d)) * np.exp(-1j * phase0)
-    FTdnew = FTd / FTg * FTgh * np.exp(1j * phase0)
-    dnew = np.real(np.fft.ifft2(np.fft.ifftshift(FTdnew)))
+    FTdnew = FTd / FTg
+    dnew = np.real(np.fft.ifft2(np.fft.ifftshift(FTdnew * np.exp(1j * phase0))))
+    dnew[np.abs(d) < sigma * threshold] = 0
     if len(x) % 2 == 0:
         dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
     if len(y) % 2 == 0:
@@ -403,7 +403,7 @@ class ChannelFit():
         if self.scaling == 'mom0fft':
             self.mom0decon = fftdeconvolve(x=self.x, y=self.y, data=self.mom0,
                                            bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
-                                           cutoff=3 * self.sigma_mom0)
+                                           sigma = self.sigma_mom0, threshold=3)
             print('Divided in the Fourier space.')
         if 'mom0' in self.scaling:
             c = convolve(self.mom0decon, self.gaussbeam, mode='same')
