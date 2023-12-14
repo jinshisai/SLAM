@@ -137,7 +137,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     model = f(tuple(rot(*np.meshgrid(x, y), np.radians(bpa)))[::-1])
     return model, xmodel, ymodel, zmodel
 
-def fftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
+def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                   bmaj: float, bmin: float, bpa: float,
                   sigma: float, threshold: float = 3) -> np.ndarray:
     xd = x[int(len(x) % 2 == 0):]
@@ -400,8 +400,8 @@ class ChannelFit():
                                 bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa)
             self.mom0decon, self.xdecon, self.ydecon, self.zdecon = d
             print('Found a deconvolved solution.')
-        if self.scaling == 'mom0fft':
-            self.mom0decon = fftdeconvolve(x=self.x, y=self.y, data=self.mom0,
+        if self.scaling == 'mom0ft':
+            self.mom0decon = ftdeconvolve(x=self.x, y=self.y, data=self.mom0,
                                            bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
                                            sigma = self.sigma_mom0, threshold=3)
             print('Divided in the Fourier space.')
