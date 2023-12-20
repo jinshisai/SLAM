@@ -247,20 +247,25 @@ class PVSilhouette():
         minintp = interp1d(self.v, self.dpvminor, kind='cubic', axis=0)(vintp)
         vobs = []
         vobserr = []
-        for c in [majintp.T, minintp.T]:
-            grad = (np.roll(c, -1) - np.roll(c, 1)) / (2 * self.dx)
-            cond = (c > cutoff * self.sigma)
-            cond = cond * ((vintp < vmask[0]) + (vmask[1] < vintp))
-            grad, vgood = grad[cond], vintp[cond]
-            err = self.sigma / np.abs(grad)
-            if len(vgood) == 0:
-                vobs.append([np.nan, np.nan])
-                vobserr.append([np.nan, np.nan])
-            else:
-                vobs.append([vgood[0], vgood[-1]])
-                vobserr.append([err[0], err[-1]])
-        vobs = np.array(vobs)
-        vobserr = np.array(vobserr)
+        for d in [majintp.T, minintp.T]:
+            vtmp = []
+            dvtmp = []
+            for c in d:
+                grad = (np.roll(c, -1) - np.roll(c, 1)) / (2 * self.dx)
+                cond = (c > cutoff * self.sigma)
+                cond = cond * ((vintp < vmask[0]) + (vmask[1] < vintp))
+                grad, vgood = grad[cond], vintp[cond]
+                err = self.sigma / np.abs(grad)
+                if len(vgood) == 0:
+                    vtmp.append([np.nan, np.nan])
+                    dvtmp.append([np.nan, np.nan])
+                else:
+                    vtmp.append([vgood[0], vgood[-1]])
+                    dvtmp.append([err[0], err[-1]])
+            vobs.append(vtmp)
+            vobserr.append(dvtmp)
+        vobs = np.moveaxis(vobs, 1, 2)
+        vobserr = np.moveaxis(vobserr, 1, 2)
         def getquad(m):
             nv, nx = np.shape(m)
             q =   np.sum(m[:nv//2, :nx//2]) + np.sum(m[nv//2:, nx//2:]) \
