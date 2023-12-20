@@ -241,14 +241,15 @@ class PVSilhouette():
                 show: bool = False,
                 progressbar: bool = True,
                 kwargs_emcee_corner: dict = {}):
-        beamlength = np.abs(self.bmaj / self.dx)
+        Nyquistskip = int(np.round(self.bmaj / self.dx / 2))
+        x = self.x[::Nyquistskip]
         vintp = np.linspace(self.v[0], self.v[-1], (len(self.v) - 1) * 10 + 1)
         dvintp = vintp[1] - vintp[0]
         majintp = interp1d(self.v, self.dpvmajor, kind='cubic', axis=0)(vintp)
         minintp = interp1d(self.v, self.dpvminor, kind='cubic', axis=0)(vintp)
         vobs = []
         vobserr = []
-        for d in [majintp.T, minintp.T]:
+        for d in [majintp.T[::Nyquistskip], minintp.T[:Nyquistskip]]:
             vtmp = []
             dvtmp = []
             for c in d:
@@ -275,7 +276,7 @@ class PVSilhouette():
         majquad = getquad(self.dpvmajor)
         minquad = getquad(self.dpvminor) * (-1)
         def makemodel(Mstar, Rc, alphainfall):
-            a = velmax(self.x, Mstar=Mstar, Rc=Rc,
+            a = velmax(x, Mstar=Mstar, Rc=Rc,
                        alphainfall=alphainfall, incl=incl)
             vmod = [[a[i][j][::k] for j in ['vlosmin', 'vlosmax']]
                     for i, k in zip(['major', 'minor'], [majquad, minquad])]
@@ -300,7 +301,7 @@ class PVSilhouette():
                 q = p_fixed.copy()
                 q[p_fixed == None] = 10**p
                 chi2 = np.nansum(((vobs - makemodel(*q)) / vobserr)**2)
-                return -0.5 * chi2 / beamlength
+                return -0.5 * chi2
             plim = np.array([Mstar_range, Rc_range, alphainfall_range])
             plim = np.log10(plim[p_fixed == None]).T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
@@ -321,26 +322,26 @@ class PVSilhouette():
         print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
         print(f'alpha = {plow[2]:.2f}, {popt[2]:.2f}, {phigh[2]:.2f}')
 
-        a = velmax(self.x, Mstar=popt[0], Rc=popt[1],
+        a = velmax(x, Mstar=popt[0], Rc=popt[1],
                    alphainfall=popt[2], incl=incl)
         fig = plt.figure()
         ax = fig.add_subplot(1, 2, 1)
         ax.contour(self.x, self.v, self.dpvmajor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x * majquad, a['major']['vlosmax'], '-r')
-        ax.plot(self.x * majquad, a['major']['vlosmin'], '-r')
-        ax.errorbar(self.x, vobs[0][0], yerr=vobserr[0][0], fmt='ob', ms=1)
-        ax.errorbar(self.x, vobs[0][1], yerr=vobserr[0][1], fmt='ob', ms=1)
+        ax.plot(x * majquad, a['major']['vlosmax'], '-r')
+        ax.plot(x * majquad, a['major']['vlosmin'], '-r')
+        ax.errorbar(x, vobs[0][0], yerr=vobserr[0][0], fmt='ob', ms=1)
+        ax.errorbar(x, vobs[0][1], yerr=vobserr[0][1], fmt='ob', ms=1)
         ax.set_xlabel('major offset (au)')
         ax.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
         ax.set_ylim(np.min(self.v), np.max(self.v))
         ax = fig.add_subplot(1, 2, 2)
         ax.contour(self.x, self.v, self.dpvminor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x * minquad, a['minor']['vlosmax'], '-r')
-        ax.plot(self.x * minquad, a['minor']['vlosmin'], '-r')
-        ax.errorbar(self.x, vobs[1][0], yerr=vobserr[1][0], fmt='ob', ms=1)
-        ax.errorbar(self.x, vobs[1][1], yerr=vobserr[1][1], fmt='ob', ms=1)
+        ax.plot(x * minquad, a['minor']['vlosmax'], '-r')
+        ax.plot(x * minquad, a['minor']['vlosmin'], '-r')
+        ax.errorbar(x, vobs[1][0], yerr=vobserr[1][0], fmt='ob', ms=1)
+        ax.errorbar(x, vobs[1][1], yerr=vobserr[1][1], fmt='ob', ms=1)
         ax.set_xlabel('minor offset (au)')
         ax.set_ylim(self.v.min(), self.v.max())
         ax.set_title(r'$M_{*}$'+f'={popt[0]:.2f}'+r'$M_{\odot}$'
