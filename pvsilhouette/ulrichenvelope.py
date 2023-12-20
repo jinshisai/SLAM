@@ -119,14 +119,12 @@ def velmax(r: np.ndarray, Mstar: float, Rc: float,
     x, y, z = XYZ2xyz(irad, 0, X, zero, Z)
     r, t, p = xyz2rtp(x, y, z)
     vlos = losvel(elos, r, t, p, alphainfall)
-    #vlos[(t < np.pi / 4 ) + (np.pi * 3 / 4 < t)] = 0  # remove outflow cavity
     vlosmax = np.nanmax(vlos, axis=0)
     vlosmin = np.nanmin(vlos, axis=0)
     a['major'] = {'vlosmax':vlosmax * vunit, 'vlosmin':vlosmin * vunit}
     x, y, z = XYZ2xyz(irad, 0, zero, X, Z)
     r, t, p = xyz2rtp(x, y, z)
     vlos = losvel(elos, r, t, p, alphainfall)
-    #vlos[(t < np.pi / 4 ) + (np.pi * 3 / 4 < t)] = 0  # remove outflow cavity
     vlosmax = np.nanmax(vlos, axis=0)
     vlosmin = np.nanmin(vlos, axis=0)
     a['minor'] = {'vlosmax':vlosmax * vunit, 'vlosmin':vlosmin * vunit}
