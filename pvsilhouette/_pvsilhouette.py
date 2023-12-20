@@ -322,10 +322,10 @@ class PVSilhouette():
             popt[:2] = 10**popt[:2]
             plow = p_fixed.copy()
             plow[p_fixed == None] = mcmc[1]
-            plow[:2] = 10**popt[:2]
+            plow[:2] = 10**plow[:2]
             phigh = p_fixed.copy()
             phigh[p_fixed == None] = mcmc[3]
-            phigh[:2] = 10**popt[:2]
+            phigh[:2] = 10**phigh[:2]
         else:
             popt = p_fixed
             plow = p_fixed
