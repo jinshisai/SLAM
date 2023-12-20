@@ -272,7 +272,9 @@ class PVSilhouette():
             vobserr.append(dvtmp)
         vobs = np.moveaxis(vobs, 1, 2)
         vobserr = np.moveaxis(vobserr, 1, 2)
-        vobserr = np.clip(vobserr, np.max([minabserr * self.dv, minrelerr * vobs]), None)
+        aerr = np.full(np.shape(vobserr), minabserr * self.dv)
+        rerr = minrelerr * vobs
+        vobserr = np.max([vobserr, aerr, rerr], axis=0)
         def getquad(m):
             nv, nx = np.shape(m)
             q =   np.sum(m[:nv//2, :nx//2]) + np.sum(m[nv//2:, nx//2:]) \
