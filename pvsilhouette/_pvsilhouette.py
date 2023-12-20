@@ -233,9 +233,11 @@ class PVSilhouette():
                 Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
                 alphainfall_range: list = [0.01, 1],
+                cavityangle_range: list = [0, 90],
                 Mstar_fixed: float = None,
                 Rc_fixed: float = None,
                 alphainfall_fixed: float = None,
+                cavityangle_fixed: float = None,
                 cutoff: float = 5, vmask: list = [0, 0],
                 figname: str = 'PVsilhouette',
                 show: bool = False,
@@ -289,11 +291,12 @@ class PVSilhouette():
                     for i, k in zip(['major', 'minor'], [majquad, minquad])]
             return np.array(vmod)
 
-        p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed])
+        p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed, cavityangle_fixed])
         if None in p_fixed:
-            labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$'])
+            labels = np.array(['log Mstar', 'log Rc', r'$\alpha_{\rm inf}$',
+                               '$\theta_{\rm cav} (deg)$'])
             labels = labels[p_fixed == None]
-            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':100, 'nsteps':500,
+            kwargs0 = {'nwalkers_per_ndim':8, 'nburnin':200, 'nsteps':500,
                        'rangelevel':None, 'labels':labels,
                        'figname':figname+'.corner.png', 'show_corner':show}
             kwargs = dict(kwargs0, **kwargs_emcee_corner)
@@ -306,18 +309,23 @@ class PVSilhouette():
                 if progressbar:
                     bar.update(1)
                 q = p_fixed.copy()
-                q[p_fixed == None] = 10**p
+                q[p_fixed == None] = p
+                q[:2] = 10**q[:2]
                 chi2 = np.nansum(((vobs - makemodel(*q)) / vobserr)**2)
                 return -0.5 * chi2
-            plim = np.array([Mstar_range, Rc_range, alphainfall_range])
-            plim = np.log10(plim[p_fixed == None]).T
+            plim = np.array([Mstar_range, Rc_range, alphainfall_range, cavityangle_range])
+            plim[:2] = np.log10(plim[:2])
+            plim = plim[p_fixed == None].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
             popt = p_fixed.copy()
-            popt[p_fixed == None] = 10**mcmc[0]
+            popt[p_fixed == None] = mcmc[0]
+            popt[:2] = 10**popt[:2]
             plow = p_fixed.copy()
-            plow[p_fixed == None] = 10**mcmc[1]
+            plow[p_fixed == None] = mcmc[1]
+            plow[:2] = 10**popt[:2]
             phigh = p_fixed.copy()
-            phigh[p_fixed == None] = 10**mcmc[3]
+            phigh[p_fixed == None] = mcmc[3]
+            phigh[:2] = 10**popt[:2]
         else:
             popt = p_fixed
             plow = p_fixed
