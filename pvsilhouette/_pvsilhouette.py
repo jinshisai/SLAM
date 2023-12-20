@@ -347,7 +347,7 @@ class PVSilhouette():
         ax.set_title(r'$M_{*}$'+f'={popt[0]:.2f}'+r'$M_{\odot}$'
             +', '+r'$R_{c}$'+f'={popt[1]:.0f} au'
             +'\n'+r'$\alpha$'+f'={popt[2]:.2f}'
-            +', '+r'$\alpha ^{2} M_{*}$'+f'={popt[0] * popt[2]**2:.2}')
+            +', '+r'$\alpha ^{2} M_{*}$'+f'={popt[0] * popt[2]**2:.2f}')
         fig.tight_layout()
         fig.savefig(figname + '.model.png')
         if show: plt.show()
