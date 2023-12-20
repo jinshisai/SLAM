@@ -284,9 +284,9 @@ class PVSilhouette():
             return int(np.sign(q))
         majquad = getquad(self.dpvmajor)
         minquad = getquad(self.dpvminor) * (-1)
-        def makemodel(Mstar, Rc, alphainfall):
-            a = velmax(x, Mstar=Mstar, Rc=Rc,
-                       alphainfall=alphainfall, incl=incl)
+        def makemodel(Mstar, Rc, alphainfall, cavityangle):
+            a = velmax(x, Mstar=Mstar, Rc=Rc, alphainfall=alphainfall,
+                       cavityangle=cavityangle, incl=incl)
             vmod = [[a[i][j][::k] for j in ['vlosmin', 'vlosmax']]
                     for i, k in zip(['major', 'minor'], [majquad, minquad])]
             return np.array(vmod)
