@@ -329,14 +329,14 @@ class PVSilhouette():
         print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
         print(f'alpha = {plow[2]:.2f}, {popt[2]:.2f}, {phigh[2]:.2f}')
 
-        a = velmax(x, Mstar=popt[0], Rc=popt[1],
+        a = velmax(self.x, Mstar=popt[0], Rc=popt[1],
                    alphainfall=popt[2], incl=incl)
         fig = plt.figure()
         ax = fig.add_subplot(1, 2, 1)
         ax.contour(self.x, self.v, self.dpvmajor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(x * majquad, a['major']['vlosmax'], '-r')
-        ax.plot(x * majquad, a['major']['vlosmin'], '-r')
+        ax.plot(self.x * majquad, a['major']['vlosmax'], '-r')
+        ax.plot(self.x * majquad, a['major']['vlosmin'], '-r')
         ax.errorbar(x, vobs[0][0], yerr=vobserr[0][0], fmt='ob', ms=2)
         ax.errorbar(x, vobs[0][1], yerr=vobserr[0][1], fmt='ob', ms=2)
         ax.set_xlabel('major offset (au)')
@@ -345,8 +345,8 @@ class PVSilhouette():
         ax = fig.add_subplot(1, 2, 2)
         ax.contour(self.x, self.v, self.dpvminor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(x * minquad, a['minor']['vlosmax'], '-r')
-        ax.plot(x * minquad, a['minor']['vlosmin'], '-r')
+        ax.plot(self.x * minquad, a['minor']['vlosmax'], '-r')
+        ax.plot(self.x * minquad, a['minor']['vlosmin'], '-r')
         ax.errorbar(x, vobs[1][0], yerr=vobserr[1][0], fmt='ob', ms=2)
         ax.errorbar(x, vobs[1][1], yerr=vobserr[1][1], fmt='ob', ms=2)
         ax.set_xlabel('minor offset (au)')
