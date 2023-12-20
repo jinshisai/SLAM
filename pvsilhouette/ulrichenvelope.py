@@ -52,11 +52,11 @@ def velrho(radius, theta, alphainfall: float = 1, withkepler: bool = True):
         vr[c] = vkep[0][c]
         vt[c] = vkep[1][c]
         vp[c] = vkep[2][c]
-    ## Open outflow cavity
-    #c = np.abs(theta - 0.5 * np.pi) > 10 * np.pi / 180
-    #vr[c] = 0
-    #vt[c] = 0
-    #vp[c] = 0
+    # Open outflow cavity
+    c = np.abs(theta - 0.5 * np.pi) > 1 * np.pi / 180
+    vr[c] = 0
+    vt[c] = 0
+    vp[c] = 0
     return vr, vt, vp, rho
 
 def xyz2rtp(x, y, z):
