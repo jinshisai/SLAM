@@ -16,7 +16,7 @@ def kepvel(radius, theta):
     vp = 1 / np.sqrt(radius) * R / radius
     return vr, vt, vp
 
-def velrho(radius, theta, alphainfall: float = 1, cavityangle: float = 5,
+def velrho(radius, theta, alphainfall: float = 1, cavityangle: float = 0,
            withkepler: bool = True):
     radius = radius.clip(1e-10, None)
     parity = np.sign(mu := np.cos(theta))
@@ -54,7 +54,7 @@ def velrho(radius, theta, alphainfall: float = 1, cavityangle: float = 5,
         vt[c] = vkep[1][c]
         vp[c] = vkep[2][c]
     # Open outflow cavity
-    c = np.abs(theta - 0.5 * np.pi) > np.pi / 180 * cavityangle
+    c = np.abs(theta - 0.5 * np.pi) > np.pi / 180 * (90 - cavityangle)
     vr[c] = 0
     vt[c] = 0
     vp[c] = 0
