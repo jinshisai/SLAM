@@ -241,28 +241,24 @@ class PVSilhouette():
                 show: bool = False,
                 progressbar: bool = True,
                 kwargs_emcee_corner: dict = {}):
+        beamlength = np.abs(self.bmaj / self.dx)
         vintp = np.linspace(self.v[0], self.v[-1], (len(self.v) - 1) * 10 + 1)
         majintp = interp1d(self.v, self.dpvmajor, kind='cubic', axis=0)(vintp)
         minintp = interp1d(self.v, self.dpvminor, kind='cubic', axis=0)(vintp)
         vobs = []
         vobserr = []
-        for d in [majintp, minintp]:
-            vtmp = []
-            dvtmp = []
-            for c in d.T:
-                grad = (np.roll(c, -1) - np.roll(c, 1)) / (2 * self.dx)
-                cond = (c > cutoff * self.sigma)
-                cond = cond * ((vintp < vmask[0]) + (vmask[1] < vintp))
-                grad, vgood = grad[cond], vintp[cond]
-                err = self.sigma / np.abs(grad)
-                if len(vgood) == 0:
-                    vtmp.append([np.nan, np.nan])
-                    dvtmp.append([np.nan, np.nan])
-                else:
-                    vtmp.append([vgood[0], vgood[-1]])
-                    dvtmp.append([err[0], err[-1]])
-            vobs.append(vtmp)
-            vobserr.append(dvtmp)
+        for c in [majintp.T, minintp.T]:
+            grad = (np.roll(c, -1) - np.roll(c, 1)) / (2 * self.dx)
+            cond = (c > cutoff * self.sigma)
+            cond = cond * ((vintp < vmask[0]) + (vmask[1] < vintp))
+            grad, vgood = grad[cond], vintp[cond]
+            err = self.sigma / np.abs(grad)
+            if len(vgood) == 0:
+                vobs.append([np.nan, np.nan])
+                vobserr.append([np.nan, np.nan])
+            else:
+                vobs.append([vgood[0], vgood[-1]])
+                vobserr.append([err[0], err[-1]])
         vobs = np.array(vobs)
         vobserr = np.array(vobserr)
         def getquad(m):
@@ -298,7 +294,7 @@ class PVSilhouette():
                 q = p_fixed.copy()
                 q[p_fixed == None] = 10**p
                 chi2 = np.nansum(((vobs - makemodel(*q)) / vobserr)**2)
-                return -0.5 * chi2
+                return -0.5 * chi2 / beamlength
             plim = np.array([Mstar_range, Rc_range, alphainfall_range])
             plim = np.log10(plim[p_fixed == None]).T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
