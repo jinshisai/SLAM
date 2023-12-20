@@ -56,16 +56,20 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
     
 def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
-          threshold: float = 3, gain: float = 0.01) -> np.ndarray:
+          threshold: float = 3, gain: float = 0.01,
+          savetxt: str = None, loadtxt: str = None) -> np.ndarray:
+    if loadtxt is not None:
+        cleancomponent = np.loadtxt(loadtxt)
+        return cleancomponent
     shape = np.shape(data)
     cleancomponent = data * 0
     cleanresidual = data * 1
     beamarea = np.sum(beam)  # pixel/beam
     cc0 = np.zeros_like(data)
     rms0, rms = 10000 * sigma, 10000 * sigma
-    for i in range(1000000):
-        if i == 1000000 - 1:
-            print('\n1000000 iterations achived in CLEAN.')
+    for i in range(10000000):
+        if i == 10000000 - 1:
+            print('\n10,000,000 iterations achived in CLEAN.')
             break
         if (peak := np.nanmax(cleanresidual)) < threshold * sigma:
             print('\nThreshold achieved in CLEAN. '
@@ -88,10 +92,13 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         cleancomponent = cleancomponent + cc
         cleanresidual = newresidual
     cleancomponent = cleancomponent + cleanresidual / np.sum(beam)
+    if savetxt is not None:
+        np.savetxt(savetxt, cleancomponent)
     return cleancomponent
     
 def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
-                    bmaj: float, bmin: float, bpa: float) -> tuple:
+                    bmaj: float, bmin: float, bpa: float,
+                    savetxt: str = None, loadtxt: str = None) -> tuple:
     nx = len(x)
     ny = len(y)
     dx = np.abs(x[1] - x[0])
@@ -129,8 +136,13 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     drot = f(tuple(rot(Xi, Yi, -np.radians(bpa)))[::-1])
     par0 = np.ravel(di[::yskip, ::xskip]).clip(0, None) / gsum
     bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
-    popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
-                        p0=par0, bounds=bounds)
+    if loadtxt is not None:
+        popt = np.loadtxt(loadtxt)
+    else:
+        popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
+                            p0=par0, bounds=bounds)
+    if savetxt is not None:
+        np.savetxt(savetxt, popt)
     zmodel = np.reshape(popt, (ynpar, xnpar))
     f = RGI((ymodel, xmodel), zmodel,
             method='linear', bounds_error=False, fill_value=0)
@@ -294,7 +306,8 @@ class ChannelFit():
                  rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
                  sigma: float = None, nlayer: int = 4,
                  xskip: int = 1, yskip: int = 1, autoskip: bool = False,
-                 gaussmargin: float = 1.6):
+                 gaussmargin: float = 1.6,
+                 savedeconvolved: str = None, loaddeconvolved: str = None):
         if not (cubefits is None):
             self.read_cubefits(cubefits, center, dist, vsys,
                                -rmax, rmax, -rmax, rmax, None, None,
@@ -394,10 +407,14 @@ class ChannelFit():
             self.gaussbeam = self.gaussbeam[:, ::-1]
         if self.scaling == 'mom0clean':
             self.mom0decon = clean(data=self.mom0, beam=self.gaussbeam,
-                                   sigma=self.sigma_mom0, threshold=2)
+                                   sigma=self.sigma_mom0, threshold=2,
+                                   savetxt=savedeconvolved,
+                                   loadtxt=loaddeconvolved)
         if self.scaling == 'mom0fitting':
             d = modeldeconvolve(x=self.x, y=self.y, data=self.mom0,
-                                bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa)
+                                bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
+                                savetxt=savedeconvolved,
+                                loadtxt=loaddeconvolved)
             self.mom0decon, self.xdecon, self.ydecon, self.zdecon = d
             print('Found a deconvolved solution.')
         if self.scaling == 'mom0ft':
