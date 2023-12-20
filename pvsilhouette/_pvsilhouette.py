@@ -258,7 +258,7 @@ class PVSilhouette():
                 cond = cond * ((vintp < vmask[0]) + (vmask[1] < vintp))
                 grad, vgood = grad[cond], vintp[cond]
                 err = self.sigma / np.abs(grad)
-                if len(vgood) == 0:
+                if len(vgood) < 2:
                     vtmp.append([np.nan, np.nan])
                     dvtmp.append([np.nan, np.nan])
                 else:
