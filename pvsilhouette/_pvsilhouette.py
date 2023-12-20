@@ -262,7 +262,9 @@ class PVSilhouette():
                     vtmp.append([np.nan, np.nan])
                     dvtmp.append([np.nan, np.nan])
                 else:
-                    vtmp.append([np.clip(vgood[0], None, 0), np.clip(vgood[-1], 0, None)])
+                    vmin = vgood[0] if vgood[0] <= 0 else np.nan
+                    vmax = vgood[1] if vgood[1] >= 0 else np.nan
+                    vtmp.append([vmin, vmax])
                     dvtmp.append([err[0], err[-1]])
             vobs.append(vtmp)
             vobserr.append(dvtmp)
