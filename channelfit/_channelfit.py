@@ -410,7 +410,7 @@ class ChannelFit():
                                    sigma=self.sigma_mom0, threshold=2,
                                    savetxt=savedeconvolved,
                                    loadtxt=loaddeconvolved)
-        if self.scaling == 'mom0fitting':
+        if self.scaling == 'mom0model':
             d = modeldeconvolve(x=self.x, y=self.y, data=self.mom0,
                                 bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
                                 savetxt=savedeconvolved,
