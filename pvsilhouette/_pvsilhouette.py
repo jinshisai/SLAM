@@ -243,6 +243,7 @@ class PVSilhouette():
                 kwargs_emcee_corner: dict = {}):
         beamlength = np.abs(self.bmaj / self.dx)
         vintp = np.linspace(self.v[0], self.v[-1], (len(self.v) - 1) * 10 + 1)
+        dvintp = vintp[1] - vintp[0]
         majintp = interp1d(self.v, self.dpvmajor, kind='cubic', axis=0)(vintp)
         minintp = interp1d(self.v, self.dpvminor, kind='cubic', axis=0)(vintp)
         vobs = []
@@ -251,7 +252,7 @@ class PVSilhouette():
             vtmp = []
             dvtmp = []
             for c in d:
-                grad = (np.roll(c, -1) - np.roll(c, 1)) / (2 * self.dx)
+                grad = (np.roll(c, -1) - np.roll(c, 1)) / (2 * dvintp)
                 cond = (c > cutoff * self.sigma)
                 cond = cond * ((vintp < vmask[0]) + (vmask[1] < vintp))
                 grad, vgood = grad[cond], vintp[cond]
