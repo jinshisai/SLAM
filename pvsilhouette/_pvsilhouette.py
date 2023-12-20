@@ -249,7 +249,7 @@ class PVSilhouette():
         minintp = interp1d(self.v, self.dpvminor, kind='cubic', axis=0)(vintp)
         vobs = []
         vobserr = []
-        for d in [majintp.T[::Nyquistskip], minintp.T[:Nyquistskip]]:
+        for d in [majintp.T[::Nyquistskip, :], minintp.T[::Nyquistskip, :]]:
             vtmp = []
             dvtmp = []
             for c in d:
