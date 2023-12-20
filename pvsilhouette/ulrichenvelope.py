@@ -93,7 +93,8 @@ def XYZ2xyz(incl, phi, X, Y, Z):
     #z[r2D < 1] = np.nan
     return x, y, z
 
-def losvel(elos, r, t, p, alphainfall: float = 1, kepler: bool = False):
+def losvel(elos, r, t, p, alphainfall: float = 1,
+           cavityangle: float = 0, kepler: bool = False):
     """Line-of-sight velocity with a given vector, elos,
        which points to the observer in the envelople coordinate.
     """
@@ -101,7 +102,7 @@ def losvel(elos, r, t, p, alphainfall: float = 1, kepler: bool = False):
     if kepler:
         vr, vt, vp = kepvel(r.ravel(), t.ravel())
     else:
-        vr, vt, vp, _ = velrho(r.ravel(), t.ravel(), alphainfall)
+        vr, vt, vp, _ = velrho(r.ravel(), t.ravel(), alphainfall, cavityangle)
     er, et, ep = rotbase(t.ravel(), p.ravel())
     e = np.moveaxis(np.full((len(r.ravel()), 3), elos), -1, 0)
     vlos = -vr * np.sum(er * e, axis=0) \
@@ -110,7 +111,8 @@ def losvel(elos, r, t, p, alphainfall: float = 1, kepler: bool = False):
     return np.reshape(vlos, shape)
 
 def velmax(r: np.ndarray, Mstar: float, Rc: float,
-           alphainfall: float = 1, incl: float = 90):
+           alphainfall: float = 1, cavityangle: float = 0,
+           incl: float = 90):
     irad = np.radians(incl)
     vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
     X, Z = np.meshgrid(r / Rc, r / Rc)  # X is inner, second axis
@@ -125,7 +127,7 @@ def velmax(r: np.ndarray, Mstar: float, Rc: float,
     a['major'] = {'vlosmax':vlosmax * vunit, 'vlosmin':vlosmin * vunit}
     x, y, z = XYZ2xyz(irad, 0, zero, X, Z)
     r, t, p = xyz2rtp(x, y, z)
-    vlos = losvel(elos, r, t, p, alphainfall)
+    vlos = losvel(elos, r, t, p, alphainfall, cavityangle)
     vlosmax = np.nanmax(vlos, axis=0)
     vlosmin = np.nanmin(vlos, axis=0)
     a['minor'] = {'vlosmax':vlosmax * vunit, 'vlosmin':vlosmin * vunit}
