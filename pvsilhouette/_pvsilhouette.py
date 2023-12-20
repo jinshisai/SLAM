@@ -240,7 +240,9 @@ class PVSilhouette():
                 figname: str = 'PVsilhouette',
                 show: bool = False,
                 progressbar: bool = True,
-                kwargs_emcee_corner: dict = {}):
+                kwargs_emcee_corner: dict = {},
+                minabserr: float = 0.1,
+                minrelerr: float = 0.01):
         Nyquistskip = int(np.round(self.bmaj / self.dx / 2))
         x = self.x[::Nyquistskip]
         vintp = np.linspace(self.v[0], self.v[-1], (len(self.v) - 1) * 10 + 1)
@@ -270,6 +272,7 @@ class PVSilhouette():
             vobserr.append(dvtmp)
         vobs = np.moveaxis(vobs, 1, 2)
         vobserr = np.moveaxis(vobserr, 1, 2)
+        vobserr = np.clip(vobserr, np.max([minabserr * self.dv, minrelerr * vobs]), None)
         def getquad(m):
             nv, nx = np.shape(m)
             q =   np.sum(m[:nv//2, :nx//2]) + np.sum(m[nv//2:, nx//2:]) \
