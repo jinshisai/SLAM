@@ -453,7 +453,7 @@ class TwoDGrad():
         if np.any(kep):
             x, y = self.x, self.y
             z = np.sum(self.data[kep], axis=0) * self.dv
-            ax.pcolormesh(x, y, z, cmap='binary', zorder=1)
+            ax.pcolormesh(x, y, z, shading='nearest', cmap='binary', zorder=1)
         x = self.kepler['xc'] + self.xoff
         y = self.kepler['yc'] + self.yoff
         dx, dy = self.kepler['dxc'], self.kepler['dyc']
