@@ -529,6 +529,7 @@ class TwoDGrad():
         ax.plot(xn[w > 0], v[w > 0], 'wo', zorder=1, markersize=4)
         if ~np.isnan(self.Mstar):
             vp = np.abs(v[~np.isnan(x)])
+            vp = np.geomspace(vp.min(), vp.max(), 100)
             r_break, v_break, dp = self.popt
             rp = doublepower_r(vp, r_break, v_break, 0.5, dp, 0)
             ax.plot(rp, vp, 'm-', zorder=4)
