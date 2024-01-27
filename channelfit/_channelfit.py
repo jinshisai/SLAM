@@ -804,7 +804,7 @@ class ChannelFit():
         vplot = (np.nanpercentile(self.mom1, 95) 
                  - np.nanpercentile(self.mom1, 5)) / 2.
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
-                          vmin=-vplot, vmax=vplot)
+                          shading='nearest', vmin=-vplot, vmax=vplot)
         fig.colorbar(m, ax=ax, label=label + r' mom1 (km s$^{-1}$)')
         ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
         r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
@@ -834,7 +834,8 @@ class ChannelFit():
                                     ['component', 'residual']):
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
-            m = ax.pcolormesh(self.x, self.y, c, cmap='jet', vmin=vmin, vmax=vmax)
+            m = ax.pcolormesh(self.x, self.y, c, cmap='jet',
+                              shading='nearest', vmin=vmin, vmax=vmax)
             fig.colorbar(m, ax=ax, label=f'CLEAN {s} / ' + r'$\sigma$')
             r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
             ax.plot(r * self.sinpa, r * self.cospa, 'k:')
@@ -858,7 +859,8 @@ class ChannelFit():
         x, y, z = self.xdecon, self.ydecon, self.zdecon / self.sigma
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
-        m = ax.pcolormesh(x, y, z, cmap='jet', vmin=z.min(), vmax=z.max())
+        m = ax.pcolormesh(x, y, z, cmap='jet',
+                          shading='nearest', vmin=z.min(), vmax=z.max())
         fig.colorbar(m, ax=ax, label=f'Deconvolution / ' + r'$\sigma$')
         r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
         pa = self.pa_rad - np.radians(self.bpa)
