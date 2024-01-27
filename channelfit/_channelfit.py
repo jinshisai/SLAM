@@ -59,6 +59,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
           threshold: float = 3, gain: float = 0.01,
           savetxt: str = None, loadtxt: str = None) -> np.ndarray:
     if loadtxt is not None:
+        print(f'Load clean components of moment 0 from {loadtxt}.')
         cleancomponent = np.loadtxt(loadtxt)
         return cleancomponent
     shape = np.shape(data)
@@ -138,6 +139,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
     if loadtxt is not None:
         popt = np.loadtxt(loadtxt)
+        print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
     else:
         popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
                             p0=par0, bounds=bounds)
