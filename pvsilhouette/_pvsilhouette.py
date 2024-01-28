@@ -277,7 +277,7 @@ class PVSilhouette():
         aerr = np.full(np.shape(vobserr), minabserr * self.dv)
         rerr = minrelerr * vobs
         vobserr = np.max([vobserr, aerr, rerr], axis=0)
-        mass = vobs**2 * x
+        mass = vobs**2 * np.abs(x)
         mmass = np.moveaxis([np.mean(mass, axis=2)] * len(x), 0, -1)
         smass = np.moveaxis([np.std(mass, axis=2)] * len(x), 0, -1)
         cond = ((mass - mmass) / smass) > -3
