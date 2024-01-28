@@ -270,13 +270,19 @@ class PVSilhouette():
                     vmax = vgood[-1] if vgood[-1] >= 0 else np.nan
                     vtmp.append([vmin, vmax])
                     dvtmp.append([err[0], err[-1]])
-            vobs.append(vtmp)
+            vobs.append(vtmp)  # (maj, min), x, (min, max)
             vobserr.append(dvtmp)
-        vobs = np.moveaxis(vobs, 1, 2)
+        vobs = np.moveaxis(vobs, 1, 2)  # (maj, min), (min, max), x
         vobserr = np.moveaxis(vobserr, 1, 2)
         aerr = np.full(np.shape(vobserr), minabserr * self.dv)
         rerr = minrelerr * vobs
         vobserr = np.max([vobserr, aerr, rerr], axis=0)
+        mass = vobs**2 * x
+        mmass = np.moveaxis([np.mean(mass, axis=2)] * len(x), 0, -1)
+        smass = np.moveaxis([np.std(mass, axis=2)] * len(x), 0, -1)
+        c = np.abs((mass - mmass) / smass) > 3
+        vobs = vobs[c]
+        vobserr = vobserr[c]
         def getquad(m):
             nv, nx = np.shape(m)
             q =   np.sum(m[:nv//2, :nx//2]) + np.sum(m[nv//2:, nx//2:]) \
