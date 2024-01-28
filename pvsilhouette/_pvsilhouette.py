@@ -352,8 +352,11 @@ class PVSilhouette():
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
         ax.plot(self.x * majquad, a['major']['vlosmax'], '-r')
         ax.plot(self.x * majquad, a['major']['vlosmin'], '-r')
-        ax.errorbar(x, vobs[0][0], yerr=vobserr[0][0], fmt='ob', ms=2)
-        ax.errorbar(x, vobs[0][1], yerr=vobserr[0][1], fmt='ob', ms=2)
+        for i in [0, 1]:
+            y, yerr = vobs[0][i], vobserr[0][i]
+            cond = ~np.isnan(y)
+            s, y, yerr = x[cond], y[cond], yerr[cond]
+            ax.errorbar(s, y, yerr=yerr, fmt='ob', ms=2)
         ax.set_xlabel('major offset (au)')
         ax.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
         ax.set_ylim(np.min(self.v), np.max(self.v))
@@ -362,8 +365,11 @@ class PVSilhouette():
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
         ax.plot(self.x * minquad, a['minor']['vlosmax'], '-r')
         ax.plot(self.x * minquad, a['minor']['vlosmin'], '-r')
-        ax.errorbar(x, vobs[1][0], yerr=vobserr[1][0], fmt='ob', ms=2)
-        ax.errorbar(x, vobs[1][1], yerr=vobserr[1][1], fmt='ob', ms=2)
+        for i in [0, 1]:
+            y, yerr = vobs[1][i], vobserr[1][i]
+            cond = ~np.isnan(y)
+            s, y, yerr = x[cond], y[cond], yerr[cond]
+            ax.errorbar(s, y, yerr=yerr, fmt='ob', ms=2)
         ax.set_xlabel('minor offset (au)')
         ax.set_ylim(self.v.min(), self.v.max())
         ax.set_title(r'$M_{*}$'+f'={popt[0]:.2f}'+r'$M_{\odot}$'
