@@ -336,9 +336,10 @@ class PVSilhouette():
         print(f'M* = {plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} Msun')
         print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
         print(f'alpha = {plow[2]:.2f}, {popt[2]:.2f}, {phigh[2]:.2f}')
+        print(f'angle = {plow[3]:.1f}, {popt[3]:.1f}, {phigh[3]:.1f}')
 
         a = velmax(self.x, Mstar=popt[0], Rc=popt[1],
-                   alphainfall=popt[2], incl=incl)
+                   alphainfall=popt[2], cavityangle=popt[3], incl=incl)
         fig = plt.figure()
         ax = fig.add_subplot(1, 2, 1)
         ax.contour(self.x, self.v, self.dpvmajor,
