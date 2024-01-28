@@ -280,7 +280,7 @@ class PVSilhouette():
         mass = vobs**2 * x
         mmass = np.moveaxis([np.mean(mass, axis=2)] * len(x), 0, -1)
         smass = np.moveaxis([np.std(mass, axis=2)] * len(x), 0, -1)
-        c = np.abs((mass - mmass) / smass) > 3
+        c = np.abs((mass - mmass) / smass) < 3
         vobs = vobs[c]
         vobserr = vobserr[c]
         def getquad(m):
