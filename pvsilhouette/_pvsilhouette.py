@@ -277,11 +277,9 @@ class PVSilhouette():
         aerr = np.full(np.shape(vobserr), minabserr * self.dv)
         rerr = minrelerr * vobs
         vobserr = np.max([vobserr, aerr, rerr], axis=0)
-        mass = vobs**2 * np.abs(x)
-        mmass = np.moveaxis([np.mean(mass, axis=2)] * len(x), 0, -1)
-        smass = np.moveaxis([np.std(mass, axis=2)] * len(x), 0, -1)
-        cond = ((mass - mmass) / smass) > -3
-        vobs = np.where(cond, vobs, np.nan)
+        mass = 2 * np.log(np.abs(vobs)) + np.log(np.abs(x))
+        mthre = np.moveaxis([np.percentile(mass, 10, axis=2)] * len(x), 0, -1)
+        vobs = np.where(mass > mthre, vobs, np.nan)
         def getquad(m):
             nv, nx = np.shape(m)
             q =   np.sum(m[:nv//2, :nx//2]) + np.sum(m[nv//2:, nx//2:]) \
