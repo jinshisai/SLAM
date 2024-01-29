@@ -488,7 +488,7 @@ class ChannelFit():
                 return None
             r = np.hypot(x_in, self.Ynest)
             c = r > Rc
-            vp = r**(-1/2) * (1 + h_in**2)**(-3/2)
+            vp = r**(-1/2) * (1 + h_in**2)**(-3/4)
             vr = r * 0
             if self.envelope:
                 vp[c] = np.sqrt(Rc) / r[c]
