@@ -57,7 +57,7 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     
 def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
           threshold: float = 2, gain: float = 0.01,
-          lowsigmathreshold: float = 3, lowsigmagain: float = 0.1,
+          weakestcomponent: float = 0.3,
           savetxt: str = None, loadtxt: str = None) -> np.ndarray:
     if loadtxt is not None:
         print(f'Load clean components of moment 0 from {loadtxt}.')
@@ -82,8 +82,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
         cc = cc0 * 1  # for deep copy
         lp = cleanresidual[ip, jp]
-        g = gain if lp > lowsigmathreshold * sigma else lowsigmagain
-        cc[ip, jp] = g * lp / beamarea  # Jy/pixel
+        cc[ip, jp] = max(gain * lp, weakestcomponent * sigma) / beamarea  # Jy/pixel
         newresidual = cleanresidual - convolve(cc, beam, mode='same')
         rms = np.sqrt(np.nanmean(newresidual**2))
         #if rms > rms0:
