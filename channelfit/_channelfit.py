@@ -139,7 +139,6 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     drot = f(tuple(rot(Xi, Yi, -np.radians(bpa)))[::-1])
     par0 = np.ravel(di[::yskip, ::xskip]).clip(0, None) / gsum
     bounds = [np.zeros_like(par0), np.full_like(par0, par0.max())]
-    bounds = [np.ravel(b) for b in bounds]
     if loadtxt is not None:
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
@@ -156,7 +155,6 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                 drott = drot[i * my:(i+1) * my, j * mx:(j+1) * mx]
                 par0t = np.ravel(di[:ly:yskip, :lx:xskip]).clip(0, None) / gsum
                 bndt = [np.zeros_like(par0t), np.full_like(par0t, par0.max())]
-                bndt = [np.ravel(b) for b in bounds]
                 def model_t(x, *par):
                     f = RGI((ymt, xmt), np.reshape(par, (len(ymt), len(xmt))),
                             method='linear', bounds_error=False, fill_value=0)
