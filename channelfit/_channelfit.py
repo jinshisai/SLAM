@@ -137,13 +137,15 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     f = RGI((yi, xi), di, method='linear',
             bounds_error=False, fill_value=0)
     drot = f(tuple(rot(Xi, Yi, -np.radians(bpa)))[::-1])
-    par0 = np.ravel(di[::yskip, ::xskip]).clip(0, None) / gsum
+    Par0 = di[::yskip, ::xskip].clip(0, None) / gsum
+    par0 = np.ravel(Par0)
     bounds = [np.zeros_like(par0), np.full_like(par0, par0.max())]
     if loadtxt is not None:
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
     else:
         ndiv = 5
+        Xmodel, Ymodel = np.meshgrid(xmodel, ymodel)
         ny, nx = np.shape(drot)
         my, mx = int(ny / ndiv + 0.5), int(nx / ndiv + 0.5)
         par0new = []
@@ -154,6 +156,10 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                 xmt, ymt = xi[:lx:xskip], yi[:ly:yskip]
                 Xit, Yit = np.meshgrid(xi[:lx], yi[:ly])
                 drott = drot[i * my:(i+1) * my, j * mx:(j+1) * mx]
+                yt = yi[i * my:(i+1) * my]
+                xt = xi[j * mx:(j+1) * mx]
+                par0t = Par0[(xt.min() <= Xmodel) * (Xmodel <= xt.max())
+                             * (yt.min() <= Ymodel) * (Ymodel <= yt.max())]
                 par0t = np.ravel(di[:ly:yskip, :lx:xskip]).clip(0, None) / gsum
                 bndt = [np.zeros_like(par0t), np.full_like(par0t, par0.max())]
                 def model_t(x, *par):
