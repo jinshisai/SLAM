@@ -130,21 +130,37 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     xnpar = len(xmodel)
     ynpar = len(ymodel)
     def model(x, *par):
-        f = RGI((ymodel, xmodel), np.reshape(par, (ynpar, xnpar)),
+        f = RGI((ymodel, xmodel), np.reshape(par, (len(ymodel), len(xmodel))),
                 method='linear', bounds_error=False, fill_value=0)
         f = convolve(f(tuple(x)), g, mode='same')
         return np.ravel(f)
     f = RGI((yi, xi), di, method='linear',
             bounds_error=False, fill_value=0)
     drot = f(tuple(rot(Xi, Yi, -np.radians(bpa)))[::-1])
-    par0 = np.ravel(di[::yskip, ::xskip]).clip(0, None) / gsum
-    bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
+    par0 = di[::yskip, ::xskip].clip(0, None) / gsum
+    #par0 = np.ravel(par0)
+    bounds = [np.zeros_like(par0), np.full_like(par0, par0.max())]
+    #bounds = np.transpose([[0, par0.max() * 10]] * (ynpar * xnpar))
     if loadtxt is not None:
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
     else:
+        ny, nx = np.shape(drot)
+        my, mx = int(ny / 3 + 0.5), int(nx / 3 + 0.5)
+        par0 = []
+        for i in range(3):
+            for j in range(3):
+                yt = Yi[i * my:(i+1) * my, j * mx:(j+1) * mx]
+                xt = Xi[i * my:(i+1) * my, j * mx:(j+1) * mx]
+                dt = drot[i * my:(i+1) * my, j * mx:(j+1) * mx]
+                p0t = np.ravel(par0[i * my:(i+1) * my, j * mx:(j+1) * mx])
+                bt = [np.ravel(b[i * my:(i+1) * my, j * mx:(j+1) * mx])
+                      for b in bounds]
+                popt, _ = curve_fit(model, [yt, xt], np.ravel(dt),
+                                    p0=p0t, bounds=bt)
+                par0.append(popt)
         popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
-                            p0=par0, bounds=bounds)
+                            p0=par0, bounds=[np.ravel(b) for b in bounds])
     if savetxt is not None:
         np.savetxt(savetxt, popt)
     zmodel = np.reshape(popt, (ynpar, xnpar))
