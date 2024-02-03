@@ -57,7 +57,7 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     
 def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
           threshold: float = 2, gain: float = 0.01,
-          weakestcomponent: float = 0.2,
+          weakestcomponent: float = 0.3,
           savetxt: str = None, loadtxt: str = None) -> np.ndarray:
     if loadtxt is not None:
         print(f'Load clean components of moment 0 from {loadtxt}.')
