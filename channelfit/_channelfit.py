@@ -56,7 +56,8 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
     
 def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
-          threshold: float = 3, gain: float = 0.01,
+          threshold: float = 2, gain: float = 0.01,
+          lowsigmathreshold: float = 3, lowsigmagain: float = 0.1,
           savetxt: str = None, loadtxt: str = None) -> np.ndarray:
     if loadtxt is not None:
         print(f'Load clean components of moment 0 from {loadtxt}.')
@@ -79,8 +80,10 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
             break
         print(f'\rCLEAN reached {peak / sigma:.2f}sigma in Moment 0.  ', end='')
         ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
-        cc = cc0 * 1
-        cc[ip, jp] = gain * cleanresidual[ip, jp] / beamarea  # Jy/pixel
+        cc = cc0 * 1  # for deep copy
+        lp = cleanresidual[ip, jp]
+        g = gain if lp > lowsigmathreshold * sigma else lowsigmagain
+        cc[ip, jp] = g * lp / beamarea  # Jy/pixel
         newresidual = cleanresidual - convolve(cc, beam, mode='same')
         rms = np.sqrt(np.nanmean(newresidual**2))
         #if rms > rms0:
@@ -92,7 +95,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         #    rms0 = rms
         cleancomponent = cleancomponent + cc
         cleanresidual = newresidual
-    cleancomponent = cleancomponent + cleanresidual / np.sum(beam)
+    cleancomponent = cleancomponent + cleanresidual / beamarea
     if savetxt is not None:
         np.savetxt(savetxt, cleancomponent)
     return cleancomponent
@@ -409,7 +412,7 @@ class ChannelFit():
             self.gaussbeam = self.gaussbeam[:, ::-1]
         if self.scaling == 'mom0clean':
             self.mom0decon = clean(data=self.mom0, beam=self.gaussbeam,
-                                   sigma=self.sigma_mom0, threshold=2,
+                                   sigma=self.sigma_mom0,
                                    savetxt=savedeconvolved,
                                    loadtxt=loaddeconvolved)
         if self.scaling == 'mom0model':
