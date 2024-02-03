@@ -143,12 +143,13 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
     else:
+        ndiv = 5
         ny, nx = np.shape(drot)
-        my, mx = int(ny / 3 + 0.5), int(nx / 3 + 0.5)
+        my, mx = int(ny / ndiv + 0.5), int(nx / ndiv + 0.5)
         par0new = []
-        for i in range(3):
+        for i in range(ndiv):
             ly = min((i + 1) * my, ny) - i * my
-            for j in range(3):
+            for j in range(ndiv):
                 lx = min((j + 1) * mx, nx) - j * mx
                 xmt, ymt = xi[:lx:xskip], yi[:ly:yskip]
                 Xit, Yit = np.meshgrid(xi[:lx], yi[:ly])
