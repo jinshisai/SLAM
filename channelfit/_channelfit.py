@@ -153,7 +153,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
             for j in range(3):
                 lx = min((j + 1) * mx, nx) - j * mx
                 xmt, ymt = xi[:lx:xskip], yi[:ly:yskip]
-                Xit, Yit = np.meshgrid(xi[0, :lx], yi[:ly, 0])
+                Xit, Yit = np.meshgrid(xi[:lx], yi[:ly])
                 dt = drot[i * my:(i+1) * my, j * mx:(j+1) * mx]
                 def model_t(x, *par):
                     f = RGI((ymt, xmt), np.reshape(par, (len(ymt), len(xmt))),
