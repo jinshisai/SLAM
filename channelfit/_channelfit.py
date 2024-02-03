@@ -147,7 +147,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     else:
         ny, nx = np.shape(drot)
         my, mx = int(ny / 3 + 0.5), int(nx / 3 + 0.5)
-        par0 = []
+        par0new = []
         for i in range(3):
             for j in range(3):
                 yt = Yi[i * my:(i+1) * my, j * mx:(j+1) * mx]
@@ -160,7 +160,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                                     p0=p0t, bounds=bt)
                 par0.append(popt)
         popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
-                            p0=par0, bounds=[np.ravel(b) for b in bounds])
+                            p0=par0new, bounds=[np.ravel(b) for b in bounds])
     if savetxt is not None:
         np.savetxt(savetxt, popt)
     zmodel = np.reshape(popt, (ynpar, xnpar))
