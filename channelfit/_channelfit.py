@@ -151,7 +151,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         def between(x, xlim):
             return (xlim[0] <= x) * (x <= xlim[1])
         par0new = []
-        print(f'\rPre-fitting:' + '.' * ndiv * ndiv, end='')
+        print(f'\rPre-fitting:' + '_' * ndiv * ndiv, end='')
         for i in range(ndiv):
             i0, i1 = i * my, min((i + 1) * my, ny) - 1
             ly = i1 - i0 + 1
