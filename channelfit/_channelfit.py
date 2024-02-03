@@ -148,6 +148,8 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         Xmodel, Ymodel = np.meshgrid(xmodel, ymodel)
         ny, nx = np.shape(drot)
         my, mx = int(np.ceil(ny / ndiv)), int(np.ceil(nx / ndiv))
+        def between(x, xlim):
+            return (xlim[0] <= x) * (x <= xlim[1])
         par0new = []
         print(f'\rPre fitting:' + '.' * ndiv * ndiv, end='')
         for i in range(ndiv):
@@ -156,14 +158,13 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
             for j in range(ndiv):
                 j0, j1 = j * mx, min((j + 1) * mx, nx) - 1
                 lx = j1 - j0 + 1
-                ymin, ymax = yi[i0], yi[i1]
-                xmin, xmax = xi[j0], xi[j1]
-                xmt = xmodel[:len(xmodel[(xmin <= xmodel) * (xmodel <= xmax)])]
-                ymt = ymodel[:len(xmodel[(ymin <= ymodel) * (ymodel <= ymax)])]
+                ylim = [yi[i0], yi[i1]]
+                xlim = [xi[j0], xi[j1]]
+                xmt = xmodel[:len(xmodel[between(xmodel, xlim)])]
+                ymt = ymodel[:len(xmodel[between(ymodel, ylim)])]
                 Xit, Yit = np.meshgrid(xi[:lx], yi[:ly])
                 drott = drot[i0:i1+1, j0:j1+1]
-                par0t = Par0[(ymin <= Ymodel) * (Ymodel <= ymax)
-                             * (xmin <= Xmodel) * (Xmodel <= xmax)]
+                par0t = Par0[between(Xmodel, xlim) * between(Ymodel, ylim)]
                 bndt = [np.zeros_like(par0t), np.full_like(par0t, par0.max())]
                 def model_t(x, *par):
                     f = RGI((ymt, xmt), np.reshape(par, (len(ymt), len(xmt))),
@@ -174,7 +175,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                                     p0=par0t, bounds=bndt)
                 par0new = par0new + list(popt)
                 print(f'\rPre fitting:' + '#' * (ndiv * i + j + 1), end='')
-        print('\n')
+        print('')
         popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
                             p0=par0new, bounds=bounds)
     if savetxt is not None:
