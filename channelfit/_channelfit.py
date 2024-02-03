@@ -153,10 +153,16 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                 yt = Yi[i * my:(i+1) * my, j * mx:(j+1) * mx]
                 xt = Xi[i * my:(i+1) * my, j * mx:(j+1) * mx]
                 dt = drot[i * my:(i+1) * my, j * mx:(j+1) * mx]
+                def model_t(x, *par):
+                    f = RGI((yt, xt), np.reshape(par, (len(yt), len(xt))),
+                            method='linear', bounds_error=False, fill_value=0)
+                    f = convolve(f(tuple(x)), g, mode='same')
+                    return np.ravel(f)
+
                 p0t = np.ravel(par0[i * my:(i+1) * my, j * mx:(j+1) * mx])
                 bt = [np.ravel(b[i * my:(i+1) * my, j * mx:(j+1) * mx])
                       for b in bounds]
-                popt, _ = curve_fit(model, [yt, xt], np.ravel(dt),
+                popt, _ = curve_fit(model_t, [yt, xt], np.ravel(dt),
                                     p0=p0t, bounds=bt)
                 par0.append(popt)
         popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
