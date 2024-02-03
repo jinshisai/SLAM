@@ -165,7 +165,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                       for b in bounds]
                 popt, _ = curve_fit(model_t, [Yit, Xit], np.ravel(dt),
                                     p0=p0t, bounds=bt)
-                par0.append(popt)
+                par0new.append(popt)
         popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
                             p0=par0new, bounds=[np.ravel(b) for b in bounds])
     if savetxt is not None:
