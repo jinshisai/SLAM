@@ -153,6 +153,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
             i0, i1 = i * my, min((i + 1) * my, ny) - 1
             ly = i1 - i0 + 1
             for j in range(ndiv):
+                print(f'\rPre fitting: ' + '-' * ndiv * ndiv, end='')
                 j0, j1 = j * mx, min((j + 1) * mx, nx) - 1
                 lx = j1 - j0 + 1
                 xmt, ymt = xi[:lx:xskip], yi[:ly:yskip]
@@ -169,6 +170,8 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                 popt, _ = curve_fit(model_t, [Yit, Xit], np.ravel(drott),
                                     p0=par0t, bounds=bndt)
                 par0new = par0new + list(popt)
+                print(f'\rPre fitting: ' + '+' * (ndiv * i + j + 1), end='')
+        print('\n')
         popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
                             p0=par0new, bounds=bounds)
     if savetxt is not None:
