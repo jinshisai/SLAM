@@ -157,7 +157,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                 lx = j1 - j0 + 1
                 xmt, ymt = xi[:lx:xskip], yi[:ly:yskip]
                 Xit, Yit = np.meshgrid(xi[:lx], yi[:ly])
-                drott = drot[i * my:(i+1) * my, j * mx:(j+1) * mx]
+                drott = drot[i0:i1, j0:j1]
                 par0t = Par0[(yi[i0] <= Ymodel) * (Ymodel <= yi[i1])
                              * (xi[j0] <= Xmodel) * (Xmodel <= xi[j1])]
                 bndt = [np.zeros_like(par0t), np.full_like(par0t, par0.max())]
