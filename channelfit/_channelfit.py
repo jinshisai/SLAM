@@ -149,11 +149,11 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         ny, nx = np.shape(drot)
         my, mx = int(ny / ndiv + 0.5), int(nx / ndiv + 0.5)
         par0new = []
+        print(f'\rPre fitting: ' + '-' * ndiv * ndiv, end='')
         for i in range(ndiv):
             i0, i1 = i * my, min((i + 1) * my, ny) - 1
             ly = i1 - i0 + 1
             for j in range(ndiv):
-                print(f'\rPre fitting: ' + '-' * ndiv * ndiv, end='')
                 j0, j1 = j * mx, min((j + 1) * mx, nx) - 1
                 lx = j1 - j0 + 1
                 xmt, ymt = xi[:lx:xskip], yi[:ly:yskip]
