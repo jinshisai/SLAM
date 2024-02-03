@@ -147,7 +147,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         ndiv = 5
         Xmodel, Ymodel = np.meshgrid(xmodel, ymodel)
         ny, nx = np.shape(drot)
-        my, mx = int(ny / ndiv + 0.5), int(nx / ndiv + 0.5)
+        my, mx = int(np.ceil(ny / ndiv)), int(np.ceil(nx / ndiv))
         par0new = []
         print(f'\rPre fitting:' + '.' * ndiv * ndiv, end='')
         for i in range(ndiv):
