@@ -150,17 +150,16 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         my, mx = int(ny / ndiv + 0.5), int(nx / ndiv + 0.5)
         par0new = []
         for i in range(ndiv):
-            ly = min((i + 1) * my, ny) - i * my
+            i0, i1 = i * my, min((i + 1) * my, ny) - 1
+            ly = i1 - i0 + 1
             for j in range(ndiv):
-                lx = min((j + 1) * mx, nx) - j * mx
+                j0, j1 = j * mx, min((j + 1) * mx, nx) - 1
+                lx = j1 - j0 + 1
                 xmt, ymt = xi[:lx:xskip], yi[:ly:yskip]
                 Xit, Yit = np.meshgrid(xi[:lx], yi[:ly])
                 drott = drot[i * my:(i+1) * my, j * mx:(j+1) * mx]
-                yt = yi[i * my:(i+1) * my]
-                xt = xi[j * mx:(j+1) * mx]
-                par0t = Par0[(xt.min() <= Xmodel) * (Xmodel <= xt.max())
-                             * (yt.min() <= Ymodel) * (Ymodel <= yt.max())]
-                par0t = np.ravel(di[:ly:yskip, :lx:xskip]).clip(0, None) / gsum
+                par0t = Par0[(yi[i0] <= Ymodel) * (Ymodel <= yi[i1])
+                              * (xi[j0] <= Xmodel) * (Xmodel <= xi[j1])]
                 bndt = [np.zeros_like(par0t), np.full_like(par0t, par0.max())]
                 def model_t(x, *par):
                     f = RGI((ymt, xmt), np.reshape(par, (len(ymt), len(xmt))),
