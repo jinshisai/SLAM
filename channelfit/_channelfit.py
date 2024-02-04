@@ -132,7 +132,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     f = RGI((yi, xi), di, method='linear',
             bounds_error=False, fill_value=0)
     drot = f(tuple(rot(Xi, Yi, -np.radians(bpa)))[::-1])
-    Par0 = di[::yskip, ::xskip].clip(0, None) / gsum
+    Par0 = drot[::yskip, ::xskip].clip(0, None) / gsum
     if loadtxt is not None:
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
