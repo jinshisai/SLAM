@@ -152,6 +152,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         bar = tqdm(total=niter * (nymodel - 2) * (nxmodel - 2))
         bar.set_description('Deconvolution')
         for _ in range(niter):
+            Par0org = Par0 + 0
             for i in range(1, nymodel - 1):
                 i0 = (i - 1) * yskip
                 i1 = min((i + 1) * yskip, nynew)
@@ -185,6 +186,8 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                                 p0=p0, bounds=bounds)
             Par0[edge] = popt
         print('')
+        print(np.sqrt(np.mean((Par0 - Par0org)**2)),
+              np.sqrt(np.max((Par0 - Par0org)**2)))
         popt = np.ravel(Par0)
         #def model(x, *par):
         #    values = np.reshape(par, (nymodel, nxmodel))
