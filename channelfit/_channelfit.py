@@ -148,33 +148,30 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bounds_error=False, fill_value=0)
             f = convolve(f(tuple(x)), g, mode='same')
             return np.ravel(f)
-        conv = np.reshape(RGIconv(Par0, [Yi, Xi]), (nynew, nxnew))
         niter = 5
-        bar = tqdm(total=niter * nymodel * nxmodel)
+        ndiv = 5
+        nxsub = int(np.ceil(nxmodel / ndiv))
+        nysub = int(np.ceil(nymodel / ndiv))
+        bar = tqdm(total=niter * ndiv * ndiv)
         bar.set_description('Deconvolution')
         for _ in range(niter):
             Par0org = Par0 + 0
-            for i in range(nymodel):
-                for j in range(nxmodel):
+            for i in range(ndiv):
+                i0 = i * nysub
+                i1 = min((i + 1) * nysub, nymodel)
+                for j in range(ndiv):
+                    j0 = j * nxsub
+                    j1 = min((j + 1) * nxsub, nxmodel)
                     bar.update(1)
-                    def model_c(x, par):
+                    def model_c(x, *par):
                         values = Par0 + 0
-                        values[i, j] = par
-                        f = RGI((ymodel, xmodel), values, method='linear',
-                                bounds_error=False, fill_value=0)
-                        ff = f(tuple(x))
-                        conv_t = conv + 0
-                        for di in range(-4, 5):
-                            for dj in range(-4, 5):
-                                gg = np.roll(g, (i + di - nyh, j + dj - nxh), axis=(0, 1))
-                                conv_t[i + di, j + dj] = np.sum(ff * gg)
-                        return np.ravel(conv_t)
-                    p0 = Par0[i, j]
+                        values[i0:i1, j0:j1] = par
+                        return RGIconv(values, x)
+                    p0 = Par0[i0:i1, j0:j1]
                     bounds = [0, bmax]
                     popt, _ = curve_fit(model_c, [Yi, Xi], np.ravel(drot),
                                         p0=p0, bounds=bounds)
-                    Par0[i, j] = popt
-                    conv = np.reshape(model_c([Yi, Xi], popt), (nynew, nxnew))
+                    Par0[i0:i1, j0:j1] = popt
             #def model_e(x, *par):
             #    values = Par0 + 0
             #    values[edge] = par
