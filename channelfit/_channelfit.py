@@ -157,7 +157,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                             gg = np.roll(g, (i - nyh, j - nxh), axis=(0, 1))
                             return np.sum(ff * gg)
                         popt, _ = curve_fit(model, [Yi, Xi], dd,
-                                            p0=p0, bounds=[0, p0 * 2])
+                                            p0=p0, bounds=[0, dd])
                         Par0[i, j] = popt
             print(np.sqrt(np.mean((Par0 - Par0org)**2)),
                   np.sqrt(np.max((Par0 - Par0org)**2)))
