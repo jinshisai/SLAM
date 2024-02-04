@@ -159,7 +159,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         ff = f(tuple(x))
                         gg = np.roll(g, (i - nyh, j - nxh), axis=(0, 1))
                         return np.sum(ff * gg)
-                    p0 = Par0[i, j]
+                    p0 = np.abs(Par0[i, j])
                     bounds = [0, p0 * 2]
                     popt, _ = curve_fit(model_c, [Yi, Xi],
                                         drot[i * yskip, j * xskip],
