@@ -143,8 +143,9 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         Par0t = Par0 + 0
         Par0t[1:nymodel, 1:nxmodel] = np.nan
         edge = ~np.isnan(Par0t)
-        print(f'\rPre fitting:' + '_' * 10, end='')
-        for l in range(10):
+        niter = 3
+        print(f'\rPre fitting:' + '_' * niter, end='')
+        for l in range(niter):
             for i in range(1, nymodel - 1):
                 i0 = (i - 1) * yskip
                 i1 = min((i + 1) * yskip, nynew)
@@ -170,6 +171,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     popt, _ = curve_fit(model_c, [Yit, Xit], np.ravel(drott),
                                         p0=p0, bounds=bounds)
                     Par0[i, j] = popt
+            print(f'\rPre fitting:' + '#' * (2 * l + 1), end='')
             def model_e(x, *par):
                 values = Par0 + 0
                 values[edge] = par
@@ -182,7 +184,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
             popt, _ = curve_fit(model_e, [Yi, Xi], np.ravel(drot),
                                 p0=p0, bounds=bounds)
             Par0[edge] = popt
-            print(f'\rPre fitting:' + '#' * (l + 1), end='')
+            print(f'\rPre fitting:' + '#' * (2 * l + 2), end='')
         print('')
         popt = np.ravel(Par0)
         #def model(x, *par):
