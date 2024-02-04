@@ -149,7 +149,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
             f = convolve(f(tuple(x)), g, mode='same')
             return np.ravel(f)
         niter = 5
-        bar = tqdm(total=niter * (nymodel - 2) * (nxmodel - 2))
+        bar = tqdm(total=niter * nymodel * nxmodel)
         bar.set_description('Deconvolution')
         for _ in range(niter):
             Par0org = Par0 + 0
@@ -162,6 +162,15 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         f = RGI((ymodel, xmodel), values, method='linear',
                                 bounds_error=False, fill_value=0)
                         ff = f(tuple(x))
+                        gg = g + 0
+                        if i <= nyh:
+                            gg[:nyh - i, :] = 0
+                        else:
+                            gg[nyh - i:, :] = 0
+                        if j <= nxh:
+                            gg[:, :nxh - j] = 0
+                        else:
+                            gg[:, nxh - j:] = 0
                         gg = np.roll(g, (i - nyh, j - nxh), axis=(0, 1))
                         return np.sum(ff * gg)
                     p0 = Par0[i, j]
