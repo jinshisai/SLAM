@@ -339,7 +339,8 @@ class ChannelFit():
                  sigma: float = None, nlayer: int = 4,
                  xskip: int = 1, yskip: int = 1, autoskip: bool = False,
                  gaussmargin: float = 1.6,
-                 savedeconvolved: str = None, loaddeconvolved: str = None):
+                 savedeconvolved: str = None, loaddeconvolved: str = None,
+                 signmajor: int = None, signminor: int = None):
         if not (cubefits is None):
             self.read_cubefits(cubefits, center, dist, vsys,
                                -rmax, rmax, -rmax, rmax, None, None,
@@ -383,8 +384,14 @@ class ChannelFit():
         self.mom2 = m['mom2']
         self.sigma_mom0 = m['sigma_mom0']
         X, Y = rot(self.X, self.Y, pa_rad)
-        self.signmajor = np.sign(np.nansum(self.mom1 * Y))
-        self.signminor = np.sign(np.nansum(self.mom1 * X)) * (-1)
+        if signmajor is None:
+            self.signmajor = np.sign(np.nansum(self.mom1 * Y))
+        else:
+            self.signmajor = signmajor
+        if signminor is None:
+            self.signminor = np.sign(np.nansum(self.mom1 * X)) * (-1)
+        else:
+            self.signminor = signminor
         
         # 2d nested grid on the disk plane.
         # x and y are minor and major axis coordinates before projection.
