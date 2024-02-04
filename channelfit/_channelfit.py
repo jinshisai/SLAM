@@ -20,7 +20,7 @@ from astropy.coordinates import SkyCoord
 from scipy.signal import convolve
 from scipy.interpolate import RegularGridInterpolator as RGI
 from scipy.interpolate import interp1d
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, minimize_scalar
 from scipy.special import erf
 import warnings
 from tqdm import tqdm
@@ -147,19 +147,17 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bar.update(1)
                     p0 = Par0[i, j]
                     if p0 > 0:
-                        def model_c(x, par):
+                        def sq_diff(par):
                             values = Par0 + 0
                             values[i, j] = par
                             f = RGI((ymodel, xmodel), values, method='linear',
                                     bounds_error=False, fill_value=0)
-                            ff = f(tuple(x))
+                            ff = f((Yi, Xi))
                             gg = np.roll(g, (i - nyh, j - nxh), axis=(0, 1))
-                            return np.sum(ff * gg)
-                        bounds = [0, p0 * 2]
-                        popt, _ = curve_fit(model_c, [Yi, Xi],
-                                            drot[i * yskip, j * xskip],
-                                            p0=p0, bounds=bounds)
-                        Par0[i, j] = popt
+                            diff = drot[i * yskip, j * xskip] - np.sum(ff * gg)
+                            return diff**2
+                        res = minimize_scalar(sq_diff, bounds=[0, p0 * 2])
+                        Par0[i, j] = res.x
             print(np.sqrt(np.mean((Par0 - Par0org)**2)),
                   np.sqrt(np.max((Par0 - Par0org)**2)))
         print('')
