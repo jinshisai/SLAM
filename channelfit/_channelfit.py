@@ -133,7 +133,6 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
             bounds_error=False, fill_value=0)
     drot = f(tuple(rot(Xi, Yi, -np.radians(bpa)))[::-1])
     Par0 = di[::yskip, ::xskip].clip(0, None) / gsum
-    bmax = np.max(Par0) * 10
     if loadtxt is not None:
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
@@ -159,12 +158,15 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         ff = f(tuple(x))
                         gg = np.roll(g, (i - nyh, j - nxh), axis=(0, 1))
                         return np.sum(ff * gg)
-                    p0 = np.abs(Par0[i, j])
-                    bounds = [0, p0 * 2]
-                    popt, _ = curve_fit(model_c, [Yi, Xi],
-                                        drot[i * yskip, j * xskip],
-                                        p0=p0, bounds=bounds)
-                    Par0[i, j] = popt
+                    p0 = max(Par0[i, j], 0)
+                    if p0 > 0:
+                        bounds = [0, p0 * 2]
+                        popt, _ = curve_fit(model_c, [Yi, Xi],
+                                            drot[i * yskip, j * xskip],
+                                            p0=p0, bounds=bounds)
+                        Par0[i, j] = popt
+                    else:
+                        Par0[i, j] = 0
             print(np.sqrt(np.mean((Par0 - Par0org)**2)),
                   np.sqrt(np.max((Par0 - Par0org)**2)))
         print('')
