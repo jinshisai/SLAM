@@ -148,7 +148,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bounds_error=False, fill_value=0)
             f = convolve(f(tuple(x)), g, mode='same')
             return np.ravel(f)
-        conv = RGIconv(Par0, [Yi, Xi])
+        conv = np.reshape(RGIconv(Par0, [Yi, Xi]), np.shape(drot))
         niter = 5
         bar = tqdm(total=niter * nymodel * nxmodel)
         bar.set_description('Deconvolution')
