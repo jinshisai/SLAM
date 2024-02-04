@@ -145,7 +145,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         edge = ~np.isnan(edge)
         def RGIconv(values, x):
             f = RGI((ymodel, xmodel), values, method='linear',
-            bounds_error=False, fill_value=0)
+                    bounds_error=False, fill_value=0)
             f = convolve(f(tuple(x)), g, mode='same')
             return np.ravel(f)
         niter = 5
@@ -153,27 +153,31 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         bar.set_description('Deconvolution')
         for _ in range(niter):
             Par0org = Par0 + 0
-            for i in range(1, nymodel - 1):
-                for j in range(1, nxmodel - 1):
+            for i in range(nymodel):
+                for j in range(nxmodel):
                     bar.update(1)
                     def model_c(x, par):
                         values = Par0 + 0
                         values[i, j] = par
-                        return RGIconv(values, x)
+                        f = RGI((ymodel, xmodel), values, method='linear',
+                                bounds_error=False, fill_value=0)
+                        ff = f(tuple(x))
+                        gg = np.roll(g, (i - nyh, j - nxh), axis=(0, 1))
+                        return np.sum(ff * gg)
                     p0 = Par0[i, j]
                     bounds = [0, bmax]
                     popt, _ = curve_fit(model_c, [Yi, Xi], np.ravel(drot),
                                         p0=p0, bounds=bounds)
                     Par0[i, j] = popt
-            def model_e(x, *par):
-                values = Par0 + 0
-                values[edge] = par
-                return RGIconv(values, x)
-            p0 = Par0[edge]
-            bounds = [np.zeros_like(p0), np.full_like(p0, bmax)]
-            popt, _ = curve_fit(model_e, [Yi, Xi], np.ravel(drot),
-                                p0=p0, bounds=bounds)
-            Par0[edge] = popt
+            #def model_e(x, *par):
+            #    values = Par0 + 0
+            #    values[edge] = par
+            #    return RGIconv(values, x)
+            #p0 = Par0[edge]
+            #bounds = [np.zeros_like(p0), np.full_like(p0, bmax)]
+            #popt, _ = curve_fit(model_e, [Yi, Xi], np.ravel(drot),
+            #                    p0=p0, bounds=bounds)
+            #Par0[edge] = popt
             print(np.sqrt(np.mean((Par0 - Par0org)**2)),
                   np.sqrt(np.max((Par0 - Par0org)**2)))
         print('')
