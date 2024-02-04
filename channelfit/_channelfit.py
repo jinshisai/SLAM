@@ -27,7 +27,6 @@ from tqdm import tqdm
 from utils import emcee_corner
 
 warnings.simplefilter('ignore', RuntimeWarning)
-warnings.simplefilter('ignore', OptimizeWarning)
 
 GG = constants.G.si.value
 M_sun = constants.M_sun.si.value
