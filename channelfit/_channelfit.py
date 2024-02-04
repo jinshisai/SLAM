@@ -143,9 +143,15 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         Par0t = Par0 + 0
         Par0t[1:nymodel, 1:nxmodel] = np.nan
         edge = ~np.isnan(Par0t)
-        niter = 3
-        print(f'\rPre fitting:' + '_' * niter, end='')
-        for l in range(niter):
+        def RGIconv(ym, xm, values, x):
+            f = RGI((ym, xm), values, method='linear',
+            bounds_error=False, fill_value=0)
+            f = convolve(f(tuple(x)), g, mode='same')
+            return np.ravel(f)
+        niter = 5
+        bar = tqdm(total=niter * (nymodel - 2) * (nxmodel - 2))
+        bar.set_description('Deconvolution')
+        for _ in range(niter):
             for i in range(1, nymodel - 1):
                 i0 = (i - 1) * yskip
                 i1 = min((i + 1) * yskip, nynew)
@@ -156,43 +162,33 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     j1 = min((j + 1) * xskip, nxnew)
                     xit = xi[j0:j1 + 1]
                     xmt = xit[::xskip]
+                    bar.update(1)
                     Xit, Yit = np.meshgrid(xit, yit)
                     drott = drot[i0:i1 + 1, j0:j1 + 1]
                     Par0t = Par0[i - 1:i + 2, j - 1:j + 2]
                     def model_c(x, par):
                         values = Par0t + 0
                         values[1, 1] = par
-                        f = RGI((ymt, xmt), values, method='linear',
-                                bounds_error=False, fill_value=0)
-                        f = convolve(f(tuple(x)), g, mode='same')
-                        return np.ravel(f)
+                        return RGIconv(ymt, xmt, values, x)
                     p0 = Par0t[1, 1]
                     bounds = [0, bmax]
                     popt, _ = curve_fit(model_c, [Yit, Xit], np.ravel(drott),
                                         p0=p0, bounds=bounds)
                     Par0[i, j] = popt
-            print(f'\rPre fitting:' + '#' * (2 * l + 1), end='')
             def model_e(x, *par):
                 values = Par0 + 0
                 values[edge] = par
-                f = RGI((ymodel, xmodel), values, method='linear',
-                        bounds_error=False, fill_value=0)
-                f = convolve(f(tuple(x)), g, mode='same')
-                return np.ravel(f)
+                return RGIconv(ymodel, xmodel, values, x)
             p0 = Par0[edge]
             bounds = [np.zeros_like(p0), np.full_like(p0, bmax)]
             popt, _ = curve_fit(model_e, [Yi, Xi], np.ravel(drot),
                                 p0=p0, bounds=bounds)
             Par0[edge] = popt
-            print(f'\rPre fitting:' + '#' * (2 * l + 2), end='')
         print('')
         popt = np.ravel(Par0)
         #def model(x, *par):
         #    values = np.reshape(par, (nymodel, nxmodel))
-        #    f = RGI((ymodel, xmodel), values, method='linear',
-        #            bounds_error=False, fill_value=0)
-        #    f = convolve(f(tuple(x)), g, mode='same')
-        #    return np.ravel(f)
+        #    return RGIconv(ymodel, xmodel, values, x)
         #p0 = np.ravel(Par0)
         #bounds = [np.zeros_like(p0), np.full_like(p0, bmax)]
         #popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
@@ -482,7 +478,9 @@ class ChannelFit():
             c = convolve(self.mom0decon, self.gaussbeam, mode='same')
             self.resdecon = self.mom0 - c
             maxres = np.max(self.resdecon) / self.sigma_mom0
-            print(f'Maximum residual is {maxres:.1f}sigma of Moment 0.')
+            rmsres = np.sqrt(np.mean(self.resdecon**2)) / self.sigma_mom0
+            print(f'Max and rms are {maxres:.1f}sigma '
+                  'and {rmsres:.1f}sigma in Moment 0 residual.')
 
                 
     def update_incl(self, incl: float):
