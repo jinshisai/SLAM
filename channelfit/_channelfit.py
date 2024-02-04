@@ -129,55 +129,72 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     ymodel = yi[::yskip]
     xnpar = len(xmodel)
     ynpar = len(ymodel)
-    def model(x, *par):
-        f = RGI((ymodel, xmodel), np.reshape(par, (len(ymodel), len(xmodel))),
-                method='linear', bounds_error=False, fill_value=0)
-        f = convolve(f(tuple(x)), g, mode='same')
-        return np.ravel(f)
     f = RGI((yi, xi), di, method='linear',
             bounds_error=False, fill_value=0)
     drot = f(tuple(rot(Xi, Yi, -np.radians(bpa)))[::-1])
     Par0 = di[::yskip, ::xskip].clip(0, None) / gsum
-    par0 = np.ravel(Par0)
-    bounds = [np.zeros_like(par0), np.full_like(par0, par0.max())]
+    bmax = np.max(Par0) * 10
     if loadtxt is not None:
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
     else:
-        ndiv = 5
-        Xmodel, Ymodel = np.meshgrid(xmodel, ymodel)
-        ny, nx = np.shape(drot)
-        my, mx = int(np.ceil(ny / ndiv)), int(np.ceil(nx / ndiv))
-        def between(x, xlim):
-            return (xlim[0] <= x) * (x <= xlim[1])
-        par0new = []
-        print(f'\rPre-fitting:' + '_' * ndiv * ndiv, end='')
-        for i in range(ndiv):
-            i0, i1 = i * my, min((i + 1) * my, ny) - 1
-            ly = i1 - i0 + 1
-            for j in range(ndiv):
-                j0, j1 = j * mx, min((j + 1) * mx, nx) - 1
-                lx = j1 - j0 + 1
-                ylim = [yi[i0], yi[i1]]
-                xlim = [xi[j0], xi[j1]]
-                xmt = xmodel[:len(xmodel[between(xmodel, xlim)])]
-                ymt = ymodel[:len(xmodel[between(ymodel, ylim)])]
-                Xit, Yit = np.meshgrid(xi[:lx], yi[:ly])
-                drott = drot[i0:i1+1, j0:j1+1]
-                par0t = Par0[between(Xmodel, xlim) * between(Ymodel, ylim)]
-                bndt = [np.zeros_like(par0t), np.full_like(par0t, par0.max())]
-                def model_t(x, *par):
-                    f = RGI((ymt, xmt), np.reshape(par, (len(ymt), len(xmt))),
-                            method='linear', bounds_error=False, fill_value=0)
-                    f = convolve(f(tuple(x)), g, mode='same')
-                    return np.ravel(f)
-                popt, _ = curve_fit(model_t, [Yit, Xit], np.ravel(drott),
-                                    p0=par0t, bounds=bndt)
-                par0new = par0new + list(popt)
-                print(f'\rPre fitting:' + '#' * (ndiv * i + j + 1), end='')
+        nxmodel = len(xmodel)
+        nymodel = len(ymodel)
+        Par0t = Par0 + 0
+        Par0t[1:nymodel, 1:nxmodel] = np.nan
+        edge = ~np.isnan(Par0t)
+        print(f'\rPre fitting:' + '_' * 10, end='')
+        for l in range(10):
+            for i in range(1, nymodel - 1):
+                i0 = (i - 1) * yskip
+                i1 = min((i + 1) * yskip, nynew)
+                yit = yi[i0:i1 + 1]
+                ymt = yit[::yskip]
+                for j in range(1, nxmodel - 1):
+                    j0 = (j - 1) * xskip
+                    j1 = min((j + 1) * xskip, nxnew)
+                    xit = xi[j0:j1 + 1]
+                    xmt = xit[::xskip]
+                    Xit, Yit = np.meshgrid(xit, yit)
+                    drott = drot[i0:i1 + 1, j0:j1 + 1]
+                    Par0t = Par0[i - 1:i + 2, j - 1:j + 2]
+                    def model_c(x, par):
+                        values = Par0t + 0
+                        values[1, 1] = par
+                        f = RGI((ymt, xmt), values, method='linear',
+                                bounds_error=False, fill_value=0)
+                        f = convolve(f(tuple(x)), g, mode='same')
+                        return np.ravel(f)
+                    p0 = Par0t[1, 1]
+                    bounds = [0, bmax]
+                    popt, _ = curve_fit(model_c, [Yit, Xit], np.ravel(drott),
+                                        p0=p0, bounds=bounds)
+                    Par0[i, j] = popt
+            def model_e(x, *par):
+                values = Par0 + 0
+                values[edge] = par
+                f = RGI((ymodel, xmodel), values, method='linear',
+                        bounds_error=False, fill_value=0)
+                f = convolve(f(tuple(x)), g, mode='same')
+                return np.ravel(f)
+            p0 = Par0[edge]
+            bounds = [np.zeros_like(p0), np.full_like(p0, bmax)]
+            popt, _ = curve_fit(model_e, [Yi, Xi], np.ravel(drot),
+                                p0=p0, bounds=bounds)
+            Par0[edge] = popt
+            print(f'\rPre fitting:' + '#' * (l + 1), end='')
         print('')
-        popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
-                            p0=par0new, bounds=bounds)
+        popt = np.ravel(Par0)
+        #def model(x, *par):
+        #    values = np.reshape(par, (nymodel, nxmodel))
+        #    f = RGI((ymodel, xmodel), values, method='linear',
+        #            bounds_error=False, fill_value=0)
+        #    f = convolve(f(tuple(x)), g, mode='same')
+        #    return np.ravel(f)
+        #p0 = np.ravel(Par0)
+        #bounds = [np.zeros_like(p0), np.full_like(p0, bmax)]
+        #popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
+        #                    p0=p0, bounds=bounds)
     if savetxt is not None:
         np.savetxt(savetxt, popt)
     zmodel = np.reshape(popt, (ynpar, xnpar))
@@ -462,6 +479,8 @@ class ChannelFit():
         if 'mom0' in self.scaling:
             c = convolve(self.mom0decon, self.gaussbeam, mode='same')
             self.resdecon = self.mom0 - c
+            maxres = np.max(self.resdecon) / self.sigma_mom0
+            print(f'Maximum residual is {maxres:.1f}sigma of Moment 0.')
 
                 
     def update_incl(self, incl: float):
