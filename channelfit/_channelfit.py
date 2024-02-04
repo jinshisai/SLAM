@@ -148,6 +148,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bounds_error=False, fill_value=0)
             f = convolve(f(tuple(x)), g, mode='same')
             return np.ravel(f)
+        conv = RGIconv(Par0, [Yi, Xi])
         niter = 5
         bar = tqdm(total=niter * nymodel * nxmodel)
         bar.set_description('Deconvolution')
@@ -162,22 +163,18 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         f = RGI((ymodel, xmodel), values, method='linear',
                                 bounds_error=False, fill_value=0)
                         ff = f(tuple(x))
-                        gg = g + 0
-                        if i <= nyh:
-                            gg[:nyh - i, :] = 0
-                        else:
-                            gg[nyh - i:, :] = 0
-                        if j <= nxh:
-                            gg[:, :nxh - j] = 0
-                        else:
-                            gg[:, nxh - j:] = 0
-                        gg = np.roll(g, (i - nyh, j - nxh), axis=(0, 1))
-                        return np.sum(ff * gg)
+                        conv_t = conv + 0
+                        for di in range(-4, 5):
+                            for dj in range(-4, 5):
+                                gg = np.roll(g, (i + di - nyh, j + dj - nxh), axis=(0, 1))
+                                conv_t[i + di, j + dj] = np.sum(ff * gg)
+                        return np.ravel(conv_t)
                     p0 = Par0[i, j]
                     bounds = [0, bmax]
                     popt, _ = curve_fit(model_c, [Yi, Xi], np.ravel(drot),
                                         p0=p0, bounds=bounds)
                     Par0[i, j] = popt
+                    conv = model_c([Yi, Xi], popt)
             #def model_e(x, *par):
             #    values = Par0 + 0
             #    values[edge] = par
