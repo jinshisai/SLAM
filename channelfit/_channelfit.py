@@ -138,23 +138,18 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
     else:
-        nxmodel = len(xmodel)
-        nymodel = len(ymodel)
-        edge = Par0 + 0
-        edge[1:nymodel, 1:nxmodel] = np.nan
-        edge = ~np.isnan(edge)
         def RGIconv(values, x):
             f = RGI((ymodel, xmodel), values, method='linear',
                     bounds_error=False, fill_value=0)
             f = convolve(f(tuple(x)), g, mode='same')
             return np.ravel(f)
         niter = 10
-        bar = tqdm(total=niter * nymodel * nxmodel)
+        bar = tqdm(total=niter * ynpar * xnpar)
         bar.set_description('Deconvolution')
         for _ in range(niter):
             Par0org = Par0 + 0
-            for i in range(nymodel):
-                for j in range(nxmodel):
+            for i in range(ynpar):
+                for j in range(xnpar):
                     bar.update(1)
                     def model_c(x, par):
                         values = Par0 + 0
@@ -165,20 +160,11 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         gg = np.roll(g, (i - nyh, j - nxh), axis=(0, 1))
                         return np.sum(ff * gg)
                     p0 = Par0[i, j]
-                    bounds = [0, bmax]
+                    bounds = [0, p0 * 2]
                     popt, _ = curve_fit(model_c, [Yi, Xi],
                                         drot[i * yskip, j * xskip],
                                         p0=p0, bounds=bounds)
                     Par0[i, j] = popt
-            #def model_e(x, *par):
-            #    values = Par0 + 0
-            #    values[edge] = par
-            #    return RGIconv(values, x)
-            #p0 = Par0[edge]
-            #bounds = [np.zeros_like(p0), np.full_like(p0, bmax)]
-            #popt, _ = curve_fit(model_e, [Yi, Xi], np.ravel(drot),
-            #                    p0=p0, bounds=bounds)
-            #Par0[edge] = popt
             print(np.sqrt(np.mean((Par0 - Par0org)**2)),
                   np.sqrt(np.max((Par0 - Par0org)**2)))
         print('')
