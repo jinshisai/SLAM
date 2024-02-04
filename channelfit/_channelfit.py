@@ -483,7 +483,7 @@ class ChannelFit():
             maxres = np.max(self.resdecon) / self.sigma_mom0
             rmsres = np.sqrt(np.mean(self.resdecon**2)) / self.sigma_mom0
             print(f'Max and rms are {maxres:.1f}sigma '
-                  'and {rmsres:.1f}sigma in Moment 0 residual.')
+                  + f'and {rmsres:.1f}sigma in Moment 0 residual.')
 
                 
     def update_incl(self, incl: float):
