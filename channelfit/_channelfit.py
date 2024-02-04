@@ -167,8 +167,8 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         values = Par0 + 0
                         values[i0:i1, j0:j1] = par
                         return RGIconv(values, x)
-                    p0 = Par0[i0:i1, j0:j1]
-                    bounds = [0, bmax]
+                    p0 = np.ravel(Par0[i0:i1, j0:j1])
+                    bounds = [np.zeros_like(p0), np.full_like(p0, bmax)]
                     popt, _ = curve_fit(model_c, [Yi, Xi], np.ravel(drot),
                                         p0=p0, bounds=bounds)
                     Par0[i0:i1, j0:j1] = popt
