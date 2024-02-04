@@ -162,16 +162,17 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                 for j in range(ndiv):
                     j0 = j * nxsub
                     j1 = min((j + 1) * nxsub, nxmodel)
+                    shape = (i1 - i0, j1 - j0)
                     bar.update(1)
                     def model_c(x, *par):
                         values = Par0 + 0
-                        values[i0:i1, j0:j1] = par
+                        values[i0:i1, j0:j1] = np.reshape(par, shape)
                         return RGIconv(values, x)
                     p0 = np.ravel(Par0[i0:i1, j0:j1])
                     bounds = [np.zeros_like(p0), np.full_like(p0, bmax)]
                     popt, _ = curve_fit(model_c, [Yi, Xi], np.ravel(drot),
                                         p0=p0, bounds=bounds)
-                    Par0[i0:i1, j0:j1] = popt
+                    Par0[i0:i1, j0:j1] = np.reshape(popt, shape)
             #def model_e(x, *par):
             #    values = Par0 + 0
             #    values[edge] = par
