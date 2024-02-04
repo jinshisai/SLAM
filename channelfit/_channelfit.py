@@ -146,6 +146,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                 for j in range(xnpar):
                     bar.update(1)
                     p0 = Par0[i, j]
+                    dd = drot[i * yskip, j * xskip]
                     if p0 > 0:
                         def sq_diff(par):
                             values = Par0 + 0
@@ -154,7 +155,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                                     bounds_error=False, fill_value=0)
                             ff = f((Yi, Xi))
                             gg = np.roll(g, (i - nyh, j - nxh), axis=(0, 1))
-                            diff = drot[i * yskip, j * xskip] - np.sum(ff * gg)
+                            diff = (dd - np.sum(ff * gg)) / dd
                             return diff**2
                         res = minimize_scalar(sq_diff, bounds=[0, p0 * 2])
                         Par0[i, j] = res.x
