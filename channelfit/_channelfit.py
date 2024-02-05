@@ -139,52 +139,33 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
     else:
         niter = 10
-        nsub = 3
-        ynparnew = int(np.ceil(ynpar / nsub))
-        xnparnew = int(np.ceil(xnpar / nsub))
-        bar = tqdm(total=niter * ynparnew * xnparnew)
+        bar = tqdm(total=niter * ynpar * xnpar)
         bar.set_description('Deconvolution')
         for _ in range(niter):
             Par0org = Par0 + 0
-            ilist = np.arange(ynparnew)
-            jlist = np.arange(xnparnew)
-            for i in ilist:
-                i0 = i * nsub
-                i1 = min((i + 1) * nsub, ynpar)
-                for j in jlist:
-                    j0 = j * nsub
-                    j1 = min((j + 1) * nsub, xnpar)
-                    parshape = (i1 - i0, j1 - j0)
+            ilist = np.arange(ynpar)
+            jlist = np.arange(xnpar)
+            for i_p in ilist:
+                i_d = i_p * yskip
+                for j_p in jlist:
+                    j_d = j_p * xskip
                     bar.update(1)
-                    p0 = np.ravel(Par0[i0:i1, j0:j1])
-                    isublist = np.arange(i0, i1) * yskip
-                    jsublist = np.arange(j0, j1) * xskip
-                    isublist, jsublist = np.meshgrid(isublist, jsublist)
-                    dd = np.ravel(drot[isublist, jsublist])
-                    bounds = [np.zeros_like(p0), np.full_like(p0, drot.max())]
-                    def model(x, *par):
+                    p0 = Par0[i_p, j_p]
+                    dd = drot[i_d, j_d]
+                    bounds = [0, dd]
+                    def model(x, par):
                         values = Par0 + 0
-                        values[i0:i1, j0:j1] = np.reshape(par, parshape)
+                        values[i_p, j_p] = par
                         f = RGI((ymodel, xmodel), values, method='linear',
                                 bounds_error=False, fill_value=0)
                         ff = f(tuple(x))
-                        conv = []
-                        for di in range(i1 - i0):
-                            for dj in range(j1 - j0):
-                                ioff = (i + di) * yskip - nyh
-                                if np.abs(ioff) > nyh:
-                                    continue
-                                joff = (j + dj) * xskip - nxh
-                                if np.abs(joff) > nxh:
-                                    continue
-                                gg = np.roll(g, (ioff, joff), axis=(0, 1))
-                                conv.append(np.sum(ff * gg))
-                        return conv
+                        gg = np.roll(g, (i_d - nyh, j_d - nxh), axis=(0, 1))
+                        return np.sum(ff * gg)
                     popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
                                         sigma=[sigma] * len(dd),
                                         absolute_sigma=True,
                                         bounds=bounds)
-                    Par0[i0:i1, j0:j1] = np.reshape(popt, parshape)
+                    Par0[i_p, j_p] = popt
             print(f'{np.sqrt(np.mean((Par0 - Par0org)**2)):.2e}',
                   f'{np.sqrt(np.max((Par0 - Par0org)**2)):.2e}')
         print('')
