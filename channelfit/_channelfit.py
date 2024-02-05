@@ -150,16 +150,17 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
             jlist = np.arange(xnparnew)
             for i in ilist:
                 i0 = i * ynparnew
-                i1 = min((i + 1) * ynparnew, ynpar)
+                i1 = min((i + 1) * nsub, ynpar)
                 for j in jlist:
                     j0 = j * xnparnew
-                    j1 = min((j + 1) * xnparnew, xnpar)
+                    j1 = min((j + 1) * nsub, xnpar)
                     parshape = (i1 - i0, j1 - j0)
                     bar.update(1)
                     p0 = np.ravel(Par0[i0:i1, j0:j1])
                     isublist = np.arange(i0, i1) * yskip
                     jsublist = np.arange(j0, j1) * xskip
-                    dd = drot[isublist, jsublist]
+                    isublist, jsublist = np.meshgrid(isublist, jsublist)
+                    dd = drot[np.ravel(isublist), np.ravel(jsublist)]
                     bounds = [np.zeros_like(p0), np.full_like(p0, dd.max())]
                     def model(x, *par):
                         values = Par0 + 0
