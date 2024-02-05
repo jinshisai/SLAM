@@ -137,7 +137,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
     else:
-        niter = 10
+        niter = 20
         bar = tqdm(total=niter * ynpar * xnpar)
         bar.set_description('Deconvolution')
         for _ in range(niter):
@@ -159,8 +159,8 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         popt, _ = curve_fit(model, [Yi, Xi], dd,
                                             p0=p0, bounds=[0, dd])
                         Par0[i, j] = popt
-            print(np.sqrt(np.mean((Par0 - Par0org)**2)),
-                  np.sqrt(np.max((Par0 - Par0org)**2)))
+            print(f'{np.sqrt(np.mean((Par0 - Par0org)**2)):.2e},
+                  {np.sqrt(np.max((Par0 - Par0org)**2)):.2e}')
         print('')
         popt = np.ravel(Par0)
         #def model(x, *par):
