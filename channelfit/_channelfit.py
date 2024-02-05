@@ -133,7 +133,6 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
             bounds_error=False, fill_value=0)
     drot = f(tuple(rot(Xi, Yi, -np.radians(bpa)))[::-1])
     Par0 = drot[::yskip, ::xskip].clip(0, None) / gsum
-    sigma_decon = sigma / gsum
     if loadtxt is not None:
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
@@ -152,7 +151,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bar.update(1)
                     p0 = Par0[i_p, j_p]
                     dd = drot[i_d, j_d]
-                    bounds = [0, np.max(drot)]
+                    bounds = [0, 3 * sigma]
                     def model(x, par):
                         values = Par0 + 0
                         values[i_p, j_p] = par
@@ -162,7 +161,6 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         gg = np.roll(g, (i_d - nyh, j_d - nxh), axis=(0, 1))
                         return np.sum(ff * gg)
                     popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
-                                        sigma=[sigma], absolute_sigma=True,
                                         bounds=bounds)
                     Par0[i_p, j_p] = popt
             print(f'{np.sqrt(np.mean((Par0 - Par0org)**2)):.2e}',
@@ -184,8 +182,8 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     zmodel = np.reshape(popt, (ynpar, xnpar))
     f = RGI((ymodel, xmodel), zmodel,
             method='linear', bounds_error=False, fill_value=0)
-    model = f(tuple(rot(*np.meshgrid(x, y), np.radians(bpa)))[::-1])
-    return model, xmodel, ymodel, zmodel
+    decon = f(tuple(rot(*np.meshgrid(x, y), np.radians(bpa)))[::-1])
+    return decon, xmodel, ymodel, zmodel
 
 def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                   bmaj: float, bmin: float, bpa: float,
