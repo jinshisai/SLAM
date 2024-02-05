@@ -151,18 +151,21 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bar.update(1)
                     p0 = Par0[i_p, j_p]
                     dd = drot[i_d, j_d]
-                    bounds = [0, 3 * sigma]
-                    def model(x, par):
-                        values = Par0 + 0
-                        values[i_p, j_p] = par
-                        f = RGI((ymodel, xmodel), values, method='linear',
-                                bounds_error=False, fill_value=0)
-                        ff = f(tuple(x))
-                        gg = np.roll(g, (i_d - nyh, j_d - nxh), axis=(0, 1))
-                        return np.sum(ff * gg)
-                    popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
-                                        bounds=bounds)
-                    Par0[i_p, j_p] = popt
+                    if dd <= 0:
+                        Par0[i_p, j_p] = 0
+                    else:
+                        bounds = [0, dd]
+                        def model(x, par):
+                            values = Par0 + 0
+                            values[i_p, j_p] = par
+                            f = RGI((ymodel, xmodel), values, method='linear',
+                                    bounds_error=False, fill_value=0)
+                            ff = f(tuple(x))
+                            gg = np.roll(g, (i_d - nyh, j_d - nxh), axis=(0, 1))
+                            return np.sum(ff * gg)
+                        popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
+                                            bounds=bounds)
+                        Par0[i_p, j_p] = popt
             print(f'{np.sqrt(np.mean((Par0 - Par0org)**2)):.2e}',
                   f'{np.sqrt(np.max((Par0 - Par0org)**2)):.2e}')
         print('')
