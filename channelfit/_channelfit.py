@@ -151,7 +151,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bar.update(1)
                     p0 = Par0[i_p, j_p]
                     dd = drot[i_d, j_d]
-                    if dd <= 0:
+                    if dd < 2 * sigma:
                         Par0[i_p, j_p] = 0
                     else:
                         bounds = [0, dd]
