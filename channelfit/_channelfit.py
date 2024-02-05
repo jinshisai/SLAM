@@ -161,7 +161,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     jsublist = np.arange(j0, j1) * xskip
                     dd = drot[isublist, jsublist]
                     bounds = [np.zeros_like(p0), np.full_like(p0, dd.max())]
-                    def model(x, par):
+                    def model(x, *par):
                         values = Par0 + 0
                         values[i0:i1, j0:j1] = np.reshape(par, parshape)
                         f = RGI((ymodel, xmodel), values, method='linear',
