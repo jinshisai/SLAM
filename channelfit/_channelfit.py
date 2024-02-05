@@ -133,6 +133,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
             bounds_error=False, fill_value=0)
     drot = f(tuple(rot(Xi, Yi, -np.radians(bpa)))[::-1])
     Par0 = drot[::yskip, ::xskip].clip(0, None) / gsum
+    sigma_decon = sigma / gsum
     if loadtxt is not None:
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
@@ -156,8 +157,9 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                             ff = f(tuple(x))
                             gg = np.roll(g, (i - nyh, j - nxh), axis=(0, 1))
                             return np.sum(ff * gg)
-                        popt, _ = curve_fit(model, [Yi, Xi], dd,
-                                            p0=p0, bounds=[0, dd])
+                        popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
+                                            sigma=sigma, absolute_sigma=True,
+                                            bounds=[0, max(dd, sigma_decon)])
                         Par0[i, j] = popt
             print(f'{np.sqrt(np.mean((Par0 - Par0org)**2)):.2e}',
                   f'{np.sqrt(np.max((Par0 - Par0org)**2)):.2e}')
@@ -452,6 +454,7 @@ class ChannelFit():
         if self.scaling == 'mom0model':
             d = modeldeconvolve(x=self.x, y=self.y, data=self.mom0,
                                 bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
+                                sigma=self.sigma_mom0,
                                 savetxt=savedeconvolved,
                                 loadtxt=loaddeconvolved)
             self.mom0decon, self.xdecon, self.ydecon, self.zdecon = d
