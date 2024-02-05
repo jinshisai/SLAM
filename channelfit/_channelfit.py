@@ -102,7 +102,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
 def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bmaj: float, bmin: float, bpa: float, sigma: float,
                     savetxt: str = None, loadtxt: str = None,
-                    direct: bool = False) -> tuple:
+                    direct: bool = False, progressbar: bool = True) -> tuple:
     nx = len(x)
     ny = len(y)
     dx = np.abs(x[1] - x[0])
@@ -150,8 +150,9 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                             p0=p0, bounds=bounds)
     else:
         niter = 20
-        bar = tqdm(total=niter * ynpar * xnpar)
-        bar.set_description('Deconvolution')
+        if progressbar:
+            bar = tqdm(total=niter * ynpar * xnpar)
+            bar.set_description('Deconvolution')
         for _ in range(niter):
             ilist = np.arange(ynpar)
             jlist = np.arange(xnpar)
@@ -159,7 +160,8 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                 i_d = i_p * yskip
                 for j_p in jlist:
                     j_d = j_p * xskip
-                    bar.update(1)
+                    if progressbar:
+                        bar.update(1)
                     p0 = Par0[i_p, j_p]
                     dd = drot[i_d, j_d]
                     if dd < 2 * sigma:
@@ -223,7 +225,8 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
 class ChannelFit():
 
     def __init__(self, disk: bool = True, envelope: bool = True,
-                 combine: bool = False, scaling: str = 'uniform'):
+                 combine: bool = False, scaling: str = 'uniform',
+                 progressbar: bool = True):
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2',
                           'pI', 'Rin', 'Ienv',
                           'xoff', 'yoff', 'voff', 'incl']
@@ -231,6 +234,7 @@ class ChannelFit():
         self.envelope = envelope
         self.combine = combine
         self.scaling = scaling
+        self.progressbar = progressbar
 
     def read_cubefits(self, cubefits: str, center: str = None,
                       dist: float = 1, vsys: float = 0,
@@ -461,7 +465,8 @@ class ChannelFit():
                                 bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
                                 sigma=self.sigma_mom0,
                                 savetxt=savedeconvolved,
-                                loadtxt=loaddeconvolved)
+                                loadtxt=loaddeconvolved,
+                                progressbar=self.progressbar)
             self.mom0decon, self.xdecon, self.ydecon, self.zdecon = d
             print('Found a deconvolved solution.')
         if self.scaling == 'mom0ft':
@@ -674,7 +679,6 @@ class ChannelFit():
                 incl_fixed: float = None,
                 filename: str = 'channelfit',
                 show: bool = False,
-                progressbar: bool = True,
                 kwargs_emcee_corner: dict = {}):
 
         p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
@@ -708,7 +712,7 @@ class ChannelFit():
                        'labels': labels, 'rangelevel':None,
                        'figname':filename+'.corner.png', 'show_corner':show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
-            if progressbar:
+            if self.progressbar:
                 total = kw['nwalkers_per_ndim'] * len(p_fixed[notfixed])
                 total *= kw['nburnin'] + kw['nsteps'] + 2
                 bar = tqdm(total=total)
@@ -722,7 +726,7 @@ class ChannelFit():
                 self.data_valid = self.data_valid0
                 self.v_valid = self.v_valid0
             def lnprob(p):
-                if progressbar:
+                if self.progressbar:
                     bar.update(1)
                 q = p_fixed.copy()
                 q[notfixed] = p
