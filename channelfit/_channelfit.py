@@ -160,7 +160,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     isublist = np.arange(i0, i1) * yskip
                     jsublist = np.arange(j0, j1) * xskip
                     dd = drot[isublist, jsublist]
-                    bounds = [np.zeros_like(p0), dd.clip(3 * sigma_decon, None)]
+                    bounds = [np.zeros_like(p0), np.full_like(p0, dd.max())]
                     def model(x, par):
                         values = Par0 + 0
                         values[i0:i1, j0:j1] = np.reshape(par, parshape)
