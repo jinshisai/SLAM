@@ -101,7 +101,8 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     
 def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bmaj: float, bmin: float, bpa: float, sigma: float,
-                    savetxt: str = None, loadtxt: str = None) -> tuple:
+                    savetxt: str = None, loadtxt: str = None,
+                    direct: bool = False) -> tuple:
     nx = len(x)
     ny = len(y)
     dx = np.abs(x[1] - x[0])
@@ -136,12 +137,22 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     if loadtxt is not None:
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
+    elif direct:
+        def model(x, *par):
+            values = np.reshape(par, (ynpar, xnpar))
+            f = RGI((ymodel, xmodel), values, method='linear',
+                    bounds_error=False, fill_value=0)
+            f = convolve(f(tuple(x)), g, mode='same')
+            return np.ravel(f)
+        p0 = np.ravel(Par0)
+        bounds = [np.zeros_like(p0), np.full_like(p0, np.max(drot))]
+        popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
+                            p0=p0, bounds=bounds)
     else:
         niter = 20
         bar = tqdm(total=niter * ynpar * xnpar)
         bar.set_description('Deconvolution')
         for _ in range(niter):
-            Par0org = Par0 + 0
             ilist = np.arange(ynpar)
             jlist = np.arange(xnpar)
             for i_p in ilist:
@@ -166,20 +177,8 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
                                             bounds=bounds)
                         Par0[i_p, j_p] = popt
-            print(f'{np.sqrt(np.mean((Par0 - Par0org)**2)):.2e}',
-                  f'{np.sqrt(np.max((Par0 - Par0org)**2)):.2e}')
         print('')
         popt = np.ravel(Par0)
-        #def model(x, *par):
-        #    values = np.reshape(par, (ypar, xnpar))
-        #    f = RGI((ymodel, xmodel), values, method='linear',
-        #            bounds_error=False, fill_value=0)
-        #    f = convolve(f(tuple(x)), g, mode='same')
-        #    return np.ravel(f)
-        #p0 = np.ravel(Par0)
-        #bounds = [np.zeros_like(p0), np.full_like(p0, bmax)]
-        #popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
-        #                    p0=p0, bounds=bounds)
     if savetxt is not None:
         np.savetxt(savetxt, popt)
     zmodel = np.reshape(popt, (ynpar, xnpar))
