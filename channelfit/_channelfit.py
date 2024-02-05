@@ -100,7 +100,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     return cleancomponent
     
 def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
-                    bmaj: float, bmin: float, bpa: float,
+                    bmaj: float, bmin: float, bpa: float, sigma: float,
                     savetxt: str = None, loadtxt: str = None) -> tuple:
     nx = len(x)
     ny = len(y)
@@ -142,8 +142,8 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         bar.set_description('Deconvolution')
         for _ in range(niter):
             Par0org = Par0 + 0
-            for i in range(ynpar):
-                for j in range(xnpar):
+            for i in np.random.shuffle(np.arange(ynpar)):
+                for j in np.random.shuffle(np.arange(xnpar)):
                     bar.update(1)
                     p0 = Par0[i, j]
                     dd = drot[i * yskip, j * xskip]
