@@ -143,8 +143,12 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         bar.set_description('Deconvolution')
         for _ in range(niter):
             Par0org = Par0 + 0
-            for i in np.random.shuffle(np.arange(ynpar)):
-                for j in np.random.shuffle(np.arange(xnpar)):
+            ilist = np.arange(ynpar)
+            jlist = np.arange(xnpar)
+            np.random.shuffle(ilist)
+            np.random.shuffle(jlist)
+            for i in ilist:
+                for j in jlist:
                     bar.update(1)
                     p0 = Par0[i, j]
                     dd = drot[i * yskip, j * xskip]
