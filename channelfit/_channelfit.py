@@ -152,7 +152,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bar.update(1)
                     p0 = Par0[i_p, j_p]
                     dd = drot[i_d, j_d]
-                    bounds = [0, dd]
+                    bounds = [0, np.max(drot)]
                     def model(x, par):
                         values = Par0 + 0
                         values[i_p, j_p] = par
