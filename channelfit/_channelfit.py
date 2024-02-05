@@ -149,10 +149,10 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
             ilist = np.arange(ynparnew)
             jlist = np.arange(xnparnew)
             for i in ilist:
-                i0 = i * ynparnew
+                i0 = i * nsub
                 i1 = min((i + 1) * nsub, ynpar)
                 for j in jlist:
-                    j0 = j * xnparnew
+                    j0 = j * nsub
                     j1 = min((j + 1) * nsub, xnpar)
                     parshape = (i1 - i0, j1 - j0)
                     bar.update(1)
