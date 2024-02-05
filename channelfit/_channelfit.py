@@ -162,7 +162,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         gg = np.roll(g, (i_d - nyh, j_d - nxh), axis=(0, 1))
                         return np.sum(ff * gg)
                     popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
-                                        sigma=[sigma] * len(dd),
+                                        sigma=[sigma],
                                         absolute_sigma=True,
                                         bounds=bounds)
                     Par0[i_p, j_p] = popt
