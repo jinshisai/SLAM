@@ -137,7 +137,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
     else:
-        niter = 10
+        niter = 20
         bar = tqdm(total=niter * ynpar * xnpar)
         bar.set_description('Deconvolution')
         for _ in range(niter):
