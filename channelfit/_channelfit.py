@@ -160,6 +160,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     isublist = np.arange(i0, i1) * yskip
                     jsublist = np.arange(j0, j1) * xskip
                     dd = drot[isublist, jsublist]
+                    bounds = [np.zeros_like(p0), dd.clip(3 * sigma_decon, None)]
                     def model(x, par):
                         values = Par0 + 0
                         values[i0:i1, j0:j1] = np.reshape(par, parshape)
@@ -176,7 +177,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         return conv
                     popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
                                         sigma=sigma, absolute_sigma=True,
-                                        bounds=[0, max(dd, 3 * sigma_decon)])
+                                        bounds=bounds)
                     Par0[i0:i1, j0:j1] = np.reshape(popt, parshape)
             print(f'{np.sqrt(np.mean((Par0 - Par0org)**2)):.2e}',
                   f'{np.sqrt(np.max((Par0 - Par0org)**2)):.2e}')
