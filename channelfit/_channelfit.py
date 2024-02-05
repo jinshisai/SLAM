@@ -139,13 +139,13 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
     else:
         niter = 10
-        bar = tqdm(total=niter * ynpar * xnpar)
+        nsub = 3
+        ynparnew = int(np.ceil(ynpar / nsub))
+        xnparnew = int(np.ceil(xnpar / nsub))
+        bar = tqdm(total=niter * ynparnew * xnparnew)
         bar.set_description('Deconvolution')
         for _ in range(niter):
             Par0org = Par0 + 0
-            nsub = 3
-            ynparnew = int(np.ceil(ynpar / nsub))
-            xnparnew = int(np.ceil(xnpar / nsub))
             ilist = np.arange(ynparnew)
             jlist = np.arange(xnparnew)
             for i in ilist:
