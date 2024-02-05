@@ -161,7 +161,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     jsublist = np.arange(j0, j1) * xskip
                     isublist, jsublist = np.meshgrid(isublist, jsublist)
                     dd = drot[np.ravel(isublist), np.ravel(jsublist)]
-                    bounds = [np.zeros_like(p0), np.full_like(p0, dd.max())]
+                    bounds = [np.zeros_like(p0), np.full_like(p0, drot.max())]
                     def model(x, *par):
                         values = Par0 + 0
                         values[i0:i1, j0:j1] = np.reshape(par, parshape)
