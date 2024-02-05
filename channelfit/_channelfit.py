@@ -160,7 +160,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     isublist = np.arange(i0, i1) * yskip
                     jsublist = np.arange(j0, j1) * xskip
                     isublist, jsublist = np.meshgrid(isublist, jsublist)
-                    dd = drot[np.ravel(isublist), np.ravel(jsublist)]
+                    dd = np.ravel(drot[isublist, jsublist])
                     bounds = [np.zeros_like(p0), np.full_like(p0, drot.max())]
                     def model(x, *par):
                         values = Par0 + 0
@@ -169,8 +169,8 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                                 bounds_error=False, fill_value=0)
                         ff = f(tuple(x))
                         conv = []
-                        for di in range(nsub):
-                            for dj in range(nsub):
+                        for di in range(i1 - i0):
+                            for dj in range(j1 - j0):
                                 ioff = (i + di) * yskip - nyh
                                 if np.abs(ioff) > nyh:
                                     continue
