@@ -172,7 +172,11 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         for di in range(nsub):
                             for dj in range(nsub):
                                 ioff = (i + di) * yskip - nyh
+                                if np.abs(ioff) > nyh:
+                                    continue
                                 joff = (j + dj) * xskip - nxh
+                                if np.abs(joff) > nxh:
+                                    continue
                                 gg = np.roll(g, (ioff, joff), axis=(0, 1))
                                 conv.append(np.sum(ff * gg))
                         return conv
