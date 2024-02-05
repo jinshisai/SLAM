@@ -159,8 +159,8 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         popt, _ = curve_fit(model, [Yi, Xi], dd,
                                             p0=p0, bounds=[0, dd])
                         Par0[i, j] = popt
-            print(f'{np.sqrt(np.mean((Par0 - Par0org)**2)):.2e},
-                  {np.sqrt(np.max((Par0 - Par0org)**2)):.2e}')
+            print(f'{np.sqrt(np.mean((Par0 - Par0org)**2)):.2e}',
+                  f'{np.sqrt(np.max((Par0 - Par0org)**2)):.2e}')
         print('')
         popt = np.ravel(Par0)
         #def model(x, *par):
