@@ -176,7 +176,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                                 conv.append(np.sum(ff * gg))
                         return conv
                     popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
-                                        sigma=[sigma] * nsub * nsub,
+                                        sigma=[sigma] * len(dd),
                                         absolute_sigma=True,
                                         bounds=bounds)
                     Par0[i0:i1, j0:j1] = np.reshape(popt, parshape)
