@@ -244,7 +244,9 @@ class PVSilhouette():
                 progressbar: bool = True,
                 kwargs_emcee_corner: dict = {},
                 minabserr: float = 0.1,
-                minrelerr: float = 0.01):
+                minrelerr: float = 0.01,
+                signmajor: int = None,
+                signminor: int = None):
         Nyquistskip = int(np.round(self.bmaj / self.dx / 2))
         x = self.x[::Nyquistskip]
         vintp = np.linspace(self.v[0], self.v[-1], (len(self.v) - 1) * 10 + 1)
@@ -281,18 +283,20 @@ class PVSilhouette():
         mthre = np.nanpercentile(mass, 20, axis=2)  # inner outlier
         mthre = np.moveaxis([mthre] * len(x), 0, -1)
         vobs = np.where(mass > mthre, vobs, np.nan)
-        def getquad(m):
+        def getsign(m):
             nv, nx = np.shape(m)
             q =   np.sum(m[:nv//2, :nx//2]) + np.sum(m[nv//2:, nx//2:]) \
                 - np.sum(m[nv//2:, :nx//2]) - np.sum(m[:nv//2, nx//2:])
             return int(np.sign(q))
-        majquad = getquad(self.dpvmajor)
-        minquad = getquad(self.dpvminor) * (-1)
+        if signmajor is None:
+            signmajor = getsign(self.dpvmajor)
+        if signminor is None:
+            signminor = getsign(self.dpvminor) * (-1)
         def makemodel(Mstar, Rc, alphainfall, cavityangle):
             a = velmax(x, Mstar=Mstar, Rc=Rc, alphainfall=alphainfall,
                        cavityangle=cavityangle, incl=incl)
             vmod = [[a[i][j][::k] for j in ['vlosmin', 'vlosmax']]
-                    for i, k in zip(['major', 'minor'], [majquad, minquad])]
+                    for i, k in zip(['major', 'minor'], [signmajor, signminor])]
             return np.array(vmod)
 
         p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed, cavityangle_fixed])
@@ -348,8 +352,8 @@ class PVSilhouette():
         ax = fig.add_subplot(1, 2, 1)
         ax.contour(self.x, self.v, self.dpvmajor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x * majquad, a['major']['vlosmax'], '-r')
-        ax.plot(self.x * majquad, a['major']['vlosmin'], '-r')
+        ax.plot(self.x * signmajor, a['major']['vlosmax'], '-r')
+        ax.plot(self.x * signmajor, a['major']['vlosmin'], '-r')
         for i in [0, 1]:
             y, yerr = vobs[0][i], vobserr[0][i]
             cond = ~np.isnan(y)
@@ -361,8 +365,8 @@ class PVSilhouette():
         ax = fig.add_subplot(1, 2, 2)
         ax.contour(self.x, self.v, self.dpvminor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x * minquad, a['minor']['vlosmax'], '-r')
-        ax.plot(self.x * minquad, a['minor']['vlosmin'], '-r')
+        ax.plot(self.x * signminor, a['minor']['vlosmax'], '-r')
+        ax.plot(self.x * signminor, a['minor']['vlosmin'], '-r')
         for i in [0, 1]:
             y, yerr = vobs[1][i], vobserr[1][i]
             cond = ~np.isnan(y)
