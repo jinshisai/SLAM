@@ -342,10 +342,14 @@ class PVSilhouette():
                 Rc_range: list = [1, 1000],
                 alphainfall_range: list = [0.01, 1],
                 fscale_range: list = [0.01, 100.],
+                tauscale_range: list = [0.05, 1000.],
+                rho_jump_range: list = [0.1, 10.],
                 Mstar_fixed: float = None,
                 Rc_fixed: float = None,
                 alphainfall_fixed: float = None,
                 fscale_fixed: float = None,
+                tauscale_fixed: float = None,
+                rho_jump_fixed: float = None,
                 cutoff: float = 5, 
                 vmask: list = [0, 0],
                 figname: str = 'PVsilhouette',
@@ -397,15 +401,17 @@ class PVSilhouette():
         minquad = getquad(self.dpvminor) * (-1)
 
         obsmax = max(np.nanmax(majobs), np.nanmax(minobs))
-        def makemodel(Mstar, Rc, alphainfall, fscale):
+        def makemodel(Mstar, Rc, alphainfall, fscale, tauscale, rho_jump):
             major = mockpvd(self.x, self.x, self.v, Mstar, Rc,
-                alphainfall=alphainfall, incl=incl, axis='major',
-                fscale = obsmax, beam = self.beam, pa=pa_maj, rout=np.nanmax(self.x))
-            major = major[:, ::majquad] * fscale
+                alphainfall=alphainfall, incl=incl, axis='major', withkepler=True,
+                rho_jump = rho_jump, tauscale = tauscale,
+                fscale = obsmax * fscale, beam = self.beam, pa=pa_maj, rout=np.nanmax(self.x))
+            major = major[:, ::majquad]
             minor = mockpvd(self.x, self.x, self.v, Mstar, Rc,
                 alphainfall=alphainfall, incl=incl, axis='minor',
-                fscale = obsmax, beam = self.beam, pa=pa_maj - 90., rout=np.nanmax(self.x))
-            minor = minor[:, ::minquad] * fscale
+                rho_jump = rho_jump, tauscale = tauscale,
+                fscale = obsmax * fscale, beam = self.beam, pa=pa_maj - 90., rout=np.nanmax(self.x))
+            minor = minor[:, ::minquad]
             return major, minor
 
 
@@ -422,9 +428,11 @@ class PVSilhouette():
 
 
         # Fitting
-        p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed, fscale_fixed])
+        p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed, 
+            fscale_fixed, tauscale_fixed, rho_jump_fixed])
         if None in p_fixed:
-            labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$', r'log f'])
+            labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$', r'log $f_\mathrm{flux}$', 
+                r'log $f_\tau', r'log $f_\rho$'])
             labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':2, 'nburnin':250, 'nsteps':250, # 16, 100, 500
                        'rangelevel':None, 'labels':labels,
@@ -442,7 +450,8 @@ class PVSilhouette():
                 q[p_fixed == None] = 10**p
                 chi2 = calcchi2(*makemodel(*q))
                 return -0.5 * chi2 # -np.inf if chi2 > chi2max else
-            plim = np.array([Mstar_range, Rc_range, alphainfall_range, fscale_range])
+            plim = np.array([Mstar_range, Rc_range, alphainfall_range, 
+                fscale_range, tauscale_range, rho_jump_range])
             plim = np.log10(plim[p_fixed == None]).T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
             if np.isinf(lnprob(mcmc[0])):
@@ -463,7 +472,9 @@ class PVSilhouette():
         print(f'M* = {plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} Msun')
         print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
         print(f'alpha = {plow[2]:.2f}, {popt[2]:.2f}, {phigh[2]:.2f}')
-        print(f'f = {plow[3]:.2f}, {popt[3]:.2f}, {phigh[3]:.2f}')
+        print(f'f_flux = {plow[3]:.2f}, {popt[3]:.2f}, {phigh[3]:.2f}')
+        print(f'f_tau = {plow[4]:.2f}, {popt[4]:.2f}, {phigh[4]:.2f}')
+        print(f'f_rho = {plow[5]:.2f}, {popt[5]:.2f}, {phigh[5]:.2f}')
 
 
         # plot
