@@ -93,31 +93,24 @@ def velrho(radius, theta,
     
     if withkepler:
         R = radius * np.sin(theta)
-        if np.nanmin(R) < 1.:
-            # velocity
-            vkep = kepvel(radius, theta)
-            #vr[R < 1] = vkep[0][R < 1]
-            #vt[R < 1] = vkep[1][R < 1]
-            #vp[R < 1] = vkep[2][R < 1]
-            # density
-            #del_R = (np.nanmax(R) - np.nanmin(R)) / np.nanmax(R.shape)
-            #del_R =  R - np.nanmin(R)
-            #del_R[del_R < 1.e-3] = np.nan
-            #del_R = np.nanmin(del_R)
-            #print(np.nanmax(R), np.nanmin(R), del_R)
-            indx_R = np.where( (R >= 0.5) & (R <= 1.5) )
-            #print(indx_R)
-            hc = h0 * rc**plh # the scale hight normalized by rc at r/rc = 1
-            sig_c = np.nanmax(rho[indx_R]) * (np.sqrt(2.*np.pi) * hc)
-            rho_d = diskrho(radius, theta, rc, sig_c, pls = pls, plh = plh, h0 = h0) * rho_jump
-            # put a disk
-            where_disk = np.where(rho_d >= rho)
-            #where_disk = np.where(R <= 1.)
-            vr[where_disk] = vkep[0][where_disk]
-            vt[where_disk] = vkep[1][where_disk]
-            vp[where_disk] = vkep[2][where_disk]
-            rho[where_disk] = rho_d[where_disk]
-            #print(where_disk)
+        # velocity
+        vkep = kepvel(radius, theta)
+        #vr[R < 1] = vkep[0][R < 1]
+        #vt[R < 1] = vkep[1][R < 1]
+        #vp[R < 1] = vkep[2][R < 1]
+        # density
+        #indx_R = np.where( (R >= 0.5) & (R <= 1.5) )
+        hc = h0 * rc**plh # the scale hight normalized by rc at r/rc = 1
+        sig_c = 20. * (np.sqrt(2.*np.pi) * hc) # rho ~ 20 at R = 1.05
+        rho_d = diskrho(radius, theta, rc, sig_c, pls = pls, plh = plh, h0 = h0) * rho_jump
+        # put a disk
+        where_disk = np.where(rho_d >= rho)
+        #where_disk = np.where(R <= 1.)
+        vr[where_disk] = vkep[0][where_disk]
+        vt[where_disk] = vkep[1][where_disk]
+        vp[where_disk] = vkep[2][where_disk]
+        rho[where_disk] = rho_d[where_disk]
+        #print(where_disk)
     return vr, vt, vp, rho
 
 def xyz2rtp(x, y, z):
