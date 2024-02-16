@@ -91,7 +91,7 @@ def velrho(radius, theta,
     vp = np.sqrt(1 - mm) / np.sqrt(radius)
     rho = radius**(-3/2) / np.sqrt(1 + mm) / (2 / radius * mu0**2 + mm)
     
-    if withkepler:
+    if withkepler & (np.nanmin(R) < 1.):
         R = radius * np.sin(theta)
         # velocity
         vkep = kepvel(radius, theta)
