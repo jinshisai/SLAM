@@ -206,7 +206,7 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
     withkepler: bool = True, pls: float = -1., plh: float = 0.25, 
     h0: float = 0.1, rho_jump: float = 1., fscale: float = 1.,
     pa: float = 0., beam: list = None, linewidth: float = None, rout: float=None,
-    axis: str = 'major', fscale_tau: float = 1.):
+    axis: str = 'major', tauscale: float = 1.):
     """
     Generate a mock Position-Velocity (PV) diagram.
 
@@ -298,7 +298,7 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
     for i in range(nv):
         _rho = np.where((ve[i] <= vlos) & (vlos < ve[i+1]), rho, np.nan)
         #I_cube[i,:,:] = np.nansum(_rho, axis=2).T
-        tau_v[i,:,:] = np.nansum(_rho, axis=2).T * fscale_tau
+        tau_v[i,:,:] = np.nansum(_rho, axis=2).T * tauscale
     #I_cube = np.array([
     #    np.nansum(np.where((ve[i] <= vlos) & (vlos < ve[i+1]), rho, np.nan), axis=2).T
     #    for i in range(nv)
