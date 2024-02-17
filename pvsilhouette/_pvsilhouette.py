@@ -380,7 +380,7 @@ class PVSilhouette():
         mask = [[(s * a > 0) * ((b < r[0]) + (r[1] < b))
                  for s, r in zip([-1, 1], rr)]
                 for a, b, rr in zip([v, x], [x, v], rng)]
-        mask = np.sum(mask, axis=(0, 1)) + (vmask[0] < v) * (v < vmask[1])
+        mask = (vmask[0] < v) * (v < vmask[1]) # np.sum(mask, axis=(0, 1)) 
         majobs = np.where(mask, np.nan, majobs)
         minobs = np.where(mask, np.nan, minobs)
         majsig, minsig = self.sigma, self.sigma
@@ -432,7 +432,7 @@ class PVSilhouette():
             fscale_fixed, tauscale_fixed, rho_jump_fixed])
         if None in p_fixed:
             labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$', r'log $f_\mathrm{flux}$', 
-                r'log $f_\tau', r'log $f_\rho$'])
+                r'log $f_\tau$', r'log $f_\rho$'])
             labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':2, 'nburnin':250, 'nsteps':250, # 16, 100, 500
                        'rangelevel':None, 'labels':labels,
@@ -478,25 +478,32 @@ class PVSilhouette():
 
 
         # plot
-        majmod, minmod = makemodel(*popt, outputvel=True)
+        majmod, minmod = makemodel(*popt)
         fig = plt.figure()
         ax = fig.add_subplot(1, 2, 1)
-        z = np.where(mask, -(mask.astype('int')), (majobs - majmod)**2)
-        ax.pcolormesh(self.x, self.v, z, cmap='bwr', vmin=-1, vmax=1, alpha=0.1)
+        z = np.where(mask, -(mask.astype('int')), np.sqrt((majobs - majmod)**2) / majsig)
+        im = ax.pcolormesh(self.x, self.v, z, cmap='bwr', 
+            vmin = -10., vmax = 10.,
+            alpha = 0.5, rasterized = True)
+        cax = ax.inset_axes([1.0, 0., 0.05, 1.]) # x0, y0, dx, dy
+        fig.colorbar(im, cax=cax)
         ax.contour(self.x, self.v, self.dpvmajor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x * majquad, a['major']['vlosmax'], '-r')
-        ax.plot(self.x * majquad, a['major']['vlosmin'], '-r')
+        #ax.plot(self.x * majquad, a['major']['vlosmax'], '-r')
+        #ax.plot(self.x * majquad, a['major']['vlosmin'], '-r')
         ax.set_xlabel('major offset (au)')
         ax.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
         ax.set_ylim(np.min(self.v), np.max(self.v))
         ax = fig.add_subplot(1, 2, 2)
-        z = np.where(mask, -(mask.astype('int')), (minobs - minmod)**2)
-        ax.pcolormesh(self.x, self.v, z, cmap='bwr', vmin=-1, vmax=1, alpha=0.1)
+        z = np.where(mask, -(mask.astype('int')), np.sqrt((minobs - minmod)**2) / minsig)
+        im = ax.pcolormesh(self.x, self.v, z, cmap='bwr', 
+            vmin= -10., vmax = 10., alpha=0.5, rasterized=True)
         ax.contour(self.x, self.v, self.dpvminor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x * minquad, a['minor']['vlosmax'], '-r')
-        ax.plot(self.x * minquad, a['minor']['vlosmin'], '-r')
+        cax = ax.inset_axes([1.0, 0., 0.05, 1.]) # x0, y0, dx, dy
+        fig.colorbar(im, cax=cax)
+        #ax.plot(self.x * minquad, a['minor']['vlosmax'], '-r')
+        #ax.plot(self.x * minquad, a['minor']['vlosmin'], '-r')
         ax.set_xlabel('minor offset (au)')
         ax.set_ylim(self.v.min(), self.v.max())
         ax.set_title(r'$M_{*}$'+f'={popt[0]:.2f}'+r'$M_{\odot}$'
