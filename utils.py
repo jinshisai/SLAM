@@ -49,7 +49,7 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
                 # The inner function lnL can't be pickled for multiprocessing.
                 sampler.run_mcmc(p0, n)
         else:
-            sampler = emcee.EnsembleSampler(nwalkers, ndim, lnL, args=args)
+            sampler = emcee.EnsembleSampler(nwalkers, ndim, lnL, args=args,)
             sampler.run_mcmc(p0, n)
         #samples = sampler.get_chain()  # emcee 3.1.1
         samples = sampler.chain  # emcee 2.2.1

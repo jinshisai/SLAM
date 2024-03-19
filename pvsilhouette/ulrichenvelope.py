@@ -199,7 +199,8 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
     alphainfall: float = 1., incl: float = 89., 
     withkepler: bool = True, pls: float = -1., plh: float = 0.25, 
     h0: float = 0.1, rho_jump: float = 1., fscale: float = 1.,
-    pa: float = 0., beam: list = None, linewidth: float = None, rout: float=None,
+    pa: float = 0., beam: list = None, linewidth: float = None, 
+    rin: float = 0.1, rout: float=None,
     axis: str = 'major', tauscale: float = 1.):
     """
     Generate a mock Position-Velocity (PV) diagram.
@@ -245,8 +246,11 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
     else:
         if len(beam) == 3:
             bmaj, bmin, bpa = beam
-            dely = bmin * 0.2
-            yin = np.arange(-int(bmaj / dely * 6.), int(bmaj/dely * 6.) + 1, 1) * dely
+            dely = bmin * 0.2 # 1/5 beam resolution
+            yin = np.arange(
+                -int(bmaj / dely * 3. / 2.35) -1, 
+                int(bmaj/dely * 3. / 2.35) + 2, 
+                1) * dely # +/- 3 sigma
         else:
             print('ERROR\tmockpvd: beam must be given as [bmaj, bmin, bpa].')
             return 0
@@ -255,12 +259,14 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
         X, Y, Z = np.meshgrid(xin/Rc, yin/Rc, zin/Rc, indexing='ij')
 
     # along which axis
-    x, y, z = XYZ2xyz(irad, 0., X, Y, Z) if axis == 'major' else XYZ2xyz(irad, 0., Y, X, Z)
+    x, y, z = XYZ2xyz(irad, 0., X, Y, Z) if axis == 'major' else XYZ2xyz(irad, 0, Y, X, Z)
     r, t, p = xyz2rtp(x, y, z)
+    #r[r  * Rc <= rin] = np.nan
 
     # get density and velocity
     _, _, _, rho = velrho(r, t, alphainfall, withkepler=withkepler,
         rc = Rc, pls = pls, plh = plh, h0 = h0, rho_jump = rho_jump)
+    rho[r  * Rc <= rin] = 0.
     #print(np.nanmax(rho))
     #print(r[np.where(rho == np.nanmax(rho))], t[np.where(rho == np.nanmax(rho))])
     rho /= np.nanmax(rho)   # normalize
@@ -271,36 +277,22 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
 
     # outer edge
     if rout is not None: rho[np.where(r.reshape(nx, ny, nz) > rout/Rc)] = np.nan
-    # for test
-    #dx = np.abs(x[1] - x[0])
-    #rho[np.where( ((1. - dx) > r.reshape(nx, ny, nz)) | ((1. + dx) < r.reshape(nx, ny, nz)))] = np.nan
 
     # integrate along Z axis
     nv = len(v)
     delv = v[1] - v[0]
     ve = np.hstack([v - delv * 0.5, v[-1] + 0.5 * delv])
-    #I_cube = np.array([[[
-    #    np.nansum(rho[i,j, np.where((ve[k] <= vlos[i,j,:]) & (vlos[i,j,:] < ve[k+1]))])
-    #    if len(np.where((ve[k] <= vlos[i,j,:]) & (vlos[i,j,:] < ve[k+1]))[0]) != 0
-    #    else 0.
-    #    for i in range(nx)]
-    #    for j in range(ny)]
-    #    for k in range(nv)
-    #    ])
     #I_cube = np.zeros((nv, ny, nx)) # cube
     tau_v  = np.zeros((nv, ny, nx)) # tau
     for i in range(nv):
         _rho = np.where((ve[i] <= vlos) & (vlos < ve[i+1]), rho, np.nan)
         #I_cube[i,:,:] = np.nansum(_rho, axis=2).T
         tau_v[i,:,:] = np.nansum(_rho, axis=2).T * tauscale
-    #I_cube = np.array([
-    #    np.nansum(np.where((ve[i] <= vlos) & (vlos < ve[i+1]), rho, np.nan), axis=2).T
-    #    for i in range(nv)
-    #    ])
 
     # convolution along the spectral direction
     if linewidth is not None:
-        gaussbeam = np.exp(-(v /(2. * linewidth / 2.35))**2.)
+        gaussbeam = np.exp(- 0.5 * (v /(linewidth / 2.35))**2.)
+        gaussbeam /= np.sum(gaussbeam)
         #I_cube = convolve(I_cube, np.array([[gaussbeam]]).T, mode='same')
         tau_v = convolve(tau_v, np.array([[gaussbeam]]).T, mode='same')
 
@@ -309,8 +301,9 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
 
     # beam convolution
     if beam is not None:
-        xb, yb = rot(*np.meshgrid(xin, yin), np.radians(bpa - pa))
-        gaussbeam = np.exp(-(yb /(2. * bmin / 2.35))**2. - (xb / (2. * bmaj / 2.35))**2.)
+        xb, yb = rot(*np.meshgrid(xin, yin, indexing='ij'), np.radians(bpa - pa))
+        gaussbeam = np.exp(- 0.5 * (yb /(bmin / 2.35))**2. - 0.5 * (xb /(bmaj / 2.35))**2.)
+        gaussbeam /= np.sum(gaussbeam)
         I_cube = convolve(I_cube, np.array([gaussbeam]), mode='same')
 
     # output

@@ -162,6 +162,7 @@ class PVSilhouette():
         self.v, self.dv = v, dv
         self.data, self.header, self.sigma = d, h, sigma
         self.bmaj, self.dNyquist = bmaj, dNyquist
+        self.bmin = h['BMIN'] * 3600. * dist
         self.pvfits, self.dist, self.vsys = pvfits, dist, vsys
         return {'x':x, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
@@ -192,11 +193,26 @@ class PVSilhouette():
     
     def put_PV(self, pvmajorfits: str, pvminorfits: str,
                dist: float, vsys: float,
-               rmax: float, vmin: float, vmax: float, sigma: float):
+               rmax: float, vmin: float, vmax: float, sigma: float,
+               dNsampling = [5, 1]):
         self.read_pvfits(pvmajorfits, dist, vsys, rmax, vmin, vmax, sigma)
+        if dNsampling is not None: self.sampling(dNsampling)
         self.dpvmajor = self.data
         self.read_pvfits(pvminorfits, dist, vsys, rmax, vmin, vmax, sigma)
+        if dNsampling is not None: self.sampling(dNsampling)
         self.dpvminor = self.data
+
+
+    def sampling(self, steps):
+        x_smpl, y_smpl = steps
+        x_smpl = int(self.bmin / x_smpl / self.dx )
+        y_smpl = int(1. / y_smpl)
+        #print(x_smpl, self.bmin, self.dx)
+        self.data = self.data[y_smpl//2::y_smpl, x_smpl//2::x_smpl]
+        self.v = self.v[y_smpl//2::y_smpl]
+        self.x = self.x[x_smpl//2::x_smpl]
+        self.dx = self.x[1] - self.x[0]
+        self.dv = self.v[1] - self.v[0]
 
     def fitting(self, incl: float = 90,
                 Mstar_range: list = [0.01, 10],
@@ -356,8 +372,8 @@ class PVSilhouette():
                 show: bool = False,
                 progressbar: bool = True,
                 kwargs_emcee_corner: dict = {},
-                pa_maj = None,
-                beam = None, p0 = None):
+                pa_maj = None, pa_min = None,
+                beam = None, linewidth = None, p0 = None):
         # Observed pv diagrams
         majobs = self.dpvmajor.copy()
         minobs = self.dpvminor.copy()
@@ -405,12 +421,14 @@ class PVSilhouette():
             major = mockpvd(self.x, self.x, self.v, Mstar, Rc,
                 alphainfall=alphainfall, incl=incl, axis='major', withkepler=True,
                 rho_jump = rho_jump, tauscale = tauscale,
-                fscale = obsmax * fscale, beam = self.beam, pa=pa_maj, rout=np.nanmax(self.x))
+                fscale = obsmax * fscale, beam = self.beam, pa=pa_maj, 
+                rout=np.nanmax(self.x), linewidth = linewidth)
             major = major[:, ::majquad]
             minor = mockpvd(self.x, self.x, self.v, Mstar, Rc,
-                alphainfall=alphainfall, incl=incl, axis='minor',
+                alphainfall=alphainfall, incl=incl, axis='minor', withkepler=True,
                 rho_jump = rho_jump, tauscale = tauscale,
-                fscale = obsmax * fscale, beam = self.beam, pa=pa_maj - 90., rout=np.nanmax(self.x))
+                fscale = obsmax * fscale, beam = self.beam, pa=pa_min, 
+                rout=np.nanmax(self.x), linewidth = linewidth)
             minor = minor[:, ::minquad]
             return major, minor
 
@@ -434,7 +452,7 @@ class PVSilhouette():
             labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$', r'log $f_\mathrm{flux}$', 
                 r'log $f_\tau$', r'log $f_\rho$'])
             labels = labels[p_fixed == None]
-            kwargs0 = {'nwalkers_per_ndim':2, 'nburnin':250, 'nsteps':250, # 16, 100, 500
+            kwargs0 = {'nwalkers_per_ndim':8, 'nburnin':300, 'nsteps':200, # 16, 100, 500
                        'rangelevel':None, 'labels':labels,
                        'figname':figname+'.corner.png', 'show_corner':show}
             kwargs = dict(kwargs0, **kwargs_emcee_corner)
@@ -479,37 +497,47 @@ class PVSilhouette():
 
         # plot
         majmod, minmod = makemodel(*popt)
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 2, 1)
-        z = np.where(mask, -(mask.astype('int')), np.sqrt((majobs - majmod)**2) / majsig)
-        im = ax.pcolormesh(self.x, self.v, z, cmap='bwr', 
-            vmin = -10., vmax = 10.,
-            alpha = 0.5, rasterized = True)
-        cax = ax.inset_axes([1.0, 0., 0.05, 1.]) # x0, y0, dx, dy
-        fig.colorbar(im, cax=cax)
-        ax.contour(self.x, self.v, self.dpvmajor,
-                   levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        #ax.plot(self.x * majquad, a['major']['vlosmax'], '-r')
-        #ax.plot(self.x * majquad, a['major']['vlosmin'], '-r')
-        ax.set_xlabel('major offset (au)')
-        ax.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
-        ax.set_ylim(np.min(self.v), np.max(self.v))
-        ax = fig.add_subplot(1, 2, 2)
-        z = np.where(mask, -(mask.astype('int')), np.sqrt((minobs - minmod)**2) / minsig)
-        im = ax.pcolormesh(self.x, self.v, z, cmap='bwr', 
-            vmin= -10., vmax = 10., alpha=0.5, rasterized=True)
-        ax.contour(self.x, self.v, self.dpvminor,
-                   levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        cax = ax.inset_axes([1.0, 0., 0.05, 1.]) # x0, y0, dx, dy
-        fig.colorbar(im, cax=cax)
-        #ax.plot(self.x * minquad, a['minor']['vlosmax'], '-r')
-        #ax.plot(self.x * minquad, a['minor']['vlosmin'], '-r')
-        ax.set_xlabel('minor offset (au)')
-        ax.set_ylim(self.v.min(), self.v.max())
-        ax.set_title(r'$M_{*}$'+f'={popt[0]:.2f}'+r'$M_{\odot}$'
-            +', '+r'$R_{c}$'+f'={popt[1]:.0f} au'
-            +'\n'+r'$\alpha$'+f'={popt[2]:.2f}'
-            +', '+r'$\alpha ^{2} M_{*}$'+f'={popt[0] * popt[2]**2:.2}')
-        fig.tight_layout()
-        fig.savefig(figname + '.model.png')
-        if show: plt.show()
+        majres = np.where(mask, -(mask.astype('int')), (majobs - majmod) / majsig)
+        minres = np.where(mask, -(mask.astype('int')), (minobs - minmod) / minsig)
+
+        for zmin, zmaj, vmin, vmax, cmap, alpha, lbl in zip(
+            [minres, minmod], [majres, majmod], 
+            [-6., np.nanmin(np.array([minmod, majmod]))], 
+            [6., np.nanmax(np.array([minmod, majmod]))],
+            ['bwr', 'viridis'],
+            [0.5, 0.8],
+            ['.residual', '.model']):
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 2, 1)
+            #z = np.where(mask, -(mask.astype('int')), (majobs - majmod) / majsig)
+            im = ax.pcolormesh(self.x, self.v, zmaj, cmap=cmap, 
+                vmin = vmin, vmax = vmax,
+                alpha = alpha, rasterized = True)
+            cax = ax.inset_axes([1.0, 0., 0.05, 1.]) # x0, y0, dx, dy
+            fig.colorbar(im, cax=cax)
+            ax.contour(self.x, self.v, self.dpvmajor,
+                       levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
+            #ax.plot(self.x * majquad, a['major']['vlosmax'], '-r')
+            #ax.plot(self.x * majquad, a['major']['vlosmin'], '-r')
+            ax.set_xlabel('major offset (au)')
+            ax.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
+            ax.set_ylim(np.min(self.v), np.max(self.v))
+            ax = fig.add_subplot(1, 2, 2)
+            #z = np.where(mask, -(mask.astype('int')), (minobs - minmod) / minsig)
+            im = ax.pcolormesh(self.x, self.v, zmin, cmap=cmap, 
+                vmin= vmin, vmax = vmax, alpha=alpha, rasterized=True)
+            ax.contour(self.x, self.v, self.dpvminor,
+                       levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
+            cax = ax.inset_axes([1.0, 0., 0.05, 1.]) # x0, y0, dx, dy
+            fig.colorbar(im, cax=cax)
+            #ax.plot(self.x * minquad, a['minor']['vlosmax'], '-r')
+            #ax.plot(self.x * minquad, a['minor']['vlosmin'], '-r')
+            ax.set_xlabel('minor offset (au)')
+            ax.set_ylim(self.v.min(), self.v.max())
+            ax.set_title(r'$M_{*}$'+f'={popt[0]:.2f}'+r'$M_{\odot}$'
+                +', '+r'$R_{c}$'+f'={popt[1]:.0f} au'
+                +'\n'+r'$\alpha$'+f'={popt[2]:.2f}'
+                +', '+r'$\alpha ^{2} M_{*}$'+f'={popt[0] * popt[2]**2:.2}')
+            fig.tight_layout()
+            fig.savefig(figname + lbl + '.png')
+            if show: plt.show()
