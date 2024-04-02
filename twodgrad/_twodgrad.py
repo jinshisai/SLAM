@@ -246,11 +246,10 @@ class TwoDGrad():
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
         dyc = self.center['dyc'] * 1
-        if (n := len(self.v)) % 2 == 0:
-            print('!!! Even number channels.!!!')
+        n = len(self.v)
         for i in range(n):
             j = -1 - i
-            if (not fixcenter) and (np.isnan(xc[i]) or np.isnan(yc)[i]):
+            if (not fixcenter) and (np.isnan(xc[i]) or np.isnan(yc[i])):
                 xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
                 xc[j] = yc[j] = dxc[j] = dyc[j] = np.nan
         if not np.any(~np.isnan(xc) * ~np.isnan(yc)):
