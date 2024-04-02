@@ -247,11 +247,15 @@ class TwoDGrad():
         dxc = self.center['dxc'] * 1
         dyc = self.center['dyc'] * 1
         n = len(self.v)
-        for i in range(n):
-            j = -1 - i
-            if (not fixcenter) and (np.isnan(xc[i]) or np.isnan(yc[i])):
-                xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
-                xc[j] = yc[j] = dxc[j] = dyc[j] = np.nan
+        n0 = np.argmin(np.abs(self.v))
+        if not fixcenter:
+            for i in range(n):
+                j = 2 * n0 - i
+                if 0 < j or j <= n:
+                    xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
+                elif np.isnan(xc[i]) or np.isnan(yc[i]):
+                    xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
+                    xc[j] = yc[j] = dxc[j] = dyc[j] = np.nan
         if not np.any(~np.isnan(xc) * ~np.isnan(yc)):
                 print('No blue-red pair.')
         
