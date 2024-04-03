@@ -241,7 +241,8 @@ class TwoDGrad():
         self.center = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
         
         
-    def filtering(self, pa0: float = 0.0, fixcenter: bool = False):
+    def filtering(self, pa0: float = 0.0, fixcenter: bool = False,
+                  axisfilter: bool = True):
         xc = self.center['xc'] * 1
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
@@ -272,6 +273,8 @@ class TwoDGrad():
                 y = y0 + y0[::-1]
             parad = np.radians(pa)
             d = x0 * np.cos(parad) - y0 * np.sin(parad)
+            if not axisfilter:
+                d = d * 0
             sx2 = np.clip(np.nanmean(x**2), 1e-10, None)
             sy2 = np.clip(np.nanmean(y**2), 1e-10, None)
             sd2 = np.clip(np.nanmean(d**2), 1e-10, None)
