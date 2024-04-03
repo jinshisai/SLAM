@@ -527,6 +527,8 @@ class TwoDGrad():
         ax.set_ylim(vmin * 0.999, vmax * 1.001)  # km/s
         ax.errorbar(x, v, xerr=dx, fmt='o', color='k', zorder=2)
         w = self.v
+        if hasattr(self, 'popt'):
+            w = w - self.popt[3]
         ax.plot(x[w < 0], v[w < 0], 'bo', zorder=3)
         ax.plot(x[w > 0], v[w > 0], 'ro', zorder=3)
         ax.plot(xn[w < 0], v[w < 0], 'bo', zorder=1)
@@ -536,8 +538,8 @@ class TwoDGrad():
         if ~np.isnan(self.Mstar):
             vp = np.abs(v[~np.isnan(x)])
             vp = np.geomspace(vp.min(), vp.max(), 100)
-            r_break, v_break, dp = self.popt
-            rp = doublepower_r(vp, r_break, v_break, 0.5, dp, 0)
+            r_break, v_break, dp, vsys = self.popt
+            rp = doublepower_r(vp, r_break, v_break, 0.5, dp, vsys)
             ax.plot(rp, vp, 'm-', zorder=4)
         ax.set_xscale('log')
         ax.set_yscale('log')
