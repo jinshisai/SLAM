@@ -304,10 +304,10 @@ class TwoDGrad():
             c = np.full_like(x_in, False)
             if np.all(np.isnan(x_in) | np.isnan(y_in)):
                 return c
-            if np.any(~np.isnan(x_in[:n0+1])) and np.any(~np.isnan(y_in[:n0+1])):
-                imax = np.nanargmax(np.hypot(x_in[:n0+1], y_in[:n0+1]))
+            if np.any(~np.isnan(x_in[:n0])) and np.any(~np.isnan(y_in[:n0])):
+                imax = np.nanargmax(np.hypot(x_in[:n0], y_in[:n0]))
                 c[imax + 1:n0 + 1] = True
-            if np.any(~np.isnan(x_in[n0:])) and np.any(~np.isnan(y_in[n0:])):
+            if np.any(~np.isnan(x_in[n0+1:])) and np.any(~np.isnan(y_in[n0+1:])):
                 imax = np.nanargmax(np.hypot(x_in[n0:], y_in[n0:]))
                 c[n0:imax] = True
             return c.astype('bool')
