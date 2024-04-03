@@ -294,28 +294,16 @@ class TwoDGrad():
             d3 = (x * np.cos(parad) - y * np.sin(parad))**2
             return np.sum(d1 + d2 + d3)
             
-        def low_velocity(x_in, y_in, dx_in, dy_in):
+        def low_velocity(x_in, y_in):
             c = np.full_like(x_in, False)
             if np.all(np.isnan(x_in) | np.isnan(y_in)):
                 return c
-            nhalf = (n - 1) // 2
-            s = np.abs(x_in[:nhalf])
-            wb = (s / dx_in[:nhalf])**2
-            lnb = np.log(s)
-            s = np.abs(x_in[-1:-1-nhalf:-1])
-            wr = (s / dx_in[-1:-1-nhalf:-1])**2
-            lnr = np.log(s)
-            x1 = np.exp((lnb * wb + lnr * wr) / (wb + wr))
-            s = np.abs(y_in[:nhalf])
-            wb = (s / dy_in[:nhalf])**2
-            lnb = np.log(s)
-            s = np.abs(y_in[-1:-1-nhalf:-1])
-            wr = (s / dy_in[-1:-1-nhalf:-1])**2
-            lnr = np.log(s)
-            y1 = np.exp((lnb * wb + lnr * wr) / (wb + wr))
-            imax = np.nanargmax(np.hypot(x1, y1)) + 1
-            jmax = -imax
-            c[imax:jmax] = True
+            if np.any(~np.isnan(x_in[:n0+1])) and np.any(~np.isnan(y_in[:n0+1])):
+                imax = np.nanargmax(np.hypot(x_in[:n0+1], y_in[:n0+1]))
+                c[imax + 1:n0 + 1] = True
+            if np.any(~np.isnan(x_in[n0:])) and np.any(~np.isnan(y_in[n0:])):
+                imax = np.nanargmax(np.hypot(x_in[n0:], y_in[n0:]))
+                c[n0:imax] = True
             return c.astype('bool')
 
         goodsolution = False
@@ -334,7 +322,7 @@ class TwoDGrad():
             xoff, yoff, pa_grad = res.x
             print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
                             
-            c1 = low_velocity(xc - xoff, yc - yoff, dxc, dyc)
+            c1 = low_velocity(xc - xoff, yc - yoff)
             xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
 
             res = diffevo(func=chi2, bounds=bounds,
