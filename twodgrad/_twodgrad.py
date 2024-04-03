@@ -300,22 +300,19 @@ class TwoDGrad():
             d3 = (x * np.cos(parad) - y * np.sin(parad))**2
             return np.sum(d1 + d2 + d3)
             
-        def low_velocity(x_in, y_in, pa):
-            parad = np.radians(pa)
-            cospa = np.cos(parad)
-            sinpa = np.sin(parad)
+        def low_velocity(x_in, y_in):
             c = np.full_like(x_in, False)
             if np.all(np.isnan(x_in) | np.isnan(y_in)):
                 return c
             x = x_in[:n0]
             y = y_in[:n0]
             if np.any(~np.isnan(x)) and np.any(~np.isnan(y)):
-                imax = np.nanargmax(np.abs(x * sinpa + y * cospa))
+                imax = np.nanargmax(np.hypot(x, y))
                 c[imax+1:n0+1] = True
             x = x_in[n0+1:]
             y = y_in[n0+1:]
             if np.any(~np.isnan(x)) and np.any(~np.isnan(y)):
-                imax = np.nanargmax(np.abs(x * cospa + y * cospa))
+                imax = np.nanargmax(np.hypot(x, y))
                 c[n0:n0+1 + imax] = True
             return c.astype('bool')
 
@@ -330,22 +327,20 @@ class TwoDGrad():
             xmax = 1e-6 if fixcenter else self.x.max()
             ymax = 1e-6 if fixcenter else self.y.max()
             bounds = [[xmin, xmax], [ymin, ymax], [pa0 - 90.0, pa0 + 90.0]]
-            res = diffevo(func=chi2, bounds=bounds,
-                          args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
-            xoff, yoff, pa_grad = res.x
-            print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
             if lowvelfilter:                
-                c1 = low_velocity(xc - xoff, yc - yoff, pa_grad)
+                res = diffevo(func=chi2, bounds=bounds,
+                              args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
+                xoff, yoff, pa_grad = res.x
+                print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
+                c1 = low_velocity(xc - xoff, yc - yoff)
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
-
             res = diffevo(func=chi2, bounds=bounds,
                           args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
             xoff, yoff, pa_grad = res.x
             print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
-
-            c1 = bad_channels(xc, yc, xoff, yoff, pa_grad)
-            if np.any(c1):
-                xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
+            c2 = bad_channels(xc, yc, xoff, yoff, pa_grad)
+            if np.any(c2):
+                xc[c2] = yc[c2] = dxc[c2] = dyc[c2] = np.nan
             else:
                 goodsolution = True
         
