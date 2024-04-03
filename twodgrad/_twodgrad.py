@@ -392,8 +392,8 @@ class TwoDGrad():
                                         p_in=0.5, dp=dp, vsys=vsys)
                 chi2 = np.sum(((r - s_model * r_model) / dr)**2)
                 return -0.5 * chi2
-            plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0],
-                             [np.max(np.abs(r)), np.max(np.abs(v)), 10]])
+            plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0, -1],
+                             [np.max(np.abs(r)), np.max(np.abs(v)), 10, 1]])
             popt, perr = emcee_corner(plim, lnprob,
                                       nwalkers_per_ndim=16,
                                       nburnin= 2000, nsteps=2000,
