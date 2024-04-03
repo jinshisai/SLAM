@@ -397,8 +397,8 @@ class TwoDGrad():
                                       nburnin= 2000, nsteps=2000,
                                       labels=['Vb (km/s)', 'Rb (au)', 'dp'],
                                       rangelevel=0.8, simpleoutput=True)
-            rb, vb, dp = popt
-            drb, dvb, ddp = perr
+            rb, vb, dp, vsys = popt
+            drb, dvb, ddp, dvsys = perr
             Mstar = rb * vb**2 * unit / np.sin(np.radians(incl))**2
             Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
             dMstar = Mstar * np.sqrt((drb / rb)**2 + (2 * dvb / vb)**2)
