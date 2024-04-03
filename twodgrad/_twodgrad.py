@@ -272,7 +272,6 @@ class TwoDGrad():
                 y = y0 + y0[::-1]
             parad = np.radians(pa)
             d = x0 * np.cos(parad) - y0 * np.sin(parad)
-            d = (d - d[::-1]) / 2
             sx2 = np.clip(np.nanmean(x**2), 1e-10, None)
             sy2 = np.clip(np.nanmean(y**2), 1e-10, None)
             sd2 = np.clip(np.nanmean(d**2), 1e-10, None)
