@@ -331,7 +331,7 @@ class TwoDGrad():
             ymax = 1e-6 if fixcenter else self.y.max()
             bounds = [[xmin, xmax], [ymin, ymax], [pa0 - 90.0, pa0 + 90.0]]
             if lowvelfilter:
-                c1 = np.full_like(xc, False)
+                c1 = np.full_like(xc, False).astype(bool)
                 for _ in range(5):
                     args = np.array([xc, yc, dxc, dyc]) * 1
                     args[0][c1] = args[1][c1] = args[2][c1] = args[3][c1] = np.nan
