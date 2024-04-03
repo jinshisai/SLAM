@@ -473,7 +473,8 @@ class TwoDGrad():
         fig.colorbar(m, ax=ax, label=r'velocity (km s$^{-1}$)')
         bpos = xmax - 0.7 * self.bmaj
         e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
-                    angle=self.bpa * np.sign(self.dx), facecolor='g')
+                    angle=self.bpa * np.sign(self.dx), facecolor='khaki',
+                    zorder=1)
         ax.add_patch(e)
         ax.set_aspect('equal', adjustable='box')
         ax.set_xlabel('R.A. offset (au)')
