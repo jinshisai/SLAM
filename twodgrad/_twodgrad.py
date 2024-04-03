@@ -498,7 +498,10 @@ class TwoDGrad():
         dx, dy = self.kepler['dxc'], self.kepler['dyc']
         x = np.abs(x * np.sin(p) + y * np.cos(p))
         dx = np.hypot(dx * np.sin(p), dy * np.cos(p))
-        v = np.abs(self.v)
+        w = self.v * 1
+        if hasattr(self, 'popt'):
+            w = w - self.popt[3]    
+        v = np.abs(w)
         xn = self.center['xc'] - self.xoff
         yn = self.center['yc'] - self.yoff
         dxn, dyn = self.center['dxc'], self.center['dyc']
@@ -526,9 +529,6 @@ class TwoDGrad():
         ax.set_xlim(xmin * 0.999, xmax * 1.001)  # au
         ax.set_ylim(vmin * 0.999, vmax * 1.001)  # km/s
         ax.errorbar(x, v, xerr=dx, fmt='o', color='k', zorder=2)
-        w = self.v
-        if hasattr(self, 'popt'):
-            w = w - self.popt[3]
         ax.plot(x[w < 0], v[w < 0], 'bo', zorder=3)
         ax.plot(x[w > 0], v[w > 0], 'ro', zorder=3)
         ax.plot(xn[w < 0], v[w < 0], 'bo', zorder=1)
@@ -539,7 +539,7 @@ class TwoDGrad():
             vp = np.abs(v[~np.isnan(x)])
             vp = np.geomspace(vp.min(), vp.max(), 100)
             r_break, v_break, dp, vsys = self.popt
-            rp = doublepower_r(vp, r_break, v_break, 0.5, dp, vsys)
+            rp = doublepower_r(vp, r_break, v_break, 0.5, dp, 0)
             ax.plot(rp, vp, 'm-', zorder=4)
         ax.set_xscale('log')
         ax.set_yscale('log')
