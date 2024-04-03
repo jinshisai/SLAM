@@ -385,9 +385,9 @@ class TwoDGrad():
             self.Rkep = Rkep
             self.Vkep = Vkep
             def lnprob(p):
-                r_break, v_break, dp, vsys = p
+                r_break, v_break, dp = p
                 r_model = doublepower_r(v=v, r_break=r_break, v_break=v_break,
-                                        p_in=0.5, dp=dp, vsys=vsys)
+                                        p_in=0.5, dp=dp, vsys=0)
                 chi2 = np.sum(((r - s_model * r_model) / dr)**2)
                 return -0.5 * chi2
             plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0, -1],
@@ -397,8 +397,8 @@ class TwoDGrad():
                                       nburnin= 2000, nsteps=2000,
                                       labels=['Vb (km/s)', 'Rb (au)', 'dp'],
                                       rangelevel=0.8, simpleoutput=True)
-            rb, vb, dp, vsys = popt
-            drb, dvb, ddp, dvsys = perr
+            rb, vb, dp = popt
+            drb, dvb, ddp = perr
             Mstar = rb * vb**2 * unit / np.sin(np.radians(incl))**2
             Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
             dMstar = Mstar * np.sqrt((drb / rb)**2 + (2 * dvb / vb)**2)
@@ -499,8 +499,6 @@ class TwoDGrad():
         x = np.abs(x * np.sin(p) + y * np.cos(p))
         dx = np.hypot(dx * np.sin(p), dy * np.cos(p))
         w = self.v * 1
-        if hasattr(self, 'popt'):
-            w = w - self.popt[3]    
         v = np.abs(w)
         xn = self.center['xc'] - self.xoff
         yn = self.center['yc'] - self.yoff
@@ -538,7 +536,7 @@ class TwoDGrad():
         if ~np.isnan(self.Mstar):
             vp = np.abs(v[~np.isnan(x)])
             vp = np.geomspace(vp.min(), vp.max(), 100)
-            r_break, v_break, dp, vsys = self.popt
+            r_break, v_break, dp = self.popt
             rp = doublepower_r(vp, r_break, v_break, 0.5, dp, 0)
             ax.plot(rp, vp, 'm-', zorder=4)
         ax.set_xscale('log')
