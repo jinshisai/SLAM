@@ -335,7 +335,7 @@ class TwoDGrad():
             xoff, yoff, pa_grad = res.x
             print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
             if lowvelfilter:                
-                c1 = low_velocity(xc - xoff, yc - yoff)
+                c1 = low_velocity(xc - xoff, yc - yoff, pa_grad)
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
 
             res = diffevo(func=chi2, bounds=bounds,
