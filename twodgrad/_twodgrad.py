@@ -310,12 +310,12 @@ class TwoDGrad():
             x = x_in[:n0]
             y = y_in[:n0]
             if np.any(~np.isnan(x)) and np.any(~np.isnan(y)):
-                imax = np.nanargmax(np.abs(x * cospa - y * sinpa))
+                imax = np.nanargmax(np.abs(x * sinpa + y * cospa))
                 c[imax+1:n0+1] = True
             x = x_in[n0+1:]
             y = y_in[n0+1:]
             if np.any(~np.isnan(x)) and np.any(~np.isnan(y)):
-                imax = np.nanargmax(np.abs(x * cospa - y * sinpa))
+                imax = np.nanargmax(np.abs(x * cospa + y * cospa))
                 c[n0:n0+1 + imax] = True
             return c.astype('bool')
 
