@@ -242,7 +242,7 @@ class TwoDGrad():
         
         
     def filtering(self, pa0: float = 0.0, fixcenter: bool = False,
-                  axisfilter: bool = True):
+                  axisfilter: bool = True, lowvelfilter: bool = True):
         xc = self.center['xc'] * 1
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
@@ -327,9 +327,9 @@ class TwoDGrad():
                           args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
             xoff, yoff, pa_grad = res.x
             print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
-                            
-            c1 = low_velocity(xc - xoff, yc - yoff)
-            xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
+            if lowvelfilter:                
+                c1 = low_velocity(xc - xoff, yc - yoff)
+                xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
 
             res = diffevo(func=chi2, bounds=bounds,
                           args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
