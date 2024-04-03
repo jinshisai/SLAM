@@ -300,15 +300,22 @@ class TwoDGrad():
             d3 = (x * np.cos(parad) - y * np.sin(parad))**2
             return np.sum(d1 + d2 + d3)
             
-        def low_velocity(x_in, y_in):
+        def low_velocity(x_in, y_in, pa):
+            parad = np.radians(pa)
+            cospa = np.cos(parad)
+            sinpa = np.sin(parad)
             c = np.full_like(x_in, False)
             if np.all(np.isnan(x_in) | np.isnan(y_in)):
                 return c
-            if np.any(~np.isnan(x_in[:n0])) and np.any(~np.isnan(y_in[:n0])):
-                imax = np.nanargmax(np.hypot(x_in[:n0], y_in[:n0]))
+            x = x_in[:n0]
+            y = y_in[:n0]
+            if np.any(~np.isnan(x)) and np.any(~np.isnan(y)):
+                imax = np.nanargmax(np.abs(x * cospa - y * sinpa))
                 c[imax+1:n0+1] = True
-            if np.any(~np.isnan(x_in[n0+1:])) and np.any(~np.isnan(y_in[n0+1:])):
-                imax = np.nanargmax(np.hypot(x_in[n0+1:], y_in[n0+1:]))
+            x = x_in[n0+1:]
+            y = y_in[n0+1:]
+            if np.any(~np.isnan(x)) and np.any(~np.isnan(y)):
+                imax = np.nanargmax(np.abs(x * cospa - y * sinpa))
                 c[n0:n0+1 + imax] = True
             return c.astype('bool')
 
