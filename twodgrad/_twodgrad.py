@@ -290,8 +290,12 @@ class TwoDGrad():
             x, y, dx, dy = x_in[c], y_in[c], dx_in[c], dy_in[c]
             x = (x - xoff) / dx
             y = (y - yoff) / dy
-            d1 = (x + x[::-1])**2
-            d2 = (y + y[::-1])**2
+            if fixcenter:
+                d1 = x * 0
+                d2 = y * 0
+            else:
+                d1 = (x + x[::-1])**2
+                d2 = (y + y[::-1])**2
             parad = np.radians(pa)
             d3 = (x * np.cos(parad) - y * np.sin(parad))**2
             return np.sum(d1 + d2 + d3)
