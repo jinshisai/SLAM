@@ -404,6 +404,7 @@ class TwoDGrad():
             dMstar = Mstar * np.sqrt((drb / rb)**2 + (2 * dvb / vb)**2)
             self.popt = popt
             self.Mstar = Mstar
+            self.dMstar = dMstar
             print(f'pout = {dp+0.5:.3} +/- {ddp:.3}')
             print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun (1/0.76 corrected)')
         
