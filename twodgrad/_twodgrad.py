@@ -284,8 +284,8 @@ class TwoDGrad():
             else:
                 return a > 7.82  # 7.82, 11.35, 13.94 covers 95, 99, 99.7%
 
-        def chi2(x, x_in, y_in, dx_in, dy_in):
-            xoff, yoff, pa = x
+        def chi2(p, x_in, y_in, dx_in, dy_in):
+            xoff, yoff, pa = p
             c = ~np.isnan(x_in) & ~np.isnan(y_in)
             x, y, dx, dy = x_in[c], y_in[c], dx_in[c], dy_in[c]
             x = (x - xoff) / dx
