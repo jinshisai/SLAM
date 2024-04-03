@@ -332,7 +332,7 @@ class TwoDGrad():
             bounds = [[xmin, xmax], [ymin, ymax], [pa0 - 90.0, pa0 + 90.0]]
             if lowvelfilter:
                 c1 = np.full_like(xc, False).astype(bool)
-                for _ in range(5):
+                for _ in range(4):
                     args = np.array([xc, yc, dxc, dyc]) * 1
                     args[0][c1] = args[1][c1] = args[2][c1] = args[3][c1] = np.nan
                     res = diffevo(func=chi2, bounds=bounds,
