@@ -385,13 +385,13 @@ class TwoDGrad():
             self.Rkep = Rkep
             self.Vkep = Vkep
             def lnprob(p):
-                r_break, v_break, dp = p
+                r_break, v_break, dp, vsys = p
                 r_model = doublepower_r(v=v, r_break=r_break, v_break=v_break,
-                                        p_in=0.5, dp=dp, vsys=0)
+                                        p_in=0.5, dp=dp, vsys=vsys)
                 chi2 = np.sum(((r - s_model * r_model) / dr)**2)
                 return -0.5 * chi2
-            plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0],
-                             [np.max(np.abs(r)), np.max(np.abs(v)), 10]])
+            plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0, -1],
+                             [np.max(np.abs(r)), np.max(np.abs(v)), 10, 1]])
             popt, perr = emcee_corner(plim, lnprob,
                                       nwalkers_per_ndim=16,
                                       nburnin= 2000, nsteps=2000,
