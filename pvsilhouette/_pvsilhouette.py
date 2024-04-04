@@ -355,8 +355,8 @@ class PVSilhouette():
         ax = fig.add_subplot(1, 2, 1)
         ax.contour(self.x, self.v, self.dpvmajor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x * signmajor, a['major']['vlosmax'], '-r')
-        ax.plot(self.x * signmajor, a['major']['vlosmin'], '-r')
+        ax.plot(self.x, a['major']['vlosmax'][::signmajor], '-r')
+        ax.plot(self.x, a['major']['vlosmin'][::signmajor], '-r')
         for i in [0, 1]:
             y, yerr = vobs[0][i], vobserr[0][i]
             cond = ~np.isnan(y)
@@ -368,8 +368,8 @@ class PVSilhouette():
         ax = fig.add_subplot(1, 2, 2)
         ax.contour(self.x, self.v, self.dpvminor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x * signminor, a['minor']['vlosmax'], '-r')
-        ax.plot(self.x * signminor, a['minor']['vlosmin'], '-r')
+        ax.plot(self.x, a['minor']['vlosmax'][::signminor], '-r')
+        ax.plot(self.x, a['minor']['vlosmin'][::signminor], '-r')
         for i in [0, 1]:
             y, yerr = vobs[1][i], vobserr[1][i]
             cond = ~np.isnan(y)
