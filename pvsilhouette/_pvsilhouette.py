@@ -319,6 +319,7 @@ class PVSilhouette():
                 q = p_fixed.copy()
                 q[p_fixed == None] = p
                 q[:2] = 10**q[:2]
+                q[p_fixed != None] = p_fixed[p_fixed != None].copy()
                 chi2 = np.nansum(((vobs - makemodel(*q)) / vobserr)**2)
                 return -0.5 * chi2
             plim = np.array([Mstar_range, Rc_range, alphainfall_range, cavityangle_range])
