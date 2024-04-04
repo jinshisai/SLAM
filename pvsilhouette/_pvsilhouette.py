@@ -279,10 +279,10 @@ class PVSilhouette():
         aerr = np.full(np.shape(vobserr), minabserr * self.dv)
         rerr = minrelerr * vobs
         vobserr = np.max([vobserr, aerr, rerr], axis=0)
-        mass = 2 * np.log(np.abs(vobs)) + np.log(np.abs(x))
-        mthre = np.nanpercentile(mass, 20, axis=2)  # inner outlier
-        mthre = np.moveaxis([mthre] * len(x), 0, -1)
-        vobs = np.where(mass > mthre, vobs, np.nan)
+        #mass = 2 * np.log(np.abs(vobs)) + np.log(np.abs(x))
+        #mthre = np.nanpercentile(mass, 20, axis=2)  # inner outlier
+        #mthre = np.moveaxis([mthre] * len(x), 0, -1)
+        #vobs = np.where(mass > mthre, vobs, np.nan)
         def getsign(m):
             nv, nx = np.shape(m)
             q =   np.sum(m[:nv//2, :nx//2]) + np.sum(m[nv//2:, nx//2:]) \
