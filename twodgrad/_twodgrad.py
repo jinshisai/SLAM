@@ -336,12 +336,17 @@ class TwoDGrad():
                 for _ in range(4):
                     args = np.array([xc, yc, dxc, dyc]) * 1
                     args[0][c1] = args[1][c1] = args[2][c1] = args[3][c1] = np.nan
-                    lnprob = lambda p: -0.5 * chi2(p, *args)
-                    popt, perr = emcee_corner(bounds, lnprob,
-                                      nwalkers_per_ndim=16,
-                                      nburnin= 2000, nsteps=2000,
-                                      labels=['xoff (au)', 'yoff (au)', 'P.A. (deg)'],
-                                      rangelevel=0.8, simpleoutput=True)
+                    if fixcenter:
+                        lnprob = lambda p: -0.5 * chi2([p, 0, 0], *args)
+                        plim = bounds[-1:]
+                    else:
+                        lnprob = lambda p: -0.5 * chi2(p, *args)
+                        plim = bounds
+                    popt, perr = emcee_corner(plim, lnprob,
+                                              nwalkers_per_ndim=16,
+                                              nburnin= 2000, nsteps=2000,
+                                              labels=['xoff (au)', 'yoff (au)', 'P.A. (deg)'],
+                                              rangelevel=0.8, simpleoutput=True)
                     #res = diffevo(func=chi2, bounds=bounds,
                     #              args=args, x0=[0, 0, pa0])
                     #xoff, yoff, pa_grad = res.x
@@ -349,8 +354,13 @@ class TwoDGrad():
                     print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
                     c1 = low_velocity(args[0] - xoff, args[1] - yoff, pa_grad)
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
-            lnprob = lambda p: -0.5 * chi2(p, xc, yc, dxc, dyc)
-            popt, perr = emcee_corner(bounds, lnprob,
+            if fixcenter:
+                lnprob = lambda p: -0.5 * chi2([p, 0, 0], xc, yc, dxc, dyc)
+                plim = bounds[-1:]
+            else:
+                lnprob = lambda p: -0.5 * chi2(p, xc, yc, dxc, dyc)
+                plim = bounds
+            popt, perr = emcee_corner(plim, lnprob,
                                       nwalkers_per_ndim=16,
                                       nburnin= 2000, nsteps=2000,
                                       labels=['xoff (au)', 'yoff (au)', 'P.A. (deg)'],
