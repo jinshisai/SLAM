@@ -326,11 +326,8 @@ class TwoDGrad():
             if np.all(np.isnan(xc) | np.isnan(yc)):
                 print('No point survived.')
                 break
-            xmin = -1e-6 if fixcenter else self.x.min()
-            ymin = -1e-6 if fixcenter else self.y.min()
-            xmax = 1e-6 if fixcenter else self.x.max()
-            ymax = 1e-6 if fixcenter else self.y.max()
-            bounds = [[xmin, xmax], [ymin, ymax], [pa0 - 90.0, pa0 + 90.0]]
+            plim = [[self.x.min(), self.y.min(), pa0 - 90.0],
+                      [self.x.max(), self.y.max(), pa0 + 90.0]]
             if lowvelfilter:
                 c1 = np.full_like(xc, False).astype(bool)
                 for _ in range(4):
@@ -338,17 +335,13 @@ class TwoDGrad():
                     args[0][c1] = args[1][c1] = args[2][c1] = args[3][c1] = np.nan
                     if fixcenter:
                         lnprob = lambda p: -0.5 * chi2([0, 0, p], *args)
-                        plim = np.transpose(bounds[-1:])
+                        plim = plim[:, -1:]
                     else:
                         lnprob = lambda p: -0.5 * chi2(p, *args)
-                        plim = np.transpose(bounds)
                     popt, perr = emcee_corner(plim, lnprob,
                                               nwalkers_per_ndim=16,
                                               nburnin= 2000, nsteps=2000,
-                                              rangelevel=0.8, simpleoutput=True)
-                    #res = diffevo(func=chi2, bounds=bounds,
-                    #              args=args, x0=[0, 0, pa0])
-                    #xoff, yoff, pa_grad = res.x
+                                              simpleoutput=True)
                     if fixcenter:
                         popt = np.array([0, 0, popt[0]])
                         perr = np.array([0, 0, perr[0]])
@@ -356,20 +349,16 @@ class TwoDGrad():
                     print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
                     c1 = low_velocity(args[0] - xoff, args[1] - yoff, pa_grad)
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
+            args = np.array([xc, yc, dxc, dyc])
             if fixcenter:
-                lnprob = lambda p: -0.5 * chi2([0, 0, p], xc, yc, dxc, dyc)
-                plim = np.transpose(bounds[-1:])
+                lnprob = lambda p: -0.5 * chi2([0, 0, p], *args)
+                plim = plim[:, -1:]
             else:
-                lnprob = lambda p: -0.5 * chi2(p, xc, yc, dxc, dyc)
-                plim = np.transpose(bounds)
+                lnprob = lambda p: -0.5 * chi2(p, *args)
             popt, perr = emcee_corner(plim, lnprob,
                                       nwalkers_per_ndim=16,
                                       nburnin= 2000, nsteps=2000,
-                                      rangelevel=0.8, simpleoutput=True)
-            
-            #res = diffevo(func=chi2, bounds=bounds,
-            #              args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
-            #xoff, yoff, pa_grad = res.x
+                                      simpleoutput=True)
             if fixcenter:
                 popt = np.array([0, 0, popt[0]])
                 perr = np.array([0, 0, perr[0]])
@@ -427,8 +416,7 @@ class TwoDGrad():
             popt, perr = emcee_corner(plim, lnprob,
                                       nwalkers_per_ndim=16,
                                       nburnin= 2000, nsteps=2000,
-                                      labels=['Vb (km/s)', 'Rb (au)', 'dp'],
-                                      rangelevel=0.8, simpleoutput=True)
+                                      simpleoutput=True)
             rb, vb, dp, vsys = popt
             drb, dvb, ddp, dvsys = perr
             Mstar = rb * vb**2 * unit / np.sin(np.radians(incl))**2
