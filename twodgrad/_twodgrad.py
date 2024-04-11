@@ -352,7 +352,7 @@ class TwoDGrad():
                     print('xoff, yoff, pa ='
                           + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
                           + f' {popt[1]:.2f}+/-{perr[1]:.2f} au,'
-                          + f' {popt[2]:.2f}+/-{perr[2]} deg')
+                          + f' {popt[2]:.2f}+/-{perr[2]:.2f} deg')
                     c1 = low_velocity(args[0] - xoff, args[1] - yoff, pa_grad)
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
             args = np.array([xc, yc, dxc, dyc])
@@ -365,7 +365,7 @@ class TwoDGrad():
             print('xoff, yoff, pa ='
                   + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
                   + f' {popt[1]:.2f}+/-{perr[1]:.2f} au,'
-                  + f' {popt[2]:.2f}+/-{perr[2]} deg')
+                  + f' {popt[2]:.2f}+/-{perr[2]:.2f} deg')
             c2 = bad_channels(xc, yc, xoff, yoff, pa_grad)
             if np.any(c2):
                 xc[c2] = yc[c2] = dxc[c2] = dyc[c2] = np.nan
