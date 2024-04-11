@@ -326,8 +326,8 @@ class TwoDGrad():
             if np.all(np.isnan(xc) | np.isnan(yc)):
                 print('No point survived.')
                 break
-            plim = [[self.x.min(), self.y.min(), pa0 - 90.0],
-                      [self.x.max(), self.y.max(), pa0 + 90.0]]
+            plim = np.array([[self.x.min(), self.y.min(), pa0 - 90.0],
+                             [self.x.max(), self.y.max(), pa0 + 90.0]])
             if lowvelfilter:
                 c1 = np.full_like(xc, False).astype(bool)
                 for _ in range(4):
