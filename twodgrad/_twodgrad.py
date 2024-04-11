@@ -43,8 +43,8 @@ def gauss2d(xy, peak, cx, cy, wx, wy, pa):
 def emcee_custom(plim, lnprob, fixcenter):
     popt, perr = emcee_corner(plim[:, -1:] if fixcenter else plim,
                               lnprob,
-                              nwalkers_per_ndim=16,
-                              nburnin= 2000, nsteps=2000,
+                              nwalkers_per_ndim=8,
+                              nburnin=1000, nsteps=1000,
                               simpleoutput=True)
     if fixcenter:
        popt = np.array([0, 0, popt[0]])
