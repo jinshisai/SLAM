@@ -338,10 +338,10 @@ class TwoDGrad():
                     args[0][c1] = args[1][c1] = args[2][c1] = args[3][c1] = np.nan
                     if fixcenter:
                         lnprob = lambda p: -0.5 * chi2([p, 0, 0], *args)
-                        plim = bounds[-1:]
+                        plim = np.transpose(bounds[-1:])
                     else:
                         lnprob = lambda p: -0.5 * chi2(p, *args)
-                        plim = bounds
+                        plim = np.transpose(bounds)
                     popt, perr = emcee_corner(plim, lnprob,
                                               nwalkers_per_ndim=16,
                                               nburnin= 2000, nsteps=2000,
@@ -356,10 +356,10 @@ class TwoDGrad():
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
             if fixcenter:
                 lnprob = lambda p: -0.5 * chi2([p, 0, 0], xc, yc, dxc, dyc)
-                plim = bounds[-1:]
+                plim = np.transpose(bounds[-1:])
             else:
                 lnprob = lambda p: -0.5 * chi2(p, xc, yc, dxc, dyc)
-                plim = bounds
+                plim = np.transpose(bounds)
             popt, perr = emcee_corner(plim, lnprob,
                                       nwalkers_per_ndim=16,
                                       nburnin= 2000, nsteps=2000,
