@@ -40,6 +40,16 @@ def gauss2d(xy, peak, cx, cy, wx, wy, pa):
     s, t = rot(x - cx, y - cy, pa)
     return np.ravel(peak * np.exp2(-s**2 / wx**2 - t**2 / wy**2))
 
+def emcee_custom(plim, lnprob, fixcenter):
+    popt, perr = emcee_corner(plim[:, -1:] if fixcenter else plim,
+                              lnprob,
+                              nwalkers_per_ndim=16,
+                              nburnin= 2000, nsteps=2000,
+                              simpleoutput=True)
+    if fixcenter:
+       popt = np.array([0, 0, popt[0]])
+       perr = np.array([0, 0, perr[0]])
+    return popt, perr
 
 
 class TwoDGrad():
@@ -335,16 +345,9 @@ class TwoDGrad():
                     args[0][c1] = args[1][c1] = args[2][c1] = args[3][c1] = np.nan
                     if fixcenter:
                         lnprob = lambda p: -0.5 * chi2([0, 0, p], *args)
-                        plim = plim[:, -1:]
                     else:
                         lnprob = lambda p: -0.5 * chi2(p, *args)
-                    popt, perr = emcee_corner(plim, lnprob,
-                                              nwalkers_per_ndim=16,
-                                              nburnin= 2000, nsteps=2000,
-                                              simpleoutput=True)
-                    if fixcenter:
-                        popt = np.array([0, 0, popt[0]])
-                        perr = np.array([0, 0, perr[0]])
+                    popt, perr = emcee_custom(plim, lnprob, fixcenter)
                     xoff, yoff, pa_grad = popt
                     print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
                     c1 = low_velocity(args[0] - xoff, args[1] - yoff, pa_grad)
@@ -352,16 +355,9 @@ class TwoDGrad():
             args = np.array([xc, yc, dxc, dyc])
             if fixcenter:
                 lnprob = lambda p: -0.5 * chi2([0, 0, p], *args)
-                plim = plim[:, -1:]
             else:
                 lnprob = lambda p: -0.5 * chi2(p, *args)
-            popt, perr = emcee_corner(plim, lnprob,
-                                      nwalkers_per_ndim=16,
-                                      nburnin= 2000, nsteps=2000,
-                                      simpleoutput=True)
-            if fixcenter:
-                popt = np.array([0, 0, popt[0]])
-                perr = np.array([0, 0, perr[0]])
+            popt, perr = emcee_custom(plim, lnprob, fixcenter)
             xoff, yoff, pa_grad = popt
             print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
             c2 = bad_channels(xc, yc, xoff, yoff, pa_grad)
@@ -413,10 +409,7 @@ class TwoDGrad():
                 return -0.5 * chi2
             plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0, -1],
                              [np.max(np.abs(r)), np.max(np.abs(v)), 10, 1]])
-            popt, perr = emcee_corner(plim, lnprob,
-                                      nwalkers_per_ndim=16,
-                                      nburnin= 2000, nsteps=2000,
-                                      simpleoutput=True)
+            popt, perr = emcee_custom(plim, lnprob, False)
             rb, vb, dp, vsys = popt
             drb, dvb, ddp, dvsys = perr
             Mstar = rb * vb**2 * unit / np.sin(np.radians(incl))**2
