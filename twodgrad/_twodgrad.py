@@ -298,6 +298,7 @@ class TwoDGrad():
                 d2 = (y + y[::-1])**2
             parad = np.radians(pa)
             d3 = (x * np.cos(parad) - y * np.sin(parad))**2
+            d3 = d3 / ((dx**2 + dy**2) / 2)
             return np.sum(d1 + d2 + d3)
             
         def low_velocity(x_in, y_in, pa_in):
@@ -335,15 +336,30 @@ class TwoDGrad():
                 for _ in range(4):
                     args = np.array([xc, yc, dxc, dyc]) * 1
                     args[0][c1] = args[1][c1] = args[2][c1] = args[3][c1] = np.nan
-                    res = diffevo(func=chi2, bounds=bounds,
-                                  args=args, x0=[0, 0, pa0])
-                    xoff, yoff, pa_grad = res.x
+                    lnprob = lambda p: -0.5 * chi2(p, *args)
+                    popt, perr = emcee_corner(bounds, lnprob,
+                                      nwalkers_per_ndim=16,
+                                      nburnin= 2000, nsteps=2000,
+                                      labels=['xoff (au)', 'yoff (au)', 'P.A. (deg)'],
+                                      rangelevel=0.8, simpleoutput=True)
+                    #res = diffevo(func=chi2, bounds=bounds,
+                    #              args=args, x0=[0, 0, pa0])
+                    #xoff, yoff, pa_grad = res.x
+                    xoff, yoff, pa_grad = popt
                     print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
                     c1 = low_velocity(args[0] - xoff, args[1] - yoff, pa_grad)
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
-            res = diffevo(func=chi2, bounds=bounds,
-                          args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
-            xoff, yoff, pa_grad = res.x
+            lnprob = lambda p: -0.5 * chi2(p, xc, yc, dxc, dyc)
+            popt, perr = emcee_corner(bounds, lnprob,
+                                      nwalkers_per_ndim=16,
+                                      nburnin= 2000, nsteps=2000,
+                                      labels=['xoff (au)', 'yoff (au)', 'P.A. (deg)'],
+                                      rangelevel=0.8, simpleoutput=True)
+            
+            #res = diffevo(func=chi2, bounds=bounds,
+            #              args=[xc, yc, dxc, dyc], x0=[0, 0, pa0])
+            #xoff, yoff, pa_grad = res.x
+            xoff, yoff, pa_grad = popt
             print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
             c2 = bad_channels(xc, yc, xoff, yoff, pa_grad)
             if np.any(c2):
@@ -352,8 +368,8 @@ class TwoDGrad():
                 goodsolution = True
         
         xc, yc = xc - xoff, yc - yoff
-        self.xoff, self.yoff = xoff, yoff
-        self.pa_grad = pa_grad
+        self.xoff, self.yoff, self.pa_grad = popt
+        self.dxoff, self.dyoff, self.dpa_grad = perr
         self.kepler = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
         
 
