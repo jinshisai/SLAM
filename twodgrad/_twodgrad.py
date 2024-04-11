@@ -349,7 +349,10 @@ class TwoDGrad():
                         lnprob = lambda p: -0.5 * chi2(p, *args)
                     popt, perr = emcee_custom(plim, lnprob, fixcenter)
                     xoff, yoff, pa_grad = popt
-                    print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
+                    print('xoff, yoff, pa ='
+                          + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
+                          + f' {popt[1]:.2f}+/-{perr[1]:.2f} au,'
+                          + f' {popt[2]:.2f}+/-{perr[2]} deg')
                     c1 = low_velocity(args[0] - xoff, args[1] - yoff, pa_grad)
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
             args = np.array([xc, yc, dxc, dyc])
@@ -359,7 +362,10 @@ class TwoDGrad():
                 lnprob = lambda p: -0.5 * chi2(p, *args)
             popt, perr = emcee_custom(plim, lnprob, fixcenter)
             xoff, yoff, pa_grad = popt
-            print(f'xoff, yoff, pa = {xoff:.2f} au, {yoff:.2f} au, {pa_grad:.2f} deg')
+            print('xoff, yoff, pa ='
+                  + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
+                  + f' {popt[1]:.2f}+/-{perr[1]:.2f} au,'
+                  + f' {popt[2]:.2f}+/-{perr[2]} deg')
             c2 = bad_channels(xc, yc, xoff, yoff, pa_grad)
             if np.any(c2):
                 xc[c2] = yc[c2] = dxc[c2] = dyc[c2] = np.nan
