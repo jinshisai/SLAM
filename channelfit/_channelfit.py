@@ -348,7 +348,7 @@ class ChannelFit():
                  pa: float = 0, incl: float = 90, dist: float = 1,
                  center: str = None, vsys: float = 0,
                  rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
-                 sigma: float = None, nlayer: int = 4,
+                 sigma: float = None, nlayer: int = 3,
                  xskip: int = 1, yskip: int = 1, autoskip: bool = False,
                  gaussmargin: float = 1.6,
                  savedeconvolved: str = None, loaddeconvolved: str = None,
@@ -387,7 +387,7 @@ class ChannelFit():
         self.data_red = self.data[(vlim[2] <= v) * (v <= vlim[3])]
         self.data_valid = np.append(self.data_blue, self.data_red, axis=0) 
         
-        m = makemom01(self.data_valid0, self.v_valid0, sigma)
+        m = makemom01(self.data_valid, self.v_valid, sigma)
         self.mom0 = m['mom0']
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
@@ -590,20 +590,11 @@ class ChannelFit():
         Iout = np.array(Iout)
         return Iout
 
-    def get_scale(self, Iout, output: bool = False) -> np.ndarray:
-        if self.scaling == 'chi2':
-            gf = np.sum(Iout * self.data_valid, axis=(1, 2))
-            ff = np.sum(Iout * Iout, axis=(1, 2))
-        elif self.scaling == 'peak':
-            gf = np.max(self.data_valid, axis=(1, 2))
-            ff = np.max(Iout, axis=(1, 2))
-        elif self.scaling == 'uniform':
-            gf = np.full_like(self.v_valid, np.sum(Iout * self.data_valid))
-            ff = np.full_like(self.v_valid, np.sum(Iout * Iout))
+    def get_scale(self, Iout) -> np.ndarray:
+        gf = np.full_like(self.v_valid, np.sum(Iout * self.data_valid))
+        ff = np.full_like(self.v_valid, np.sum(Iout * Iout))
         scale = gf / ff
         scale[(ff == 0) + (scale < 0)] = 0
-        if output:
-            print(list(np.round(scale / np.max(scale), decimals=2)))
         return scale
 
     def peaktounity(self, I_in: np.ndarray) -> np.ndarray:
@@ -748,7 +739,7 @@ class ChannelFit():
             self.phigh = p_fixed
         plist = [self.popt, self.plow, self.pmid, self.phigh]
         print('------------------------')
-        print(f'popt :', ', '.join([f'{p:.2e}' for p in self.popt]))
+        print(f'popt:', ', '.join([f'{k}={p:.2e}' for k, p in zip(self.paramkeys, self.popt)]))
         print('------------------------')
         np.savetxt(filename+'.popt.txt', plist)
         self.popt = dict(zip(self.paramkeys, self.popt))
@@ -771,8 +762,6 @@ class ChannelFit():
             self.free[k] = True
         if kwargs != {}:
             self.popt = kwargs
-        self.data_valid = self.data_valid0
-        self.v_valid = self.v_valid0
         m = self.cubemodel(**self.popt)
         m0 = self.cubemodel(**self.popt, convolving=False, scaling=False)
         m1 = self.cubemodel(**self.popt, scaling=False)
@@ -821,7 +810,7 @@ class ChannelFit():
             if kwargs != {}:
                 self.popt = kwargs
             d = self.cubemodel(**self.popt)
-            m = makemom01(d, self.v_valid0, self.sigma)
+            m = makemom01(d, self.v_valid, self.sigma)
         if 'obs' in mode:
             mom0 = self.mom0
             mom1 = self.mom1
@@ -839,8 +828,8 @@ class ChannelFit():
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
-        vplot = (np.nanpercentile(self.mom1, 95) 
-                 - np.nanpercentile(self.mom1, 5)) / 2.
+        vplot = (np.nanpercentile(self.mom1, 99) 
+                 - np.nanpercentile(self.mom1, 1)) / 2.
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
                           shading='nearest', vmin=-vplot, vmax=vplot)
         fig.colorbar(m, ax=ax, label=label + r' mom1 (km s$^{-1}$)')
@@ -916,52 +905,3 @@ class ChannelFit():
         ax.set_aspect(1)
         fig.savefig(filename.replace('.png', '') + f'.deconvolution.png')
         plt.close()
-
-    def equivelocity(self, filename: str = 'equivel.png', **kwargs):
-        if kwargs != {}:
-            self.popt = kwargs
-        m = self.popt['Mstar']
-        h1 = self.popt['h1']
-        h2 = self.popt['h2']
-        if h1 < 0: h1 = np.nan
-        if h2 < 0: h2 = np.nan
-        incl = self.incl0 + self.popt['incl']
-        irad = np.radians(incl)
-        sini = np.sin(irad)
-        cosi = np.cos(irad)
-        def getxy(ymax):
-            y = np.linspace(-ymax, ymax, 128)
-            v, y = np.meshgrid(self.v_valid, y)
-            y[y * np.sign(v) < 0] = np.nan
-            r = (m / (v / sini / vunit / y)**2)**(1/3)
-            x = np.sqrt(r**2 - y**2)
-            return x, y, r
-        x, y, _ = getxy(np.max(np.abs(self.x)))
-        ymax = np.max(np.abs(y[~np.isnan(x)]))
-        x, y, r = getxy(ymax)
-        xcosi = x * cosi
-        rsini = r * sini
-        x = [xcosi + h1 * rsini,
-             xcosi - h1 * rsini,
-             xcosi + h2 * rsini,
-             xcosi - h2 * rsini,
-             -xcosi + h1 * rsini,
-             -xcosi - h1 * rsini,
-             -xcosi + h2 * rsini,
-             -xcosi - h2 * rsini,
-        ]
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        for i in range(8):
-            for xx, yy in zip(x[i], y):
-                m = ax.scatter(xx, yy, c=self.v_valid, cmap='jet', s=1,
-                               vmin=self.v.min(), vmax=self.v.max())
-        fig.colorbar(m, ax=ax, label=r'$V_{\rm los}$ (km s$^{-1}$)')
-        ax.set_xlabel('major offset (au)')
-        ax.set_ylabel('minor offset (au)')
-        ax.set_xlim(-ymax * 1.01, ymax * 1.01)
-        ax.set_ylim(-ymax * 1.01, ymax * 1.01)
-        ax.set_aspect(1)
-        fig.savefig(filename)
-        plt.close()
-        
