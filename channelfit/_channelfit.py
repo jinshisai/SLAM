@@ -224,15 +224,16 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
 
 class ChannelFit():
 
-    def __init__(self, disk: bool = True, envelope: bool = True,
-                 combine: bool = False, scaling: str = 'uniform',
+    def __init__(self,
+                 disk: bool = True,
+                 envelope: bool = False,
+                 scaling: str = 'uniform',
                  progressbar: bool = True):
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2',
                           'pI', 'Rin', 'Ienv',
                           'xoff', 'yoff', 'voff', 'incl']
         self.disk = disk
         self.envelope = envelope
-        self.combine = combine
         self.scaling = scaling
         self.progressbar = progressbar
 
@@ -380,14 +381,11 @@ class ChannelFit():
         self.v_nanmid = v[(vlim[1] < v) * (v < vlim[2])]
         self.v_red = v[(vlim[2] <= v) * (v <= vlim[3])]
         self.v_nanred = v[vlim[3] < v]
-        self.v_valid0 = np.r_[self.v_blue, self.v_red]
-        self.v_valid1 = np.array([np.mean(self.v_blue), np.mean(self.v_red)])
+        self.v_valid = np.r_[self.v_blue, self.v_red]
 
         self.data_blue = self.data[(vlim[0] <= v) * (v <= vlim[1])]
         self.data_red = self.data[(vlim[2] <= v) * (v <= vlim[3])]
-        self.data_valid0 = np.append(self.data_blue, self.data_red, axis=0) 
-        self.data_valid1 = np.array([np.mean(self.data_blue, axis=0),
-                                     np.mean(self.data_red, axis=0)]) 
+        self.data_valid = np.append(self.data_blue, self.data_red, axis=0) 
         
         m = makemom01(self.data_valid0, self.v_valid0, sigma)
         self.mom0 = m['mom0']
@@ -717,14 +715,6 @@ class ChannelFit():
                 total *= kw['nburnin'] + kw['nsteps'] + 2
                 bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
-            if self.combine:
-                self.data_valid = self.data_valid1
-                self.v_valid = self.v_valid1
-                self.dv = self.dv * len(self.v_valid0) / 2
-                self.sigma = self.sigma / np.sqrt(len(self.v_valid0) / 2)
-            else:
-                self.data_valid = self.data_valid0
-                self.v_valid = self.v_valid0
             def lnprob(p):
                 if self.progressbar:
                     bar.update(1)
@@ -742,11 +732,6 @@ class ChannelFit():
                              incl_range])
             plim = plim[notfixed].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
-            if self.combine:
-                self.data_valid = self.data_valid0
-                self.v_valid = self.v_valid0
-                self.dv = self.dv / (len(self.v_valid0) / 2)
-                self.sigma = self.sigma * np.sqrt(len(self.v_valid0) / 2)
             def get_p(i: int):
                 p = p_fixed.copy()
                 p[notfixed] = mcmc[i]
