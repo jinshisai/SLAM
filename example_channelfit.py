@@ -9,7 +9,7 @@ vsys = 4  # km/s
 dist = 139  # pc
 sigma = 2e-3  # Jy/beam; None means automatic calculation.
 rmax = 1 * dist  # au
-vlim = (-2.52, -0.9, 0.9, 2.52)  # km/s; from vsys
+vlim = (-2.7, -1.0, 1.0, 2.7)  # km/s; from vsys
 '------------------------'
 
 
@@ -22,12 +22,12 @@ if __name__ == '__main__':
                   autoskip=True,  # autoskip=True will resample the pixels if the beam minor axis > 10 pixels.
                   )
     chan.fitting(Mstar_range=[0.01, 1.0],
-                 #Mstar_fixed=0.5,
+                 Mstar_fixed=None,
                  Rc_range=[3, 300],
-                 #Rc_fixed=100,
+                 Rc_fixed=None,
                  pI_range=[0.0, 3.0],
-                 #pI_fixed=0,
-                 cs_fixed=0.5,
+                 pI_fixed=None,
+                 cs_fixed=0.4,
                  h1_fixed=0,
                  h2_fixed=-1,  # h2_fixed<0 means to use h1 only.
                  Rin_fixed=0,
@@ -38,8 +38,7 @@ if __name__ == '__main__':
                  incl_fixed=0,
                  kwargs_emcee_corner={'nwalkers_per_ndim':2,
                                       'nburnin':100,
-                                      'nsteps':100,
-                                      'rangelevel':None}, 
+                                      'nsteps':300},
                  filename=filehead)
     p = chan.popt
     chan.modeltofits(**p, filehead=filehead)

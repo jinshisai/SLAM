@@ -608,7 +608,7 @@ class ChannelFit():
                   h1: float, h2: float, pI: float, Rin: float, Ienv: float, 
                   xoff: float = 0, yoff: float = 0, voff: float = 0,
                   incl: float = 90,
-                  convolving: bool = True, scaling: bool = True):
+                  convolving: bool = True):
         if self.free['incl']:
             self.update_incl(incl)
         if self.free['cs']:
@@ -626,7 +626,7 @@ class ChannelFit():
             Iunif = self.rgi2d(xoff, yoff, Iunif)
             mom0unif = np.sum(Iunif, axis=0) * self.dv
             mom0unif[mom0unif < 0] = np.nan
-            Iunif = self.mom0decon * Iunif / mom0unif
+            Iunif = Iunif * self.mom0decon / mom0unif
             Iunif = np.nan_to_num(Iunif)
         if convolving:
             Iout = convolve(Iunif, [self.gaussbeam], mode='same')
@@ -634,12 +634,8 @@ class ChannelFit():
             Iout = self.peaktounity(Iunif)
         if not ('mom0' in self.scaling):
             Iout = self.rgi2d(xoff, yoff, Iout)
-        if scaling:
-            if not ('mom0' in self.scaling):
-                scale = self.get_scale(Iout)
-                Iout = Iout * np.moveaxis([[scale]], 2, 0)
-        else:
-            Iout = Iout / np.max(Iout)
+            scale = self.get_scale(Iout)
+            Iout = Iout * np.moveaxis([[scale]], 2, 0)
         return Iout
                   
     def fitting(self, Mstar_range: list = [0.01, 10],
@@ -763,8 +759,7 @@ class ChannelFit():
         if kwargs != {}:
             self.popt = kwargs
         m = self.cubemodel(**self.popt)
-        m0 = self.cubemodel(**self.popt, convolving=False, scaling=False)
-        m1 = self.cubemodel(**self.popt, scaling=False)
+        m0 = self.cubemodel(**self.popt, convolving=False)
         
         def concat(m):
             if len(self.v_red) > 0:
@@ -803,7 +798,6 @@ class ChannelFit():
         tofits((model := concat(m)), 'model')
         tofits(self.data - model, 'residual')
         tofits(concat(m0), 'beforeconvolving')
-        tofits(concat(m1), 'beforescaling')
         
     def plotmom(self, mode: str, filename: str = 'mom01.png', **kwargs):
         if 'mod' in mode or 'res' in mode or 'clean' in mode:
