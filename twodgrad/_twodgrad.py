@@ -413,8 +413,8 @@ class TwoDGrad():
                                         p_in=0.5, dp=dp, vsys=vsys)
                 chi2 = np.sum(((r - s_model * r_model) / dr)**2)
                 return -0.5 * chi2
-            plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0, -1],
-                             [np.max(np.abs(r)), np.max(np.abs(v)), 10, 1]])
+            plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0, -0.5],
+                             [np.max(np.abs(r)), np.max(np.abs(v)), 10, 0.5]])
             popt, perr = emcee_custom(plim, lnprob, False)
             rb, vb, dp, vsys = popt
             drb, dvb, ddp, dvsys = perr
