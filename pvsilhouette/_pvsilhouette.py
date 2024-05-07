@@ -326,7 +326,8 @@ class PVSilhouette():
                 chi2 = np.nansum(((vobs - makemodel(*q)) / vobserr)**2)
                 chi2 = chi2 / Npixperbeam
                 return -0.5 * chi2
-            plim = np.array([Mstar_range, Rc_range, alphainfall_range, cavityangle_range])
+            plim = np.array([Mstar_range, Rc_range, alphainfall_range,
+                             cavityangle_range, vsys_range])
             plim[:2] = np.log10(plim[:2])
             plim = plim[p_fixed == None].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
