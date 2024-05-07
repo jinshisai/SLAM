@@ -247,15 +247,15 @@ class PVSilhouette():
                 minrelerr: float = 0.01,
                 signmajor: int = None,
                 signminor: int = None):
-        Nyquistskip = int(np.round(self.bmaj / self.dx / 2))
-        x = self.x[::Nyquistskip]
+        Npixperbeam = np.sqrt(np.pi / 4 / np.log(2)) * self.bmaj / self.dx
+        x = self.x
         vintp = np.linspace(self.v[0], self.v[-1], (len(self.v) - 1) * 10 + 1)
         dvintp = vintp[1] - vintp[0]
         majintp = interp1d(self.v, self.dpvmajor, kind='cubic', axis=0)(vintp)
         minintp = interp1d(self.v, self.dpvminor, kind='cubic', axis=0)(vintp)
         vobs = []
         vobserr = []
-        for d in [majintp.T[::Nyquistskip, :], minintp.T[::Nyquistskip, :]]:
+        for d in [majintp.T, minintp.T]:
             vtmp = []
             dvtmp = []
             for c in d:
@@ -321,6 +321,7 @@ class PVSilhouette():
                 q[:2] = 10**q[:2]
                 q[p_fixed != None] = p_fixed[p_fixed != None].copy()
                 chi2 = np.nansum(((vobs - makemodel(*q)) / vobserr)**2)
+                chi2 = chi2 / Npixperbeam
                 return -0.5 * chi2
             plim = np.array([Mstar_range, Rc_range, alphainfall_range, cavityangle_range])
             plim[:2] = np.log10(plim[:2])
