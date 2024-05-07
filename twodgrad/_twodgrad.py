@@ -422,6 +422,7 @@ class TwoDGrad():
             Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
             dMstar = Mstar * np.sqrt((drb / rb)**2 + (2 * dvb / vb)**2)
             self.popt = popt
+            self.perr = perr
             self.Mstar = Mstar
             self.dMstar = dMstar
             print(f'vsys = {vsys:.3f} +/- {dvsys:.3f}')
