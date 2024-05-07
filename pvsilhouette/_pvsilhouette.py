@@ -334,6 +334,10 @@ class PVSilhouette():
             plow[p_fixed == None] = mcmc[1]
             plow[:2] = 10**plow[:2]
             plow[p_fixed != None] = p_fixed[p_fixed != None].copy()
+            pmid = p_fixed.copy()
+            pmid[p_fixed == None] = mcmc[2]
+            pmid[:2] = 10**pmid[:2]
+            pmid[p_fixed != None] = p_fixed[p_fixed != None].copy()
             phigh = p_fixed.copy()
             phigh[p_fixed == None] = mcmc[3]
             phigh[:2] = 10**phigh[:2]
@@ -341,14 +345,16 @@ class PVSilhouette():
         else:
             popt = p_fixed
             plow = p_fixed
+            pmid = p_fixed
             phigh = p_fixed
         self.popt = popt
         self.plow = plow
+        self.pmid = pmid
         self.phigh = phigh
-        print(f'M* = {plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} Msun')
-        print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
-        print(f'alpha = {plow[2]:.2f}, {popt[2]:.2f}, {phigh[2]:.2f}')
-        print(f'angle = {plow[3]:.1f}, {popt[3]:.1f}, {phigh[3]:.1f}')
+        print(f'M* = {popt[0]} ({plow[0]:.2f}|{pmid[0]:.2f}|{phigh[0]:.2f}) Msun')
+        print(f'Rc = {popt[1]} ({plow[1]:.0f}|{pmid[1]:.0f}|{phigh[1]:.0f}) au')
+        print(f'alpha = {popt[2]} ({plow[2]:.2f}|{pmid[2]:.2f}|{phigh[2]:.2f})')
+        print(f'angle = {popt[3]} ({plow[3]:.1f}|{pmid[3]:.1f}|{phigh[3]:.1f}) deg')
 
         a = velmax(self.x, Mstar=popt[0], Rc=popt[1],
                    alphainfall=popt[2], cavityangle=popt[3], incl=incl)
