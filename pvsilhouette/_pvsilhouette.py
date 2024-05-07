@@ -258,13 +258,13 @@ class PVSilhouette():
         for d in [majintp.T, minintp.T]:
             vtmp = []
             dvtmp = []
-            for c in d:
+            for c, xtemp in zip(d, x):
                 grad = (np.roll(c, -1) - np.roll(c, 1)) / (2 * dvintp)
                 cond = (c > cutoff * self.sigma)
                 cond = cond * ((vintp < vmask[0]) + (vmask[1] < vintp))
                 grad, vgood = grad[cond], vintp[cond]
                 err = self.sigma / np.abs(grad)
-                if len(vgood) == 0:
+                if len(vgood) == 0 or np.abs(xtemp) < self.bmaj / 2:
                     vtmp.append([np.nan, np.nan])
                     dvtmp.append([np.nan, np.nan])
                 else:
