@@ -360,7 +360,7 @@ class PVSilhouette():
         print(f'Rc = {popt[1]:.0f} ({plow[1]:.0f}|{pmid[1]:.0f}|{phigh[1]:.0f}) au')
         print(f'alpha = {popt[2]:.2f} ({plow[2]:.2f}|{pmid[2]:.2f}|{phigh[2]:.2f})')
         print(f'angle = {popt[3]:.1f} ({plow[3]:.1f}|{pmid[3]:.1f}|{phigh[3]:.1f}) deg')
-        print(f'angle = {popt[4]:.1f} ({plow[4]:.1f}|{pmid[4]:.1f}|{phigh[4]:.1f}) deg')
+        print(f'vsys = {popt[4]:.1f} ({plow[4]:.1f}|{pmid[4]:.1f}|{phigh[4]:.1f}) km/s')
 
         a = velmax(self.x, Mstar=popt[0], Rc=popt[1],
                    alphainfall=popt[2], cavityangle=popt[3], incl=incl)
