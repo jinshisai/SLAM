@@ -305,7 +305,7 @@ class PVSilhouette():
                             cavityangle_fixed, vsys_fixed])
         if None in p_fixed:
             labels = np.array(['log Mstar', 'log Rc', r'$\alpha_{\rm inf}$',
-                               r'$\theta_{\rm cav} (deg)$', r'$V_{rm sys}$ (km/s)'])
+                               r'$\theta_{\rm cav} (deg)$', r'$V_{\rm sys}$ (km/s)'])
             labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':8, 'nburnin':200, 'nsteps':500,
                        'rangelevel':None, 'labels':labels,
