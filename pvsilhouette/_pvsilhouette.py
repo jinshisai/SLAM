@@ -391,10 +391,6 @@ class PVSilhouette():
             ax.errorbar(s, y, yerr=yerr, fmt='ob', ms=2)
         ax.set_xlabel('minor offset (au)')
         ax.set_ylim(self.v.min(), self.v.max())
-        ax.set_title(r'$M_{*}$'+f'={popt[0]:.2f}'+r'$M_{\odot}$'
-            +', '+r'$R_{c}$'+f'={popt[1]:.0f} au'
-            +'\n'+r'$\alpha$'+f'={popt[2]:.2f}'
-            +', '+r'$\theta$'+f'={popt[3]:.1f}'+r'$^{\circ}$')
         fig.tight_layout()
         fig.savefig(figname + '.model.png')
         if show: plt.show()
