@@ -234,10 +234,12 @@ class PVSilhouette():
                 Rc_range: list = [1, 1000],
                 alphainfall_range: list = [0.01, 1],
                 cavityangle_range: list = [0, 90],
+                vsys_range: list = [-0.5, 0.5],
                 Mstar_fixed: float = None,
                 Rc_fixed: float = None,
                 alphainfall_fixed: float = None,
                 cavityangle_fixed: float = None,
+                vsys_fixed: float = None,
                 cutoff: float = 5, vmask: list = [0, 0],
                 figname: str = 'PVsilhouette',
                 show: bool = False,
@@ -292,17 +294,18 @@ class PVSilhouette():
             signmajor = getsign(self.dpvmajor)
         if signminor is None:
             signminor = getsign(self.dpvminor) * (-1)
-        def makemodel(Mstar, Rc, alphainfall, cavityangle):
+        def makemodel(Mstar, Rc, alphainfall, cavityangle, vsys):
             a = velmax(x, Mstar=Mstar, Rc=Rc, alphainfall=alphainfall,
                        cavityangle=cavityangle, incl=incl)
             vmod = [[a[i][j][::k] for j in ['vlosmin', 'vlosmax']]
                     for i, k in zip(['major', 'minor'], [signmajor, signminor])]
-            return np.array(vmod)
+            return np.array(vmod) + vsys
 
-        p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed, cavityangle_fixed])
+        p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed,
+                            cavityangle_fixed, vsys_fixed])
         if None in p_fixed:
             labels = np.array(['log Mstar', 'log Rc', r'$\alpha_{\rm inf}$',
-                               r'$\theta_{\rm cav} (deg)$'])
+                               r'$\theta_{\rm cav} (deg)$', r'$V_{rm sys}$ (km/s)'])
             labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':8, 'nburnin':200, 'nsteps':500,
                        'rangelevel':None, 'labels':labels,
@@ -356,9 +359,11 @@ class PVSilhouette():
         print(f'Rc = {popt[1]:.0f} ({plow[1]:.0f}|{pmid[1]:.0f}|{phigh[1]:.0f}) au')
         print(f'alpha = {popt[2]:.2f} ({plow[2]:.2f}|{pmid[2]:.2f}|{phigh[2]:.2f})')
         print(f'angle = {popt[3]:.1f} ({plow[3]:.1f}|{pmid[3]:.1f}|{phigh[3]:.1f}) deg')
+        print(f'angle = {popt[4]:.1f} ({plow[4]:.1f}|{pmid[4]:.1f}|{phigh[4]:.1f}) deg')
 
         a = velmax(self.x, Mstar=popt[0], Rc=popt[1],
                    alphainfall=popt[2], cavityangle=popt[3], incl=incl)
+        a = a + popt[4]
         fig = plt.figure()
         ax = fig.add_subplot(1, 2, 1)
         ax.contour(self.x, self.v, self.dpvmajor,
