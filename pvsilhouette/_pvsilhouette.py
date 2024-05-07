@@ -351,10 +351,10 @@ class PVSilhouette():
         self.plow = plow
         self.pmid = pmid
         self.phigh = phigh
-        print(f'M* = {popt[0]} ({plow[0]:.2f}|{pmid[0]:.2f}|{phigh[0]:.2f}) Msun')
-        print(f'Rc = {popt[1]} ({plow[1]:.0f}|{pmid[1]:.0f}|{phigh[1]:.0f}) au')
-        print(f'alpha = {popt[2]} ({plow[2]:.2f}|{pmid[2]:.2f}|{phigh[2]:.2f})')
-        print(f'angle = {popt[3]} ({plow[3]:.1f}|{pmid[3]:.1f}|{phigh[3]:.1f}) deg')
+        print(f'M* = {popt[0]:.2f} ({plow[0]:.2f}|{pmid[0]:.2f}|{phigh[0]:.2f}) Msun')
+        print(f'Rc = {popt[1]:.0f} ({plow[1]:.0f}|{pmid[1]:.0f}|{phigh[1]:.0f}) au')
+        print(f'alpha = {popt[2]:.2f} ({plow[2]:.2f}|{pmid[2]:.2f}|{phigh[2]:.2f})')
+        print(f'angle = {popt[3]:.1f} ({plow[3]:.1f}|{pmid[3]:.1f}|{phigh[3]:.1f}) deg')
 
         a = velmax(self.x, Mstar=popt[0], Rc=popt[1],
                    alphainfall=popt[2], cavityangle=popt[3], incl=incl)
