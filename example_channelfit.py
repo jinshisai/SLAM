@@ -19,7 +19,7 @@ if __name__ == '__main__':
     chan = ChannelFit(scaling='mom0ft', progressbar=True)
     chan.makegrid(cubefits=cubefits, center=center, pa=pa, incl=incl,
                   vsys=vsys, dist=dist, sigma=sigma, rmax=rmax, vlim=vlim,
-                  autoskip=True,  # autoskip=True will resample the pixels if the beam minor axis > 10 pixels.
+                  autoskip=True,  # autoskip=True will resample the pixels if the beam minor axis > 8 pixels.
                   )
     chan.fitting(Mstar_range=[0.01, 1.0],
                  Mstar_fixed=None,
