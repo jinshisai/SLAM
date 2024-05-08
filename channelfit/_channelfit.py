@@ -431,6 +431,7 @@ class ChannelFit():
         self.Xnest = np.array(Xnest)
         self.Ynest = np.array(Ynest)
         self.Xnest, self.Ynest = rot(self.Xnest, self.Ynest, pa_rad)
+        print('{len(xnest) channels will be fitted.}')
         print('-------- nested grid --------')
         for l in range(len(xnest)):
             print(f'x, dx, npix: +/-{xnest[l][-1]:.2f},'
