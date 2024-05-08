@@ -379,8 +379,8 @@ class TwoDGrad():
         
 
     def calc_mstar(self, incl: float = 90,
-                   vsys_range: list = [-0.5, 0.5],
-                   vsys_fixed: float = None,
+                   voff_range: list = [-0.5, 0.5],
+                   voff_fixed: float = None,
                    minabserr: float = 0.1, minrelerr: float = 0.01):
         self.incl = incl
         xc = self.kepler['xc'] * 1
@@ -410,7 +410,7 @@ class TwoDGrad():
             self.Rkep = Rkep
             self.Vkep = Vkep
             def lnprob(p):
-                if vsys_fixed is None:
+                if voff_fixed is None:
                     r_break, v_break, dp, vsys = p
                 else:
                     r_break, v_break, dp = p
@@ -419,14 +419,14 @@ class TwoDGrad():
                                         p_in=0.5, dp=dp, vsys=vsys)
                 chi2 = np.sum(((r - s_model * r_model) / dr)**2)
                 return -0.5 * chi2
-            plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0, vsys_range[0]],
-                             [np.max(np.abs(r)), np.max(np.abs(v)), 10, vsys_range[1]]])
+            plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0, voff_range[0]],
+                             [np.max(np.abs(r)), np.max(np.abs(v)), 10, voff_range[1]]])
             popt, perr = emcee_custom(plim, lnprob, False)
-            if vsys_fixed is not None:
+            if voff_fixed is not None:
                 popt = np.r_[popt, 0]
                 perr = np.r_[perr, 0]
-            rb, vb, dp, vsys = popt
-            drb, dvb, ddp, dvsys = perr
+            rb, vb, dp, voff = popt
+            drb, dvb, ddp, dvoff = perr
             Mstar = rb * vb**2 * unit / np.sin(np.radians(incl))**2
             Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
             dMstar = Mstar * np.sqrt((drb / rb)**2 + (2 * dvb / vb)**2)
@@ -434,7 +434,7 @@ class TwoDGrad():
             self.perr = perr
             self.Mstar = Mstar
             self.dMstar = dMstar
-            print(f'voff = {vsys:.3f} +/- {dvsys:.3f}')
+            print(f'voff = {voff:.3f} +/- {dvoff:.3f}')
             print(f'pout = {dp+0.5:.3f} +/- {ddp:.3f}')
             print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun (1/0.76 corrected)')
         
