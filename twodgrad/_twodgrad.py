@@ -379,6 +379,8 @@ class TwoDGrad():
         
 
     def calc_mstar(self, incl: float = 90,
+                   vsys_range: list = [-0.5, 0.5],
+                   vsys_fixed: float = None,
                    minabserr: float = 0.1, minrelerr: float = 0.01):
         self.incl = incl
         xc = self.kepler['xc'] * 1
@@ -408,14 +410,21 @@ class TwoDGrad():
             self.Rkep = Rkep
             self.Vkep = Vkep
             def lnprob(p):
-                r_break, v_break, dp, vsys = p
+                if vsys_fixed is None:
+                    r_break, v_break, dp, vsys = p
+                else:
+                    r_break, v_break, dp = p
+                    vsys = 0
                 r_model = doublepower_r(v=v, r_break=r_break, v_break=v_break,
                                         p_in=0.5, dp=dp, vsys=vsys)
                 chi2 = np.sum(((r - s_model * r_model) / dr)**2)
                 return -0.5 * chi2
-            plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0, -0.5],
-                             [np.max(np.abs(r)), np.max(np.abs(v)), 10, 0.5]])
+            plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0, vsys_range[0]],
+                             [np.max(np.abs(r)), np.max(np.abs(v)), 10, vsys_range[1]]])
             popt, perr = emcee_custom(plim, lnprob, False)
+            if vsys_fixed is not None:
+                popt = np.r_[popt, 0]
+                perr = np.r_[perr, 0]
             rb, vb, dp, vsys = popt
             drb, dvb, ddp, dvsys = perr
             Mstar = rb * vb**2 * unit / np.sin(np.radians(incl))**2
