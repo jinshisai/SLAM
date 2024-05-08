@@ -434,7 +434,7 @@ class TwoDGrad():
             self.perr = perr
             self.Mstar = Mstar
             self.dMstar = dMstar
-            print(f'vsys = {vsys:.3f} +/- {dvsys:.3f}')
+            print(f'voff = {vsys:.3f} +/- {dvsys:.3f}')
             print(f'pout = {dp+0.5:.3f} +/- {ddp:.3f}')
             print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun (1/0.76 corrected)')
         
