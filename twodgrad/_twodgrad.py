@@ -421,6 +421,8 @@ class TwoDGrad():
                 return -0.5 * chi2
             plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0, voff_range[0]],
                              [np.max(np.abs(r)), np.max(np.abs(v)), 10, voff_range[1]]])
+            if voff_fixed is not None:
+                plim = plim[:, :-1]
             popt, perr = emcee_custom(plim, lnprob, False)
             if voff_fixed is not None:
                 popt = np.r_[popt, 0]
