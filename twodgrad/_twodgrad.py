@@ -575,7 +575,7 @@ class TwoDGrad():
             vp = np.geomspace(vp.min(), vp.max(), 100)
             r_break, v_break, dp, vsys = self.popt
             rp = doublepower_r(vp, r_break, v_break, 0.5, dp, 0)
-            ax.plot(rp, vp, 'm-', zorder=4)
+            ax.plot(rp, vp, 'g-', zorder=4)
         ax.set_xscale('log')
         ax.set_yscale('log')
         def nice_ticks(ticks, tlim):
