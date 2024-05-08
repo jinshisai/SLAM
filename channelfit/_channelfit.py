@@ -359,14 +359,15 @@ class ChannelFit():
                                xskip, yskip, sigma)
             dpix = min([np.abs(self.dx), np.abs(self.dy)])
             if autoskip:
-                iskip = int(self.bmin / (dpix / xskip) / 5)
+                iskip = int(self.bmin / (dpix / xskip) / 4)
                 self.read_cubefits(cubefits, center, dist, vsys,
                                    -rmax, rmax, -rmax, rmax, None, None,
                                    iskip, iskip, sigma)
                 dpix = min([np.abs(self.dx), np.abs(self.dy)])
+                ibmaj = self.bmaj / dpix
                 ibmin = self.bmin / dpix
                 print(f'Adopt xskip={iskip:d} and yskip={iskip:d}.')
-                print(f'Beam minor axis is {ibmin:.1f} pixels.')
+                print(f'Beam major/minor axis is {ibmaj:.1f}/{ibmin:.1f} pixels.')
             v = self.v
         self.incl0 = incl
         self.update_incl(incl)
