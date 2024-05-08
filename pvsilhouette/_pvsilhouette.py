@@ -234,12 +234,12 @@ class PVSilhouette():
                 Rc_range: list = [1, 1000],
                 alphainfall_range: list = [0.01, 1],
                 cavityangle_range: list = [0, 90],
-                vsys_range: list = [-0.5, 0.5],
+                voff_range: list = [-0.5, 0.5],
                 Mstar_fixed: float = None,
                 Rc_fixed: float = None,
                 alphainfall_fixed: float = None,
                 cavityangle_fixed: float = None,
-                vsys_fixed: float = None,
+                voff_fixed: float = None,
                 cutoff: float = 5, vmask: list = [0, 0],
                 figname: str = 'PVsilhouette',
                 show: bool = False,
@@ -294,15 +294,15 @@ class PVSilhouette():
             signmajor = getsign(self.dpvmajor)
         if signminor is None:
             signminor = getsign(self.dpvminor) * (-1)
-        def makemodel(Mstar, Rc, alphainfall, cavityangle, vsys):
+        def makemodel(Mstar, Rc, alphainfall, cavityangle, voff):
             a = velmax(x, Mstar=Mstar, Rc=Rc, alphainfall=alphainfall,
                        cavityangle=cavityangle, incl=incl)
             vmod = [[a[i][j][::k] for j in ['vlosmin', 'vlosmax']]
                     for i, k in zip(['major', 'minor'], [signmajor, signminor])]
-            return np.array(vmod) + vsys
+            return np.array(vmod) + voff
 
         p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed,
-                            cavityangle_fixed, vsys_fixed])
+                            cavityangle_fixed, voff_fixed])
         if None in p_fixed:
             labels = np.array(['log Mstar', 'log Rc', r'$\alpha_{\rm inf}$',
                                r'$\theta_{\rm cav} (deg)$', r'$V_{\rm sys}$ (km/s)'])
@@ -327,7 +327,7 @@ class PVSilhouette():
                 chi2 = chi2 / Npixperbeam
                 return -0.5 * chi2
             plim = np.array([Mstar_range, Rc_range, alphainfall_range,
-                             cavityangle_range, vsys_range])
+                             cavityangle_range, voff_range])
             plim[:2] = np.log10(plim[:2])
             plim = plim[p_fixed == None].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
@@ -360,17 +360,17 @@ class PVSilhouette():
         print(f'Rc = {popt[1]:.0f} ({plow[1]:.0f}|{pmid[1]:.0f}|{phigh[1]:.0f}) au')
         print(f'alpha = {popt[2]:.2f} ({plow[2]:.2f}|{pmid[2]:.2f}|{phigh[2]:.2f})')
         print(f'angle = {popt[3]:.1f} ({plow[3]:.1f}|{pmid[3]:.1f}|{phigh[3]:.1f}) deg')
-        print(f'vsys = {popt[4]:.1f} ({plow[4]:.1f}|{pmid[4]:.1f}|{phigh[4]:.1f}) km/s')
+        print(f'voff = {popt[4]:.1f} ({plow[4]:.1f}|{pmid[4]:.1f}|{phigh[4]:.1f}) km/s')
 
         a = velmax(self.x, Mstar=popt[0], Rc=popt[1],
                    alphainfall=popt[2], cavityangle=popt[3], incl=incl)
-        vsys = popt[4]
+        voff = popt[4]
         fig = plt.figure()
         ax = fig.add_subplot(1, 2, 1)
         ax.contour(self.x, self.v, self.dpvmajor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x, a['major']['vlosmax'][::signmajor] + vsys, '-r')
-        ax.plot(self.x, a['major']['vlosmin'][::signmajor] + vsys, '-r')
+        ax.plot(self.x, a['major']['vlosmax'][::signmajor] + voff, '-r')
+        ax.plot(self.x, a['major']['vlosmin'][::signmajor] + voff, '-r')
         for i in [0, 1]:
             y, yerr = vobs[0][i], vobserr[0][i]
             cond = ~np.isnan(y)
@@ -382,8 +382,8 @@ class PVSilhouette():
         ax = fig.add_subplot(1, 2, 2)
         ax.contour(self.x, self.v, self.dpvminor,
                    levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x, a['minor']['vlosmax'][::signminor] + vsys, '-r')
-        ax.plot(self.x, a['minor']['vlosmin'][::signminor] + vsys, '-r')
+        ax.plot(self.x, a['minor']['vlosmax'][::signminor] + voff, '-r')
+        ax.plot(self.x, a['minor']['vlosmin'][::signminor] + voff, '-r')
         for i in [0, 1]:
             y, yerr = vobs[1][i], vobserr[1][i]
             cond = ~np.isnan(y)
