@@ -454,7 +454,8 @@ class TwoDGrad():
 
     def plot_center(self, pa: float = None,
                      filehead: str = 'channelanalysis',
-                     show_figs: bool = False):
+                     show_figs: bool = False,
+                     title: str = None):
         plt.rcParams['font.size'] = 20
         plt.rcParams['axes.linewidth'] = 1.5
         plt.rcParams['xtick.direction'] = 'out'
@@ -523,6 +524,8 @@ class TwoDGrad():
         ax.set_xlim(xmax * 1.001, -xmax * 1.001)  # au
         ax.set_ylim(-ymax * 1.001, ymax * 1.001)  # au
         ax.grid()
+        if title is not None:
+            ax.set_title(title)
         fig.tight_layout()
         fig.savefig(filehead + '.radec.png', transparent=True)
         if show_figs: plt.show()
@@ -599,6 +602,8 @@ class TwoDGrad():
         ax.set_xlabel('Offset along vel. grad. (au)')
         ax.set_ylabel(r'Velocity (km s$^{-1}$)')
         ax.grid()
+        if title is not None:
+            ax.set_title(title)
         fig.tight_layout()
         fig.savefig(filehead + '.majvel.png', transparent=True)
         if show_figs: plt.show()
