@@ -248,7 +248,8 @@ class PVSilhouette():
                 minabserr: float = 0.1,
                 minrelerr: float = 0.01,
                 signmajor: int = None,
-                signminor: int = None):
+                signminor: int = None,
+                title: str = None):
         Npixperbeam = np.sqrt(np.pi / 4 / np.log(2)) * self.bmaj / self.dx
         x = self.x
         vintp = np.linspace(self.v[0], self.v[-1], (len(self.v) - 1) * 10 + 1)
@@ -391,6 +392,8 @@ class PVSilhouette():
             ax.errorbar(s, y, yerr=yerr, fmt='ob', ms=2)
         ax.set_xlabel('minor offset (au)')
         ax.set_ylim(self.v.min(), self.v.max())
+        if title is not None:
+            fig.suptitle(title)
         fig.tight_layout()
         fig.savefig(figname + '.model.png')
         if show: plt.show()
