@@ -548,7 +548,7 @@ class TwoDGrad():
             v0 = np.exp(np.mean(np.log(v[kep])))
             ratiox = np.exp(np.max(np.abs(np.log(x[kep] / x0))))
             ratiov = np.exp(np.max(np.abs(np.log(v[kep] / v0))))
-            ratio = max(ratiox, ratiov, 4)
+            ratio = max(ratiox, ratiov, 3.2)
             xmin = x0 / ratio
             xmax = x0 * ratio
             vmin = v0 / ratio
