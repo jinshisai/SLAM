@@ -48,9 +48,7 @@ def velrho(radius, theta, alphainfall: float = 1, cavityangle: float = 0,
     
     if withkepler:
         R = radius * np.sin(theta)
-        z = np.abs(radius * np.cos(theta))
-        c = z < 0.3 * (R / 0.5)**1.25  # z < 3H
-        c = c * (R < 1)
+        c = (R < 1) * (np.tan(np.abs(theta - 0.5 * np.pi)) < 0.3)  # z/R < 0.3
         vkep = kepvel(radius, theta)
         vr[c] = vkep[0][c]
         vt[c] = vkep[1][c]
