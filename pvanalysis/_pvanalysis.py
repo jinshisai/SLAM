@@ -806,6 +806,11 @@ class PVAnalysis():
                       include_pin: bool = False,
                       fixed_pin: float = 0.5,
                       fixed_dp: float = 0,
+                      rb_range: list = None,
+                      vb_range: list = None,
+                      pin_range: list = [0.01, 10],
+                      dp_range: list = [0, 10],
+                      vsys_range: list = [-1, 1],
                       outname: str = 'pvanalysis',
                       rangelevel: float = 0.8,
                       show_corner: bool = False,
@@ -824,6 +829,16 @@ class PVAnalysis():
                pin = fixed_pin if include_pix is False. pin = 0.5 means the Keplerian law.
             fixed_dp : float
                dp = fixed_dp if include_dp is False. dp = 0 means a single-power fitting.
+            rb_range : list
+                The prior range. None means the r range the obtained edge/ridge points.
+            vb_range : list
+                The prior range. None means the v range the obtained edge/ridge points.
+            pin_range : list
+                The prior range. Defaults to [0.01, 10].
+            dp_range : list
+                The prior range. Defaults to [0, 10].
+            vsys_range : list
+                The prior range. Defaults to [-1, 1].
             outname : str
                The output corner figures have names of "outname".corner_e.png
                and "outname".corner_r.png.
@@ -872,9 +887,11 @@ class PVAnalysis():
         minabs = lambda a, i, j: np.min(np.abs(np.r_[a[i], a[j]]))
         maxabs = lambda a, i, j: np.max(np.abs(np.r_[a[i], a[j]]))
         for args, ext, res in zip([Es, Rs], ['_e', '_r'], [popt_e, popt_r]):
-            plim = np.array([
-                   [minabs(args, 1, 3), minabs(args, 0, 4), 0.01, 0, -1],
-                   [maxabs(args, 1, 3), maxabs(args, 0, 4), 10.0, 10, 1]])
+            if rb_range is None:
+                rb_range = [minabs(args, 1, 3), maxabs(args, 1, 3)]
+            if vb_range is None:
+                vb_range = [minabs(args, 0, 4), maxabs(args, 0, 4)]
+            plim = np.transpose([rb_range, vb_range, pin_range, dp_range, vsys_range])
             q0 = np.array([0, np.sqrt(plim[0][1] * plim[1][1]),
                            fixed_pin, fixed_dp, 0])
             q0 = np.where(include, np.nan, q0)
