@@ -294,8 +294,8 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
         #gaussbeam = np.exp(- 0.5 * (v /(linewidth / 2.35))**2.)
         gaussbeam = np.exp(- v**2. / linewidth**2.)
         gaussbeam /= np.sum(gaussbeam)
-        #I_cube = convolve(I_cube, np.array([[gaussbeam]]).T, mode='same')
-        tau_v = convolve(tau_v, np.array([[gaussbeam]]).T, mode='same')
+        tau_v = convolve(tau_v, 
+        np.array([[gaussbeam]]).T, mode='same') # conserve integrated value
 
     I_cube = fscale * ( 1. - np.exp(-tau_v) ) # fscale = (Bv(Tex) - Bv(Tbg))
     #I_cube = fscale * tau_v # optically thin
