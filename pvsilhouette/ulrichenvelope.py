@@ -220,7 +220,7 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
     pa (float): Position angle (deg).
     beam (list): List of beam information. Must be [major FWHM, minor FWHM, PA]
                  in units of [arcsec, arcsec, deg].
-    linewidth (float): FWHM of the line broadening (km/s).
+    linewidth (float): The Doppler line broadening (km/s).
     rout (float): Envelope outer radius to make the envelope shape spherical (au).
     axis (str): PV cut axis. Must be major or minor.
     coeff_tau (float): A conversion coefficient from the column density 
@@ -291,7 +291,8 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
 
     # convolution along the spectral direction
     if linewidth is not None:
-        gaussbeam = np.exp(- 0.5 * (v /(linewidth / 2.35))**2.)
+        #gaussbeam = np.exp(- 0.5 * (v /(linewidth / 2.35))**2.)
+        gaussbeam = np.exp(- v**2. / linewidth**2.)
         gaussbeam /= np.sum(gaussbeam)
         #I_cube = convolve(I_cube, np.array([[gaussbeam]]).T, mode='same')
         tau_v = convolve(tau_v, np.array([[gaussbeam]]).T, mode='same')
