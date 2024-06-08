@@ -290,9 +290,9 @@ class TwoDGrad():
             sd2 = np.clip(np.nanmean(d**2), 1e-10, None)
             a = x**2 / sx2 + y**2 / sy2 + d**2 / sd2
             if fixcenter:
-                return a > 6.65  # 3.84, 6.65, 8.81 covers 95, 99, 99.7%
+                return a > 3.84  # 3.84, 6.65, 8.81 covers 95, 99, 99.7%
             else:
-                return a > 11.35  # 7.82, 11.35, 13.94 covers 95, 99, 99.7%
+                return a > 7.82  # 7.82, 11.35, 13.94 covers 95, 99, 99.7%
 
         def chi2(p, x_in, y_in, dx_in, dy_in):
             xoff, yoff, pa = p
