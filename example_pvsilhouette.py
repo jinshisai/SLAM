@@ -20,14 +20,19 @@ show_figs = True
 '-------- HOW TO DO EACH STEP --------'
 filehead = pvmajorfits.replace('.pvmajor.fits', '')
 pvsil = PVSilhouette()
-#pvsil.get_PV(cubefits=cubefits, center=center, pa=pa,
-#             vsys=vsys, dist=dist, sigma=sigma,
-#             rmax=rmax, vmax=vmax, show=False)
 pvsil.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
              dist=dist, vsys=vsys, rmax=rmax, vmin=vlim[0], vmax=vlim[1],
              sigma=sigma)
-pvsil.fitting(incl=incl, Mstar_range=[0.01, 10], Rc_range=[1, 1000],
-              alphainfall_range=[0.01, 1],
-              Mstar_fixed=None, Rc_fixed=None, alphainfall_fixed=None,
-              cutoff=5, show=show_figs, figname=filehead, vmask=vmask)
+pvsil.fitting(incl=incl,
+              Mstar_range=[0.01, 10],
+              Rc_range=[1, 1000],
+              cavityangle_range=[0, 90],
+              alphainfall_fixed=1,
+              voff_fixed=0,
+              cutoff=cutoff, show=show_figs, figname=filehead, vmask=vmask,
+              kwargs_emcee_corner={'nwalkers_per_ndim':4,
+                                   'nburnin':100,
+                                   'nsteps':300,
+                                   'rangelevel':1.0},
+              progressbar=True, signmajor=1, signminor=1)
 '-------------------------------------'
