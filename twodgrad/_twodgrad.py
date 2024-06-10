@@ -431,7 +431,7 @@ class TwoDGrad():
             drb, dvb, ddp, dvoff = perr
             Mstar = rb * vb**2 * unit / np.sin(np.radians(incl))**2
             Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-            dMstar = Mstar * np.sqrt((drb * vb**2 * unit / (Mstar * np.sin(np.radians(incl))**2))**2 + 2 * (dvb / vb)**2)
+            dMstar = Mstar * np.sqrt(2 * (dvb / vb)**2)
             self.popt = popt
             self.perr = perr
             self.Mstar = Mstar
