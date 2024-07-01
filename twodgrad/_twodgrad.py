@@ -51,6 +51,12 @@ def emcee_custom(plim, lnprob, fixcenter):
        perr = np.array([0, 0, perr[0]])
     return popt, perr
 
+def r_kep_out(v, M_p, v_break, p_low, vsys):
+    v_s, v_a = np.sign(v - vsys), np.abs(v - vsys)
+    p = 0.5 + (p_low - 0.5) * (1 + np.sign(v_break - v_a)) / 2.
+    r_break = M_p / v_break**2
+    return v_s * r_break * (v_a / v_break)**(-1 / p)
+
 
 class TwoDGrad():
 
@@ -383,6 +389,7 @@ class TwoDGrad():
                    voff_fixed: float = None,
                    minabserr: float = 0.1, minrelerr: float = 0.01):
         self.incl = incl
+        sini2 = np.sin(np.radians(incl))**2
         xc = self.kepler['xc'] * 1
         yc = self.kepler['yc'] * 1
         dxc = self.kepler['dxc'] * 1
@@ -411,33 +418,36 @@ class TwoDGrad():
             self.Vkep = Vkep
             def lnprob(p):
                 if voff_fixed is None:
-                    r_break, v_break, dp, vsys = p
+                    M_p, v_break, p_low, vsys = p
                 else:
-                    r_break, v_break, dp = p
+                    M_p, v_break, p_low = p
                     vsys = 0
-                r_model = doublepower_r(v=v, r_break=r_break, v_break=v_break,
-                                        p_in=0.5, dp=dp, vsys=vsys)
+                r_model =  r_kep_out(v, M_p, v_break, p_low, vsys)
                 chi2 = np.sum(((r - s_model * r_model) / dr)**2)
                 return -0.5 * chi2
-            plim = np.array([[np.min(np.abs(r)), np.min(np.abs(v)), 0, voff_range[0]],
-                             [np.max(np.abs(r)), np.max(np.abs(v)), 10, voff_range[1]]])
+            Mmin = np.min(np.abs(r)) * np.min(np.abs(v))**2
+            Mmax = np.max(np.abs(r)) * np.max(np.abs(v))**2
+            plim = np.array([[Mmin, np.min(np.abs(v)), -10, voff_range[0]],
+                             [Mmax, np.max(np.abs(v)), 10, voff_range[1]]])
             if voff_fixed is not None:
                 plim = plim[:, :-1]
             popt, perr = emcee_custom(plim, lnprob, False)
             if voff_fixed is not None:
                 popt = np.r_[popt, 0]
                 perr = np.r_[perr, 0]
-            rb, vb, dp, voff = popt
-            drb, dvb, ddp, dvoff = perr
-            Mstar = rb * vb**2 * unit / np.sin(np.radians(incl))**2
+            M_p, vb, p_low, voff = popt
+            dM_p, dvb, dp_low, dvoff = perr
+            Mstar = M_p * unit / sini2
+            dMstar = dM_p * unit / sini2
             Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
-            dMstar = Mstar * np.sqrt(2 * (dvb / vb)**2)
+            dMstar /= 0.760
             self.popt = popt
             self.perr = perr
             self.Mstar = Mstar
             self.dMstar = dMstar
             print(f'voff = {voff:.3f} +/- {dvoff:.3f}')
-            print(f'pout = {dp+0.5:.3f} +/- {ddp:.3f}')
+            print(f'vb = {vb:.3f} +/- {dvb:.3f}')
+            print(f'pout = {p_low:.3f} +/- {dp_low:.3f}')
             print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun (1/0.76 corrected)')
         
 
@@ -576,8 +586,8 @@ class TwoDGrad():
         if ~np.isnan(self.Mstar):
             vp = np.abs(v[~np.isnan(x)])
             vp = np.geomspace(vp.min(), vp.max(), 100)
-            r_break, v_break, dp, vsys = self.popt
-            rp = doublepower_r(vp, r_break, v_break, 0.5, dp, 0)
+            M_p, v_break, p_low, _ = self.popt
+            rp = r_kep_out(vp, M_p, v_break, p_low, 0)
             ax.plot(rp, vp, 'g-', zorder=4)
         ax.set_xscale('log')
         ax.set_yscale('log')
