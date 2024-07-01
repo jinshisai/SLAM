@@ -53,9 +53,9 @@ def emcee_custom(plim, lnprob, fixcenter):
 
 def r_kep_out(v, M_p, v_break, p_low, vsys):
     v_s, v_a = np.sign(v - vsys), np.abs(v - vsys)
-    p = 0.5 + (p_low - 0.5) * (1 + np.sign(v_break - v_a)) / 2.
+    p = 2. + (p_low - 2.) * (1 + np.sign(v_break - v_a)) / 2.
     r_break = M_p / v_break**2
-    return v_s * r_break * (v_a / v_break)**(-1 / p)
+    return v_s * r_break * (v_a / v_break)**(-p)
 
 
 class TwoDGrad():
@@ -441,6 +441,8 @@ class TwoDGrad():
             dMstar = dM_p * unit / sini2
             Mstar /= 0.760  # Appendix A in Aso+15_ApJ_812_27
             dMstar /= 0.760
+            p_low = 1 / p_low
+            dp_low = p_low**2 * dp_low
             self.popt = popt
             self.perr = perr
             self.Mstar = Mstar
