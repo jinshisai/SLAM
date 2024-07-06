@@ -359,7 +359,7 @@ class ChannelFit():
                                xskip, yskip, sigma)
             dpix = min([np.abs(self.dx), np.abs(self.dy)])
             if autoskip:
-                iskip = int(self.bmin / (dpix / xskip) / 4)
+                iskip = int(self.bmin / (dpix / xskip) / 5)
                 self.read_cubefits(cubefits, center, dist, vsys,
                                    -rmax, rmax, -rmax, rmax, None, None,
                                    iskip, iskip, sigma)
