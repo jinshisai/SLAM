@@ -18,9 +18,7 @@ if __name__ == '__main__':
     filehead = cubefits.replace('.fits', '')
     chan = ChannelFit(scaling='mom0ft', progressbar=True)
     chan.makegrid(cubefits=cubefits, center=center, pa=pa, incl=incl,
-                  vsys=vsys, dist=dist, sigma=sigma, rmax=rmax, vlim=vlim,
-                  autoskip=True,  # autoskip=True will resample the pixels if the beam minor axis > 8 pixels.
-                  )
+                  vsys=vsys, dist=dist, sigma=sigma, rmax=rmax, vlim=vlim)
     chan.fitting(Mstar_range=[0.01, 1.0],
                  Mstar_fixed=None,
                  Rc_range=[3, 300],

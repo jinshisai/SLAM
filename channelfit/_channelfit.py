@@ -349,7 +349,7 @@ class ChannelFit():
                  center: str = None, vsys: float = 0,
                  rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
                  sigma: float = None, nlayer: int = 3,
-                 xskip: int = 1, yskip: int = 1, autoskip: bool = False,
+                 xskip: int = 1, yskip: int = 1, skipto: bool = False,
                  gaussmargin: float = 1.6,
                  savedeconvolved: str = None, loaddeconvolved: str = None,
                  signmajor: int = None, signminor: int = None):
@@ -358,8 +358,8 @@ class ChannelFit():
                                -rmax, rmax, -rmax, rmax, None, None,
                                xskip, yskip, sigma)
             dpix = min([np.abs(self.dx), np.abs(self.dy)])
-            if autoskip:
-                iskip = int(self.bmin / (dpix / xskip) / 5)
+            if type(skipto) is int:
+                iskip = int(self.bmin / (dpix / xskip) / skipto)
                 self.read_cubefits(cubefits, center, dist, vsys,
                                    -rmax, rmax, -rmax, rmax, None, None,
                                    iskip, iskip, sigma)
