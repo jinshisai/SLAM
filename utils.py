@@ -19,7 +19,8 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
                  labels: list = None, rangelevel: float = 0.8,
                  figname: str = None, show_corner: bool = False,
                  ncore: int = 1,
-                 simpleoutput: bool = True):
+                 simpleoutput: bool = True, 
+                 moves = emcee.moves.StretchMove()):
     ndim = len(bounds[0])
     nwalkers = ndim * nwalkers_per_ndim
     plim = np.array(bounds)
@@ -45,11 +46,12 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
         if ncore > 1:
             with Pool(ncore) as pool:
                 sampler = emcee.EnsembleSampler(nwalkers, ndim, log_prob_fn,
-                                                args=args, pool=pool)
+                                                args=args, pool=pool, moves=moves,)
                 # The inner function lnL can't be pickled for multiprocessing.
                 sampler.run_mcmc(p0, n)
         else:
-            sampler = emcee.EnsembleSampler(nwalkers, ndim, lnL, args=args,)
+            sampler = emcee.EnsembleSampler(nwalkers, ndim, lnL, args=args,
+                moves=moves,)
             sampler.run_mcmc(p0, n)
         #samples = sampler.get_chain()  # emcee 3.1.1
         samples = sampler.chain  # emcee 2.2.1
@@ -64,6 +66,7 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
     #lnp = sampler.get_log_prob()  # emcee 3.1.1
     lnp = sampler.lnprobability  # emcee 2.2.1
     popt = samples[np.unravel_index(np.argmax(lnp), lnp.shape)]
+    _samples = samples.copy()
     samples = samples.reshape((-1, ndim))
     plow = np.percentile(samples, 16, axis=0)
     pmid = np.percentile(samples, 50, axis=0)
@@ -77,6 +80,25 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
         if not figname is None: plt.savefig(figname)
         if show_corner: plt.show()
         plt.close()
+        # ------- !!! for debug !!! ----------
+        # Chain plot
+        fig, axes = plt.subplots(ndim, 1, sharex=True)
+        xplot = np.arange(0, nsteps, 1)
+        for i, ax in enumerate(axes):
+            chain_plot = np.array(
+                [ax.plot(xplot, _samples[iwalk,:,i].T, 'k')
+                for iwalk in range(nwalkers)])
+            ax.set_ylabel(labels[i])
+            ax.tick_params(which='both', direction='in',
+                bottom=True, top=True, left=True, right=True, labelbottom=False)
+        # x-label
+        axes[0].set_xlim(0,nsteps)
+        axes[-1].tick_params(labelbottom=True)
+        axes[-1].set_xlabel('Step number')
+        if not figname is None: plt.savefig(figname.replace('.png','.chains.png'))
+        if show_corner: plt.show()
+        plt.close()
+        # ----------------------------------------
     if simpleoutput:
         return [pmid, perr]
     else:

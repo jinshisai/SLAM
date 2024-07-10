@@ -20,6 +20,7 @@ from astropy.coordinates import SkyCoord
 from scipy.interpolate import RegularGridInterpolator as RGI
 from tqdm import tqdm
 import warnings
+import emcee.moves
 
 from utils import emcee_corner
 from pvsilhouette.ulrichenvelope import velmax, mockpvd
@@ -207,6 +208,8 @@ class PVSilhouette():
         x_smpl, y_smpl = steps
         x_smpl = int(self.bmin / x_smpl / self.dx )
         y_smpl = int(1. / y_smpl)
+        if x_smpl == 0: x_smpl = 1
+        if y_smpl == 0: y_smpl = 1
         #print(x_smpl, self.bmin, self.dx)
         self.data = self.data[y_smpl//2::y_smpl, x_smpl//2::x_smpl]
         self.v = self.v[y_smpl//2::y_smpl]
@@ -286,7 +289,7 @@ class PVSilhouette():
             labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':100, 'nsteps':500,
                        'rangelevel':None, 'labels':labels,
-                       'figname':figname+'.corner.png', 'show_corner':show}
+                       'figname':figname+'.corner.png', 'show_corner':show,}
             kwargs = dict(kwargs0, **kwargs_emcee_corner)
             if progressbar:
                 total = kwargs['nwalkers_per_ndim'] * len(p_fixed[p_fixed == None])
@@ -355,30 +358,38 @@ class PVSilhouette():
     def fit_mockpvd(self, 
                 incl: float = 89.,
                 Mstar_range: list = [0.01, 10],
-                Rc_range: list = [1, 1000],
-                alphainfall_range: list = [0.01, 1],
-                fscale_range: list = [0.01, 100.],
-                tauscale_range: list = [0.05, 1000.],
-                rho_jump_range: list = [0.1, 10.],
+                Rc_range: list = [1., 1000.],
+                alphainfall_range: list = [0.0, 1],
+                fflux_range: list = [0.3, 3.],
+                log_ftau_range: list = [-1., 3.],
+                log_frho_range: list = [-1., 4.],
+                sig_mdl_range: list = [0., 10.],
                 Mstar_fixed: float = None,
                 Rc_fixed: float = None,
                 alphainfall_fixed: float = None,
-                fscale_fixed: float = None,
-                tauscale_fixed: float = None,
-                rho_jump_fixed: float = None,
-                cutoff: float = 5, 
+                fflux_fixed: float = None,
+                log_ftau_fixed: float = None,
+                log_frho_fixed: float = None,
+                sig_mdl_fixed: float = 0.,
                 vmask: list = [0, 0],
                 figname: str = 'PVsilhouette',
                 show: bool = False,
                 progressbar: bool = True,
                 kwargs_emcee_corner: dict = {},
+                signmajor = None, signminor = None,
                 pa_maj = None, pa_min = None,
-                beam = None, linewidth = None, p0 = None):
+                beam = None, linewidth = None,
+                p0 = None,
+                nsubgrid = 1):
         # Observed pv diagrams
         majobs = self.dpvmajor.copy()
         minobs = self.dpvminor.copy()
-        #majobs[majobs < cutoff * self.sigma] = np.nan
-        #minobs[minobs < cutoff * self.sigma] = np.nan
+        # correction factor for over sampling
+        beam_area = np.pi/(4.*np.log(2.)) * self.bmaj * self.bmin # beam area
+        Rarea = beam_area / self.dx / self.dx # area ratio
+        #print('Rarea %.2f'%Rarea)
+
+        # grid & mask
         x, v = np.meshgrid(self.x, self.v)
         def minmax(a: np.ndarray, b: np.ndarray, s: str, m: np.ndarray):
             rng = a[(b >= 0 if s == '+' else b < 0) * (m > 0.5)]
@@ -399,93 +410,115 @@ class PVSilhouette():
         mask = (vmask[0] < v) * (v < vmask[1]) # np.sum(mask, axis=(0, 1)) 
         majobs = np.where(mask, np.nan, majobs)
         minobs = np.where(mask, np.nan, minobs)
+
+        # define chi2
         majsig, minsig = self.sigma, self.sigma
-        def calcchi2(majmod: np.ndarray, minmod: np.ndarray):
-            chi2 =   np.nansum((majobs - majmod)**2 / majsig**2) \
+        def calcchi2(majmod: np.ndarray, minmod: np.ndarray, majsig: float, minsig: float):
+            chi2 = np.nansum((majobs - majmod)**2 / majsig**2) \
                    + np.nansum((minobs - minmod)**2 / minsig**2)
-            return chi2
-        
-        chi2max1 = calcchi2(majobs, minobs)
-        chi2max0 = calcchi2(majobs, minobs)
-        chi2max = np.min([chi2max0, chi2max1])
+            return chi2 / np.sqrt(Rarea) # correct over sampling
+        #chi2max1 = calcchi2(majobs, minobs)
+        #chi2max0 = calcchi2(majobs, minobs)
+        #chi2max = np.min([chi2max0, chi2max1])
+
+        # get quadrant
         def getquad(m):
             nv, nx = np.shape(m)
             q =   np.sum(m[:nv//2, :nx//2]) + np.sum(m[nv//2:, nx//2:]) \
                 - np.sum(m[nv//2:, :nx//2]) - np.sum(m[:nv//2, nx//2:])
             return int(np.sign(q))
-        majquad = getquad(self.dpvmajor)
-        minquad = getquad(self.dpvminor) * (-1)
-
+        majquad = getquad(self.dpvmajor) if signmajor is None else signmajor
+        minquad = getquad(self.dpvminor) * (-1) if signminor is None else signminor
         obsmax = max(np.nanmax(majobs), np.nanmax(minobs))
-        def makemodel(Mstar, Rc, alphainfall, fscale, tauscale, rho_jump):
+
+        # model
+        def makemodel(Mstar, Rc, alphainfall, fflux, log_ftau, log_frho):
+            # f_tau is in log scale
             major = mockpvd(self.x, self.x, self.v, Mstar, Rc,
                 alphainfall=alphainfall, incl=incl, axis='major', withkepler=True,
-                rho_jump = rho_jump, tauscale = tauscale,
-                fscale = obsmax * fscale, beam = self.beam, pa=pa_maj, 
-                rout=np.nanmax(self.x), linewidth = linewidth)
-            major = major[:, ::majquad]
+                rho_jump = 10.**log_frho, tauscale = 10.**log_ftau,
+                fscale = obsmax * fflux, beam = self.beam, pa=pa_maj, 
+                rout=np.nanmax(self.x), linewidth = linewidth,
+                nsubgrid = nsubgrid)
+            major = major[:, ::majquad] #[:,step//2::step]
             minor = mockpvd(self.x, self.x, self.v, Mstar, Rc,
                 alphainfall=alphainfall, incl=incl, axis='minor', withkepler=True,
-                rho_jump = rho_jump, tauscale = tauscale,
-                fscale = obsmax * fscale, beam = self.beam, pa=pa_min, 
-                rout=np.nanmax(self.x), linewidth = linewidth)
-            minor = minor[:, ::minquad]
+                rho_jump = 10.**log_frho, tauscale = 10.**log_ftau,
+                fscale = obsmax * fflux, beam = self.beam, pa=pa_min, 
+                rout=np.nanmax(self.x), linewidth = linewidth,
+                nsubgrid = nsubgrid)
+            minor = minor[:, ::minquad] #[:,step//2::step]
             return major, minor
-
-
-        # chi2 fitting
-        #from scipy.optimize import least_squares
-        #f_lsfit = lambda params: calcchi2(*makemodel(*params))
-        #plim = np.array([Mstar_range, Rc_range, alphainfall_range, fscale_range])
-        #print('Run fitting..')
-        #res = least_squares(f_lsfit, p0, bounds=plim.T)
-        #popt = res.x #[ x for x in res.x]
-        #print('Done.')
-        #print(popt)
-        #return popt
 
 
         # Fitting
         p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed, 
-            fscale_fixed, tauscale_fixed, rho_jump_fixed])
+            fflux_fixed, log_ftau_fixed, log_frho_fixed, sig_mdl_fixed])
         if None in p_fixed:
-            labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$', r'log $f_\mathrm{flux}$', 
-                r'log $f_\tau$', r'log $f_\rho$'])
+            labels = np.array(['Mstar', 'Rc', r'$\alpha$', r'$f_\mathrm{flux}$', 
+                r'log $f_\tau$', r'log $f_\rho$', r'$\sigma_\mathrm{model}$'])
             labels = labels[p_fixed == None]
-            kwargs0 = {'nwalkers_per_ndim':8, 'nburnin':300, 'nsteps':200, # 16, 100, 500
-                       'rangelevel':None, 'labels':labels,
-                       'figname':figname+'.corner.png', 'show_corner':show}
+            kwargs0 = {'nwalkers_per_ndim':2, 'nburnin':2000, 'nsteps':1000, # 16, 100, 500
+                       'rangelevel': None, 'labels':labels,
+                       'figname':figname+'.corner.png', 'show_corner':show,
+                       #'moves': [(emcee.moves.DEMove(), 0.8),(emcee.moves.DESnookerMove(), 0.2),]
+                       }
             kwargs = dict(kwargs0, **kwargs_emcee_corner)
+            # progress bar
             if progressbar:
                 total = kwargs['nwalkers_per_ndim'] * len(p_fixed[p_fixed == None])
-                total *= kwargs['nburnin'] + kwargs['nsteps'] + 2
+                total *= kwargs['nburnin'] + kwargs['nsteps'] #+ 2
                 bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
+            # log likelihood
+            #def lnprob(p):
+            #    if progressbar:
+            #        bar.update(1)
+            #    q = p_fixed.copy()
+            #    #q[p_fixed == None] = 10**p
+            #    q[p_fixed == None] = p # in linear scale
+            #    chi2 = calcchi2(*makemodel(*q[:-1]), q[-1])
+            #    return -0.5 * chi2 # -np.inf if chi2 > chi2max else
+            # Modified log likelihood
             def lnprob(p):
                 if progressbar:
                     bar.update(1)
+                # parameter
                 q = p_fixed.copy()
-                q[p_fixed == None] = 10**p
-                chi2 = calcchi2(*makemodel(*q))
-                return -0.5 * chi2 # -np.inf if chi2 > chi2max else
+                #q[p_fixed == None] = 10**p
+                q[p_fixed == None] = p # in linear scale
+                # updated sigma
+                majsig2 = majsig**2. + q[-1]**2.
+                minsig2 = minsig**2. + q[-1]**2.
+                # make model
+                majmod, minmod = makemodel(*q[:-1])
+                return - 0.5 * (np.nansum((majobs - majmod)**2 / majsig2 + np.log(2.*np.pi*majsig2))\
+                    + np.nansum((minobs - minmod)**2 / minsig2 + np.log(2.*np.pi*minsig2))) / np.sqrt(Rarea)
+            # prior
+            sig_mdl_range = np.array(sig_mdl_range) * self.sigma
             plim = np.array([Mstar_range, Rc_range, alphainfall_range, 
-                fscale_range, tauscale_range, rho_jump_range])
-            plim = np.log10(plim[p_fixed == None]).T
+                fflux_range, log_ftau_range, log_frho_range, list(sig_mdl_range)])
+            #plim = np.log10(plim[p_fixed == None]).T
+            plim = plim[p_fixed == None].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
             if np.isinf(lnprob(mcmc[0])):
                 print('No model is better than the all-0 or all-1 models.')
             popt = p_fixed.copy()
-            popt[p_fixed == None] = 10**mcmc[0]
+            popt[p_fixed == None] = mcmc[0] # 10**
             plow = p_fixed.copy()
-            plow[p_fixed == None] = 10**mcmc[1]
+            plow[p_fixed == None] = mcmc[1]
+            pmid = p_fixed.copy()
+            pmid[p_fixed == None] = mcmc[2]
             phigh = p_fixed.copy()
-            phigh[p_fixed == None] = 10**mcmc[3]
+            phigh[p_fixed == None] = mcmc[3]
         else:
             popt = p_fixed
             plow = p_fixed
+            pmid = p_fixed
             phigh = p_fixed
         self.popt = popt
         self.plow = plow
+        self.pmid = pmid
         self.phigh = phigh
         print(f'M* = {plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} Msun')
         print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
@@ -496,14 +529,14 @@ class PVSilhouette():
 
 
         # plot
-        majmod, minmod = makemodel(*popt)
+        majmod, minmod = makemodel(*popt[:-1])
         majres = np.where(mask, -(mask.astype('int')), (majobs - majmod) / majsig)
         minres = np.where(mask, -(mask.astype('int')), (minobs - minmod) / minsig)
 
         for zmin, zmaj, vmin, vmax, cmap, alpha, lbl in zip(
             [minres, minmod], [majres, majmod], 
-            [-6., np.nanmin(np.array([minmod, majmod]))], 
-            [6., np.nanmax(np.array([minmod, majmod]))],
+            [np.nanmin(np.array([minres, majres])), np.nanmin(np.array([minmod, majmod]))], 
+            [np.nanmax(np.array([minres, majres])), np.nanmax(np.array([minmod, majmod]))],
             ['bwr', 'viridis'],
             [0.5, 0.8],
             ['.residual', '.model']):

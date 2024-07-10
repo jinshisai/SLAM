@@ -45,7 +45,7 @@ def diskrho(radius, theta, rc, sig_c,
     sigma = sig_c * R**pls # surface density as a function of r
     exp = np.exp(-z*z/(2.*h*h))
     rho = sigma * exp / (np.sqrt(2.*np.pi) * h)
-    rho[R > 1.] = 0. # set an outer edge
+    rho[R > 1.0] = 0. # set an outer edge
     return rho
 
 def velrho(radius, theta, 
@@ -65,7 +65,8 @@ def velrho(radius, theta,
     '''
     radius = radius.clip(1e-10, None)
     parity = np.sign(mu := np.cos(theta))
-    mu = np.abs(mu).clip(1e-10, 1)
+    #mu = np.abs(mu).clip(1e-10, 1.) # clip off 85 deg < theta < 95deg.
+    mu = np.abs(mu).clip(0.087, 1.) # clip off 85 deg < theta < 95deg.0.087
     p = (radius - 1) / 3.
     q = mu * radius / 2.
     mu0 = np.full_like(radius, np.nan)
@@ -101,7 +102,8 @@ def velrho(radius, theta,
         # density
         #indx_R = np.where( (R >= 0.5) & (R <= 1.5) )
         hc = h0 * rc**plh # the scale hight normalized by rc at r/rc = 1
-        sig_c = 20. * (np.sqrt(2.*np.pi) * hc) # rho ~ 20 at R = 1.05
+        #sig_c = 20. * (np.sqrt(2.*np.pi) * hc) # rho ~ 20 at R = 1.05 and theta=90.
+        sig_c = 1.5 * (np.sqrt(2.*np.pi) * hc) # rho ~ 1.4 at R = 1 and theta=85.
         rho_d = diskrho(radius, theta, rc, sig_c, pls = pls, plh = plh, h0 = h0) * rho_jump
         # put a disk
         where_disk = np.where(rho_d >= rho)
@@ -201,7 +203,8 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
     h0: float = 0.1, rho_jump: float = 1., fscale: float = 1.,
     pa: float = 0., beam: list = None, linewidth: float = None, 
     rin: float = 0.1, rout: float=None,
-    axis: str = 'major', tauscale: float = 1.):
+    axis: str = 'major', tauscale: float = 1.,
+    nsubgrid = 1):
     """
     Generate a mock Position-Velocity (PV) diagram.
 
@@ -236,11 +239,24 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
     irad = np.radians(incl)
     vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
     elos = [0, -np.sin(irad), np.cos(irad)] # line of sight vector
-    nz, nx = len(zin), len(xin)
+
+    # grid
+    _nz, _nx = len(zin), len(xin)
+    if nsubgrid > 1:
+        dx = xin[1] - xin[0]
+        dz = zin[1] - zin[0]
+        _xin_e = np.linspace( xin[0] - 0.5 * dx, xin[-1] + 0.5 * dx, _nx*nsubgrid + 1)
+        _xin = 0.5 * (_xin_e[:-1] + _xin_e[1:])
+        _zin_e = np.linspace( zin[0] - 0.5 * dz, zin[-1] + 0.5 * dz, _nz*nsubgrid + 1)
+        _zin = 0.5 * (_zin_e[:-1] + _zin_e[1:])
+        nz, nx = _nz * nsubgrid, _nx * nsubgrid
+    else:
+        _zin, _xin = zin.copy(), xin.copy()
+        nz, nx = len(zin), len(xin)
 
     # grid
     if beam is None:
-        X, Z = np.meshgrid(xin/Rc, zin/Rc, indexing='ij') # in units of Rc
+        X, Z = np.meshgrid(_xin/Rc, _zin/Rc, indexing='ij') # in units of Rc
         Y = np.zeros_like(X)
         ny = 1
     else:
@@ -256,7 +272,7 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
             return 0
 
         ny = len(yin)
-        X, Y, Z = np.meshgrid(xin/Rc, yin/Rc, zin/Rc, indexing='ij')
+        X, Y, Z = np.meshgrid(_xin/Rc, yin/Rc, _zin/Rc, indexing='ij')
 
     # along which axis
     x, y, z = XYZ2xyz(irad, 0., X, Y, Z) if axis == 'major' else XYZ2xyz(irad, 0, Y, X, Z)
@@ -303,14 +319,22 @@ def mockpvd(xin: np.ndarray, zin: np.ndarray, v: np.ndarray,
     # beam convolution
     if beam is not None:
         xb, yb = rot(*np.meshgrid(xin, yin, indexing='ij'), np.radians(bpa - pa))
-        gaussbeam = np.exp(- 0.5 * (yb /(bmin / 2.35))**2. - 0.5 * (xb /(bmaj / 2.35))**2.)
+        gaussbeam = np.exp(
+            - 0.5 * (yb /(bmin / 2.35))**2. \
+            - 0.5 * (xb /(bmaj / 2.35))**2.)
         gaussbeam /= np.sum(gaussbeam)
         I_cube = convolve(I_cube, np.array([gaussbeam]), mode='same')
 
     # output
     I_pv = I_cube[:,ny//2,:]
-    #I_pv /= np.nanmax(I_pv) # normalize
-    #I_pv *= fscale # scaling
+
+    if nsubgrid > 1:
+        I_pv = np.nanmean(
+            np.array([
+            I_pv[:, i::nsubgrid]
+            for i in range(nsubgrid)
+            ]),
+            axis = 0)
     return I_pv
 
 
