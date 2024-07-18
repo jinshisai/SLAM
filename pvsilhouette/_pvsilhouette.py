@@ -24,6 +24,7 @@ import emcee.moves
 
 from utils import emcee_corner
 from pvsilhouette.ulrichenvelope import velmax, mockpvd
+from pvsilhouette.mockpvd import MockPVD
 
 warnings.simplefilter('ignore', RuntimeWarning)
 
@@ -355,6 +356,30 @@ class PVSilhouette():
         if show: plt.show()
 
 
+
+    def check_modelgrid(self, nsubgrid: float = 1, 
+        n_nest: list = None, reslim: float = 5):
+        # model grid
+        mpvd = MockPVD(self.x, self.x, self.v, 
+            nsubgrid = nsubgrid, nnest = n_nest, 
+            beam = self.beam, reslim = reslim)
+        xaxes, yaxes, zaxes = mpvd.grid.xaxes, mpvd.grid.yaxes, mpvd.grid.zaxes
+        nlevels = mpvd.grid.nlevels
+
+        print('Nesting level: %i'%nlevels)
+        print('Resolutions:')
+        for l in range(nlevels):
+            dx = xaxes[l][1] - xaxes[l][0]
+            dy = yaxes[l][1] - yaxes[l][0]
+            dz = zaxes[l][1] - zaxes[l][0]
+            print('   l=%i: (dx, dy, dz) = (%.2e au, %.2e au, %.2e au)'%(l, dx, dy, dz))
+            print('      : (xlim, ylim, zlim) = (%.2e to %.2e au, %.2e to %.2e au, %.2e to %.2e au, )'%(
+                    mpvd.grid.xlim[l][0], mpvd.grid.xlim[l][1],
+                    mpvd.grid.ylim[l][0], mpvd.grid.ylim[l][1],
+                    mpvd.grid.zlim[l][0], mpvd.grid.zlim[l][1],))
+
+
+
     def fit_mockpvd(self, 
                 incl: float = 89.,
                 Mstar_range: list = [0.01, 10],
@@ -380,7 +405,7 @@ class PVSilhouette():
                 pa_maj = None, pa_min = None,
                 beam = None, linewidth = None,
                 p0 = None,
-                nsubgrid = 1):
+                nsubgrid = 1, n_nest = [3, 3], reslim = 5):
         # Observed pv diagrams
         majobs = self.dpvmajor.copy()
         minobs = self.dpvminor.copy()
@@ -388,6 +413,7 @@ class PVSilhouette():
         beam_area = np.pi/(4.*np.log(2.)) * self.bmaj * self.bmin # beam area
         Rarea = beam_area / self.dx / self.dx # area ratio
         #print('Rarea %.2f'%Rarea)
+
 
         # grid & mask
         x, v = np.meshgrid(self.x, self.v)
@@ -411,6 +437,7 @@ class PVSilhouette():
         majobs = np.where(mask, np.nan, majobs)
         minobs = np.where(mask, np.nan, minobs)
 
+
         # define chi2
         majsig, minsig = self.sigma, self.sigma
         def calcchi2(majmod: np.ndarray, minmod: np.ndarray, majsig: float, minsig: float):
@@ -420,6 +447,7 @@ class PVSilhouette():
         #chi2max1 = calcchi2(majobs, minobs)
         #chi2max0 = calcchi2(majobs, minobs)
         #chi2max = np.min([chi2max0, chi2max1])
+
 
         # get quadrant
         def getquad(m):
@@ -431,22 +459,35 @@ class PVSilhouette():
         minquad = getquad(self.dpvminor) * (-1) if signminor is None else signminor
         obsmax = max(np.nanmax(majobs), np.nanmax(minobs))
 
+
         # model
+        mpvd = MockPVD(self.x, self.x, self.v, 
+            nsubgrid = nsubgrid, nnest = n_nest, 
+            beam = self.beam, reslim = reslim)
         def makemodel(Mstar, Rc, alphainfall, fflux, log_ftau, log_frho):
             # f_tau is in log scale
+            '''
             major = mockpvd(self.x, self.x, self.v, Mstar, Rc,
                 alphainfall=alphainfall, incl=incl, axis='major', withkepler=True,
                 rho_jump = 10.**log_frho, tauscale = 10.**log_ftau,
                 fscale = obsmax * fflux, beam = self.beam, pa=pa_maj, 
                 rout=np.nanmax(self.x), linewidth = linewidth,
                 nsubgrid = nsubgrid)
-            major = major[:, ::majquad] #[:,step//2::step]
             minor = mockpvd(self.x, self.x, self.v, Mstar, Rc,
                 alphainfall=alphainfall, incl=incl, axis='minor', withkepler=True,
                 rho_jump = 10.**log_frho, tauscale = 10.**log_ftau,
                 fscale = obsmax * fflux, beam = self.beam, pa=pa_min, 
                 rout=np.nanmax(self.x), linewidth = linewidth,
                 nsubgrid = nsubgrid)
+            '''
+            major, minor = mpvd.generate_mockpvd(
+                Mstar, Rc, alphainfall, 
+                fflux = fflux * obsmax, frho = 10.**log_frho, ftau = 10.**log_ftau,
+                incl = incl, withkepler = True, linewidth = linewidth,
+                rout = np.nanmax(self.x), pa = [pa_maj, pa_min],
+                axis = 'both')
+            # quadrant
+            major = major[:, ::majquad] #[:,step//2::step]
             minor = minor[:, ::minquad] #[:,step//2::step]
             return major, minor
 

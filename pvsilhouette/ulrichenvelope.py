@@ -67,6 +67,7 @@ def velrho(radius, theta,
     parity = np.sign(mu := np.cos(theta))
     #mu = np.abs(mu).clip(1e-10, 1.) # clip off 85 deg < theta < 95deg.
     mu = np.abs(mu).clip(0.087, 1.) # clip off 85 deg < theta < 95deg.0.087
+    mu = np.abs(mu).clip(0.17, 1.) # clip off 85 deg < theta < 95deg.0.087
     p = (radius - 1) / 3.
     q = mu * radius / 2.
     mu0 = np.full_like(radius, np.nan)

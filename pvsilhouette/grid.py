@@ -8,7 +8,7 @@ class Nested3DGrid(object):
     """docstring for NestedGrid"""
     def __init__(self, x, y, z, 
         xlim, ylim, zlim, nsub, 
-        nlevels = 1, precision = 4,):
+        nlevels = 1, reslim = 5,):
         super(Nested3DGrid, self).__init__()
         # save axes of the mother grid
         self.x = x
@@ -55,12 +55,20 @@ class Nested3DGrid(object):
         # nest
         if self.nlevels > 1:
             if (np.array([xlim, ylim, zlim]) == None).any():
-                _xlim, _ylim, _zlim = self.get_nestinglim()
+                _xlim, _ylim, _zlim = self.get_nestinglim(reslim = reslim)
                 if xlim is None: xlim = _xlim
                 if ylim is None: ylim = _ylim
                 if zlim is None: zlim = _zlim
             for l in range(nlevels):
                 self.nest(l+1, xlim[l], ylim[l], zlim[l], nsub[l])
+            self.xlim, self.ylim, self.zlim = xlim.copy(), ylim.copy(), zlim.copy()
+            self.xlim.insert(0, [xe[0], xe[-1]])
+            self.ylim.insert(0, [ye[0], ye[-1]])
+            self.zlim.insert(0, [ze[0], ze[-1]])
+        else:
+            self.xlim = [xe[0], xe[-1]]
+            self.ylim = [ye[0], ye[-1]]
+            self.zlim = [ze[0], ze[-1]]
 
 
         '''
