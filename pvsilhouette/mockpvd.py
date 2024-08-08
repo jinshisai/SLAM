@@ -170,6 +170,10 @@ class MockPVD(object):
         self.grid = grid
 
 
+    def gridinfo(self):
+        self.grid.gridinfo(units = ['au', 'au', 'au'])
+
+
     def build(self, Mstar:float, Rc:float, incl:float,
         alphainfall:float = 1., withkepler: bool = True, 
         pls: float = -1., plh: float = 0.25, h0: float = 0.1, frho:float = 1.,

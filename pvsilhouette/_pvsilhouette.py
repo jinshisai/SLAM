@@ -218,6 +218,7 @@ class PVSilhouette():
         self.dx = self.x[1] - self.x[0]
         self.dv = self.v[1] - self.v[0]
 
+
     def fitting(self, incl: float = 90,
                 Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
@@ -363,21 +364,7 @@ class PVSilhouette():
         mpvd = MockPVD(self.x, self.x, self.v, 
             nsubgrid = nsubgrid, nnest = n_nest, 
             beam = self.beam, reslim = reslim)
-        xaxes, yaxes, zaxes = mpvd.grid.xaxes, mpvd.grid.yaxes, mpvd.grid.zaxes
-        nlevels = mpvd.grid.nlevels
-
-        print('Nesting level: %i'%nlevels)
-        print('Resolutions:')
-        for l in range(nlevels):
-            dx = xaxes[l][1] - xaxes[l][0]
-            dy = yaxes[l][1] - yaxes[l][0]
-            dz = zaxes[l][1] - zaxes[l][0]
-            print('   l=%i: (dx, dy, dz) = (%.2e au, %.2e au, %.2e au)'%(l, dx, dy, dz))
-            print('      : (xlim, ylim, zlim) = (%.2e to %.2e au, %.2e to %.2e au, %.2e to %.2e au, )'%(
-                    mpvd.grid.xlim[l][0], mpvd.grid.xlim[l][1],
-                    mpvd.grid.ylim[l][0], mpvd.grid.ylim[l][1],
-                    mpvd.grid.zlim[l][0], mpvd.grid.zlim[l][1],))
-
+        mpvd.grid.gridinfo()
 
 
     def fit_mockpvd(self, 
