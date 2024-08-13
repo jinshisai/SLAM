@@ -379,16 +379,8 @@ class PVSilhouette():
                 fixed_params: dict = {'Mstar': None, 
                 'Rc': None, 'alphainfall': None, 'fflux': None,
                 'log_ftau': None, 'log_frho': None, 'sig_mdl': None},
-                Mstar_fixed: float = None,
-                Rc_fixed: float = None,
-                alphainfall_fixed: float = None,
-                fflux_fixed: float = None,
-                log_ftau_fixed: float = None,
-                log_frho_fixed: float = None,
-                sig_mdl_fixed: float = 0.,
                 vmask: list = [0, 0],
                 filename: str = 'PVsilhouette',
-                figname: str = 'PVsilhouette',
                 show: bool = False,
                 progressbar: bool = True,
                 kwargs_emcee_corner: dict = {},
@@ -476,7 +468,7 @@ class PVSilhouette():
             labels = labels[p_fixed == None]
             kwargs0 = {'nwalkers_per_ndim':4, 'nburnin':500, 'nsteps':500,
                        'rangelevel': None, 'labels':labels,
-                       'figname':figname+'.corner.png', 'show_corner':show,
+                       'figname':filename+'.corner.png', 'show_corner':show,
                        }
             kwargs = dict(kwargs0, **kwargs_emcee_corner)
             # progress bar
@@ -678,9 +670,11 @@ class PVSilhouette():
                 ax.set_ylim(np.min(self.v), np.max(self.v))
 
             if vmask is not None:
+                _v = self.v[ (self.v > vmask[0]) * (self.v < vmask[1])] # masked velocity ranges
                 for ax in axes:
                     ax.fill_between(
-                        self.x, np.full(len(self.x), vmask[0]), np.full(len(self.x), vmask[1]),
+                        self.x, np.full(len(self.x), np.min(_v) - 0.5 * self.dv), 
+                        np.full(len(self.x), np.max(_v) + 0.5 * self.dv),
                         color = shadecolor, alpha = 0.6,
                         edgecolor = None,
                         )
