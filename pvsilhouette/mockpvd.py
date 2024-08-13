@@ -31,9 +31,11 @@ class MockPVD(object):
         x, z, v (array): 1D arrays for x, z and v axes.
         nsubgrid (int): Number of sub pixels to which the original pixel is divided.
         nnest (list): Number of sub pixels of the nested grid, to which the parental pixel is divided.
-         E.g., if nnest=[4], a nested grid having a resolution four finer is created. If [4, 4],
-         the grid is nested to two levels and each has four times better resolution than the upper grid.
+         E.g., if nnest=[4], a nested grid having a resolution four times finer than the resolution
+         of the parental grid is created. If [4, 4], the grid is nested to two levels and 
+         each has a four times better resolution than its parental grid.
         xlim, zlim (list): x and z ranges for the nested grid. Must be given as [[xmin0, xmax0], [xmin1, xmax1]].
+        beam (list): Beam info, which must be give [major, minor, pa].
         '''
         super(MockPVD, self).__init__()
 
@@ -83,11 +85,6 @@ class MockPVD(object):
         incl (float): Inclination angle (deg). Incl=90 deg corresponds to edge-on configuration.
         axis (str): Axis of the pv cut. Must be major, minor or both.
         '''
-        # parameters
-        #self.Mstar = Mstar
-        #self.Rc = Rc
-        #self.alphainfall = alphainfall
-        #self.incl = incl
 
         # check
         if axis not in ['major', 'minor', 'both']:

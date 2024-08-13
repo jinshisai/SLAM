@@ -326,30 +326,6 @@ class Nested3DGrid(object):
 
 
 
-    def edgecut_indices(self, xlength, ylength):
-        # odd or even
-        x_oddeven = self.nx%2
-        y_oddeven = self.ny%2
-        # edge indices for subgrid
-        xi = int(xlength / self.dx_sub) if self.dx_sub > 0 else int(- xlength / self.dx_sub)
-        yi = int(ylength / self.dy_sub)
-        _nx_resub = int(self.nx_sub - 2 * xi) // self.nsub # nx of subgrid after cutting edge
-        _ny_resub = int(self.ny_sub - 2 * yi) // self.nsub # ny of subgrid after cutting edge
-        # fit odd/even
-        if _nx_resub%2 != x_oddeven: _nx_resub += 1
-        if _ny_resub%2 != y_oddeven: _ny_resub += 1
-        # nx, ny of the new subgrid and new xi and yi
-        nx_resub = _nx_resub * self.nsub
-        ny_resub = _ny_resub * self.nsub
-        xi = (self.nx_sub - nx_resub) // 2
-        yi = (self.ny_sub - ny_resub) // 2
-        # for original grid
-        xi0 = int((self.nx - nx_resub / self.nsub) * 0.5)
-        yi0 = int((self.ny - ny_resub / self.nsub) * 0.5)
-        #print(nx_resub / self.nsub, self.nx - xi0 - xi0)
-        return xi, yi, xi0, yi0
-
-
     def gridinfo(self, units = ['au', 'au', 'au']):
         ux, uy, uz = units
         print('Nesting level: %i'%self.nlevels)
