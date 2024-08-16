@@ -562,7 +562,7 @@ class ChannelFit():
         self.vlos = [self.getvlos(x, h) for x, h in zip(self.xdisk, [h1, h1, h2, h2])]
     
     def get_Iunif(self, Mstar: float, Rc: float, pI: float,
-                 Ienv: float, offvsys: float) -> np.ndarray:
+                  Ienv: float, offvsys: float) -> np.ndarray:
         Iunif = 0
         for vlos_in, x_in in zip(self.vlos, self.xdisk):
             if vlos_in is None:
@@ -652,40 +652,27 @@ class ChannelFit():
                 yoff_range: list = [-100, 100],
                 voff_range: list = [-0.2, 0.2],
                 incl_range: list = [-45, 45],
-                Mstar_fixed: float = None,
-                Rc_fixed: float = None,
-                cs_fixed: float = None,
-                h1_fixed: float = None,
-                h2_fixed: float = None,
-                pI_fixed: float = None,
-                Rin_fixed: float = None,
-                Ienv_fixed: float = None,
-                xoff_fixed: float = None,
-                yoff_fixed: float = None,
-                voff_fixed: float = None,
-                incl_fixed: float = None,
+                fixed_params: dict = {},
                 filename: str = 'channelfit',
                 show: bool = False,
                 kwargs_emcee_corner: dict = {}):
 
-        p_fixed = np.array([Mstar_fixed, Rc_fixed, cs_fixed,
-                            h1_fixed, h2_fixed, pI_fixed,
-                            Rin_fixed, Ienv_fixed,
-                            xoff_fixed, yoff_fixed, voff_fixed,
-                            incl_fixed])
-        self.free = dict(zip(self.paramkeys, [p is None for p in p_fixed]))
+        p_fixed = {k:fixed_params[k] if k in fixed_params else None for k in self.paramkeys}
+        self.free = {k:p_fixed[k] is None for k in self.paramkeys}
 
         if not self.free['incl']:
-            self.update_incl(incl_fixed)
+            self.update_incl(p_fixed['incl'])
         if not self.free['cs']:
-            self.update_prof(cs_fixed)
+            self.update_prof(p_fixed['cs'])
         if not (self.free['h1'] or self.free['h2']):
-            self.update_xdisk(h1_fixed, h2_fixed)
+            self.update_xdisk(p_fixed['h1'], p_fixed['h2'])
         if not (self.free['Rc'] or self.free['Rin']):
-            self.update_getvlos(Rc_fixed, Rin_fixed)
+            self.update_getvlos(p_fixed['Rc'], p_fixed['Rin'])
         if not (self.free['h1'] or self.free['h2'] 
                 or self.free['Rc'] or self.free['Rin']):
-            self.update_vlos(h1_fixed, h2_fixed)
+            self.update_vlos(p_fixed['h1'], p_fixed['h2'])
+        
+        p_fixed = np.array([p_fixed[k] for k in self.paramkeys])
         
         if None in p_fixed:
             notfixed = p_fixed == None
@@ -739,7 +726,10 @@ class ChannelFit():
         print('------------------------')
         print(f'popt:', ', '.join([f'{k}={p:.2e}' for k, p in zip(self.paramkeys, self.popt)]))
         print('------------------------')
-        np.savetxt(filename+'.popt.txt', plist)
+        with open(filename+'.popt.txt', 'w') as f:
+            f.write('#Rows:' + ','.join(self.paramkeys) + '\n')
+            f.write('#Columns:' + ','.join(['popt', 'plow', 'pmid', 'phigh']) + '\n')
+            np.savetxt(f, np.transpose(plist))
         self.popt = dict(zip(self.paramkeys, self.popt))
         self.plow = dict(zip(self.paramkeys, self.plow))
         self.pmid = dict(zip(self.paramkeys, self.pmid))
