@@ -65,13 +65,50 @@ def velrho(radius, theta,
     '''
     radius = radius.clip(1e-10, None)
     parity = np.sign(mu := np.cos(theta))
-    #mu = np.abs(mu).clip(1e-10, 1.) # clip off 85 deg < theta < 95deg.
-    mu = np.abs(mu).clip(0.087, 1.) # clip off 85 deg < theta < 95deg.0.087
-    mu = np.abs(mu).clip(0.17, 1.) # clip off 85 deg < theta < 95deg.0.087
+    mu = np.abs(mu).clip(1e-10, 1.)
+
+    # velocity fiedl
+    mu0 = mu2mu0(radius, mu)
+    mm = mu / mu0
+    vr = -np.sqrt(1 + mm) / np.sqrt(radius) * alphainfall
+    vt = parity * np.sqrt(1 + mm) * (mu0 - mu) / np.sin(theta) / np.sqrt(radius)
+    vp = np.sqrt(1 - mm) / np.sqrt(radius)
+    # density with clip (to avoid singularity)
+    mu = np.abs(mu).clip(0.17, 1.) # clip off 80 deg < theta < 95deg.
+    mu0 = mu2mu0(radius, mu)
+    rho = radius**(-3/2) / np.sqrt(1 + mm) / (2 / radius * mu0**2 + mm)
+    
+    if withkepler:
+        R = radius * np.sin(theta)
+        zabs = np.abs(radius * np.cos(theta))
+        # velocity
+        vkep = kepvel(radius, theta)
+        # density
+        hc = h0 * rc**plh # the scale hight normalized by rc at r/rc = 1
+        sig_c = 1.5 * (np.sqrt(2.*np.pi) * hc) # rho ~ 1.4 at R = 1 and theta=85.
+        rho_d = diskrho(radius, theta, rc, sig_c, pls = pls, plh = plh, h0 = h0) * rho_jump
+        # put a disk
+        #where_disk = np.where(rho_d >= rho)
+        H = R * h0 * (R * rc)**plh # the scale hight at r (in units of rc)
+        where_disk = (R < 1.) * (zabs < 3.* H)  # z < 3H
+        vr[where_disk] = vkep[0][where_disk]
+        vt[where_disk] = vkep[1][where_disk]
+        vp[where_disk] = vkep[2][where_disk]
+        rho[where_disk] = rho_d[where_disk]
+        #print(where_disk)
+    return vr, vt, vp, rho
+
+def mu2mu0(radius, mu):
+    '''
+    Parameters
+    ----------
+    radius: radius normalized by Rc
+    mu: cos(theta)
+    '''
+    mu0 = np.full_like(radius, np.nan)
     p = (radius - 1) / 3.
     q = mu * radius / 2.
-    mu0 = np.full_like(radius, np.nan)
-    ### three cases for computational stability
+    # three cases for computational stability
     # r >= 1 (p >= 0, D >= 0)
     c = (radius >= 1)
     D = q[c]**2 + p[c]**3
@@ -86,35 +123,7 @@ def velrho(radius, theta,
     c = (D < 0)
     mu0[c] = 2 * np.sqrt(p_minus[c]) \
              * np.cos(np.arccos(q[c] * p_minus[c]**(-3/2)) / 3.)
-    
-    mm = mu / mu0
-    vr = -np.sqrt(1 + mm) / np.sqrt(radius) * alphainfall
-    vt = parity * np.sqrt(1 + mm) * (mu0 - mu) / np.sin(theta) / np.sqrt(radius)
-    vp = np.sqrt(1 - mm) / np.sqrt(radius)
-    rho = radius**(-3/2) / np.sqrt(1 + mm) / (2 / radius * mu0**2 + mm)
-    
-    if withkepler:
-        R = radius * np.sin(theta)
-        # velocity
-        vkep = kepvel(radius, theta)
-        #vr[R < 1] = vkep[0][R < 1]
-        #vt[R < 1] = vkep[1][R < 1]
-        #vp[R < 1] = vkep[2][R < 1]
-        # density
-        #indx_R = np.where( (R >= 0.5) & (R <= 1.5) )
-        hc = h0 * rc**plh # the scale hight normalized by rc at r/rc = 1
-        #sig_c = 20. * (np.sqrt(2.*np.pi) * hc) # rho ~ 20 at R = 1.05 and theta=90.
-        sig_c = 1.5 * (np.sqrt(2.*np.pi) * hc) # rho ~ 1.4 at R = 1 and theta=85.
-        rho_d = diskrho(radius, theta, rc, sig_c, pls = pls, plh = plh, h0 = h0) * rho_jump
-        # put a disk
-        where_disk = np.where(rho_d >= rho)
-        #where_disk = np.where(R <= 1.)
-        vr[where_disk] = vkep[0][where_disk]
-        vt[where_disk] = vkep[1][where_disk]
-        vp[where_disk] = vkep[2][where_disk]
-        rho[where_disk] = rho_d[where_disk]
-        #print(where_disk)
-    return vr, vt, vp, rho
+    return mu0
 
 def xyz2rtp(x, y, z):
     r = np.sqrt(x**2 + y**2 + z**2).clip(1e-10, None)
