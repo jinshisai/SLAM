@@ -1,11 +1,10 @@
 import numpy as np
-import time
 from astropy import constants, units
 from scipy.signal import convolve
 
 from pvsilhouette.grid import Nested3DGrid
-from pvsilhouette.ulrichenvelope import *
-
+from pvsilhouette.ulrichenvelope import xyz2rtp, XYZ2xyz
+from pvsilhouette import precalculation
 
 au = units.au.to('m')
 GG = constants.G.si.value
@@ -185,21 +184,25 @@ class MockPVD(object):
         d_rho = [None] * self.grid.nlevels
         d_vlos = [None] * self.grid.nlevels
         for l in range(self.grid.nlevels):
-            X, Y, Z = self.grid.xnest[l].copy(), self.grid.ynest[l].copy(), self.grid.znest[l].copy()
-            X /= Rc
-            Y /= Rc
-            Z /= Rc
-
-            # along which axis
-            x, y, z = XYZ2xyz(irad, 0., X, Y, Z) if axis == 'major' else XYZ2xyz(irad, 0, Y, X, Z)
-            r, t, p = xyz2rtp(x, y, z)
-
+            X = self.grid.xnest[l].copy()
+            Y = self.grid.ynest[l].copy()
+            Z = self.grid.znest[l].copy()
+            if precalculation.elos_r[axis][l] is None:
+                X /= Rc
+                Y /= Rc
+                Z /= Rc
+                # along which axis
+                if axis == 'major':
+                    r, t, p = xyz2rtp(*XYZ2xyz(irad, 0, X, Y, Z))
+                else:
+                    r, t, p = xyz2rtp(*XYZ2xyz(irad, 0, Y, X, Z))
+                precalculation.update(t, p, irad, axis, l)
+            else:
+                r = np.sqrt(X**2 + Y**2 + Z**2) / Rc
             # get density and velocity
-            _, _, _, rho = velrho(r, t, alphainfall, withkepler=withkepler,
-                rc = Rc, pls = pls, plh = plh, h0 = h0, rho_jump = frho)
+            rho = precalculation.get_rho(r, frho, axis, l)
             #if len(rho.shape) != 3: rho = rho.reshape(nx, ny, nz) # in 3D
-            vlos = losvel(elos, r, t, p, alphainfall, kepler=False, withkepler=withkepler,
-                rc = Rc, pls = pls, plh = plh, h0 = h0, rho_jump = frho) * vunit
+            vlos = precalculation.get_vlos(r, alphainfall, axis, l) * vunit
             #if len(vlos.shape) != 3: vlos = vlos.reshape(nx, ny, nz) # in 3D
 
             # inner and outer edge

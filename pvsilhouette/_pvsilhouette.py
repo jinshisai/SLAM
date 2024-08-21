@@ -20,10 +20,8 @@ from astropy.coordinates import SkyCoord
 from scipy.interpolate import RegularGridInterpolator as RGI
 from tqdm import tqdm
 import warnings
-import emcee.moves
 
 from utils import emcee_corner
-from pvsilhouette.ulrichenvelope import velmax, mockpvd
 from pvsilhouette.mockpvd import MockPVD
 
 warnings.simplefilter('ignore', RuntimeWarning)
@@ -218,7 +216,7 @@ class PVSilhouette():
         self.dx = self.x[1] - self.x[0]
         self.dv = self.v[1] - self.v[0]
 
-
+    '''
     def fitting(self, incl: float = 90,
                 Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
@@ -355,7 +353,7 @@ class PVSilhouette():
         fig.tight_layout()
         fig.savefig(figname + '.model.png')
         if show: plt.show()
-
+    '''
 
 
     def check_modelgrid(self, nsubgrid: float = 1, 
