@@ -386,7 +386,8 @@ class PVSilhouette():
                 pa_maj = None, pa_min = None,
                 beam = None, linewidth = None,
                 p0 = None,
-                nsubgrid = 1, n_nest = [3, 3], reslim = 5):
+                nsubgrid = 1, n_nest = [3, 3], reslim = 5,
+                set_title: bool = True, title: str = None):
         # Observed PV diagrams
         majobs = self.dpvmajor.copy()
         minobs = self.dpvminor.copy()
@@ -532,7 +533,8 @@ class PVSilhouette():
         figs = self.plot_pvds(color = 'model', contour = 'obs',
             filename = filename, incl = incl, vmask = vmask, pa_maj = pa_maj, pa_min = pa_min,
             linewidth = linewidth, signmajor = signmajor, signminor = signminor,
-            show = show, set_title = True, nsubgrid = nsubgrid, n_nest = n_nest, reslim = reslim)
+            show = show, set_title = set_title, nsubgrid = nsubgrid, n_nest = n_nest, reslim = reslim,
+            title=title)
 
 
     def writeout_fitres(self, fout:str = 'PVsilhouette.popt'):
@@ -577,7 +579,7 @@ class PVSilhouette():
         vmask = [0., 0.], pa_maj = None, pa_min = None, linewidth = None,
         signmajor: int = None, signminor: int = None, 
         cmap = 'viridis', cmap_residual = 'bwr', ext = '.png',
-        set_title = False,
+        set_title = False, title = None,
         show = False, nsubgrid = 1, n_nest = [3, 3], reslim = 5,
         shadecolor = 'white', clevels = None):
         '''
@@ -682,6 +684,8 @@ class PVSilhouette():
                     +', '+r'$R_{c}$'+f'={self.popt[1]:.0f} au'
                     +'\n'+r'$\alpha$'+f'={self.popt[2]:.2f}'
                     +', '+r'$\alpha ^{2} M_{*}$'+f'={self.popt[0] * self.popt[2]**2:.2}')
+            if title is not None:
+                fig.suptitle(title)
 
             return fig
 
