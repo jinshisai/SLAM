@@ -37,7 +37,7 @@ class diskenvelope():
                 et = np.array([cos_t * sin_p, -cos_t * cos_p, -sin_t])
                 ep = np.array([cos_p, sin_p, np.zeros_like(p)])
                 elos = np.array([0, -np.sin(incl), np.cos(incl)])
-                elos = np.moveaxis(np.full((len(t), 3), elos), -1, 0)
+                elos = elos[:, np.newaxis]
                 elos_r = -np.sum(er * elos, axis=0)
                 elos_t = -np.sum(et * elos, axis=0)
                 elos_p = -np.sum(ep * elos, axis=0)
