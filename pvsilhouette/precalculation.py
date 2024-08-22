@@ -154,11 +154,11 @@ m = diskenvelope(radius=np.exp(lnr_mesh), theta=theta_mesh)
 vr_env, vt_env, vp_env, rho_env = m.envelope()
 vp_disk, rho_disk = m.disk()
 vp_all = vp_env + vp_disk
-f_rho_env = RGI((theta_mesh, lnr_mesh), rho_env, bounds_error=False, fill_value=0)
-f_rho_disk = RGI((theta_mesh, lnr_mesh), rho_disk, bounds_error=False, fill_value=0)
-f_vr_env = RGI((theta_mesh, lnr_mesh), vr_env, bounds_error=False, fill_value=0)
-f_vt_env = RGI((theta_mesh, lnr_mesh), vt_env, bounds_error=False, fill_value=0)
-f_vp_all = RGI((theta_mesh, lnr_mesh), vp_all, bounds_error=False, fill_value=0)
+f_rho_env = RGI((theta, lnr), rho_env, bounds_error=False, fill_value=0)
+f_rho_disk = RGI((theta, lnr), rho_disk, bounds_error=False, fill_value=0)
+f_vr_env = RGI((theta, lnr), vr_env, bounds_error=False, fill_value=0)
+f_vt_env = RGI((theta, lnr), vt_env, bounds_error=False, fill_value=0)
+f_vp_all = RGI((theta, lnr), vp_all, bounds_error=False, fill_value=0)
 
 lmax = 10
 elos_r = {'major' : [None] * lmax, 'minor' : [None] * lmax}
