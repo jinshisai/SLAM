@@ -235,11 +235,7 @@ class MockPVD(object):
         nv = len(v)
         delv = v[1] - v[0]
         if precalculation.vedge is None:
-            ve = np.hstack([v - delv * 0.5, v[-1] + 0.5 * delv])
-        else:
-            ve = precalculation.vedge
-        
-
+            precalculation.vedge = np.hstack([v - delv * 0.5, v[-1] + 0.5 * delv])
 
         if type(rho) == np.ndarray: rho = [rho.ravel()]
         if type(vlos) == np.ndarray: vlos = [vlos.ravel()]
