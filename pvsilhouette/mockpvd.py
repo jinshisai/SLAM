@@ -234,7 +234,11 @@ class MockPVD(object):
         v = self.v.copy()
         nv = len(v)
         delv = v[1] - v[0]
-        ve = np.hstack([v - delv * 0.5, v[-1] + 0.5 * delv])
+        if precalculation.vedge is None:
+            ve = np.hstack([v - delv * 0.5, v[-1] + 0.5 * delv])
+        else:
+            ve = precalculation.vedge
+        
 
 
         if type(rho) == np.ndarray: rho = [rho.ravel()]
@@ -257,7 +261,7 @@ class MockPVD(object):
         _nx, _ny, _nz = self.grid.ngrids[-1] # dimension of the l-th layer
         rho_l = rho_col[-1].reshape(_nx, _ny, _nz)
         vlos_l = vlos_col[-1].reshape(_nx, _ny, _nz)
-        tau_v = rho2tau(ve, vlos_l, rho_l) * ftau
+        tau_v = rho2tau(vlos_l, rho_l) * ftau
         # if nested grid
         if self.grid.nlevels >= 2:
             for l in range(self.grid.nlevels-2,-1,-1):
@@ -272,7 +276,7 @@ class MockPVD(object):
                     zimin, zimax = self.grid.zinest[l+1]
                     rho_l[ximin:ximax+1, yimin:yimax+1, zimin:zimax+1] = 0.
 
-                tau_vl = rho2tau(ve, vlos_l, rho_l) * ftau
+                tau_vl = rho2tau(vlos_l, rho_l) * ftau
                 # add values from the inner grid
                 _tau_v = binning(tau_v, self.grid.nsub[l])
                 tau_vl[:, yimin:yimax+1, ximin:ximax+1] += _tau_v
