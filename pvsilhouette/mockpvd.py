@@ -5,6 +5,7 @@ from scipy.signal import convolve
 from pvsilhouette.grid import Nested3DGrid
 from pvsilhouette.precalculation import XYZ2rtp
 from pvsilhouette import precalculation
+from pvsilhouette.precalculation import rho2tau
 
 au = units.au.to('m')
 GG = constants.G.si.value
@@ -171,14 +172,12 @@ class MockPVD(object):
 
 
     def build(self, Mstar:float, Rc:float, incl:float,
-        alphainfall:float = 1., withkepler: bool = True, 
-        pls: float = -1., plh: float = 0.25, h0: float = 0.1, frho:float = 1.,
+        alphainfall:float = 1., frho:float = 1.,
         rin:float = 1.0, rout:float = None, collapse = False, normalize = True,
         axis: str = 'major'):
         # parameters/units
         irad = np.radians(incl)
         vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
-        elos = [0, -np.sin(irad), np.cos(irad)] # line of sight vector
 
         # for each nested level
         d_rho = [None] * self.grid.nlevels
@@ -260,11 +259,7 @@ class MockPVD(object):
         _nx, _ny, _nz = self.grid.ngrids[-1] # dimension of the l-th layer
         rho_l = rho_col[-1].reshape(_nx, _ny, _nz)
         vlos_l = vlos_col[-1].reshape(_nx, _ny, _nz)
-        tau_v = np.zeros((nv, _ny, _nx))
-        for i in range(nv):
-            _rho = np.where((ve[i] <= vlos_l) & (vlos_l < ve[i+1]), rho_l, np.nan)
-            tau_v[i, :, :] = np.nansum(_rho, axis=2).T * ftau
-
+        tau_v = rho2tau(ve, vlos_l, rho_l) * ftau
         # if nested grid
         if self.grid.nlevels >= 2:
             for l in range(self.grid.nlevels-2,-1,-1):
@@ -279,11 +274,7 @@ class MockPVD(object):
                     zimin, zimax = self.grid.zinest[l+1]
                     rho_l[ximin:ximax+1, yimin:yimax+1, zimin:zimax+1] = 0.
 
-                tau_vl = np.zeros((nv, _ny, _nx))
-                for i in range(nv):
-                    _rho = np.where((ve[i] <= vlos_l) & (vlos_l < ve[i+1]), rho_l, np.nan)
-                    tau_vl[i, :, :] = np.nansum(_rho, axis=2).T * ftau
-
+                tau_vl = rho2tau(ve, vlos_l, rho_l) * ftau
                 # add values from the inner grid
                 _tau_v = binning(tau_v, self.grid.nsub[l])
                 tau_vl[:, yimin:yimax+1, ximin:ximax+1] += _tau_v

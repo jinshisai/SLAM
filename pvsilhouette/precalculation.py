@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator as RGI
-
+from numba import jit
+from numba import prange
 
 class diskenvelope():
     def __init__(self, radius: np.ndarray = None,
@@ -129,6 +130,15 @@ def XYZ2rtp(incl: float, phi: float,
     p = np.reshape(p, shape)
     return r, t, p
 
+@jit(parallel=True)
+def rho2tau(vedge: np.ndarray, vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
+    nv = len(vedge) - 1
+    nx, ny, _ = np.shape(vlos)
+    tau = np.zeros((nv, ny, nx))
+    for i in prange(nv):
+        mask = (vedge[i] <= vlos) * (vlos < vedge[i])
+        tau[i] = np.sum(mask * rho, axis=2).T
+    return tau
 
 Nr = 1600
 lnr = np.linspace(np.log(1e-4), np.log(1e4), Nr)  # dr/r ~ dtheta ~ 0.01
