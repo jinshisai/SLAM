@@ -148,8 +148,8 @@ theta = np.linspace(0, np.pi, Ntheta)
 theta0 = theta[0]
 dtheta = theta[1] - theta[0]
 lnr_mesh, theta_mesh = np.meshgrid(lnr, theta)
-m = diskenvelope(radius=np.exp(lnr_mesh), theta=theta_mesh)
 
+m = diskenvelope(radius=np.exp(lnr_mesh), theta=theta_mesh)
 vr_env, vt_env, vp_env, rho_env = m.envelope()
 vp_disk, rho_disk = m.disk()
 vp_all = vp_env + vp_disk

@@ -69,7 +69,7 @@ class MockPVD(object):
         incl: float = 89.,
         pa: float | list = 0., linewidth: float = None, 
         rin: float = 1., rout: float = None,
-        axis: str = 'both', tauscale: float = 1.,):
+        axis: str = 'both'):
         '''
         Generate a mock PV diagram.
 
@@ -182,10 +182,10 @@ class MockPVD(object):
         d_rho = [None] * self.grid.nlevels
         d_vlos = [None] * self.grid.nlevels
         for l in range(self.grid.nlevels):
-            X = self.grid.xnest[l] / Rc
-            Y = self.grid.ynest[l] / Rc
-            Z = self.grid.znest[l] / Rc
             if precalculation.elos_r[axis][l] is None:
+                X = self.grid.xnest[l] / Rc
+                Y = self.grid.ynest[l] / Rc
+                Z = self.grid.znest[l] / Rc
                 # along which axis
                 if axis == 'major':
                     r, t, p = XYZ2rtp(irad, 0, X, Y, Z)
