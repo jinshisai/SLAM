@@ -195,9 +195,8 @@ class MockPVD(object):
             else:
                 r = precalculation.r_org[axis][l] / Rc
             # get density and velocity
-            rho = precalculation.get_rho(r, frho, axis, l)
+            rho, vlos = precalculation.get_rho_vlos(Rc, frho, alphainfall, axis, l)
             #if len(rho.shape) != 3: rho = rho.reshape(nx, ny, nz) # in 3D
-            vlos = precalculation.get_vlos(r, alphainfall, axis, l) * vunit
             #if len(vlos.shape) != 3: vlos = vlos.reshape(nx, ny, nz) # in 3D
 
             # inner and outer edge
