@@ -130,6 +130,8 @@ def XYZ2rtp(incl: float, phi: float,
     p = np.reshape(p, shape)
     return r, t, p
 
+gauss_xy = None
+gauss_v = None
 vedge = None
 @jit(parallel=True)
 def rho2tau(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:

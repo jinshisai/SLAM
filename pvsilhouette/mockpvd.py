@@ -280,23 +280,28 @@ class MockPVD(object):
 
         # convolution along the spectral direction
         if linewidth is not None:
-            #gaussbeam = np.exp(- 0.5 * (v /(linewidth / 2.35))**2.)
-            gaussbeam = np.exp(- (v - v[nv//2 - 1 + nv%2])**2. / linewidth**2.)
-            gaussbeam /= np.sum(gaussbeam)
-            tau_v = convolve(tau_v, 
-            np.array([[gaussbeam]]).T, mode='same') # conserve integrated value
+            if precalculation.gauss_v is None:
+                #gaussbeam = np.exp(- 0.5 * (v /(linewidth / 2.35))**2.)
+                gaussbeam = np.exp(- (v - v[nv//2 - 1 + nv%2])**2. / linewidth**2.)
+                gaussbeam /= np.sum(gaussbeam)
+                precalculation.gauss_v = gaussbeam[:, np.newaxis, np.newaxis]
+            g = precalculation.gauss_v
+            tau_v = convolve(tau_v, g, mode='same') # conserve integrated value
 
         I_cube = fflux * ( 1. - np.exp(-tau_v) ) # fscale = (Bv(Tex) - Bv(Tbg))
 
         # beam convolution
         if beam is not None:
-            bmaj, bmin, bpa = beam
-            xb, yb = rot(*np.meshgrid(self.x, self.y, indexing='ij'), np.radians(bpa - pa))
-            gaussbeam = np.exp(
-                - 0.5 * (yb /(bmin / 2.35))**2. \
-                - 0.5 * (xb /(bmaj / 2.35))**2.)
-            gaussbeam /= np.sum(gaussbeam)
-            I_cube = convolve(I_cube, np.array([gaussbeam]), mode='same')
+            if precalculation.gauss_xy is None:
+                bmaj, bmin, bpa = beam
+                xb, yb = rot(*np.meshgrid(self.x, self.y, indexing='ij'), np.radians(bpa - pa))
+                gaussbeam = np.exp(
+                    - 0.5 * (yb /(bmin / 2.35))**2. \
+                    - 0.5 * (xb /(bmaj / 2.35))**2.)
+                gaussbeam /= np.sum(gaussbeam)
+                precalculation.gauss_xy = gaussbeam[np.newaxis, :]
+            g = precalculation.gauss_xy
+            I_cube = convolve(I_cube, g, mode='same')
 
         # output
         I_pv = I_cube[:,ny//2,:]
