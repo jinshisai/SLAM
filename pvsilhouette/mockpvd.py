@@ -193,7 +193,7 @@ class MockPVD(object):
                     r, t, p = XYZ2rtp(irad, 0, Y, X, Z)
                 precalculation.update(r * Rc, t, p, irad, axis, l)
             else:
-                r = precalculation.r_org[axis][l] / Rc
+                r_org = precalculation.r_org[axis][l]
             # get density and velocity
             rho, vlos = precalculation.get_rho_vlos(Rc, frho, alphainfall, axis, l)
             vlos = vlos * vunit
@@ -201,8 +201,8 @@ class MockPVD(object):
             #if len(vlos.shape) != 3: vlos = vlos.reshape(nx, ny, nz) # in 3D
 
             # inner and outer edge
-            rho[r * Rc <= rin] = 0.
-            if rout is not None: rho[np.where(r * Rc > rout)] = np.nan
+            rho[r_org <= rin] = 0.
+            if rout is not None: rho[np.where(r_org > rout)] = 0
 
             d_rho[l] = rho
             d_vlos[l] = vlos
