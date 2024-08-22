@@ -191,9 +191,9 @@ class MockPVD(object):
                     r, t, p = XYZ2rtp(irad, 0, X, Y, Z)
                 else:
                     r, t, p = XYZ2rtp(irad, 0, Y, X, Z)
-                precalculation.update(t, p, irad, axis, l)
+                precalculation.update(r * Rc, t, p, irad, axis, l)
             else:
-                r = np.linalg.norm([X, Y, Z], axis=0)
+                r = precalculation.r_org[axis][l] / Rc
             # get density and velocity
             rho = precalculation.get_rho(r, frho, axis, l)
             #if len(rho.shape) != 3: rho = rho.reshape(nx, ny, nz) # in 3D
