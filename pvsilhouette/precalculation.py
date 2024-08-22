@@ -190,7 +190,7 @@ def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
     #vp = vp_all[i, j]
     theta = t[axis][l]
     rho = f_rho_env((theta, lnr)) + f_rho_disk((theta, lnr)) * rho_jump
-    vr = f_vr_env((theta, lnr))
+    vr = f_vr_env((theta, lnr)) * alphainfall
     vt = f_vt_env((theta, lnr))
     vp = f_vp_all((theta, lnr))
     vlos = vr * elos_r[axis][l] + vt * elos_t[axis][l] + vp * elos_p[axis][l]
