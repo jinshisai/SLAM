@@ -603,7 +603,7 @@ class PVSilhouette():
             major, minor = mpvd.generate_mockpvd(
                 Mstar, Rc, alphainfall, 
                 fflux = fflux * obsmax, frho = 10.**log_frho, ftau = 10.**log_ftau,
-                incl = incl, withkepler = True, linewidth = linewidth,
+                incl = incl, linewidth = linewidth,
                 rout = rout, pa = [pa_maj, pa_min],
                 axis = 'both')
             # quadrant

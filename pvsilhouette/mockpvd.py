@@ -66,8 +66,7 @@ class MockPVD(object):
     def generate_mockpvd(self, 
         Mstar: float, Rc: float, alphainfall: float = 1., 
         fflux: float = 1., frho: float = 1., ftau: float = 1.,
-        incl: float = 89., withkepler: bool = True, 
-        pls: float = -1., plh: float = 0.25, h0: float = 0.1, 
+        incl: float = 89.,
         pa: float | list = 0., linewidth: float = None, 
         rin: float = 1., rout: float = None,
         axis: str = 'both', tauscale: float = 1.,):
@@ -100,8 +99,8 @@ class MockPVD(object):
             for _axis in ['major', 'minor']:
                 # build model
                 _rho, _vlos = self.build(Mstar, Rc, incl, 
-                    alphainfall = alphainfall, withkepler = withkepler, 
-                    pls = pls, plh = plh, h0 = h0, frho = frho, rin = rin, rout = rout, 
+                    alphainfall = alphainfall,
+                    frho = frho, rin = rin, rout = rout, 
                     axis = _axis, collapse = False, normalize = False)
                 rho.append(_rho)
                 vlos.append(_vlos)
@@ -119,8 +118,8 @@ class MockPVD(object):
         else:
             # build model
             rho, vlos = self.build(Mstar, Rc, incl, 
-                alphainfall = alphainfall, withkepler = withkepler, 
-                pls = pls, plh = plh, h0 = h0, frho = frho, rin = rin, rout = rout, 
+                alphainfall = alphainfall,
+                frho = frho, rin = rin, rout = rout, 
                 axis = axis, collapse = False)
             # PV cut
             return self.generate_pvd(rho, vlos, fflux, ftau, beam = self.beam,
