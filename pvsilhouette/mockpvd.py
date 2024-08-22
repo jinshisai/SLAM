@@ -192,8 +192,7 @@ class MockPVD(object):
                 else:
                     r, t, p = XYZ2rtp(irad, 0, Y, X, Z)
                 precalculation.update(r * Rc, t, p, irad, axis, l)
-            else:
-                r_org = precalculation.r_org[axis][l]
+            r_org = precalculation.r_org[axis][l]
             # get density and velocity
             rho, vlos = precalculation.get_rho_vlos(Rc, frho, alphainfall, axis, l)
             vlos = vlos * vunit
