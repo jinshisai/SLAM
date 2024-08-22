@@ -1,7 +1,7 @@
 import numpy as np
 from numba import jit
 from numba import prange
-#from scipy.interpolate import RegularGridInterpolator as RGI
+
 
 class diskenvelope():
     def __init__(self, radius: np.ndarray = None,
@@ -136,7 +136,7 @@ def rho2tau(vedge: np.ndarray, vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
     nx, ny, _ = np.shape(vlos)
     tau = np.zeros((nv, ny, nx))
     for i in prange(nv):
-        mask = (vedge[i] <= vlos) * (vlos < vedge[i])
+        mask = (vedge[i] <= vlos) * (vlos < vedge[i + 1])
         tau[i] = np.sum(mask * rho, axis=2).T
     return tau
 
@@ -154,11 +154,6 @@ m = diskenvelope(radius=np.exp(lnr_mesh), theta=theta_mesh)
 vr_env, vt_env, vp_env, rho_env = m.envelope()
 vp_disk, rho_disk = m.disk()
 vp_all = vp_env + vp_disk
-#f_rho_env = RGI((theta, lnr), rho_env, bounds_error=False, fill_value=0)
-#f_rho_disk = RGI((theta, lnr), rho_disk, bounds_error=False, fill_value=0)
-#f_vr_env = RGI((theta, lnr), vr_env, bounds_error=False, fill_value=0)
-#f_vt_env = RGI((theta, lnr), vt_env, bounds_error=False, fill_value=0)
-#f_vp_all = RGI((theta, lnr), vp_all, bounds_error=False, fill_value=0)
 
 lmax = 10
 elos_r = {'major' : [None] * lmax, 'minor' : [None] * lmax}
@@ -188,10 +183,5 @@ def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
     vr = vr_env[i, j] * alphainfall
     vt = vt_env[i, j]
     vp = vp_all[i, j]
-    #theta = t[axis][l]
-    #rho = f_rho_env((theta, lnr)) + f_rho_disk((theta, lnr)) * rho_jump
-    #vr = f_vr_env((theta, lnr)) * alphainfall
-    #vt = f_vt_env((theta, lnr))
-    #vp = f_vp_all((theta, lnr))
     vlos = vr * elos_r[axis][l] + vt * elos_t[axis][l] + vp * elos_p[axis][l]
     return rho, vlos
