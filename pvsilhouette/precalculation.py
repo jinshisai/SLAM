@@ -1,6 +1,7 @@
 import numpy as np
 from numba import jit
 from numba import prange
+from scipy.interpolate import RegularGridInterpolator as RGI
 
 class diskenvelope():
     def __init__(self, radius: np.ndarray = None,
@@ -153,6 +154,11 @@ m = diskenvelope(radius=np.exp(lnr_mesh), theta=theta_mesh)
 vr_env, vt_env, vp_env, rho_env = m.envelope()
 vp_disk, rho_disk = m.disk()
 vp_all = vp_env + vp_disk
+f_rho_env = RGI((theta_mesh, lnr_mesh), rho_env, bounds_error=False, fill_value=0)
+f_rho_disk = RGI((theta_mesh, lnr_mesh), rho_disk, bounds_error=False, fill_value=0)
+f_vr_env = RGI((theta_mesh, lnr_mesh), vr_env, bounds_error=False, fill_value=0)
+f_vt_env = RGI((theta_mesh, lnr_mesh), vt_env, bounds_error=False, fill_value=0)
+f_vp_all = RGI((theta_mesh, lnr_mesh), vp_all, bounds_error=False, fill_value=0)
 
 lmax = 10
 elos_r = {'major' : [None] * lmax, 'minor' : [None] * lmax}
@@ -178,9 +184,14 @@ def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
     lnr = np.log(r_org[axis][l] / Rc)
     j = np.clip((lnr - lnr0) / dlnr + 0.5, 0, Nr - 1) 
     j = j.astype(int)
-    rho = rho_env[i, j] + rho_disk[i, j] * rho_jump
-    vr = vr_env[i, j] * alphainfall
-    vt = vt_env[i, j]
-    vp = vp_all[i, j]
+    #rho = rho_env[i, j] + rho_disk[i, j] * rho_jump
+    #vr = vr_env[i, j] * alphainfall
+    #vt = vt_env[i, j]
+    #vp = vp_all[i, j]
+    theta = t[axis][l]
+    rho = f_rho_env((theta, lnr)) + f_rho_disk((theta, lnr)) * rho_jump
+    vr = f_vr_env((theta, lnr))
+    vt = f_vt_env((theta, lnr))
+    vp = f_vp_all((theta, lnr))
     vlos = vr * elos_r[axis][l] + vt * elos_t[axis][l] + vp * elos_p[axis][l]
     return rho, vlos
