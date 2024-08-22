@@ -142,25 +142,30 @@ def rho2tau(vedge: np.ndarray, vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
 
 Nr = 1600
 lnr = np.linspace(np.log(1e-4), np.log(1e4), Nr)  # dr/r ~ dtheta ~ 0.01
+lnr0 = lnr[0]
 dlnr = np.exp(lnr[1] - lnr[0]) - 1
 Ntheta = int(np.pi / dlnr + 0.5)
 theta = np.linspace(0, np.pi, Ntheta)
+theta0 = theta[0]
+dtheta = theta[1] - theta[0]
 lnr_mesh, theta_mesh = np.meshgrid(lnr, theta)
 m = diskenvelope(radius=np.exp(lnr_mesh), theta=theta_mesh)
 
 vr_env, vt_env, vp_env, rho_env = m.envelope()
 vp_disk, rho_disk = m.disk()
-f_vr_env = RGI((theta, lnr), vr_env, bounds_error=False, fill_value=0)
-f_vt_env = RGI((theta, lnr), vt_env, bounds_error=False, fill_value=0)
-f_vp = RGI((theta, lnr), vp_env + vp_disk, bounds_error=False, fill_value=0)
-f_rho_env = RGI((theta, lnr), rho_env, bounds_error=False, fill_value=0)
-f_rho_disk = RGI((theta, lnr), rho_disk, bounds_error=False, fill_value=0)
+vp_all = vp_env + vp_disk
+#f_vr_env = RGI((theta, lnr), vr_env, bounds_error=False, fill_value=0)
+#f_vt_env = RGI((theta, lnr), vt_env, bounds_error=False, fill_value=0)
+#f_vp = RGI((theta, lnr), vp_all, bounds_error=False, fill_value=0)
+#f_rho_env = RGI((theta, lnr), rho_env, bounds_error=False, fill_value=0)
+#f_rho_disk = RGI((theta, lnr), rho_disk, bounds_error=False, fill_value=0)
 
 lmax = 10
 elos_r = {'major' : [None] * lmax, 'minor' : [None] * lmax}
 elos_t = {'major' : [None] * lmax, 'minor' : [None] * lmax}
 elos_p = {'major' : [None] * lmax, 'minor' : [None] * lmax}
 t = {'major' : [None] * lmax, 'minor' : [None] * lmax}
+idx_t = {'major' : [None] * lmax, 'minor' : [None] * lmax}
 r_org = {'major' : [None] * lmax, 'minor' : [None] * lmax}
 def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: float,
            axis: str, l: int) -> None:
@@ -169,21 +174,24 @@ def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: flo
     elos_t[axis][l] = m.elos_t
     elos_p[axis][l] = m.elos_p
     t[axis][l] = m.theta
+    i = (m.theta - theta0) / dtheta + 0.5
+    idx_t[axis][l] = i.astype(int)
     r_org[axis][l] = radius_org
 
-def get_rho(Rc: float, rho_jump: float,
-            axis: str, l: int) -> np.ndarray:
-    theta = t[axis][l]
+def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
+                 axis: str, l: int) -> tuple[np.ndarray, np.ndarray]:
+    i = idx_t[axis][l]
     lnr = np.log(r_org[axis][l] / Rc)
-    rho = f_rho_env((theta, lnr)) + f_rho_disk((theta, lnr)) * rho_jump
-    return rho
-
-def get_vlos(Rc: float, alphainfall: float,
-             axis: str, l: int) -> np.ndarray:
-    theta = t[axis][l]
-    lnr = np.log(r_org[axis][l] / Rc)
-    vr = f_vr_env((theta, lnr)) * alphainfall
-    vt = f_vt_env((theta, lnr))
-    vp = f_vp((theta, lnr))
+    j = np.clip((lnr - lnr0) / dlnr + 0.5, 0, Nr - 1) 
+    j = j.astype(int)
+    #theta = t[axis][l]
+    #rho = f_rho_env((theta, lnr)) + f_rho_disk((theta, lnr)) * rho_jump
+    #vr = f_vr_env((theta, lnr)) * alphainfall
+    #vt = f_vt_env((theta, lnr))
+    #vp = f_vp((theta, lnr))
+    rho = rho_env[i, j] + rho_disk[i, j] * rho_jump
+    vr = vr_env[i, j]
+    vt = vt_env[i, j]
+    vp = vp_all[i, j]
     vlos = vr * elos_r[axis][l] + vt * elos_t[axis][l] + vp * elos_p[axis][l]
-    return vlos
+    return rho, vlos
