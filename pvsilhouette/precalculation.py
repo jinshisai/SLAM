@@ -130,8 +130,9 @@ def XYZ2rtp(incl: float, phi: float,
     p = np.reshape(p, shape)
     return r, t, p
 
+vedge = None
 @jit(parallel=True)
-def rho2tau(vedge: np.ndarray, vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
+def rho2tau(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
     nv = len(vedge) - 1
     nx, ny, _ = np.shape(vlos)
     tau = np.zeros((nv, ny, nx))
