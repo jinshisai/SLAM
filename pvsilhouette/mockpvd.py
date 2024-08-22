@@ -3,7 +3,7 @@ from astropy import constants, units
 from scipy.signal import convolve
 
 from pvsilhouette.grid import Nested3DGrid
-from pvsilhouette.ulrichenvelope import xyz2rtp, XYZ2xyz
+from pvsilhouette.precalculation import XYZ2rtp
 from pvsilhouette import precalculation
 
 au = units.au.to('m')
@@ -184,21 +184,18 @@ class MockPVD(object):
         d_rho = [None] * self.grid.nlevels
         d_vlos = [None] * self.grid.nlevels
         for l in range(self.grid.nlevels):
-            X = self.grid.xnest[l].copy()
-            Y = self.grid.ynest[l].copy()
-            Z = self.grid.znest[l].copy()
+            X = self.grid.xnest[l] / Rc
+            Y = self.grid.ynest[l] / Rc
+            Z = self.grid.znest[l] / Rc
             if precalculation.elos_r[axis][l] is None:
-                X /= Rc
-                Y /= Rc
-                Z /= Rc
                 # along which axis
                 if axis == 'major':
-                    r, t, p = xyz2rtp(*XYZ2xyz(irad, 0, X, Y, Z))
+                    r, t, p = XYZ2rtp(irad, 0, X, Y, Z)
                 else:
-                    r, t, p = xyz2rtp(*XYZ2xyz(irad, 0, Y, X, Z))
+                    r, t, p = XYZ2rtp(irad, 0, Y, X, Z)
                 precalculation.update(t, p, irad, axis, l)
             else:
-                r = np.sqrt(X**2 + Y**2 + Z**2) / Rc
+                r = np.linalg.norm([X, Y, Z], axis=0)
             # get density and velocity
             rho = precalculation.get_rho(r, frho, axis, l)
             #if len(rho.shape) != 3: rho = rho.reshape(nx, ny, nz) # in 3D

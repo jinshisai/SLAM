@@ -100,22 +100,51 @@ class diskenvelope():
         rho[~c] = 0
         return vp, rho
 
+def rotbase(t: np.ndarray, p: np.ndarray
+            ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """t is an inclination angle from +z to (x, y)=(sin p, -cos p).
+       p is an azimuthal angle from -y to +x.
+    """
+    er = np.array([np.sin(t) * np.sin(p), -np.sin(t) * np.cos(p), np.cos(t)])
+    et = np.array([np.cos(t) * np.sin(p), -np.cos(t) * np.cos(p), -np.sin(t)])
+    ep = np.array([np.cos(p), np.sin(p), np.zeros_like(p)])
+    return er, et, ep
+
+def XYZ2rtp(incl: float, phi: float,
+            X: np.ndarray, Y: np.ndarray, Z: np.ndarray
+            ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """The observer coordinate (X,Y,Z) and the envelope coordinate (x,y,z)
+       are linked as X * ep + Y * (-et) + Z * er = x, y, z.
+    """
+    shape = np.shape(X)
+    er, et, ep = rotbase(incl, phi)
+    x, y, z = np.outer(ep, X.ravel()) \
+              + np.outer(-et, Y.ravel()) \
+              + np.outer(er, Z.ravel())
+    r = np.linalg.norm([x, y, z], axis=0).clip(1e-10, None)
+    t = np.arccos(z / r)
+    p = np.arctan2(x, -y)
+    r = np.reshape(r, shape)
+    t = np.reshape(t, shape)
+    p = np.reshape(p, shape)
+    return r, t, p
+
 
 Nr = 1600
 lnr = np.linspace(np.log(1e-4), np.log(1e4), Nr)  # dr/r ~ dtheta ~ 0.01
 dlnr = np.exp(lnr[1] - lnr[0]) - 1
-Nt = int(np.pi / dlnr + 0.5)
-t = np.linspace(0, np.pi, Nt)
-lnr_mesh, t_mesh = np.meshgrid(lnr, t)
-m = diskenvelope(radius=np.exp(lnr_mesh), theta=t_mesh)
+Ntheta = int(np.pi / dlnr + 0.5)
+theta = np.linspace(0, np.pi, Ntheta)
+lnr_mesh, theta_mesh = np.meshgrid(lnr, theta)
+m = diskenvelope(radius=np.exp(lnr_mesh), theta=theta_mesh)
 
 vr_env, vt_env, vp_env, rho_env = m.envelope()
 vp_disk, rho_disk = m.disk()
-f_vr_env = RGI((t, lnr), vr_env, bounds_error=False, fill_value=0)
-f_vt_env = RGI((t, lnr), vt_env, bounds_error=False, fill_value=0)
-f_vp = RGI((t, lnr), vp_env + vp_disk, bounds_error=False, fill_value=0)
-f_rho_env = RGI((t, lnr), rho_env, bounds_error=False, fill_value=0)
-f_rho_disk = RGI((t, lnr), rho_disk, bounds_error=False, fill_value=0)
+f_vr_env = RGI((theta, lnr), vr_env, bounds_error=False, fill_value=0)
+f_vt_env = RGI((theta, lnr), vt_env, bounds_error=False, fill_value=0)
+f_vp = RGI((theta, lnr), vp_env + vp_disk, bounds_error=False, fill_value=0)
+f_rho_env = RGI((theta, lnr), rho_env, bounds_error=False, fill_value=0)
+f_rho_disk = RGI((theta, lnr), rho_disk, bounds_error=False, fill_value=0)
 
 lmax = 10
 elos_r = {'major' : [None] * lmax, 'minor' : [None] * lmax}
@@ -133,14 +162,16 @@ def update(theta: np.ndarray, phi: np.ndarray, incl: float,
 def get_rho(radius: np.ndarray, rho_jump: float,
             axis: str, l: int) -> np.ndarray:
     theta = t[axis][l]
-    rho = f_rho_env((theta, radius)) + f_rho_disk((theta, radius)) * rho_jump
+    lnr = np.log(radius)
+    rho = f_rho_env((theta, lnr)) + f_rho_disk((theta, radius)) * rho_jump
     return rho
 
 def get_vlos(radius: np.ndarray, alphainfall: float,
              axis: str, l: int) -> np.ndarray:
     theta = t[axis][l]
-    vr = f_vr_env((theta, radius)) * alphainfall
-    vt = f_vt_env((theta, radius))
-    vp = f_vp((theta, radius))
+    lnr = np.log(radius)
+    vr = f_vr_env((theta, lnr)) * alphainfall
+    vt = f_vt_env((theta, lnr))
+    vp = f_vp((theta, lnr))
     vlos = vr * elos_r[axis][l] + vt * elos_t[axis][l] + vp * elos_p[axis][l]
     return vlos
