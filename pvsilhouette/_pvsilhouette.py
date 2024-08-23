@@ -484,22 +484,19 @@ class PVSilhouette():
                 q = p_fixed.copy()
                 q[p_fixed == None] = p # in linear scale
                 # updated sigma
-                majsig2 = majsig**2. + q[-1]**2.
-                minsig2 = minsig**2. + q[-1]**2.
+                majsig2 = majsig**2. + (q[-1] * self.sigma)**2.
+                minsig2 = minsig**2. + (q[-1] * self.sigma)**2.
                 # make model
                 majmod, minmod = makemodel(*q[:-1])
                 return - 0.5 * (np.nansum((majobs - majmod)**2 / majsig2 + np.log(2.*np.pi*majsig2))\
                     + np.nansum((minobs - minmod)**2 / minsig2 + np.log(2.*np.pi*minsig2))) / np.sqrt(Rarea)
             # prior
-            sig_mdl_range = np.array(sig_mdl_range) * self.sigma
             plim = np.array([Mstar_range, Rc_range, alphainfall_range, 
-                fflux_range, log_ftau_range, log_frho_range, list(sig_mdl_range)])
+                fflux_range, log_ftau_range, log_frho_range, sig_mdl_range])
             plim = plim[p_fixed == None].T
 
             # run mcmc fitting
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
-            mcmc = np.array(mcmc)
-            mcmc[:, -1] = mcmc[:, -1] / self.sigma
             # best parameters & errors
             popt = p_fixed.copy()
             popt[p_fixed == None] = mcmc[0]
