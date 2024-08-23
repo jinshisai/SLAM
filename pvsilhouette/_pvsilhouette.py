@@ -488,6 +488,10 @@ class PVSilhouette():
                 minsig2 = minsig**2. + (q[-1] * self.sigma)**2.
                 # make model
                 majmod, minmod = makemodel(*q[:-1])
+                fflux = (np.nansum(majobs * majmod) + np.nansum(minobs * minmod)) \
+                        / (np.nansum(majmod * majmod) + np.nansum(minmod * minmod))
+                majmod = fflux * majmod
+                minmod = fflux * minmod
                 return - 0.5 * (np.nansum((majobs - majmod)**2 / majsig2 + np.log(2.*np.pi*majsig2))\
                     + np.nansum((minobs - minmod)**2 / minsig2 + np.log(2.*np.pi*minsig2))) / np.sqrt(Rarea)
             # prior
