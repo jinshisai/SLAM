@@ -498,7 +498,8 @@ class PVSilhouette():
 
             # run mcmc fitting
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
-
+            mcmc = np.array(mcmc)
+            mcmc[:, -1] = mcmc[:, -1] / self.sigma
             # best parameters & errors
             popt = p_fixed.copy()
             popt[p_fixed == None] = mcmc[0]
