@@ -165,6 +165,7 @@ elos_p = {'major' : [None] * lmax, 'minor' : [None] * lmax}
 t = {'major' : [None] * lmax, 'minor' : [None] * lmax}
 idx_t = {'major' : [None] * lmax, 'minor' : [None] * lmax}
 r_org = {'major' : [None] * lmax, 'minor' : [None] * lmax}
+j_org = {'major' : [None] * lmax, 'minor' : [None] * lmax}
 def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: float,
            axis: str, l: int) -> None:
     m = diskenvelope(theta=theta, phi=phi, incl=incl)
@@ -175,12 +176,13 @@ def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: flo
     i = (m.theta - theta0) / dtheta + 0.5
     idx_t[axis][l] = i.astype(int)
     r_org[axis][l] = radius_org
+    j_org[axis][l] = (np.log(radius_org) - lnr0) / dlnr + 0.5
 
 def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
                  axis: str, l: int) -> tuple[np.ndarray, np.ndarray]:
     i = idx_t[axis][l]
-    lnr = np.log(r_org[axis][l] / Rc)
-    j = np.clip((lnr - lnr0) / dlnr + 0.5, 0, Nr - 1) 
+    j = j_org[axis][l] - np.log(Rc) / dlnr
+    j = np.clip(j, 0, Nr - 1) 
     j = j.astype(int)
     rho = rho_env[i, j] + rho_disk[i, j] * rho_jump
     vr = vr_env[i, j] * alphainfall
