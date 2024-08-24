@@ -484,8 +484,8 @@ class PVSilhouette():
                 q = p_fixed.copy()
                 q[p_fixed == None] = p # in linear scale
                 # updated sigma
-                majsig2 = majsig**2. + (q[-1] * self.sigma)**2.
-                minsig2 = minsig**2. + (q[-1] * self.sigma)**2.
+                majsig2 = ((1. + q[-1]) * majsig)**2.
+                minsig2 = ((1. + q[-1]) * minsig)**2.
                 # make model
                 majmod, minmod = makemodel(*q[:-1])
                 fflux = (np.nansum(majobs * majmod) + np.nansum(minobs * minmod)) \
