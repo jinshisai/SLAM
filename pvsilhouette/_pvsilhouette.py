@@ -431,8 +431,6 @@ class PVSilhouette():
         # get quadrant
         majquad = getquad(self.dpvmajor) if signmajor is None else signmajor
         minquad = getquad(self.dpvminor) * (-1) if signminor is None else signminor
-        obsmax = max(np.nanmax(majobs), np.nanmax(minobs))
-
 
         # model
         mpvd = MockPVD(self.x, self.x, self.v, 
@@ -519,9 +517,9 @@ class PVSilhouette():
         print(f'M* = {plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} Msun')
         print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
         print(f'alpha = {plow[2]:.2f}, {popt[2]:.2f}, {phigh[2]:.2f}')
-        print(f'f_flux = {plow[3]:.2f}, {popt[3]:.2f}, {phigh[3]:.2f}')
-        print(f'f_tau = {plow[4]:.2f}, {popt[4]:.2f}, {phigh[4]:.2f}')
-        print(f'f_rho = {plow[5]:.2f}, {popt[5]:.2f}, {phigh[5]:.2f}')
+        print(f'f_tau = {plow[3]:.2f}, {popt[3]:.2f}, {phigh[3]:.2f}')
+        print(f'f_rho = {plow[4]:.2f}, {popt[4]:.2f}, {phigh[4]:.2f}')
+        print(f'sig_mdl = {plow[5]:.2f}, {popt[5]:.2f}, {phigh[5]:.2f}')
 
 
         # write out result
@@ -591,7 +589,6 @@ class PVSilhouette():
         # get quadrant
         majquad = getquad(self.dpvmajor) if signmajor is None else signmajor
         minquad = getquad(self.dpvminor) * (-1) if signminor is None else signminor
-        obsmax = max(np.nanmax(majobs), np.nanmax(minobs))
 
         # model
         mpvd = MockPVD(self.x, self.x, self.v, 

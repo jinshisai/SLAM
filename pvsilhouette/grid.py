@@ -269,7 +269,7 @@ class Nested3DGrid(object):
         zimin, zimax = index_between(self.z, zlim, mode='edge')[0]
         _nx = ximax - ximin + 1
         _ny = yimax - yimin + 1
-        _nz - zimax - zimin + 1
+        _nz = zimax - zimin + 1
         xemin, xemax = self.xe[ximin], self.xe[ximax + 1]
         yemin, yemax = self.ye[yimin], self.ye[yimax + 1]
         zemin, zemax = self.ze[zimin], self.ze[zimax + 1]
