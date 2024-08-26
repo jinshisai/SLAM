@@ -353,12 +353,11 @@ class PVSilhouette():
         self.plow = plow
         self.pmid = pmid
         self.phigh = phigh
-        print(f'M* = {plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} Msun')
-        print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
-        print(f'alpha = {plow[2]:.2f}, {popt[2]:.2f}, {phigh[2]:.2f}')
-        print(f'f_tau = {plow[3]:.2f}, {popt[3]:.2f}, {phigh[3]:.2f}')
-        print(f'f_rho = {plow[4]:.2f}, {popt[4]:.2f}, {phigh[4]:.2f}')
-        print(f'sig_mdl = {plow[5]:.2f}, {popt[5]:.2f}, {phigh[5]:.2f}')
+        units = ['Msun', 'au', '', '', '', 'sig_obs']
+        digits = [2, 0, 2, 2, 2, 2]
+        for i, (k, d, u) in enumerate(zip(paramkeys, digits, units)):
+            plow, popt, phigh = self.plow[i], self.popt[i], self.phigh[i]
+            print(f'{k} = {plow:.{d:d}f}, {popt:.{d:d}f}, {phigh:.{d:d}f} {u}')
         plist = [self.popt, self.plow, self.pmid, self.phigh]
         with open(filename+'.popt.txt', 'w') as f:
             f.write('#Rows:' + ','.join(paramkeys) + '\n')

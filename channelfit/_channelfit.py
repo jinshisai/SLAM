@@ -723,9 +723,11 @@ class ChannelFit():
             self.plow = p_fixed
             self.pmid = p_fixed
             self.phigh = p_fixed
-        print('------------------------')
-        print(f'popt:', ', '.join([f'{k}={p:.2e}' for k, p in zip(self.paramkeys, self.popt)]))
-        print('------------------------')
+        units = ['Msun', 'au', 'km/s', '', '', '', 'au', '', 'au', 'au', 'km/s', 'deg']
+        digits = [2, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+        for i, (k, d, u) in enumerate(zip(self.paramkeys, digits, units)):
+            plow, popt, phigh = self.plow[i], self.popt[i], self.phigh[i]
+            print(f'{k} = {plow:.{d:d}f}, {popt:.{d:d}f}, {phigh:.{d:d}f} {u}')
         plist = [self.popt, self.plow, self.pmid, self.phigh]
         with open(filename+'.popt.txt', 'w') as f:
             f.write('#Rows:' + ','.join(self.paramkeys) + '\n')
