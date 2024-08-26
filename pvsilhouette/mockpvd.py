@@ -20,9 +20,9 @@ class MockPVD(object):
 
     """
     def __init__(self, x:np.ndarray, z:np.ndarray, v:np.ndarray, 
-        nnest:list = None, nsubgrid:int = 1, 
-        xlim:list = None, ylim: list = None, zlim:list = None,
-        beam:list = None, reslim:float = 5):
+                 nnest:list | None = None, nsubgrid: int = 1, 
+                 xlim:list | None = None, ylim: list | None = None, zlim:list | None = None,
+                 beam:list | None = None, reslim: float = 5):
         '''
         Initialize MockPVD with a given grid. z is the line of sight axis.
 
@@ -63,11 +63,11 @@ class MockPVD(object):
 
 
 
-    def generate_mockpvd(self, Mstar: float, Rc: float, alphainfall: float = 1., 
+    def generate_mockpvd(self, Mstar:float, Rc:float, alphainfall: float = 1., 
                          ftau: float = 1., frho: float = 1.,
                          incl: float = 89., pa: float | list = 0.,
-                         linewidth: float = None, rin: float = 1., 
-                         rout: float = None, axis: str = 'both'):
+                         linewidth: float | None = None, rin: float = 1., 
+                         rout: float | None = None, axis: str = 'both'):
         '''
         Generate a mock PV diagram.
 
