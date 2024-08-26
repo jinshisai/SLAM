@@ -370,12 +370,11 @@ class PVSilhouette():
                 Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1., 1000.],
                 alphainfall_range: list = [0.0, 1],
-                fflux_range: list = [0.3, 3.],
                 log_ftau_range: list = [-1., 3.],
                 log_frho_range: list = [-1., 4.],
                 sig_mdl_range: list = [0., 10.],
                 fixed_params: dict = {'Mstar': None, 
-                'Rc': None, 'alphainfall': None, 'fflux': None,
+                'Rc': None, 'alphainfall': None,
                 'log_ftau': None, 'log_frho': None, 'sig_mdl': None},
                 vmask: list = [0, 0],
                 filename: str = 'PVsilhouette',
@@ -440,10 +439,10 @@ class PVSilhouette():
             nsubgrid = nsubgrid, nnest = n_nest, 
             beam = self.beam, reslim = reslim)
         rout = np.nanmax(self.x)
-        def makemodel(Mstar, Rc, alphainfall, fflux, log_ftau, log_frho):
+        def makemodel(Mstar, Rc, alphainfall, log_ftau, log_frho):
             major, minor = mpvd.generate_mockpvd(
                 Mstar, Rc, alphainfall, 
-                fflux = fflux * obsmax, frho = 10.**log_frho, ftau = 10.**log_ftau,
+                frho = 10.**log_frho, ftau = 10.**log_ftau,
                 incl = incl, linewidth = linewidth,
                 rout = rout, pa = [pa_maj, pa_min],
                 axis = 'both')
@@ -455,12 +454,10 @@ class PVSilhouette():
 
         # Fitting
         _fixed_params = {'Mstar': None, 
-        'Rc': None, 'alphainfall': None, 'fflux': None,
+        'Rc': None, 'alphainfall': None,
         'log_ftau': None, 'log_frho': None, 'sig_mdl': None}
         _fixed_params.update(fixed_params)
         p_fixed = np.array(list(_fixed_params.values()))
-        #p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed, 
-        #    fflux_fixed, log_ftau_fixed, log_frho_fixed, sig_mdl_fixed])
         if None in p_fixed:
             labels = np.array(['Mstar', 'Rc', r'$\alpha$', r'$f_\mathrm{flux}$', 
                 r'log $f_\tau$', r'log $f_\rho$', r'$\sigma_\mathrm{model}$'])
@@ -495,8 +492,8 @@ class PVSilhouette():
                 return - 0.5 * (np.nansum((majobs - majmod)**2 / majsig2 + np.log(2.*np.pi*majsig2))\
                     + np.nansum((minobs - minmod)**2 / minsig2 + np.log(2.*np.pi*minsig2))) / np.sqrt(Rarea)
             # prior
-            plim = np.array([Mstar_range, Rc_range, alphainfall_range, 
-                fflux_range, log_ftau_range, log_frho_range, sig_mdl_range])
+            plim = np.array([Mstar_range, Rc_range, alphainfall_range,
+                             log_ftau_range, log_frho_range, sig_mdl_range])
             plim = plim[p_fixed == None].T
 
             # run mcmc fitting
@@ -548,8 +545,8 @@ class PVSilhouette():
         fout (str): Output file name without the file extension.
         '''
         if hasattr(self, 'popt'):
-            labels = np.array(['Mstar', 'Rc', 'alpha', 
-                'fflux', 'log_ftau', 'log_frho', 'sig_mdl'])
+            labels = np.array(['Mstar', 'Rc', 'alpha',
+                               'log_ftau', 'log_frho', 'sig_mdl'])
             header = '# popt plow pmid phigh\n'
 
             with open(fout+'.txt', 'w+') as f:
@@ -601,10 +598,10 @@ class PVSilhouette():
             nsubgrid = nsubgrid, nnest = n_nest, 
             beam = self.beam, reslim = reslim)
         rout = np.nanmax(self.x)
-        def makemodel(Mstar, Rc, alphainfall, fflux, log_ftau, log_frho):
+        def makemodel(Mstar, Rc, alphainfall, log_ftau, log_frho):
             major, minor = mpvd.generate_mockpvd(
                 Mstar, Rc, alphainfall, 
-                fflux = fflux * obsmax, frho = 10.**log_frho, ftau = 10.**log_ftau,
+                frho = 10.**log_frho, ftau = 10.**log_ftau,
                 incl = incl, linewidth = linewidth,
                 rout = rout, pa = [pa_maj, pa_min],
                 axis = 'both')

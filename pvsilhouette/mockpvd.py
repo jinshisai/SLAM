@@ -65,7 +65,7 @@ class MockPVD(object):
 
     def generate_mockpvd(self, 
         Mstar: float, Rc: float, alphainfall: float = 1., 
-        fflux: float = 1., frho: float = 1., ftau: float = 1.,
+        frho: float = 1., ftau: float = 1.,
         incl: float = 89.,
         pa: float | list = 0., linewidth: float = None, 
         rin: float = 1., rout: float = None,
@@ -78,7 +78,6 @@ class MockPVD(object):
         Mstar (float): Stellar mass (Msun)
         Rc (float): Centrifugal radius (au)
         alphainfall (float): Decelerating factor
-        fflux (float): Factor to scale mock flux
         frho (float): Factor to scale density contrast between disk and envelope
         ftau (float): Factor to scale mock optical depth
         incl (float): Inclination angle (deg). Incl=90 deg corresponds to edge-on configuration.
@@ -111,7 +110,7 @@ class MockPVD(object):
             # get PV diagrams
             for _rho, _vlos, _pa in zip(rho, vlos, pa):
                 # PV cut
-                I_pv = self.generate_pvd(_rho, _vlos, fflux, ftau, beam = self.beam,
+                I_pv = self.generate_pvd(_rho, _vlos, ftau, beam = self.beam,
                     linewidth = linewidth, pa = _pa)
                 I_out.append(I_pv)
             return I_out
@@ -122,7 +121,7 @@ class MockPVD(object):
                 frho = frho, rin = rin, rout = rout, 
                 axis = axis, collapse = False)
             # PV cut
-            return self.generate_pvd(rho, vlos, fflux, ftau, beam = self.beam,
+            return self.generate_pvd(rho, vlos, ftau, beam = self.beam,
                 linewidth = linewidth)
 
 
@@ -227,7 +226,7 @@ class MockPVD(object):
 
 
     def generate_pvd(self, rho:np.ndarray | list, vlos:np.ndarray | list, 
-        fflux:float = 1., ftau:float = 1., beam:list = None, linewidth: float = None, 
+        ftau:float = 1., beam:list = None, linewidth: float = None, 
         pa: float = 0.):
         nx, ny, nz = self.grid.nx, self.grid.ny, self.grid.nz
         # integrate along Z axis
@@ -288,7 +287,7 @@ class MockPVD(object):
             g = precalculation.gauss_v
             tau_v = convolve(tau_v, g, mode='same') # conserve integrated value
 
-        I_cube = fflux * ( 1. - np.exp(-tau_v) ) # fscale = (Bv(Tex) - Bv(Tbg))
+        I_cube = 1. - np.exp(-tau_v)
 
         # beam convolution
         if beam is not None:
