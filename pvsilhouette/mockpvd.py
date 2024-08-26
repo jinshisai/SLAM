@@ -256,7 +256,7 @@ class MockPVD(object):
         _nx, _ny, _nz = self.grid.ngrids[-1] # dimension of the l-th layer
         rho_l = rho_col[-1].reshape(_nx, _ny, _nz)
         vlos_l = vlos_col[-1].reshape(_nx, _ny, _nz)
-        tau_v = rho2tau(vlos_l, rho_l) * ftau
+        tau_v = rho2tau(vlos_l, rho_l)
         # if nested grid
         if self.grid.nlevels >= 2:
             for l in range(self.grid.nlevels-2,-1,-1):
@@ -271,7 +271,7 @@ class MockPVD(object):
                     zimin, zimax = self.grid.zinest[l+1]
                     rho_l[ximin:ximax+1, yimin:yimax+1, zimin:zimax+1] = 0.
 
-                tau_vl = rho2tau(vlos_l, rho_l) * ftau
+                tau_vl = rho2tau(vlos_l, rho_l)
                 # add values from the inner grid
                 _tau_v = binning(tau_v, self.grid.nsub[l])
                 tau_vl[:, yimin:yimax+1, ximin:ximax+1] += _tau_v
@@ -287,7 +287,7 @@ class MockPVD(object):
             g = precalculation.gauss_v
             tau_v = convolve(tau_v, g, mode='same') # conserve integrated value
 
-        I_cube = 1. - np.exp(-tau_v)
+        I_cube = 1. - np.exp(-tau_v * ftau)
 
         # beam convolution
         if beam is not None:
@@ -298,7 +298,7 @@ class MockPVD(object):
                     - 0.5 * (yb /(bmin / 2.35))**2. \
                     - 0.5 * (xb /(bmaj / 2.35))**2.)
                 gaussbeam /= np.sum(gaussbeam)
-                precalculation.gauss_xy = gaussbeam[np.newaxis, :]
+                precalculation.gauss_xy = gaussbeam[np.newaxis, :, :]
             g = precalculation.gauss_xy
             I_cube = convolve(I_cube, g, mode='same')
 
