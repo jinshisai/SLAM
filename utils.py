@@ -18,8 +18,8 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
                  gr_check: bool = False, ndata: int = 1000,
                  labels: list = None, rangelevel: float = 0.8,
                  figname: str = None, show_corner: bool = False,
-                 ncore: int = 1,
-                 simpleoutput: bool = True, 
+                 plot_chain: bool = False, show_chain: bool = False,
+                 ncore: int = 1, simpleoutput: bool = True, 
                  moves = emcee.moves.StretchMove()):
     ndim = len(bounds[0])
     nwalkers = ndim * nwalkers_per_ndim
@@ -46,12 +46,12 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
         if ncore > 1:
             with Pool(ncore) as pool:
                 sampler = emcee.EnsembleSampler(nwalkers, ndim, log_prob_fn,
-                                                args=args, pool=pool, moves=moves,)
+                                                args=args, pool=pool, moves=moves)
                 # The inner function lnL can't be pickled for multiprocessing.
                 sampler.run_mcmc(p0, n)
         else:
-            sampler = emcee.EnsembleSampler(nwalkers, ndim, lnL, args=args,
-                moves=moves,)
+            sampler = emcee.EnsembleSampler(nwalkers, ndim, lnL,
+                                            args=args, moves=moves)
             sampler.run_mcmc(p0, n)
         #samples = sampler.get_chain()  # emcee 3.1.1
         samples = sampler.chain  # emcee 2.2.1
@@ -73,32 +73,35 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
     phigh = np.percentile(samples, 84, axis=0)
     perr = (phigh - plow) / 2.
     cornerrange = [rangelevel] * ndim if rangelevel is not None else np.transpose(bounds)
-    if show_corner or (not figname is None):
+    if show_corner or figname is not None:
         corner.corner(samples, truths=popt,
                       quantiles=[0.16, 0.5, 0.84], show_titles=True,
                       range=cornerrange, labels=labels),
-        if not figname is None: plt.savefig(figname)
+        if figname is not None:
+            plt.savefig(figname.replace('.png', '.corner.png'))
         if show_corner: plt.show()
         plt.close()
-        # ------- !!! for debug !!! ----------
-        # Chain plot
+
+    if plot_chain:
         fig, axes = plt.subplots(ndim, 1, sharex=True)
         xplot = np.arange(0, nsteps, 1)
         for i, ax in enumerate(axes):
-            chain_plot = np.array(
-                [ax.plot(xplot, _samples[iwalk,:,i].T, 'k')
-                for iwalk in range(nwalkers)])
+            for iwalk in range(nwalkers):
+                ax.plot(xplot, _samples[iwalk,:,i].T, 'k')
             ax.set_ylabel(labels[i])
             ax.tick_params(which='both', direction='in',
-                bottom=True, top=True, left=True, right=True, labelbottom=False)
-        # x-label
-        axes[0].set_xlim(0,nsteps)
+                           bottom=True, top=True,
+                           left=True, right=True,
+                           labelbottom=False)
+        axes[0].set_xlim(0, nsteps)
         axes[-1].tick_params(labelbottom=True)
         axes[-1].set_xlabel('Step number')
-        if not figname is None: plt.savefig(figname.replace('.png','.chains.png'))
-        if show_corner: plt.show()
+        if figname is not None:
+            fig.savefig(figname.replace('.png', '.chains.png'))
+        if show_chain:
+            plt.show()
         plt.close()
-        # ----------------------------------------
+
     if simpleoutput:
         return [pmid, perr]
     else:
