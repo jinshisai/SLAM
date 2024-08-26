@@ -433,7 +433,7 @@ class PVSilhouette():
         if 'model' in [color, contour]:
             # check if fitting result exists
             if hasattr(self, 'popt'):
-                popt = self.popt.values()
+                popt = np.array(self.popt.values())
             else:
                 print('ERROR\twriteout_fitres: No optimized parameters are found.')
                 print('ERROR\twriteout_fitres: Run fitting or read fitting result first.')
