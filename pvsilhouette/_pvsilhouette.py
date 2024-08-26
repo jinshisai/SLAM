@@ -388,14 +388,16 @@ class PVSilhouette():
         self.popt, self.plow, self.pmid, self.phigh = np.loadtxt(f).T
 
 
-    def plot_pvds(self, filename = 'PVsilhouette', 
-        color = 'model', contour = 'obs', incl = 89.,
-        vmask = [0., 0.], pa_maj = None, pa_min = None, linewidth = None,
-        signmajor: int = None, signminor: int = None, 
-        cmap = 'viridis', cmap_residual = 'bwr', ext = '.png',
-        set_title = False, title = None,
-        show = False, nsubgrid = 1, n_nest = [3, 3], reslim = 5,
-        shadecolor = 'white', clevels = None):
+    def plot_pvds(self, filename: str = 'PVsilhouette', 
+                  color: str = 'model', contour: str = 'obs', incl: float = 89.,
+                  vmask: list[float, float] = [0., 0.],
+                  pa_maj: float | None = None, pa_min: float | None = None,
+                  linewidth: float | None = None,
+                  signmajor: int | None = None, signminor: int | None = None, 
+                  cmap: str = 'viridis', cmap_residual: str = 'bwr', ext: str = '.png',
+                  set_title: bool = False, title: str | None = None, show: bool = False,
+                  nsubgrid: int = 1, n_nest: list[int, int] = [3, 3], reslim: int = 5,
+                  shadecolor: str = 'white', clevels: list[float] | None = None):
         '''
         Plot observed and model PV diagrams.
         '''
@@ -408,17 +410,15 @@ class PVSilhouette():
         minquad = getquad(self.dpvminor) * (-1) if signminor is None else signminor
 
         # model
-        mpvd = MockPVD(self.x, self.x, self.v, 
-            nsubgrid = nsubgrid, nnest = n_nest, 
-            beam = self.beam, reslim = reslim)
+        mpvd = MockPVD(self.x, self.x, self.v, nsubgrid=nsubgrid, nnest=n_nest,
+                       beam=self.beam, reslim=reslim)
         rout = np.nanmax(self.x)
         def makemodel(Mstar, Rc, alphainfall, log_ftau, log_frho):
-            major, minor = mpvd.generate_mockpvd(
-                Mstar, Rc, alphainfall, 
-                frho = 10.**log_frho, ftau = 10.**log_ftau,
-                incl = incl, linewidth = linewidth,
-                rout = rout, pa = [pa_maj, pa_min],
-                axis = 'both')
+            major, minor = mpvd.generate_mockpvd(Mstar, Rc, alphainfall,
+                                                 frho=10.**log_frho, ftau=10.**log_ftau,
+                                                 incl=incl, linewidth=linewidth,
+                                                 rout=rout, pa=[pa_maj, pa_min],
+                                                 axis='both')
             # quadrant
             major = major[:, ::majquad] #[:,step//2::step]
             minor = minor[:, ::minquad] #[:,step//2::step]
@@ -433,13 +433,13 @@ class PVSilhouette():
         if 'model' in [color, contour]:
             # check if fitting result exists
             if hasattr(self, 'popt'):
-                pass
+                popt = self.popt.values()
             else:
                 print('ERROR\twriteout_fitres: No optimized parameters are found.')
                 print('ERROR\twriteout_fitres: Run fitting or read fitting result first.')
                 return 0
             # model pv diagrams
-            majmod, minmod = makemodel(*self.popt[:-1])
+            majmod, minmod = makemodel(*popt[:-1])
             # residual
             majres = np.where(mask, -(mask.astype('int')), (majobs - majmod) / majsig)
             minres = np.where(mask, -(mask.astype('int')), (minobs - minmod) / minsig)
@@ -450,27 +450,27 @@ class PVSilhouette():
             outlabel = '.obs'
 
 
-        if clevels is None: clevels = np.arange(1, 10) * 3 * self.sigma
-        def makeplots(data_color, data_contour, cmap,
-            vmin = None, vmax = None, vmask = None, alpha = 1.):
+        if clevels is None:
+            clevels = np.arange(1, 10) * 3 * self.sigma
+        def makeplots(data_color, data_contour, cmap, vmin=None,
+                      vmax=None, vmask=None, alpha=1.):
             # set figure
             fig, axes = plt.subplots(1, 2,)
             ax1, ax2 = axes
 
             # major
             im = ax1.pcolormesh(self.x, self.v, data_color[0], 
-                cmap=cmap, vmin = vmin, vmax = vmax,
-                alpha = alpha, rasterized = True)
-            #cax = ax1.inset_axes([1.0, 0., 0.05, 1.]) # x0, y0, dx, dy
-            #fig.colorbar(im, cax=cax)
+                                cmap=cmap, vmin=vmin, vmax=vmax,
+                                alpha=alpha, rasterized=True)
             ax1.contour(self.x, self.v, data_contour[0],
                        levels = clevels, colors='k')
             ax1.set_xlabel('Major offset (au)')
             ax1.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
 
             # minor
-            im = ax2.pcolormesh(self.x, self.v, data_color[1], cmap=cmap, 
-                vmin= vmin, vmax = vmax, alpha=alpha, rasterized=True)
+            im = ax2.pcolormesh(self.x, self.v, data_color[1],
+                                cmap=cmap, vmin=vmin, vmax=vmax,
+                                alpha=alpha, rasterized=True)
             ax2.contour(self.x, self.v, data_contour[1],
                        levels = clevels, colors='k')
             cax2 = ax2.inset_axes([1.0, 0., 0.05, 1.]) # x0, y0, dx, dy
@@ -485,18 +485,16 @@ class PVSilhouette():
             if vmask is not None:
                 _v = self.v[ (self.v > vmask[0]) * (self.v < vmask[1])] # masked velocity ranges
                 for ax in axes:
-                    ax.fill_between(
-                        self.x, np.full(len(self.x), np.min(_v) - 0.5 * self.dv), 
-                        np.full(len(self.x), np.max(_v) + 0.5 * self.dv),
-                        color = shadecolor, alpha = 0.6,
-                        edgecolor = None,
-                        )
+                    ax.fill_between(self.x,
+                                    np.full(len(self.x), np.min(_v) - 0.5 * self.dv), 
+                                    np.full(len(self.x), np.max(_v) + 0.5 * self.dv),
+                                    color=shadecolor, alpha=0.6, edgecolor=None)
 
             if set_title:
-                ax2.set_title(r'$M_{*}$'+f'={self.popt[0]:.2f}'+r'$M_{\odot}$'
-                    +', '+r'$R_{c}$'+f'={self.popt[1]:.0f} au'
-                    +'\n'+r'$\alpha$'+f'={self.popt[2]:.2f}'
-                    +', '+r'$\alpha ^{2} M_{*}$'+f'={self.popt[0] * self.popt[2]**2:.2}')
+                ax2.set_title(r'$M_{*}$'+f'={popt[0]:.2f}'+r'$M_{\odot}$'
+                    +', '+r'$R_{c}$'+f'={popt[1]:.0f} au'
+                    +'\n'+r'$\alpha$'+f'={popt[2]:.2f}'
+                    +', '+r'$\alpha ^{2} M_{*}$'+f'={popt[0] * popt[2]**2:.2}')
             if title is not None:
                 fig.suptitle(title)
 
@@ -512,10 +510,10 @@ class PVSilhouette():
         # main plot
         vmin, vmax = np.nanmin(np.array(d_col)), np.nanmax(np.array(d_col))
         vmask = vmask if vmask[1] > vmask[0] else None
-        fig = makeplots(d_col, d_con, cmap, vmin = vmin, vmax = vmax, 
-            vmask = vmask, alpha = 0.8)
+        fig = makeplots(d_col, d_con, cmap, vmin=vmin, vmax=vmax,
+                        vmask=vmask, alpha=0.8)
         fig.tight_layout()
-        fig.savefig(filename + outlabel + ext, dpi = 300)
+        fig.savefig(filename + outlabel + ext, dpi=300)
         figs.append(fig)
         if show: plt.show()
 
@@ -525,11 +523,10 @@ class PVSilhouette():
             d_con = [majres, minres] if contour == 'model' else [majobs, minobs]
             vmin, vmax = np.nanmin(np.array(d_col)), np.nanmax(np.array(d_col))
             # plot
-            fig2 = makeplots(d_col, d_con, cmap_residual, 
-                vmin = vmin, vmax = vmax, 
-                vmask = None, alpha = 0.5)
+            fig2 = makeplots(d_col, d_con, cmap_residual, vmin=vmin, vmax=vmax,
+                             vmask=None, alpha=0.5)
             fig2.tight_layout()
-            fig2.savefig(filename + '.residual' + ext, dpi = 300)
+            fig2.savefig(filename + '.residual' + ext, dpi=300)
             figs.append(fig2)
             if show: plt.show()
 
