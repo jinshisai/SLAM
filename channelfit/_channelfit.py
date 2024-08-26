@@ -684,7 +684,7 @@ class ChannelFit():
             labels = labels[notfixed]
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':200, 'nsteps':500,
                        'labels': labels, 'rangelevel':None,
-                       'figname':filename+'.corner.png', 'show_corner':show}
+                       'figname':filename+'.png', 'show_corner':show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
             if self.progressbar:
                 total = kw['nwalkers_per_ndim'] * len(p_fixed[notfixed])
@@ -701,11 +701,12 @@ class ChannelFit():
                 chi2 = np.nansum((self.data_valid - model)**2) \
                        / self.sigma**2 / self.pixperbeam
                 return -0.5 * chi2
-            plim = np.array([np.log10(Mstar_range), np.log10(Rc_range),
+            plim = np.array([Mstar_range, Rc_range,
                              cs_range, h1_range, h2_range,
-                             pI_range, Rin_range, np.log10(Ienv_range),
+                             pI_range, Rin_range, Ienv_range,
                              xoff_range, yoff_range, voff_range,
                              incl_range])
+            plim[ilog] = np.log10(plim[ilog])
             plim = plim[notfixed].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
             def get_p(i: int):
@@ -722,10 +723,10 @@ class ChannelFit():
             self.plow = p_fixed
             self.pmid = p_fixed
             self.phigh = p_fixed
-        plist = [self.popt, self.plow, self.pmid, self.phigh]
         print('------------------------')
         print(f'popt:', ', '.join([f'{k}={p:.2e}' for k, p in zip(self.paramkeys, self.popt)]))
         print('------------------------')
+        plist = [self.popt, self.plow, self.pmid, self.phigh]
         with open(filename+'.popt.txt', 'w') as f:
             f.write('#Rows:' + ','.join(self.paramkeys) + '\n')
             f.write('#Columns:' + ','.join(['popt', 'plow', 'pmid', 'phigh']) + '\n')

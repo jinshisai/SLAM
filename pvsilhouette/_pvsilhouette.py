@@ -233,9 +233,9 @@ class PVSilhouette():
                 log_ftau_range: list = [-1., 3.],
                 log_frho_range: list = [-1., 4.],
                 sig_mdl_range: list = [0., 10.],
-                fixed_params: dict = {'Mstar': None, 
-                'Rc': None, 'alphainfall': None,
-                'log_ftau': None, 'log_frho': None, 'sig_mdl': None},
+                fixed_params: dict = {'Mstar': None, 'Rc': None,
+                                      'alphainfall': None, 'log_ftau': None,
+                                      'log_frho': None, 'sig_mdl': None},
                 vmask: list = [0, 0],
                 filename: str = 'PVsilhouette',
                 show: bool = False,
@@ -243,8 +243,7 @@ class PVSilhouette():
                 kwargs_emcee_corner: dict = {},
                 signmajor = None, signminor = None,
                 pa_maj = None, pa_min = None,
-                beam = None, linewidth = None,
-                p0 = None,
+                linewidth = None,
                 nsubgrid = 1, n_nest = [3, 3], reslim = 5,
                 set_title: bool = True, title: str = None):
         # Observed PV diagrams
@@ -285,24 +284,26 @@ class PVSilhouette():
 
 
         # Fitting
-        _fixed_params = {'Mstar': None, 
-        'Rc': None, 'alphainfall': None,
-        'log_ftau': None, 'log_frho': None, 'sig_mdl': None}
-        _fixed_params.update(fixed_params)
-        p_fixed = np.array(list(_fixed_params.values()))
+        paramkeys = ['Mstar', 'Rc', 'alphainfall','log_ftau', 'log_frho', 'sig_mdl']
+        p_fixed = np.array([fixed_params[k] if k in fixed_params else None for k in paramkeys])
         if None in p_fixed:
-            labels = np.array(['Mstar', 'Rc', r'$\alpha$', r'$f_\mathrm{flux}$', 
-                r'log $f_\tau$', r'log $f_\rho$', r'$\sigma_\mathrm{model}$'])
-            labels = labels[p_fixed == None]
+            notfixed = p_fixed == None
+            ilog = np.array([0, 1, 2])
+            i = ilog[p_fixed[ilog] != None]
+            p_fixed[i] = np.log10(p_fixed[i].astype('float'))
+            labels = np.array(['Mstar', 'Rc', r'$\alpha$', r'log $f_\tau$',
+                               r'log $f_\rho$', r'$\sigma_\mathrm{model}$'])
+            labels[ilog] = ['log'+labels[i] for i in ilog]
+            labels = labels[notfixed]
             kwargs0 = {'nwalkers_per_ndim':4, 'nburnin':500, 'nsteps':500,
                        'rangelevel': None, 'labels':labels,
-                       'figname':filename+'.corner.png', 'show_corner':show,
+                       'figname':filename+'.png', 'show_corner':show,
                        }
-            kwargs = dict(kwargs0, **kwargs_emcee_corner)
+            kw = dict(kwargs0, **kwargs_emcee_corner)
             # progress bar
             if progressbar:
-                total = kwargs['nwalkers_per_ndim'] * len(p_fixed[p_fixed == None])
-                total *= kwargs['nburnin'] + kwargs['nsteps']
+                total = kw['nwalkers_per_ndim'] * len(p_fixed[notfixed])
+                total *= kw['nburnin'] + kw['nsteps']
                 bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
             # Modified log likelihood
@@ -311,7 +312,8 @@ class PVSilhouette():
                     bar.update(1)
                 # parameter
                 q = p_fixed.copy()
-                q[p_fixed == None] = p # in linear scale
+                q[notfixed] = p # in linear scale
+                q[ilog] = 10**q[ilog]
                 # updated sigma
                 majsig2 = ((1. + q[-1]) * majsig)**2.
                 minsig2 = ((1. + q[-1]) * minsig)**2.
@@ -321,24 +323,27 @@ class PVSilhouette():
                         / (np.nansum(majmod * majmod) + np.nansum(minmod * minmod))
                 majmod = fflux * majmod
                 minmod = fflux * minmod
-                return - 0.5 * (np.nansum((majobs - majmod)**2 / majsig2 + np.log(2.*np.pi*majsig2))\
-                    + np.nansum((minobs - minmod)**2 / minsig2 + np.log(2.*np.pi*minsig2))) / np.sqrt(Rarea)
+                chi2 = (np.nansum((majobs - majmod)**2) / majsig2
+                        + np.nansum((minobs - minmod)**2) / minsig2) / np.sqrt(Rarea)
+                return - 0.5 * (chi2 + np.log(majsig2) + np.log(minsig2)) 
             # prior
             plim = np.array([Mstar_range, Rc_range, alphainfall_range,
                              log_ftau_range, log_frho_range, sig_mdl_range])
-            plim = plim[p_fixed == None].T
+            plim[ilog] = np.log10(plim[ilog])
+            plim = plim[notfixed].T
 
             # run mcmc fitting
-            mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
+            mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
             # best parameters & errors
-            popt = p_fixed.copy()
-            popt[p_fixed == None] = mcmc[0]
-            plow = p_fixed.copy()
-            plow[p_fixed == None] = mcmc[1]
-            pmid = p_fixed.copy()
-            pmid[p_fixed == None] = mcmc[2]
-            phigh = p_fixed.copy()
-            phigh[p_fixed == None] = mcmc[3]
+            def get_p(i: int):
+                p = p_fixed.copy()
+                p[notfixed] = mcmc[i]
+                p[ilog] = 10**p[ilog]
+                return p
+            popt = get_p(0)
+            plow = get_p(1)
+            pmid = get_p(2)
+            phigh = get_p(3)
         else:
             popt = p_fixed
             plow = p_fixed
@@ -354,11 +359,15 @@ class PVSilhouette():
         print(f'f_tau = {plow[3]:.2f}, {popt[3]:.2f}, {phigh[3]:.2f}')
         print(f'f_rho = {plow[4]:.2f}, {popt[4]:.2f}, {phigh[4]:.2f}')
         print(f'sig_mdl = {plow[5]:.2f}, {popt[5]:.2f}, {phigh[5]:.2f}')
-
-
-        # write out result
-        self.writeout_fitres(filename + '.popt')
-
+        plist = [self.popt, self.plow, self.pmid, self.phigh]
+        with open(filename+'.popt.txt', 'w') as f:
+            f.write('#Rows:' + ','.join(paramkeys) + '\n')
+            f.write('#Columns:' + ','.join(['popt', 'plow', 'pmid', 'phigh']) + '\n')
+            np.savetxt(f, np.transpose(plist))
+        self.popt = dict(zip(paramkeys, self.popt))
+        self.plow = dict(zip(paramkeys, self.plow))
+        self.pmid = dict(zip(paramkeys, self.pmid))
+        self.phigh = dict(zip(paramkeys, self.phigh))
 
         # plot
         self.plot_pvds(color='model', contour='obs', filename=filename,
@@ -366,30 +375,6 @@ class PVSilhouette():
                        linewidth=linewidth, signmajor=signmajor, signminor=signminor,
                        show=show, nsubgrid=nsubgrid, n_nest=n_nest, reslim=reslim,
                        title=title, set_title=set_title)
-
-
-    def writeout_fitres(self, fout:str = 'PVsilhouette.popt'):
-        '''
-        Write out fitting result.
-
-        Parameters
-        ----------
-        fout (str): Output file name without the file extension.
-        '''
-        if hasattr(self, 'popt'):
-            labels = np.array(['Mstar', 'Rc', 'alpha',
-                               'log_ftau', 'log_frho', 'sig_mdl'])
-            header = '# popt plow pmid phigh\n'
-
-            with open(fout+'.txt', 'w+') as f:
-                f.write(header)
-                np.savetxt(f, 
-                    np.array([labels, self.popt, self.plow, self.pmid, self.phigh]).T,
-                    fmt = '%s')#, '%13.6e', '%13.6e', '%13.6e', '%13.6e'])
-        else:
-            print('ERROR\twriteout_fitres: No optimized parameters are found.')
-            print('ERROR\twriteout_fitres: Run fitting first.')
-            return 0
 
 
     def read_fitres(self, f: str):
@@ -400,9 +385,7 @@ class PVSilhouette():
         ---------
         f (str): Path to a file containing the fitting result.
         '''
-        self.popt, self.plow, self.pmid, self.phigh = \
-        np.genfromtxt(f, dtype = float, comments = '#', unpack = True,
-            usecols = (1,2,3,4))
+        self.popt, self.plow, self.pmid, self.phigh = np.loadtxt(f).T
 
 
     def plot_pvds(self, filename = 'PVsilhouette', 
