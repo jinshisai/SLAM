@@ -230,12 +230,12 @@ class PVSilhouette():
                 Mstar_range: list[float, float] = [0.01, 10],
                 Rc_range: list[float, float] = [1., 1000.],
                 alphainfall_range: list[float, float] = [0.0, 1],
-                log_ftau_range: list[float, float] = [-1., 3.],
-                log_frho_range: list[float, float] = [-1., 4.],
+                ftau_range: list[float, float] = [0.1, 1e3],
+                frho_range: list[float, float] = [1., 1e4],
                 sig_mdl_range: list[float, float] = [0., 10.],
                 fixed_params: dict = {'Mstar':None, 'Rc':None,
-                                      'alphainfall':None, 'log_ftau':None,
-                                      'log_frho':None, 'sig_mdl':None},
+                                      'alphainfall':None, 'ftau':None,
+                                      'frho':None, 'sig_mdl':None},
                 vmask: list[float, float] = [0, 0],
                 filename: str = 'PVsilhouette',
                 show: bool = False,
@@ -270,10 +270,9 @@ class PVSilhouette():
                        nsubgrid=nsubgrid, nnest=n_nest,
                        beam=self.beam, reslim=reslim)
         rout = np.nanmax(self.x)
-        def makemodel(Mstar, Rc, alphainfall, log_ftau, log_frho):
+        def makemodel(Mstar, Rc, alphainfall, ftau, frho):
             major, minor = mpvd.generate_mockpvd(Mstar, Rc, alphainfall,
-                                                 frho=10.**log_frho,
-                                                 ftau=10.**log_ftau,
+                                                 ftau=ftau, frho=frho,
                                                  incl=incl, linewidth=linewidth,
                                                  rout=rout, pa=[pa_maj, pa_min],
                                                  axis='both')
@@ -284,22 +283,21 @@ class PVSilhouette():
 
 
         # Fitting
-        paramkeys = ['Mstar', 'Rc', 'alphainfall','log_ftau', 'log_frho', 'sig_mdl']
+        paramkeys = ['Mstar', 'Rc', 'alphainfall', 'ftau', 'frho', 'sig_mdl']
         p_fixed = np.array([fixed_params[k] if k in fixed_params else None for k in paramkeys])
         if None in p_fixed:
             notfixed = p_fixed == None
-            ilog = np.array([0, 1, 2], dtype=int)
+            ilog = np.array([0, 1, 2, 3, 4], dtype=int)
             i = ilog[p_fixed[ilog] != None]
             p_fixed[i] = np.log10(p_fixed[i].astype('float'))
-            labels = np.array(['Mstar', 'Rc', r'$\alpha$', r'log $f_\tau$',
-                               r'log $f_\rho$', r'$\sigma_\mathrm{model}$'])
+            labels = np.array(['Mstar', 'Rc', r'$\alpha$', r'$f_\tau$',
+                               r'$f_\rho$', r'$\sigma_\mathrm{model}$'])
             labels[ilog] = ['log'+labels[i] for i in ilog]
             labels = labels[notfixed]
             kwargs0 = {'nwalkers_per_ndim':4, 'nburnin':500, 'nsteps':500,
                        'rangelevel': None, 'labels':labels,
                        'figname':filename+'.png', 'show_corner':show,
-                       'plot_chain':True, 'show_chain':show,
-                       }
+                       'plot_chain':True, 'show_chain':show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
             # progress bar
             if progressbar:
@@ -329,7 +327,7 @@ class PVSilhouette():
                 return -0.5 * (chi2maj + chi2min) / np.sqrt(Rarea)
             # prior
             plim = np.array([Mstar_range, Rc_range, alphainfall_range,
-                             log_ftau_range, log_frho_range, sig_mdl_range])
+                             ftau_range, frho_range, sig_mdl_range])
             plim[ilog] = np.log10(plim[ilog])
             plim = plim[notfixed].T
 
@@ -413,9 +411,9 @@ class PVSilhouette():
         mpvd = MockPVD(self.x, self.x, self.v, nsubgrid=nsubgrid, nnest=n_nest,
                        beam=self.beam, reslim=reslim)
         rout = np.nanmax(self.x)
-        def makemodel(Mstar, Rc, alphainfall, log_ftau, log_frho):
+        def makemodel(Mstar, Rc, alphainfall, ftau, frho):
             major, minor = mpvd.generate_mockpvd(Mstar, Rc, alphainfall,
-                                                 frho=10.**log_frho, ftau=10.**log_ftau,
+                                                 ftau=ftau, frho=frho,
                                                  incl=incl, linewidth=linewidth,
                                                  rout=rout, pa=[pa_maj, pa_min],
                                                  axis='both')

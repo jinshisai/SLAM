@@ -63,13 +63,11 @@ class MockPVD(object):
 
 
 
-    def generate_mockpvd(self, 
-        Mstar: float, Rc: float, alphainfall: float = 1., 
-        frho: float = 1., ftau: float = 1.,
-        incl: float = 89.,
-        pa: float | list = 0., linewidth: float = None, 
-        rin: float = 1., rout: float = None,
-        axis: str = 'both'):
+    def generate_mockpvd(self, Mstar: float, Rc: float, alphainfall: float = 1., 
+                         ftau: float = 1., frho: float = 1.,
+                         incl: float = 89., pa: float | list = 0.,
+                         linewidth: float = None, rin: float = 1., 
+                         rout: float = None, axis: str = 'both'):
         '''
         Generate a mock PV diagram.
 
@@ -78,8 +76,8 @@ class MockPVD(object):
         Mstar (float): Stellar mass (Msun)
         Rc (float): Centrifugal radius (au)
         alphainfall (float): Decelerating factor
-        frho (float): Factor to scale density contrast between disk and envelope
         ftau (float): Factor to scale mock optical depth
+        frho (float): Factor to scale density contrast between disk and envelope
         incl (float): Inclination angle (deg). Incl=90 deg corresponds to edge-on configuration.
         axis (str): Axis of the pv cut. Must be major, minor or both.
         '''
@@ -97,32 +95,31 @@ class MockPVD(object):
             # build model along major and minor axes
             for _axis in ['major', 'minor']:
                 # build model
-                _rho, _vlos = self.build(Mstar, Rc, incl, 
-                    alphainfall = alphainfall,
-                    frho = frho, rin = rin, rout = rout, 
-                    axis = _axis, collapse = False, normalize = False)
+                _rho, _vlos = self.build(Mstar=Mstar, Rc=Rc, incl=incl,
+                                         alphainfall=alphainfall, frho=frho,
+                                         rin=rin, rout=rout, axis=_axis,
+                                         collapse=False, normalize=False)
                 rho.append(_rho)
                 vlos.append(_vlos)
             # density normalization
-            rho_max = np.nanmax(
-                [np.nanmax([np.nanmax(i) for i in _rho]) for _rho in rho])
+            rho_max = np.nanmax([np.nanmax([np.nanmax(i) for i in _rho]) for _rho in rho])
             rho = [ [i / rho_max for i in _rho] for _rho in rho] # normalized rho
             # get PV diagrams
             for _rho, _vlos, _pa in zip(rho, vlos, pa):
                 # PV cut
-                I_pv = self.generate_pvd(_rho, _vlos, ftau, beam = self.beam,
-                    linewidth = linewidth, pa = _pa)
+                I_pv = self.generate_pvd(rho=_rho, vlos=_vlos, ftau=ftau,
+                                         beam=self.beam, linewidth=linewidth, pa=_pa)
                 I_out.append(I_pv)
             return I_out
         else:
             # build model
-            rho, vlos = self.build(Mstar, Rc, incl, 
-                alphainfall = alphainfall,
-                frho = frho, rin = rin, rout = rout, 
-                axis = axis, collapse = False)
+            rho, vlos = self.build(Mstar=Mstar, Rc=Rc, incl=incl,
+                                   alphainfall=alphainfall, frho=frho,
+                                   rin=rin, rout=rout, axis=axis,
+                                   collapse=False)
             # PV cut
-            return self.generate_pvd(rho, vlos, ftau, beam = self.beam,
-                linewidth = linewidth)
+            return self.generate_pvd(rho=rho, vlos=vlos, ftau=ftau,
+                                     beam=self.beam, linewidth=linewidth)
 
 
     def subgrid(self, axes:list, nsubgrid:int):
@@ -136,9 +133,8 @@ class MockPVD(object):
         return axes_out
 
 
-    def makegrid(self, 
-        xlim:list = None, ylim:list = None, zlim:list = None,
-        reslim: float = 5):
+    def makegrid(self, xlim: list | None = None, ylim: list | None = None,
+                 zlim: list | None = None, reslim: float = 5):
         # parental grid
         # x and z
         x = self.x
@@ -157,22 +153,22 @@ class MockPVD(object):
 
 
         if self.nnest is not None:
-            grid = Nested3DGrid(x, y, z, xlim, ylim, zlim,
-                self.nnest, nlevels = len(self.nnest), reslim = reslim)
+            grid = Nested3DGrid(x, y, z, xlim, ylim, zlim, self.nnest,
+                                nlevels=len(self.nnest), reslim=reslim)
         else:
-            grid = Nested3DGrid(x, y, z, None, None, None, [1],
-                nlevels = 0)
+            grid = Nested3DGrid(x, y, z, None, None, None, [1], nlevels=0)
         self.grid = grid
 
 
     def gridinfo(self):
-        self.grid.gridinfo(units = ['au', 'au', 'au'])
+        self.grid.gridinfo(units=['au', 'au', 'au'])
 
 
     def build(self, Mstar:float, Rc:float, incl:float,
-        alphainfall:float = 1., frho:float = 1.,
-        rin:float = 1.0, rout:float = None, collapse = False, normalize = True,
-        axis: str = 'major'):
+              alphainfall: float = 1., frho: float = 1.,
+              rin: float = 1.0, rout: float | None = None,
+              collapse: bool = False, normalize: bool = True,
+              axis: str = 'major'):
         # parameters/units
         irad = np.radians(incl)
         vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
@@ -226,8 +222,8 @@ class MockPVD(object):
 
 
     def generate_pvd(self, rho:np.ndarray | list, vlos:np.ndarray | list, 
-        ftau:float = 1., beam:list = None, linewidth: float = None, 
-        pa: float = 0.):
+                     ftau: float = 1., beam: list | None = None,
+                     linewidth: float | None = None, pa: float = 0.):
         ny = self.grid.ny
         # integrate along Z axis
         v = self.v.copy()
@@ -250,7 +246,7 @@ class MockPVD(object):
                 data[:, i::nbin, i::nbin]
                 for i in range(nbin)
                 ])
-            return np.nanmean(d_avg, axis = 0)
+            return np.nanmean(d_avg, axis=0)
 
         # innermost grid
         _nx, _ny, _nz = self.grid.ngrids[-1] # dimension of the l-th layer
@@ -281,7 +277,7 @@ class MockPVD(object):
         if linewidth is not None:
             if precalculation.gauss_v is None:
                 #gaussbeam = np.exp(- 0.5 * (v /(linewidth / 2.35))**2.)
-                gaussbeam = np.exp(- (v - v[nv//2 - 1 + nv%2])**2. / linewidth**2.)
+                gaussbeam = np.exp(-(v - v[nv//2 - 1 + nv%2])**2. / linewidth**2.)
                 gaussbeam /= np.sum(gaussbeam)
                 precalculation.gauss_v = gaussbeam[:, np.newaxis, np.newaxis]
             g = precalculation.gauss_v
@@ -294,24 +290,19 @@ class MockPVD(object):
             if precalculation.gauss_xy is None:
                 bmaj, bmin, bpa = beam
                 xb, yb = rot(*np.meshgrid(self.x, self.y, indexing='ij'), np.radians(bpa - pa))
-                gaussbeam = np.exp(
-                    - 0.5 * (yb /(bmin / 2.35))**2. \
-                    - 0.5 * (xb /(bmaj / 2.35))**2.)
+                gaussbeam = np.exp(-0.5 * (yb /(bmin / 2.35))**2. 
+                                   - 0.5 * (xb /(bmaj / 2.35))**2.)
                 gaussbeam /= np.sum(gaussbeam)
                 precalculation.gauss_xy = gaussbeam[np.newaxis, :, :]
             g = precalculation.gauss_xy
             I_cube = convolve(I_cube, g, mode='same')
 
         # output
-        I_pv = I_cube[:,ny//2,:]
+        I_pv = I_cube[:, ny//2, :]
 
         if self.nsubgrid > 1:
-            I_pv = np.nanmean(
-                np.array([
-                I_pv[:, i::self.nsubgrid]
-                for i in range(self.nsubgrid)
-                ]),
-                axis = 0)
+            I_pv = np.nanmean(np.array([I_pv[:, i::self.nsubgrid] 
+                                        for i in range(self.nsubgrid)]), axis=0)
         return I_pv
 
 
