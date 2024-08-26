@@ -227,25 +227,25 @@ class PVSilhouette():
 
     def fit_mockpvd(self, 
                 incl: float = 89.,
-                Mstar_range: list = [0.01, 10],
-                Rc_range: list = [1., 1000.],
-                alphainfall_range: list = [0.0, 1],
-                log_ftau_range: list = [-1., 3.],
-                log_frho_range: list = [-1., 4.],
-                sig_mdl_range: list = [0., 10.],
-                fixed_params: dict = {'Mstar': None, 'Rc': None,
-                                      'alphainfall': None, 'log_ftau': None,
-                                      'log_frho': None, 'sig_mdl': None},
-                vmask: list = [0, 0],
+                Mstar_range: list[float, float] = [0.01, 10],
+                Rc_range: list[float, float] = [1., 1000.],
+                alphainfall_range: list[float, float] = [0.0, 1],
+                log_ftau_range: list[float, float] = [-1., 3.],
+                log_frho_range: list[float, float] = [-1., 4.],
+                sig_mdl_range: list[float, float] = [0., 10.],
+                fixed_params: dict = {'Mstar':None, 'Rc':None,
+                                      'alphainfall':None, 'log_ftau':None,
+                                      'log_frho':None, 'sig_mdl':None},
+                vmask: list[float, float] = [0, 0],
                 filename: str = 'PVsilhouette',
                 show: bool = False,
                 progressbar: bool = True,
                 kwargs_emcee_corner: dict = {},
-                signmajor = None, signminor = None,
-                pa_maj = None, pa_min = None,
-                linewidth = None,
-                nsubgrid = 1, n_nest = [3, 3], reslim = 5,
-                set_title: bool = True, title: str = None):
+                signmajor: int | None = None, signminor: int | None = None,
+                pa_maj: float | None = None, pa_min: float | None = None,
+                linewidth: float | None = None,
+                nsubgrid: int = 1, n_nest: list[float] = [3, 3], reslim: float = 5,
+                set_title: bool = True, title: str | None = None):
         # Observed PV diagrams
         majobs = self.dpvmajor.copy()
         minobs = self.dpvminor.copy()
@@ -266,17 +266,17 @@ class PVSilhouette():
         minquad = getquad(self.dpvminor) * (-1) if signminor is None else signminor
 
         # model
-        mpvd = MockPVD(self.x, self.x, self.v, 
-            nsubgrid = nsubgrid, nnest = n_nest, 
-            beam = self.beam, reslim = reslim)
+        mpvd = MockPVD(self.x, self.x, self.v,
+                       nsubgrid=nsubgrid, nnest=n_nest,
+                       beam=self.beam, reslim=reslim)
         rout = np.nanmax(self.x)
         def makemodel(Mstar, Rc, alphainfall, log_ftau, log_frho):
-            major, minor = mpvd.generate_mockpvd(
-                Mstar, Rc, alphainfall, 
-                frho = 10.**log_frho, ftau = 10.**log_ftau,
-                incl = incl, linewidth = linewidth,
-                rout = rout, pa = [pa_maj, pa_min],
-                axis = 'both')
+            major, minor = mpvd.generate_mockpvd(Mstar, Rc, alphainfall,
+                                                 frho=10.**log_frho,
+                                                 ftau=10.**log_ftau,
+                                                 incl=incl, linewidth=linewidth,
+                                                 rout=rout, pa=[pa_maj, pa_min],
+                                                 axis='both')
             # quadrant
             major = major[:, ::majquad] #[:,step//2::step]
             minor = minor[:, ::minquad] #[:,step//2::step]
@@ -288,7 +288,7 @@ class PVSilhouette():
         p_fixed = np.array([fixed_params[k] if k in fixed_params else None for k in paramkeys])
         if None in p_fixed:
             notfixed = p_fixed == None
-            ilog = np.array([0, 1, 2])
+            ilog = np.array([0, 1, 2], dtype=int)
             i = ilog[p_fixed[ilog] != None]
             p_fixed[i] = np.log10(p_fixed[i].astype('float'))
             labels = np.array(['Mstar', 'Rc', r'$\alpha$', r'log $f_\tau$',
@@ -324,9 +324,9 @@ class PVSilhouette():
                         / (np.nansum(majmod * majmod) + np.nansum(minmod * minmod))
                 majmod = fflux * majmod
                 minmod = fflux * minmod
-                chi2 = (np.nansum((majobs - majmod)**2) / majsig2
-                        + np.nansum((minobs - minmod)**2) / minsig2) / np.sqrt(Rarea)
-                return - 0.5 * (chi2 + np.log(majsig2) + np.log(minsig2)) 
+                chi2maj = np.nansum((majobs - majmod)**2 / majsig2 + np.log(majsig2))
+                chi2min = np.nansum((minobs - minmod)**2 / minsig2 + np.log(minsig2)) 
+                return -0.5 * (chi2maj + chi2min) / np.sqrt(Rarea)
             # prior
             plim = np.array([Mstar_range, Rc_range, alphainfall_range,
                              log_ftau_range, log_frho_range, sig_mdl_range])
