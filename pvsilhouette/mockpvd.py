@@ -228,7 +228,7 @@ class MockPVD(object):
     def generate_pvd(self, rho:np.ndarray | list, vlos:np.ndarray | list, 
         ftau:float = 1., beam:list = None, linewidth: float = None, 
         pa: float = 0.):
-        nx, ny, nz = self.grid.nx, self.grid.ny, self.grid.nz
+        ny = self.grid.ny
         # integrate along Z axis
         v = self.v.copy()
         nv = len(v)
@@ -241,8 +241,8 @@ class MockPVD(object):
 
         #tau_v  = np.zeros((nv, ny, nx)) # mock tau
         # go up from the deepest layer to the upper layer
-        rho_col = [self.grid.collapse(rho, upto = l) for l in range(self.grid.nlevels)]
-        vlos_col = [self.grid.collapse(vlos, upto = l) for l in range(self.grid.nlevels)]
+        rho_col = [self.grid.collapse(rho, upto=l) for l in range(self.grid.nlevels)]
+        vlos_col = [self.grid.collapse(vlos, upto=l) for l in range(self.grid.nlevels)]
 
         # binning
         def binning(data, nbin):

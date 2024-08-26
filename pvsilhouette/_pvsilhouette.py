@@ -216,146 +216,6 @@ class PVSilhouette():
         self.dx = self.x[1] - self.x[0]
         self.dv = self.v[1] - self.v[0]
 
-    '''
-    def fitting(self, incl: float = 90,
-                Mstar_range: list = [0.01, 10],
-                Rc_range: list = [1, 1000],
-                alphainfall_range: list = [0.01, 1],
-                Mstar_fixed: float = None,
-                Rc_fixed: float = None,
-                alphainfall_fixed: float = None,
-                cutoff: float = 5, vmask: list = [0, 0],
-                figname: str = 'PVsilhouette',
-                show: bool = False,
-                progressbar: bool = True,
-                kwargs_emcee_corner: dict = {}):
-        majobs = np.where(self.dpvmajor > cutoff * self.sigma, 1, 0)
-        minobs = np.where(self.dpvminor > cutoff * self.sigma, 1, 0)
-        x, v = np.meshgrid(self.x, self.v)
-        def minmax(a: np.ndarray, b: np.ndarray, s: str, m: np.ndarray):
-            rng = a[(b >= 0 if s == '+' else b < 0) * (m > 0.5)]
-            if len(rng) == 0:
-                return 0, 0
-            else:
-                return np.min(rng), np.max(rng)
-        rng = np.array([[[minmax(a, b, s, m)
-                          for m in [majobs, minobs]]
-                         for s in ['-', '+']]
-                        for a, b in zip([x, v], [v, x])])
-        def combine(r: np.ndarray):
-            return np.min(r[:, 0]), np.max(r[:, 1])
-        rng = [[combine(r) for r in rr] for rr in rng]
-        mask = [[(s * a > 0) * ((b < r[0]) + (r[1] < b))
-                 for s, r in zip([-1, 1], rr)]
-                for a, b, rr in zip([v, x], [x, v], rng)]
-        mask = np.sum(mask, axis=(0, 1)) + (vmask[0] < v) * (v < vmask[1])
-        majobs = np.where(mask, np.nan, majobs)
-        minobs = np.where(mask, np.nan, minobs)
-        majsig = 1
-        minsig = 1
-        def calcchi2(majmod: np.ndarray, minmod: np.ndarray):
-            chi2 =   np.nansum((majobs - majmod)**2 / majsig**2) \
-                   + np.nansum((minobs - minmod)**2 / minsig**2)
-            return chi2
-        
-        chi2max1 = calcchi2(np.ones_like(majobs), np.ones_like(minobs))
-        chi2max0 = calcchi2(np.zeros_like(majobs), np.zeros_like(minobs))
-        chi2max = np.min([chi2max0, chi2max1])
-        def getquad(m):
-            nv, nx = np.shape(m)
-            q =   np.sum(m[:nv//2, :nx//2]) + np.sum(m[nv//2:, nx//2:]) \
-                - np.sum(m[nv//2:, :nx//2]) - np.sum(m[:nv//2, nx//2:])
-            return int(np.sign(q))
-        majquad = getquad(self.dpvmajor)
-        minquad = getquad(self.dpvminor) * (-1)
-        def makemodel(Mstar, Rc, alphainfall, outputvel=False):
-            a = velmax(self.x, Mstar=Mstar, Rc=Rc,
-                       alphainfall=alphainfall, incl=incl)
-            major = []
-            for min, max in zip(a['major']['vlosmin'], a['major']['vlosmax']):
-                major.append(np.where((min < self.v) * (self.v < max), 1, 0))
-            major = np.transpose(major)[:, ::majquad]
-            minor = []
-            for min, max in zip(a['minor']['vlosmin'], a['minor']['vlosmax']):
-                minor.append(np.where((min < self.v) * (self.v < max), 1, 0))
-            minor = np.transpose(minor)[:, ::minquad]
-            if outputvel:
-                return major, minor, a
-            else:
-                return major, minor
-        p_fixed = np.array([Mstar_fixed, Rc_fixed, alphainfall_fixed])
-        if None in p_fixed:
-            labels = np.array(['log Mstar', 'log Rc', r'log $\alpha$'])
-            labels = labels[p_fixed == None]
-            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':100, 'nsteps':500,
-                       'rangelevel':None, 'labels':labels,
-                       'figname':figname+'.corner.png', 'show_corner':show,}
-            kwargs = dict(kwargs0, **kwargs_emcee_corner)
-            if progressbar:
-                total = kwargs['nwalkers_per_ndim'] * len(p_fixed[p_fixed == None])
-                total *= kwargs['nburnin'] + kwargs['nsteps'] + 2
-                bar = tqdm(total=total)
-                bar.set_description('Within the ranges')
-            def lnprob(p):
-                if progressbar:
-                    bar.update(1)
-                q = p_fixed.copy()
-                q[p_fixed == None] = 10**p
-                chi2 = calcchi2(*makemodel(*q))
-                return -np.inf if chi2 > chi2max else -0.5 * chi2
-            plim = np.array([Mstar_range, Rc_range, alphainfall_range])
-            plim = np.log10(plim[p_fixed == None]).T
-            mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kwargs)
-            if np.isinf(lnprob(mcmc[0])):
-                print('No model is better than the all-0 or all-1 models.')
-            popt = p_fixed.copy()
-            popt[p_fixed == None] = 10**mcmc[0]
-            plow = p_fixed.copy()
-            plow[p_fixed == None] = 10**mcmc[1]
-            phigh = p_fixed.copy()
-            phigh[p_fixed == None] = 10**mcmc[3]
-        else:
-            popt = p_fixed
-            plow = p_fixed
-            phigh = p_fixed
-        self.popt = popt
-        self.plow = plow
-        self.phigh = phigh
-        print(f'M* = {plow[0]:.2f}, {popt[0]:.2f}, {phigh[0]:.2f} Msun')
-        print(f'Rc = {plow[1]:.0f}, {popt[1]:.0f}, {phigh[1]:.0f} au')
-        print(f'alpha = {plow[2]:.2f}, {popt[2]:.2f}, {phigh[2]:.2f}')
-
-        majmod, minmod, a = makemodel(*popt, outputvel=True)
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 2, 1)
-        z = np.where(mask, -(mask.astype('int')), (majobs - majmod)**2)
-        ax.pcolormesh(self.x, self.v, z, cmap='bwr', vmin=-1, vmax=1, alpha=0.1)
-        ax.contour(self.x, self.v, self.dpvmajor,
-                   levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x * majquad, a['major']['vlosmax'], '-r')
-        ax.plot(self.x * majquad, a['major']['vlosmin'], '-r')
-        ax.set_xlabel('major offset (au)')
-        ax.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
-        ax.set_ylim(np.min(self.v), np.max(self.v))
-        ax = fig.add_subplot(1, 2, 2)
-        z = np.where(mask, -(mask.astype('int')), (minobs - minmod)**2)
-        ax.pcolormesh(self.x, self.v, z, cmap='bwr', vmin=-1, vmax=1, alpha=0.1)
-        ax.contour(self.x, self.v, self.dpvminor,
-                   levels=np.arange(1, 10) * 3 * self.sigma, colors='k')
-        ax.plot(self.x * minquad, a['minor']['vlosmax'], '-r')
-        ax.plot(self.x * minquad, a['minor']['vlosmin'], '-r')
-        ax.set_xlabel('minor offset (au)')
-        ax.set_ylim(self.v.min(), self.v.max())
-        ax.set_title(r'$M_{*}$'+f'={popt[0]:.2f}'+r'$M_{\odot}$'
-            +', '+r'$R_{c}$'+f'={popt[1]:.0f} au'
-            +'\n'+r'$\alpha$'+f'={popt[2]:.2f}'
-            +', '+r'$\alpha ^{2} M_{*}$'+f'={popt[0] * popt[2]**2:.2}')
-        fig.tight_layout()
-        fig.savefig(figname + '.model.png')
-        if show: plt.show()
-    '''
-
-
     def check_modelgrid(self, nsubgrid: float = 1, 
         n_nest: list = None, reslim: float = 5):
         # model grid
@@ -397,36 +257,10 @@ class PVSilhouette():
 
         # grid & mask
         x, v = np.meshgrid(self.x, self.v)
-        '''
-        def minmax(a: np.ndarray, b: np.ndarray, s: str, m: np.ndarray):
-            rng = a[(b >= 0 if s == '+' else b < 0) * (m > 0.5)]
-            if len(rng) == 0:
-                return 0, 0
-            else:
-                return np.min(rng), np.max(rng)
-        rng = np.array([[[minmax(a, b, s, m)
-                          for m in [majobs, minobs]]
-                         for s in ['-', '+']]
-                        for a, b in zip([x, v], [v, x])])
-        def combine(r: np.ndarray):
-            return np.min(r[:, 0]), np.max(r[:, 1])
-        rng = [[combine(r) for r in rr] for rr in rng]
-        mask = [[(s * a > 0) * ((b < r[0]) + (r[1] < b))
-                 for s, r in zip([-1, 1], rr)]
-                for a, b, rr in zip([v, x], [x, v], rng)]
-        '''
         mask = (vmask[0] < v) * (v < vmask[1])
         majobs = np.where(mask, np.nan, majobs)
         minobs = np.where(mask, np.nan, minobs)
-
-
-        # define chi2
         majsig, minsig = self.sigma, self.sigma
-        def calcchi2(majmod: np.ndarray, minmod: np.ndarray, majsig: float, minsig: float):
-            chi2 = np.nansum((majobs - majmod)**2 / majsig**2) \
-                   + np.nansum((minobs - minmod)**2 / minsig**2)
-            return chi2 / np.sqrt(Rarea) # correct over sampling
-
 
         # get quadrant
         majquad = getquad(self.dpvmajor) if signmajor is None else signmajor
@@ -527,11 +361,11 @@ class PVSilhouette():
 
 
         # plot
-        figs = self.plot_pvds(color = 'model', contour = 'obs',
-            filename = filename, incl = incl, vmask = vmask, pa_maj = pa_maj, pa_min = pa_min,
-            linewidth = linewidth, signmajor = signmajor, signminor = signminor,
-            show = show, set_title = set_title, nsubgrid = nsubgrid, n_nest = n_nest, reslim = reslim,
-            title=title)
+        self.plot_pvds(color='model', contour='obs', filename=filename,
+                       incl=incl, vmask=vmask, pa_maj=pa_maj, pa_min=pa_min,
+                       linewidth=linewidth, signmajor=signmajor, signminor=signminor,
+                       show=show, nsubgrid=nsubgrid, n_nest=n_nest, reslim=reslim,
+                       title=title, set_title=set_title)
 
 
     def writeout_fitres(self, fout:str = 'PVsilhouette.popt'):

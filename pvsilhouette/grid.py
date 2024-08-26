@@ -393,5 +393,4 @@ def nestgrid_3D(x, y, z, xlim, ylim, zlim, nsub, decimals = 4.):
     x_sub = 0.5 * (xe_sub[:-1] + xe_sub[1:])
     y_sub = 0.5 * (ye_sub[:-1] + ye_sub[1:])
     z_sub = 0.5 * (ze_sub[:-1] + ze_sub[1:])
-    xx_sub, yy_sub, zz_sub = np.meshgrid(x_sub, y_sub, z_sub, indexing = 'ij')
     return ximin, ximax, yimin, yimax, zimin, zimax, x_sub, y_sub, z_sub
