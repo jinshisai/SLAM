@@ -289,7 +289,7 @@ class PVSilhouette():
             ilog = np.array([0, 1, 2, 3, 4], dtype=int)
             i = ilog[p_fixed[ilog] != None]
             p_fixed[i] = np.log10(p_fixed[i].astype('float'))
-            labels = np.array(['Mstar', 'Rc', r'$\alpha$', r'$f_\tau$',
+            labels = np.array(['Mstar', 'Rc', r'$\alpha$', r'$\tau_\mathrm{max}$',
                                r'$f_\rho$', r'$\sigma_\mathrm{model}$'])
             labels[ilog] = ['log'+labels[i] for i in ilog]
             labels = labels[notfixed]
