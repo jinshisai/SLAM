@@ -64,7 +64,7 @@ class MockPVD(object):
 
 
     def generate_mockpvd(self, Mstar:float, Rc:float, alphainfall: float = 1., 
-                         ftau: float = 1., frho: float = 1.,
+                         taumax: float = 1., frho: float = 1.,
                          incl: float = 89., pa: float | list = 0.,
                          linewidth: float | None = None, rin: float = 1., 
                          rout: float | None = None, axis: str = 'both'):
@@ -76,7 +76,7 @@ class MockPVD(object):
         Mstar (float): Stellar mass (Msun)
         Rc (float): Centrifugal radius (au)
         alphainfall (float): Decelerating factor
-        ftau (float): Factor to scale mock optical depth
+        taumax (float): Factor to scale mock optical depth
         frho (float): Factor to scale density contrast between disk and envelope
         incl (float): Inclination angle (deg). Incl=90 deg corresponds to edge-on configuration.
         axis (str): Axis of the pv cut. Must be major, minor or both.
@@ -107,7 +107,7 @@ class MockPVD(object):
             # get PV diagrams
             for _rho, _vlos, _pa in zip(rho, vlos, pa):
                 # PV cut
-                I_pv = self.generate_pvd(rho=_rho, vlos=_vlos, ftau=ftau,
+                I_pv = self.generate_pvd(rho=_rho, vlos=_vlos, taumax=taumax,
                                          beam=self.beam, linewidth=linewidth, pa=_pa)
                 I_out.append(I_pv)
             return I_out
@@ -118,7 +118,7 @@ class MockPVD(object):
                                    rin=rin, rout=rout, axis=axis,
                                    collapse=False)
             # PV cut
-            return self.generate_pvd(rho=rho, vlos=vlos, ftau=ftau,
+            return self.generate_pvd(rho=rho, vlos=vlos, taumax=taumax,
                                      beam=self.beam, linewidth=linewidth)
 
 
@@ -222,7 +222,7 @@ class MockPVD(object):
 
 
     def generate_pvd(self, rho:np.ndarray | list, vlos:np.ndarray | list, 
-                     ftau: float = 1., beam: list | None = None,
+                     taumax: float = 1., beam: list | None = None,
                      linewidth: float | None = None, pa: float = 0.):
         ny = self.grid.ny
         # integrate along Z axis
@@ -283,7 +283,7 @@ class MockPVD(object):
             g = precalculation.gauss_v
             tau_v = convolve(tau_v, g, mode='same') # conserve integrated value
 
-        I_cube = 1. - np.exp(-ftau * tau_v / np.nanmax(tau_v))
+        I_cube = 1. - np.exp(-taumax * tau_v / np.nanmax(tau_v))
 
         # beam convolution
         if beam is not None:

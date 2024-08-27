@@ -229,11 +229,11 @@ class PVSilhouette():
                     Mstar_range: list[float, float] = [0.01, 10],
                     Rc_range: list[float, float] = [1., 1000.],
                     alphainfall_range: list[float, float] = [0.0, 1],
-                    ftau_range: list[float, float] = [0.1, 1e3],
+                    taumax_range: list[float, float] = [0.1, 1e3],
                     frho_range: list[float, float] = [1., 1e4],
                     sig_mdl_range: list[float, float] = [0., 10.],
                     fixed_params: dict = {'Mstar':None, 'Rc':None,
-                                          'alphainfall':None, 'ftau':None,
+                                          'alphainfall':None, 'taumax':None,
                                           'frho':None, 'sig_mdl':None},
                     vmask: list[float, float] = [0, 0],
                     filename: str = 'PVsilhouette',
@@ -268,9 +268,9 @@ class PVSilhouette():
                        nsubgrid=nsubgrid, nnest=n_nest,
                        beam=self.beam, reslim=reslim)
         rout = np.nanmax(self.x)
-        def makemodel(Mstar, Rc, alphainfall, ftau, frho):
+        def makemodel(Mstar, Rc, alphainfall, taumax, frho):
             major, minor = mpvd.generate_mockpvd(Mstar, Rc, alphainfall,
-                                                 ftau=ftau, frho=frho,
+                                                 taumax=taumax, frho=frho,
                                                  incl=incl, linewidth=linewidth,
                                                  rout=rout, pa=[pa_maj, pa_min],
                                                  axis='both')
@@ -282,7 +282,7 @@ class PVSilhouette():
             return fflux * major, fflux * minor
         self.makemodel = makemodel
         # Fitting
-        paramkeys = ['Mstar', 'Rc', 'alphainfall', 'ftau', 'frho', 'sig_mdl']
+        paramkeys = ['Mstar', 'Rc', 'alphainfall', 'taumax', 'frho', 'sig_mdl']
         p_fixed = np.array([fixed_params[k] if k in fixed_params else None for k in paramkeys])
         if None in p_fixed:
             notfixed = p_fixed == None
@@ -322,7 +322,7 @@ class PVSilhouette():
                 return -0.5 * (chi2maj + chi2min) / np.sqrt(Rarea)
             # prior
             plim = np.array([Mstar_range, Rc_range, alphainfall_range,
-                             ftau_range, frho_range, sig_mdl_range])
+                             taumax_range, frho_range, sig_mdl_range])
             plim[ilog] = np.log10(plim[ilog])
             plim = plim[notfixed].T
 
