@@ -225,27 +225,25 @@ class PVSilhouette():
         mpvd.grid.gridinfo()
 
 
-    def fit_mockpvd(self, 
-                incl: float = 89.,
-                Mstar_range: list[float, float] = [0.01, 10],
-                Rc_range: list[float, float] = [1., 1000.],
-                alphainfall_range: list[float, float] = [0.0, 1],
-                ftau_range: list[float, float] = [0.1, 1e3],
-                frho_range: list[float, float] = [1., 1e4],
-                sig_mdl_range: list[float, float] = [0., 10.],
-                fixed_params: dict = {'Mstar':None, 'Rc':None,
-                                      'alphainfall':None, 'ftau':None,
-                                      'frho':None, 'sig_mdl':None},
-                vmask: list[float, float] = [0, 0],
-                filename: str = 'PVsilhouette',
-                show: bool = False,
-                progressbar: bool = True,
-                kwargs_emcee_corner: dict = {},
-                signmajor: int | None = None, signminor: int | None = None,
-                pa_maj: float | None = None, pa_min: float | None = None,
-                linewidth: float | None = None,
-                nsubgrid: int = 1, n_nest: list[float] = [3, 3], reslim: float = 5,
-                set_title: bool = True, title: str | None = None):
+    def fit_mockpvd(self, incl: float = 89.,
+                    Mstar_range: list[float, float] = [0.01, 10],
+                    Rc_range: list[float, float] = [1., 1000.],
+                    alphainfall_range: list[float, float] = [0.0, 1],
+                    ftau_range: list[float, float] = [0.1, 1e3],
+                    frho_range: list[float, float] = [1., 1e4],
+                    sig_mdl_range: list[float, float] = [0., 10.],
+                    fixed_params: dict = {'Mstar':None, 'Rc':None,
+                                          'alphainfall':None, 'ftau':None,
+                                          'frho':None, 'sig_mdl':None},
+                    vmask: list[float, float] = [0, 0],
+                    filename: str = 'PVsilhouette',
+                    show: bool = False, progressbar: bool = True,
+                    kwargs_emcee_corner: dict = {},
+                    signmajor: int | None = None, signminor: int | None = None,
+                    pa_maj: float | None = None, pa_min: float | None = None,
+                    linewidth: float | None = None,
+                    nsubgrid: int = 1, n_nest: list[float] = [3, 3], reslim: float = 5,
+                    set_title: bool = True, title: str | None = None):
         # Observed PV diagrams
         majobs = self.dpvmajor.copy()
         minobs = self.dpvminor.copy()
@@ -277,11 +275,12 @@ class PVSilhouette():
                                                  rout=rout, pa=[pa_maj, pa_min],
                                                  axis='both')
             # quadrant
-            major = major[:, ::majquad] #[:,step//2::step]
-            minor = minor[:, ::minquad] #[:,step//2::step]
-            return major, minor
-
-
+            major = major[:, ::majquad]
+            minor = minor[:, ::minquad]
+            fflux = (np.nansum(majobs * major) + np.nansum(minobs * minor)) \
+                    / (np.nansum(major * major) + np.nansum(minor * minor))
+            return fflux * major, fflux * minor
+        self.makemodel = makemodel
         # Fitting
         paramkeys = ['Mstar', 'Rc', 'alphainfall', 'ftau', 'frho', 'sig_mdl']
         p_fixed = np.array([fixed_params[k] if k in fixed_params else None for k in paramkeys])
@@ -317,11 +316,7 @@ class PVSilhouette():
                 majsig2 = ((1. + q[-1]) * majsig)**2.
                 minsig2 = ((1. + q[-1]) * minsig)**2.
                 # make model
-                majmod, minmod = makemodel(*q[:-1])
-                fflux = (np.nansum(majobs * majmod) + np.nansum(minobs * minmod)) \
-                        / (np.nansum(majmod * majmod) + np.nansum(minmod * minmod))
-                majmod = fflux * majmod
-                minmod = fflux * minmod
+                majmod, minmod = self.makemodel(*q[:-1])
                 chi2maj = np.nansum((majobs - majmod)**2 / majsig2 + np.log(majsig2))
                 chi2min = np.nansum((minobs - minmod)**2 / minsig2 + np.log(minsig2)) 
                 return -0.5 * (chi2maj + chi2min) / np.sqrt(Rarea)
@@ -368,11 +363,8 @@ class PVSilhouette():
         self.phigh = dict(zip(paramkeys, self.phigh))
 
         # plot
-        self.plot_pvds(color='model', contour='obs', filename=filename,
-                       incl=incl, vmask=vmask, pa_maj=pa_maj, pa_min=pa_min,
-                       linewidth=linewidth, signmajor=signmajor, signminor=signminor,
-                       show=show, nsubgrid=nsubgrid, n_nest=n_nest, reslim=reslim,
-                       title=title, set_title=set_title)
+        self.plot_pvds(filename=filename, color='model', contour='obs', 
+                       vmask=vmask, title=title, set_title=set_title, show=show)
 
 
     def read_fitres(self, f: str):
@@ -387,14 +379,10 @@ class PVSilhouette():
 
 
     def plot_pvds(self, filename: str = 'PVsilhouette', 
-                  color: str = 'model', contour: str = 'obs', incl: float = 89.,
+                  color: str = 'model', contour: str = 'obs',
                   vmask: list[float, float] = [0., 0.],
-                  pa_maj: float | None = None, pa_min: float | None = None,
-                  linewidth: float | None = None,
-                  signmajor: int | None = None, signminor: int | None = None, 
                   cmap: str = 'viridis', cmap_residual: str = 'bwr', ext: str = '.png',
                   set_title: bool = False, title: str | None = None, show: bool = False,
-                  nsubgrid: int = 1, n_nest: list[int, int] = [3, 3], reslim: int = 5,
                   shadecolor: str = 'white', clevels: list[float] | None = None):
         '''
         Plot observed and model PV diagrams.
@@ -402,27 +390,6 @@ class PVSilhouette():
 
         # data
         majobs, minobs = self.dpvmajor.copy(), self.dpvminor.copy()
-
-        # get quadrant
-        majquad = getquad(self.dpvmajor) if signmajor is None else signmajor
-        minquad = getquad(self.dpvminor) * (-1) if signminor is None else signminor
-
-        # model
-        mpvd = MockPVD(self.x, self.x, self.v, nsubgrid=nsubgrid, nnest=n_nest,
-                       beam=self.beam, reslim=reslim)
-        rout = np.nanmax(self.x)
-        def makemodel(Mstar, Rc, alphainfall, ftau, frho):
-            major, minor = mpvd.generate_mockpvd(Mstar, Rc, alphainfall,
-                                                 ftau=ftau, frho=frho,
-                                                 incl=incl, linewidth=linewidth,
-                                                 rout=rout, pa=[pa_maj, pa_min],
-                                                 axis='both')
-            # quadrant
-            major = major[:, ::majquad] #[:,step//2::step]
-            minor = minor[:, ::minquad] #[:,step//2::step]
-            return major, minor
-
-
         # grid/data/mask/sigma
         x, v = np.meshgrid(self.x, self.v)
         mask = (vmask[0] < v) * (v < vmask[1]) # velocity mask
@@ -437,7 +404,7 @@ class PVSilhouette():
                 print('ERROR\twriteout_fitres: Run fitting or read fitting result first.')
                 return 0
             # model pv diagrams
-            majmod, minmod = makemodel(*popt[:-1])
+            majmod, minmod = self.makemodel(*popt[:-1])
             # residual
             majres = np.where(mask, -(mask.astype('int')), (majobs - majmod) / majsig)
             minres = np.where(mask, -(mask.astype('int')), (minobs - minmod) / minsig)
