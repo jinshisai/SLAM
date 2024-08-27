@@ -283,7 +283,7 @@ class MockPVD(object):
             g = precalculation.gauss_v
             tau_v = convolve(tau_v, g, mode='same') # conserve integrated value
 
-        I_cube = 1. - np.exp(-tau_v * ftau)
+        I_cube = 1. - np.exp(-ftau * tau_v / np.nanmax(tau_v))
 
         # beam convolution
         if beam is not None:
