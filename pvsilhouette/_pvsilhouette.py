@@ -284,7 +284,8 @@ class PVSilhouette():
         # Fitting
         paramkeys = ['Mstar', 'Rc', 'alphainfall', 'taumax', 'frho', 'sig_mdl']
         p_fixed = np.array([fixed_params[k] if k in fixed_params else None for k in paramkeys])
-        if None in p_fixed:
+        runfit = None in p_fixed
+        if runfit:
             notfixed = p_fixed == None
             ilog = np.array([0, 1, 2, 3, 4], dtype=int)
             i = ilog[p_fixed[ilog] != None]
@@ -353,11 +354,12 @@ class PVSilhouette():
         for i, (k, d, u, f) in enumerate(zip(paramkeys, digits, ulist, flist)):
             p = [self.plow[i], self.popt[i], self.phigh[i]]
             print(f'{k} = {p[0]:.{d:d}{f}}, {p[1]:.{d:d}{f}}, {p[2]:.{d:d}{f}} {u}')
-        plist = [self.popt, self.plow, self.pmid, self.phigh]
-        with open(filename+'.popt.txt', 'w') as f:
-            f.write('#Rows:' + ','.join(paramkeys) + '\n')
-            f.write('#Columns:' + ','.join(['popt', 'plow', 'pmid', 'phigh']) + '\n')
-            np.savetxt(f, np.transpose(plist))
+        if runfit:
+            plist = [self.popt, self.plow, self.pmid, self.phigh]
+            with open(filename+'.popt.txt', 'w') as f:
+                f.write('#Rows:' + ','.join(paramkeys) + '\n')
+                f.write('#Columns:' + ','.join(['popt', 'plow', 'pmid', 'phigh']) + '\n')
+                np.savetxt(f, np.transpose(plist))
         self.popt = dict(zip(paramkeys, self.popt))
         self.plow = dict(zip(paramkeys, self.plow))
         self.pmid = dict(zip(paramkeys, self.pmid))
