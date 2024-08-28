@@ -673,8 +673,8 @@ class ChannelFit():
             self.update_vlos(p_fixed['h1'], p_fixed['h2'])
         
         p_fixed = np.array([p_fixed[k] for k in self.paramkeys])
-        
-        if None in p_fixed:
+        runfit = None in p_fixed
+        if runfit:
             notfixed = p_fixed == None
             ilog = np.array([0, 1, 7])
             i = ilog[p_fixed[ilog] != None]
@@ -728,11 +728,12 @@ class ChannelFit():
         for i, (k, d, u) in enumerate(zip(self.paramkeys, digits, ulist)):
             p = [self.plow[i], self.popt[i], self.phigh[i]]
             print(f'{k} = {p[0]:.{d:d}f}, {p[1]:.{d:d}f}, {p[2]:.{d:d}f} {u}')
-        plist = [self.popt, self.plow, self.pmid, self.phigh]
-        with open(filename+'.popt.txt', 'w') as f:
-            f.write('#Rows:' + ','.join(self.paramkeys) + '\n')
-            f.write('#Columns:' + ','.join(['popt', 'plow', 'pmid', 'phigh']) + '\n')
-            np.savetxt(f, np.transpose(plist))
+        if runfit:
+            plist = [self.popt, self.plow, self.pmid, self.phigh]
+            with open(filename+'.popt.txt', 'w') as f:
+                f.write('#Rows:' + ','.join(self.paramkeys) + '\n')
+                f.write('#Columns:' + ','.join(['popt', 'plow', 'pmid', 'phigh']) + '\n')
+                np.savetxt(f, np.transpose(plist))
         self.popt = dict(zip(self.paramkeys, self.popt))
         self.plow = dict(zip(self.paramkeys, self.plow))
         self.pmid = dict(zip(self.paramkeys, self.pmid))
