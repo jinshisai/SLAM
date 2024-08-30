@@ -236,13 +236,15 @@ class PVSilhouette():
                                           'alphainfall':None, 'taumax':None,
                                           'frho':None, 'sig_mdl':None},
                     vmask: list[float, float] = [0, 0],
+                    zmax: float | None = None,
                     filename: str = 'PVsilhouette',
                     show: bool = False, progressbar: bool = True,
                     kwargs_emcee_corner: dict = {},
                     signmajor: int | None = None, signminor: int | None = None,
                     pa_maj: float | None = None, pa_min: float | None = None,
                     linewidth: float | None = None,
-                    nsubgrid: int = 1, n_nest: list[float] = [3, 3], reslim: float = 5,
+                    nsubgrid: int = 1, n_nest: list[float] = [3, 3],
+                    reslim: float = 5,
                     set_title: bool = True, title: str | None = None):
         # Observed PV diagrams
         majobs = self.dpvmajor.copy()
@@ -264,7 +266,13 @@ class PVSilhouette():
         minquad = getquad(self.dpvminor) * (-1) if signminor is None else signminor
 
         # model
-        mpvd = MockPVD(self.x, self.x, self.v,
+        if zmax is None:
+            z = self.x
+        else:
+            dx = self.x[1] - self.x[0]
+            nz = int(zmax / dx + 0.5)
+            z = (np.arange(2 * nz + 1) - nz) * dx
+        mpvd = MockPVD(self.x, z, self.v,
                        nsubgrid=nsubgrid, nnest=n_nest,
                        beam=self.beam, reslim=reslim)
         rout = np.nanmax(self.x)
