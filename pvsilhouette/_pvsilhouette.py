@@ -275,9 +275,10 @@ class PVSilhouette():
         mpvd = MockPVD(self.x, z, self.v,
                        nsubgrid=nsubgrid, nnest=n_nest,
                        beam=self.beam, reslim=reslim)
-        rout = np.nanmax(self.x)
+        rout = np.max(z)
         def makemodel(Mstar, Rc, alphainfall, taumax, frho):
-            major, minor = mpvd.generate_mockpvd(Mstar, Rc, alphainfall,
+            major, minor = mpvd.generate_mockpvd(Mstar=Mstar, Rc=Rc,
+                                                 alphainfall=alphainfall,
                                                  taumax=taumax, frho=frho,
                                                  incl=incl, linewidth=linewidth,
                                                  rout=rout, pa=[pa_maj, pa_min],
