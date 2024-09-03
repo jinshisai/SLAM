@@ -209,12 +209,15 @@ class PVSilhouette():
         y_smpl = int(1. / y_smpl)
         if x_smpl == 0: x_smpl = 1
         if y_smpl == 0: y_smpl = 1
-        #print(x_smpl, self.bmin, self.dx)
         self.data = self.data[y_smpl//2::y_smpl, x_smpl//2::x_smpl]
         self.v = self.v[y_smpl//2::y_smpl]
         self.x = self.x[x_smpl//2::x_smpl]
         self.dx = self.x[1] - self.x[0]
         self.dv = self.v[1] - self.v[0]
+        ibmaj = self.bmaj / self.dx
+        ibmin = self.bmin / self.dx
+        print(f'Adopt xskip={x_smpl:d} and vskip={y_smpl:d}.')
+        print(f'Beam major/minor axis is {ibmaj:.1f}/{ibmin:.1f} pixels.')
 
     def check_modelgrid(self, nsubgrid: float = 1, 
         n_nest: list = None, reslim: float = 5):

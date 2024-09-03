@@ -237,13 +237,13 @@ class ChannelFit():
         self.scaling = scaling
         self.progressbar = progressbar
 
-    def read_cubefits(self, cubefits: str, center: str = None,
+    def read_cubefits(self, cubefits: str, center: str | None = None,
                       dist: float = 1, vsys: float = 0,
-                      xmin: float = None, xmax: float = None,
-                      ymin: float = None, ymax: float = None,
-                      vmin: float = None, vmax: float = None,
+                      xmin: float | None = None, xmax: float | None = None,
+                      ymin: float | None = None, ymax: float | None = None,
+                      vmin: float | None = None, vmax: float | None = None,
                       xskip: int = 1, yskip: int = 1,
-                      sigma: float = None,
+                      sigma: float | None = None,
                       centering_velocity: bool = False) -> dict:
         """
         Read a position-velocity diagram in the FITS format.
@@ -344,15 +344,18 @@ class ChannelFit():
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
-    def makegrid(self, cubefits: str = None,
+    def makegrid(self, cubefits: str | None = None,
                  pa: float = 0, incl: float = 90, dist: float = 1,
-                 center: str = None, vsys: float = 0,
-                 rmax: float = 1e4, vlim: tuple = (-100, 0, 0, 100),
-                 sigma: float = None, nlayer: int = 3,
-                 xskip: int = 1, yskip: int = 1, skipto: bool = False,
+                 center: str | None = None, vsys: float = 0,
+                 rmax: float = 1e4,
+                 vlim: tuple[float, float, float, float] = (-100, 0, 0, 100),
+                 sigma: float | None = None, nlayer: int = 3,
+                 xskip: int = 1, yskip: int = 1, skipto: bool | int = False,
                  gaussmargin: float = 1.6,
-                 savedeconvolved: str = None, loaddeconvolved: str = None,
-                 signmajor: int = None, signminor: int = None):
+                 savedeconvolved: str | None = None,
+                 loaddeconvolved: str | None = None,
+                 signmajor: int | None = None,
+                 signminor: int | None = None):
         if not (cubefits is None):
             self.read_cubefits(cubefits, center, dist, vsys,
                                -rmax, rmax, -rmax, rmax, None, None,
