@@ -252,13 +252,15 @@ class MockPVD(object):
         _nx, _ny, _nz = self.grid.ngrids[-1] # dimension of the l-th layer
         rho_l = rho_col[-1].reshape(_nx, _ny, _nz)
         vlos_l = vlos_col[-1].reshape(_nx, _ny, _nz)
-        tau_v = rho2tau(vlos_l, rho_l)
+        dz = self.grid.zaxes[-1][1] - self.grid.zaxes[-1][0]
+        tau_v = rho2tau(vlos_l, rho_l, dz)
         # if nested grid
         if self.grid.nlevels >= 2:
             for l in range(self.grid.nlevels-2,-1,-1):
                 _nx, _ny, _nz = self.grid.ngrids[l] # dimension of the l-th layer
                 rho_l = rho_col[l].reshape(_nx, _ny, _nz)
                 vlos_l = vlos_col[l].reshape(_nx, _ny, _nz)
+                dz = self.grid.zaxes[l][1] - self.grid.zaxes[l][0]
 
                 if l < (self.grid.nlevels - 1):
                     # starting & ending indices of the inner grid
@@ -267,7 +269,7 @@ class MockPVD(object):
                     zimin, zimax = self.grid.zinest[l+1]
                     rho_l[ximin:ximax+1, yimin:yimax+1, zimin:zimax+1] = 0.
 
-                tau_vl = rho2tau(vlos_l, rho_l)
+                tau_vl = rho2tau(vlos_l, rho_l, dz)
                 # add values from the inner grid
                 _tau_v = binning(tau_v, self.grid.nsub[l])
                 tau_vl[:, yimin:yimax+1, ximin:ximax+1] += _tau_v
