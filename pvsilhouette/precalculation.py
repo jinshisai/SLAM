@@ -134,13 +134,13 @@ gauss_xy = None
 gauss_v = None
 vedge = None
 @jit(parallel=True)
-def rho2tau(vlos: np.ndarray, rho: np.ndarray, dz: float) -> np.ndarray:
+def rho2tau(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
     nv = len(vedge) - 1
     nx, ny, _ = np.shape(vlos)
     tau = np.zeros((nv, ny, nx))
     for i in prange(nv):
         mask = (vedge[i] <= vlos) * (vlos < vedge[i + 1])
-        tau[i] = np.sum(mask * rho * dz, axis=2).T
+        tau[i] = np.sum(mask * rho, axis=2).T
     return tau
 
 Nr = 1600
