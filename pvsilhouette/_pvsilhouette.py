@@ -219,12 +219,12 @@ class PVSilhouette():
         print(f'Adopt xskip={x_smpl:d} and vskip={y_smpl:d}.')
         print(f'Beam major/minor axis is {ibmaj:.1f}/{ibmin:.1f} pixels.')
 
-    def check_modelgrid(self, nsubgrid: float = 1, 
-        n_nest: list = None, reslim: float = 5):
+    def check_modelgrid(self, nsubgrid: float = 1,
+                        n_nest: list | None = None, reslim: float = 5):
         # model grid
         mpvd = MockPVD(self.x, self.x, self.v, 
-            nsubgrid = nsubgrid, nnest = n_nest, 
-            beam = self.beam, reslim = reslim)
+                       nsubgrid=nsubgrid, nnest=n_nest, 
+                       beam=self.beam, reslim=reslim)
         mpvd.grid.gridinfo()
 
 
