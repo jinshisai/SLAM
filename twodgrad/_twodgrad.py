@@ -574,7 +574,7 @@ class TwoDGrad():
             vmax = np.max(self.v) * 1.5
             vmin = vmax / 30
         
-        fig = plt.figure()
+        fig = plt.figure(figsize=(5.3, 5.3))
         ax = fig.add_subplot(1, 1, 1)
         ax.set_xlim(xmin * 0.999, xmax * 1.001)  # au
         ax.set_ylim(vmin * 0.999, vmax * 1.001)  # km/s
