@@ -478,7 +478,7 @@ class PVSilhouette():
                     +'\n'+r'$\alpha$'+f'={popt[2]:.2f}'
                     +', '+r'$\alpha ^{2} M_{*}$'+f'={popt[0] * popt[2]**2:.2}')
             if title is not None:
-                fig.suptitle(title)
+                fig.suptitle(title, y=0.92)
 
             return fig
 
