@@ -611,7 +611,7 @@ class TwoDGrad():
         ax.set_xlim(xmin * 0.999, xmax * 1.001)  # au
         ax.set_ylim(vmin * 0.999, vmax * 1.001)  # km/s
         ax.set_aspect('equal', adjustable='box')
-        ax.set_xlabel('Offset along vel. grad. (au)')
+        ax.set_xlabel('Offset along v-grad (au)')
         ax.set_ylabel(r'Velocity (km s$^{-1}$)')
         ax.grid()
         if title is not None:
