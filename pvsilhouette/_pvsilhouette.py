@@ -449,7 +449,9 @@ class PVSilhouette():
             else:
                 vmin_plot = vmin
                 vmax_plot = vmax
-            d_plot = np.log10(d_plot) if log else data_color[0]
+            d_plot = data_color[0] * 1
+            if log:
+                d_plot = np.log10(d_plot.clip(vmin, None))
             im = ax1.pcolormesh(self.x, self.v, d_plot, 
                                 cmap=cmap, vmin=vmin_plot, vmax=vmax_plot,
                                 alpha=alpha, rasterized=True)
@@ -459,14 +461,23 @@ class PVSilhouette():
             ax1.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
 
             # minor
-            d_plot = np.log10(d_plot) if log else data_color[1]
+            d_plot = data_color[1] * 1
+            if log:
+                d_plot = np.log10(d_plot.clip(vmin, None))
             im = ax2.pcolormesh(self.x, self.v, d_plot,
                                 cmap=cmap, vmin=vmin_plot, vmax=vmax_plot,
                                 alpha=alpha, rasterized=True)
             ax2.contour(self.x, self.v, data_contour[1],
                        levels = clevels, colors='k')
             cax2 = ax2.inset_axes([1.02, 0., 0.05, 1.]) # x0, y0, dx, dy
-            fig.colorbar(im, cax=cax2)
+            cb = plt.colorbar(im, cax=cax2)
+            if log:
+                cbticks = np.outer([1, 2, 5], 10**np.arange(-6, 3, 1))
+                cbticks = np.log10(np.sort(np.ravel(cbticks)))
+                cbticks = cbticks[(vmin_plot < cbticks) * (cbticks < vmax_plot)]
+                cb.set_ticks(cbticks)
+                cb.set_ticklabels([f'{i:.1e}' for i in 10**cbticks])
+
             ax2.set_yticklabels('')
             ax2.set_xlabel('Minor offset (au)')
 
