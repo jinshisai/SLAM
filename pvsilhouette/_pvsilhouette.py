@@ -248,7 +248,8 @@ class PVSilhouette():
                     linewidth: float | None = None,
                     nsubgrid: int = 1, n_nest: list[float] = [3, 3],
                     reslim: float = 5,
-                    set_title: bool = True, title: str | None = None):
+                    set_title: bool = True, title: str | None = None,
+                    log: bool = False):
         # Observed PV diagrams
         majobs = self.dpvmajor.copy()
         minobs = self.dpvminor.copy()
@@ -379,7 +380,7 @@ class PVSilhouette():
 
         # plot
         self.plot_pvds(filename=filename, color='model', contour='obs', 
-                       vmask=vmask, title=title, set_title=set_title, show=show)
+                       vmask=vmask, title=title, set_title=set_title, show=show, log=log)
 
 
     def read_fitres(self, f: str):
@@ -398,7 +399,8 @@ class PVSilhouette():
                   vmask: list[float, float] = [0., 0.],
                   cmap: str = 'viridis', cmap_residual: str = 'bwr', ext: str = '.png',
                   set_title: bool = False, title: str | None = None, show: bool = False,
-                  shadecolor: str = 'white', clevels: list[float] | None = None):
+                  shadecolor: str = 'white', clevels: list[float] | None = None,
+                  log: bool = False):
         '''
         Plot observed and model PV diagrams.
         '''
@@ -431,7 +433,7 @@ class PVSilhouette():
 
 
         if clevels is None:
-            clevels = np.arange(1, 10) * 3 * self.sigma
+            clevels = (2**np.arange(1, 10) if log else np.arange(1, 10)) * 3 * self.sigma
         def makeplots(data_color, data_contour, cmap, vmin=None,
                       vmax=None, vmask=None, alpha=1.):
             # set figure
@@ -441,8 +443,15 @@ class PVSilhouette():
             ax1, ax2 = axes
 
             # major
-            im = ax1.pcolormesh(self.x, self.v, data_color[0], 
-                                cmap=cmap, vmin=vmin, vmax=vmax,
+            if log:
+                vmin_plot = np.log10(2 * self.sigma) if vmin is None else np.log10(vmin)
+                vmax_plot = None if vmax is None else np.log10(vmax)
+            else:
+                vmin_plot = vmin
+                vmax_plot = vmax
+            d_plot = np.log10(d_plot) if log else data_color[0]
+            im = ax1.pcolormesh(self.x, self.v, d_plot, 
+                                cmap=cmap, vmin=vmin_plot, vmax=vmax_plot,
                                 alpha=alpha, rasterized=True)
             ax1.contour(self.x, self.v, data_contour[0],
                        levels = clevels, colors='k')
@@ -450,8 +459,9 @@ class PVSilhouette():
             ax1.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
 
             # minor
-            im = ax2.pcolormesh(self.x, self.v, data_color[1],
-                                cmap=cmap, vmin=vmin, vmax=vmax,
+            d_plot = np.log10(d_plot) if log else data_color[1]
+            im = ax2.pcolormesh(self.x, self.v, d_plot,
+                                cmap=cmap, vmin=vmin_plot, vmax=vmax_plot,
                                 alpha=alpha, rasterized=True)
             ax2.contour(self.x, self.v, data_contour[1],
                        levels = clevels, colors='k')
@@ -490,7 +500,8 @@ class PVSilhouette():
 
         figs = []
         # main plot
-        vmin, vmax = np.nanmin(np.array(d_col)), np.nanmax(np.array(d_col))
+        vmin = 2 * self.sigma if log else np.nanmin(np.array(d_col))
+        vmax = np.nanmax(np.array(d_col))
         vmask = vmask if vmask[1] > vmask[0] else None
         fig = makeplots(d_col, d_con, cmap, vmin=vmin, vmax=vmax,
                         vmask=vmask, alpha=0.8)
