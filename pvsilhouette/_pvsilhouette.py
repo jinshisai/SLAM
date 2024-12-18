@@ -436,6 +436,8 @@ class PVSilhouette():
                       vmax=None, vmask=None, alpha=1.):
             # set figure
             fig, axes = plt.subplots(1, 2,)
+            fig.set_figheight(4)
+            fig.set_figwidth(5)
             ax1, ax2 = axes
 
             # major
@@ -453,7 +455,7 @@ class PVSilhouette():
                                 alpha=alpha, rasterized=True)
             ax2.contour(self.x, self.v, data_contour[1],
                        levels = clevels, colors='k')
-            cax2 = ax2.inset_axes([1.0, 0., 0.05, 1.]) # x0, y0, dx, dy
+            cax2 = ax2.inset_axes([1.02, 0., 0.05, 1.]) # x0, y0, dx, dy
             fig.colorbar(im, cax=cax2)
             ax2.set_yticklabels('')
             ax2.set_xlabel('Minor offset (au)')
