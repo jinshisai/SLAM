@@ -472,7 +472,7 @@ class PVSilhouette():
             cax2 = ax2.inset_axes([1.02, 0., 0.05, 1.]) # x0, y0, dx, dy
             cb = plt.colorbar(im, cax=cax2)
             if log:
-                cbticks = np.outer([1, 2, 5], 10**np.arange(-6, 3, 1))
+                cbticks = np.outer([1, 2, 5], 10**np.arange(-6, 3, 1.0))
                 cbticks = np.log10(np.sort(np.ravel(cbticks)))
                 cbticks = cbticks[(vmin_plot < cbticks) * (cbticks < vmax_plot)]
                 cb.set_ticks(cbticks)
