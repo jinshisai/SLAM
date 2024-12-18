@@ -433,7 +433,7 @@ class PVSilhouette():
 
 
         if clevels is None:
-            clevels = (2**np.arange(1, 10) if log else np.arange(1, 10)) * 3 * self.sigma
+            clevels = (2**np.arange(0, 10) if log else np.arange(1, 11)) * 3 * self.sigma
         def makeplots(data_color, data_contour, cmap, vmin=None,
                       vmax=None, vmask=None, alpha=1.):
             # set figure
