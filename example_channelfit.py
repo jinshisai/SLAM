@@ -18,7 +18,8 @@ if __name__ == '__main__':
     filehead = cubefits.replace('.fits', '')
     chan = ChannelFit(scaling='mom0ft', progressbar=True)
     chan.makegrid(cubefits=cubefits, center=center, pa=pa, incl=incl,
-                  vsys=vsys, dist=dist, sigma=sigma, rmax=rmax, vlim=vlim)
+                  vsys=vsys, dist=dist, sigma=sigma, rmax=rmax, vlim=vlim,
+                  skipto=5)
     chan.fitting(Mstar_range=[0.01, 1.0],
                  Rc_range=[3, 300],
                  pI_range=[0.0, 3.0],
