@@ -435,7 +435,7 @@ class TwoDGrad():
                 plim = plim[:, :-1]
             popt, perr = emcee_custom(plim, lnprob, False)
             dof = len(v) - len(popt) - 1
-            self.chi2r_mass = -2. * lnprob(*popt) / dof
+            self.chi2r_mass = -2. * lnprob(popt) / dof
             if voff_fixed is not None:
                 popt = np.r_[popt, 0]
                 perr = np.r_[perr, 0]
