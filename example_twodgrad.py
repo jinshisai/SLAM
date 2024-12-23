@@ -1,19 +1,19 @@
 from twodgrad import TwoDGrad
 
 '-------- INPUTS --------'
-cubefits = './twodgrad/IRAS16253_SBLB_C18O_robust_2.0.imsub.fits'
-center = '16h28m21.61526785s -24d36m24.32538414s'
-pa = 113  # deg
-incl = 65  # deg
-vsys = 4  # km/s
-dist = 139  # pc
-sigma = 1.9e-3  # Jy/beam; None means automatic calculation.
+cubefits = './twodgrad/testcube.fits'
+center = '16h28m21.615s -24d36m23.33s'
+pa = 0  # deg
+incl = 45  # deg
+vsys = 0  # km/s
+dist = 140  # pc
+sigma = 2e-3  # Jy/beam; None means automatic calculation.
 cutoff = 5.0  # sigma
-xmax = 1 * dist  # au
+xmax = 1.5 * dist  # au
 ymax = xmax  # au
-vmax = 2.5  # km/s
+vmax = 4.0  # km/s
 vmin = -vmax  # km/s
-vmask = [-0.5, 0.5]  # km/s
+vmask = [-2, 2]  # km/s
 show_figs = True
 minrelerr = 0.01
 minabserr = 0.1
@@ -28,11 +28,10 @@ tdg.read_cubefits(cubefits=cubefits, center=center,
                   vsys=vsys, dist=dist, sigma=sigma,
                   xmin=-xmax, xmax=xmax,
                   ymin=-ymax, ymax=ymax,
-                  vmin=vmin, vmax=vmax,
-                  centering_velocity=True)
+                  vmin=vmin, vmax=vmax)
 tdg.get_2Dcenter(cutoff=cutoff, vmask=vmask,
                  minrelerr=minrelerr, minabserr=minabserr, method=method)
-tdg.filtering(pa0=pa)
-tdg.calc_mstar(incl=incl)
+tdg.filtering(pa0=pa, fixcenter=True, axisfilter=False, lowvelfilter=False)
+tdg.calc_mstar(incl=incl, voff_fixed=0)
 tdg.plot_center(filehead=filehead, pa=pa, show_figs=show_figs)
 '-------------------------------------'
