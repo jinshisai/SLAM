@@ -382,7 +382,7 @@ class TwoDGrad():
         self.xoff, self.yoff, self.pa_grad = popt
         self.dxoff, self.dyoff, self.dpa_grad = perr
         self.kepler = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
-        dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.)
+        dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.) - 1
         self.chi2r_grad = chi2(popt, xc, yc, dxc, dyc) / dof
         
 
@@ -434,12 +434,11 @@ class TwoDGrad():
             if voff_fixed is not None:
                 plim = plim[:, :-1]
             popt, perr = emcee_custom(plim, lnprob, False)
+            dof = len(v) - len(popt) - 1
+            self.chi2r_mass = -2. * lnprob(*popt) / dof
             if voff_fixed is not None:
                 popt = np.r_[popt, 0]
                 perr = np.r_[perr, 0]
-            
-            dof = len(v) - (4. if voff_fixed is None else 3.)
-            self.chi2r_mass = -2. * lnprob(*popt) / dof
             
             M_p, vb, p_low, voff = popt
             dM_p, dvb, dp_low, dvoff = perr
