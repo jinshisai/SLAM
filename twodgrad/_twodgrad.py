@@ -382,6 +382,8 @@ class TwoDGrad():
         self.xoff, self.yoff, self.pa_grad = popt
         self.dxoff, self.dyoff, self.dpa_grad = perr
         self.kepler = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
+        dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.)
+        self.reduced_chi2 = -2.0 * lnprob(*popt) / dof
         
 
     def calc_mstar(self, incl: float = 90,
