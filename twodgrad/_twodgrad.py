@@ -383,12 +383,12 @@ class TwoDGrad():
         self.dxoff, self.dyoff, self.dpa_grad = perr
         self.kepler = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
         dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.)
-        self.reduced_chi2 = chi2(popt, xc, yc, dxc, dyc) / dof
+        self.chi2r_grad = chi2(popt, xc, yc, dxc, dyc) / dof
         
 
     def calc_mstar(self, incl: float = 90,
                    voff_range: list = [-0.5, 0.5],
-                   voff_fixed: float = None,
+                   voff_fixed: float | None = None,
                    minabserr: float = 0.1, minrelerr: float = 0.01):
         self.incl = incl
         sini2 = np.sin(np.radians(incl))**2
@@ -423,7 +423,7 @@ class TwoDGrad():
                     M_p, v_break, p_low, vsys = p
                 else:
                     M_p, v_break, p_low = p
-                    vsys = 0
+                    vsys = voff_fixed
                 r_model =  r_kep_out(v, M_p, v_break, p_low, vsys)
                 chi2 = np.sum(((r - s_model * r_model) / dr)**2)
                 return -0.5 * chi2
@@ -437,6 +437,10 @@ class TwoDGrad():
             if voff_fixed is not None:
                 popt = np.r_[popt, 0]
                 perr = np.r_[perr, 0]
+            
+            dof = len(v) - (4. if voff_fixed is None else 3.)
+            self.chi2r_mass = -2. * lnprob(*popt) / dof
+            
             M_p, vb, p_low, voff = popt
             dM_p, dvb, dp_low, dvoff = perr
             Mstar = M_p * unit / sini2
