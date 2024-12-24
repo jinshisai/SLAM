@@ -364,7 +364,7 @@ class PVSilhouette():
         
         dof = len(majobs) * len(majobs[0]) + len(minobs) * len(minobs[0])
         dof = dof / np.sqrt(Rarea) - len(notfixed[notfixed]) - 1
-        self.chi2r = lnprob(popt) / dof
+        self.chi2r = -2. * lnprob(popt) / dof
         
         ulist = ['Msun', 'au', '', '', '', 'sig_obs']
         digits = [2, 0, 2, 2, 2, 2]
