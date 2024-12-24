@@ -361,6 +361,11 @@ class PVSilhouette():
         self.plow = plow
         self.pmid = pmid
         self.phigh = phigh
+        
+        dof = len(majobs) * len(majobs[0]) + len(minobs) * len(minobs[0])
+        dof = dof / np.sqrt(Rarea) - len(notfixed[notfixed]) - 1
+        self.chi2r = lnprob(popt) / dof
+        
         ulist = ['Msun', 'au', '', '', '', 'sig_obs']
         digits = [2, 0, 2, 2, 2, 2]
         flist = ['f', 'f', 'f', 'e', 'e', 'f']
