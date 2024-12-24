@@ -365,7 +365,7 @@ class PVSilhouette():
                 chi2maj = np.nansum((majobs - majmod)**2 / majsig2)
                 chi2min = np.nansum((minobs - minmod)**2 / minsig2)
                 return (chi2maj + chi2min) / np.sqrt(Rarea)
-            dof = len(majobs) * len(majobs[0]) + len(minobs) * len(minobs[0])
+            dof = np.prod(np.shape(majobs)) + np.prod(np.shape(minobs))
             # The number of paramter is assumed to be 6 but won't change dof much.
             dof = dof / np.sqrt(Rarea) - 6 - 1
             self.chi2r = chi2() / dof

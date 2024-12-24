@@ -722,6 +722,17 @@ class ChannelFit():
             self.pmid = get_p(2)
             self.phigh = get_p(3)
         else:
+            def chi2():
+                q = p_fixed.copy()
+                model = self.cubemodel(*q)
+                chi2 = np.nansum((self.data_valid - model)**2) \
+                       / self.sigma**2 / self.pixperbeam
+                return chi2
+            dof = np.prod(np.shape(self.data_valid))
+            # The number of paramter is assumed to be 6 but won't change dof much.
+            dof = dof / self.pixperbeam - 6 - 1
+            self.chi2r = chi2() / dof
+
             self.popt = p_fixed
             self.plow = p_fixed
             self.pmid = p_fixed
