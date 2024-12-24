@@ -353,6 +353,23 @@ class PVSilhouette():
             pmid = get_p(2)
             phigh = get_p(3)
         else:
+            def chi2():
+                # parameter
+                q = p_fixed.copy()
+                # updated sigma
+                majsig2 = ((1. + q[-1]) * majsig)**2.
+                minsig2 = ((1. + q[-1]) * minsig)**2.
+                # make model
+                majmod, minmod = self.makemodel(*q[:-1])
+                # chi2 does not use log(majsig2) and log(minsig2).
+                chi2maj = np.nansum((majobs - majmod)**2 / majsig2)
+                chi2min = np.nansum((minobs - minmod)**2 / minsig2)
+                return (chi2maj + chi2min) / np.sqrt(Rarea)
+            dof = len(majobs) * len(majobs[0]) + len(minobs) * len(minobs[0])
+            # The number of paramter is assumed to be 6 but won't change dof much.
+            dof = dof / np.sqrt(Rarea) - 6 - 1
+            self.chi2r = chi2() / dof
+            
             popt = p_fixed
             plow = p_fixed
             pmid = p_fixed
@@ -361,11 +378,6 @@ class PVSilhouette():
         self.plow = plow
         self.pmid = pmid
         self.phigh = phigh
-        
-        dof = len(majobs) * len(majobs[0]) + len(minobs) * len(minobs[0])
-        dof = dof / np.sqrt(Rarea) - len(notfixed[notfixed]) - 1
-        self.chi2r = -2. * lnprob(popt) / dof
-        
         ulist = ['Msun', 'au', '', '', '', 'sig_obs']
         digits = [2, 0, 2, 2, 2, 2]
         flist = ['f', 'f', 'f', 'e', 'e', 'f']
