@@ -373,6 +373,9 @@ class ChannelFit():
             dpix = min([np.abs(self.dx), np.abs(self.dy)])
             if type(skipto) is int:
                 iskip = int(self.bmin / (dpix / xskip) / skipto)
+                if iskip == 0:
+                    print('WARNING: \'skipto\' is ignored because the beam minor axis is smaller than \'skipto\' pixels.')
+                    iskip = 1
                 self.read_cubefits(cubefits, center, dist, vsys,
                                    -rmax, rmax, -rmax, rmax, None, None,
                                    iskip, iskip, sigma)
