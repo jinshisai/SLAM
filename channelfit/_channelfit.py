@@ -313,7 +313,17 @@ class ChannelFit():
         v = v + h['CRVAL3']
         x = (x - cx) * 3600. * dist  # au
         y = (y - cy) * 3600. * dist  # au
-        v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
+        if h['CUNIT3'] == 'Hz':
+            restfreq = np.mean(v)
+            if 'RESTFRQ' in h:
+                restfreq = h['RESTFRQ']
+            elif 'RESTFREQ' in h:
+                restfreq = h['RESTFREQ']
+            else:
+                print('No rest frequency found. The middle frequency adopted.')
+            v = (1. - v / restfreq) * cc / 1.e3 - vsys  # km/s
+        elif h['CUNIT3'] == 'm/s':
+            v = v * 1e-3 - vsys
         i0 = 0 if xmax is None else np.argmin(np.abs(x - xmax))
         i1 = len(x) if xmin is None else np.argmin(np.abs(x - xmin))
         j0 = 0 if ymin is None else np.argmin(np.abs(y - ymin))
