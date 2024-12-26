@@ -69,7 +69,7 @@ class TwoDGrad():
                       ymin: float = None, ymax: float = None,
                       vmin: float = None, vmax: float = None,
                       xskip: int = 1, yskip: int = 1,
-                      sigma: float = None,
+                      sigma: float | None = None,
                       centering_velocity: bool = False) -> dict:
         """
         Read a position-velocity diagram in the FITS format.
