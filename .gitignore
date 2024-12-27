@@ -22,3 +22,6 @@ pvsilhouette/__pycache__/ulrichenvelope.cpython-310.pyc
 twodgrad/IRAS16253_SBLB_C18O_robust_2.0.imsub.majmin.png
 twodgrad/IRAS16253_SBLB_C18O_robust_2.0.imsub.majvel.png
 twodgrad/IRAS16253_SBLB_C18O_robust_2.0.imsub.radec.png
+__pycache__/utils.cpython-312.pyc
+channelfit/__pycache__/__init__.cpython-312.pyc
+channelfit/__pycache__/_channelfit.cpython-312.pyc
