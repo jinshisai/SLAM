@@ -101,7 +101,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     
 def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bmaj: float, bmin: float, bpa: float, sigma: float,
-                    savetxt: str = None, loadtxt: str = None,
+                    savetxt: str | None = None, loadtxt: str | None = None,
                     direct: bool = False, progressbar: bool = True) -> tuple:
     nx = len(x)
     ny = len(y)
@@ -231,7 +231,7 @@ class ChannelFit():
                  progressbar: bool = True):
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2',
                           'pI', 'Rin', 'Ienv',
-                          'xoff', 'yoff', 'voff', 'incl']
+                          'xoff', 'yoff', 'voff', 'incl', 'pa']
         self.disk = disk
         self.envelope = envelope
         self.scaling = scaling
@@ -447,6 +447,8 @@ class ChannelFit():
         self.Xnest = np.array(Xnest)
         self.Ynest = np.array(Ynest)
         self.Xnest, self.Ynest = rot(self.Xnest, self.Ynest, pa_rad)
+        self.Xnest0 = self.Xnest * 1
+        self.Ynest0 = self.Ynest * 1
         print(f'{len(self.v_valid):d} channels will be fitted.')
         print('-------- nested grid --------')
         for l in range(len(xnest)):
@@ -498,7 +500,9 @@ class ChannelFit():
             print(f'Max and rms are {maxres:.1f}sigma '
                   + f'and {rmsres:.1f}sigma in Moment 0 residual.')
 
-                
+    def update_pa(self, pa: float):
+        self.Xnest, self.Ynest = rot(self.Xnest0, self.Ynest0, np.radians(pa))
+
     def update_incl(self, incl: float):
         i = np.radians(self.incl0 + incl)
         self.sini = np.sin(i)
@@ -625,17 +629,19 @@ class ChannelFit():
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   h1: float, h2: float, pI: float, Rin: float, Ienv: float, 
                   xoff: float = 0, yoff: float = 0, voff: float = 0,
-                  incl: float = 90,
+                  incl: float = 90, pa: float = 0,
                   convolving: bool = True):
+        if self.free['pa']:
+            self.update_pa(pa)
         if self.free['incl']:
             self.update_incl(incl)
         if self.free['cs']:
             self.update_prof(cs)
-        if self.free['h1'] or self.free['h2']:
+        if self.free['pa'] or self.free['h1'] or self.free['h2']:
             self.update_xdisk(h1, h2)
-        if self.free['Rc'] or self.free['Rin']:
+        if self.free['pa'] or self.free['Rc'] or self.free['Rin']:
             self.update_getvlos(Rc, Rin)
-        if self.free['h1'] or self.free['h2'] \
+        if self.free['pa'] or self.free['h1'] or self.free['h2'] \
             or self.free['Rc'] or self.free['Rin']:
             self.update_vlos(h1, h2)
 
@@ -668,6 +674,7 @@ class ChannelFit():
                 yoff_range: list = [-100, 100],
                 voff_range: list = [-0.2, 0.2],
                 incl_range: list = [-45, 45],
+                pa_range: list = [-45, 45],
                 fixed_params: dict = {},
                 filename: str = 'channelfit',
                 show: bool = False,
@@ -676,15 +683,17 @@ class ChannelFit():
         p_fixed = {k:fixed_params[k] if k in fixed_params else None for k in self.paramkeys}
         self.free = {k:p_fixed[k] is None for k in self.paramkeys}
 
+        if not self.free['pa']:
+            self.update_pa(p_fixed['pa'])
         if not self.free['incl']:
             self.update_incl(p_fixed['incl'])
         if not self.free['cs']:
             self.update_prof(p_fixed['cs'])
-        if not (self.free['h1'] or self.free['h2']):
+        if not (self.free['pa'] or self.free['h1'] or self.free['h2']):
             self.update_xdisk(p_fixed['h1'], p_fixed['h2'])
-        if not (self.free['Rc'] or self.free['Rin']):
+        if not (self.free['pa'] or self.free['Rc'] or self.free['Rin']):
             self.update_getvlos(p_fixed['Rc'], p_fixed['Rin'])
-        if not (self.free['h1'] or self.free['h2'] 
+        if not (self.free['pa'] or self.free['h1'] or self.free['h2'] 
                 or self.free['Rc'] or self.free['Rin']):
             self.update_vlos(p_fixed['h1'], p_fixed['h2'])
         
@@ -721,7 +730,7 @@ class ChannelFit():
                              cs_range, h1_range, h2_range,
                              pI_range, Rin_range, Ienv_range,
                              xoff_range, yoff_range, voff_range,
-                             incl_range])
+                             incl_range, pa_range])
             plim[ilog] = np.log10(plim[ilog])
             plim = plim[notfixed].T
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
@@ -750,8 +759,13 @@ class ChannelFit():
             self.plow = p_fixed
             self.pmid = p_fixed
             self.phigh = p_fixed
-        ulist = ['Msun', 'au', 'km/s', '', '', '', 'au', '', 'au', 'au', 'km/s', 'deg']
-        digits = [2, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+            
+        self.pa_rad = self.pa_rad + np.radians(self.popt[12])
+        self.sinpa = np.sin(self.pa_rad)
+        self.cospa = np.cos(self.pa_rad)
+        ulist = ['Msun', 'au', 'km/s', '', '', '', 'au', '',
+                 'au', 'au', 'km/s', 'deg', 'deg']
+        digits = [2, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
         for i, (k, d, u) in enumerate(zip(self.paramkeys, digits, ulist)):
             p = [self.plow[i], self.popt[i], self.phigh[i]]
             print(f'{k} = {p[0]:.{d:d}f}, {p[1]:.{d:d}f}, {p[2]:.{d:d}f} {u}')
