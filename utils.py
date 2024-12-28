@@ -17,6 +17,7 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
                  nburnin: int = 2000, nsteps: int = 2000,
                  gr_check: bool = False, ndata: int = 1000,
                  labels: list = None, rangelevel: float = 0.8,
+                 range_corner: list | None = None,
                  figname: str = None, show_corner: bool = False,
                  plot_chain: bool = False, show_chain: bool = False,
                  ncore: int = 1, simpleoutput: bool = True, 
@@ -72,11 +73,14 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
     pmid = np.percentile(samples, 50, axis=0)
     phigh = np.percentile(samples, 84, axis=0)
     perr = (phigh - plow) / 2.
-    cornerrange = [rangelevel] * ndim if rangelevel is not None else np.transpose(bounds)
+    if range_corner is None:
+        r_c = [rangelevel] * ndim if rangelevel is not None else np.transpose(bounds)
+    else:
+        r_c = range_corner
     if show_corner or figname is not None:
         corner.corner(samples, truths=popt,
                       quantiles=[0.16, 0.5, 0.84], show_titles=True,
-                      range=cornerrange, labels=labels),
+                      range=r_c, labels=labels),
         if figname is not None:
             plt.savefig(figname.replace('.png', '.corner.png'))
         if show_corner: plt.show()

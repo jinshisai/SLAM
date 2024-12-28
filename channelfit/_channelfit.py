@@ -708,7 +708,8 @@ class ChannelFit():
             labels[ilog] = ['log'+labels[i] for i in ilog]
             labels = labels[notfixed]
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':200, 'nsteps':500,
-                       'labels': labels, 'rangelevel':None,
+                       'labels': labels,
+                       'rangelevel':None, 'range_corner':None,
                        'figname':filename+'.png', 'show_corner':show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
             if self.progressbar:
@@ -733,6 +734,13 @@ class ChannelFit():
                              incl_range, pa_range])
             plim[ilog] = np.log10(plim[ilog])
             plim = plim[notfixed].T
+            if type(r_c := kw['range_corner']) is dict:
+                r_c = [r_c[k] if k in r_c else 0.8 for k in self.paramkeys]
+                for i in ilog:
+                    r_c[i] = r_c[i] if type(r_c[i]) is float else np.log10(r_c[i])
+                r_c = [a for a, k in zip(r_c, self.paramkeys) if self.free[k]]
+                kw['range_corner'] = r_c
+                    
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
             def get_p(i: int):
                 p = p_fixed.copy()
