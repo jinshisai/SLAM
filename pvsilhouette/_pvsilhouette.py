@@ -297,6 +297,7 @@ class PVSilhouette():
         # Fitting
         paramkeys = ['Mstar', 'Rc', 'alphainfall', 'taumax', 'frho', 'sig_mdl']
         p_fixed = np.array([fixed_params[k] if k in fixed_params else None for k in paramkeys])
+        free = {k:p_fixed[k] is None for k in paramkeys}
         runfit = None in p_fixed
         if runfit:
             notfixed = p_fixed == None
@@ -339,6 +340,12 @@ class PVSilhouette():
                              taumax_range, frho_range, sig_mdl_range])
             plim[ilog] = np.log10(plim[ilog])
             plim = plim[notfixed].T
+            if type(r_c := kw['range_corner']) is dict:
+                r_c = [r_c[k] if k in r_c else 0.8 for k in paramkeys]
+                for i in ilog:
+                    r_c[i] = r_c[i] if type(r_c[i]) is float else np.log10(r_c[i])
+                r_c = [a for a, k in zip(r_c, paramkeys) if free[k]]
+                kw['range_corner'] = r_c
 
             # run mcmc fitting
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
