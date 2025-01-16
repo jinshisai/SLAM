@@ -1,9 +1,8 @@
-from pvsilhouette import PVSilhouette
+from pvfitting import PVFitting
 
 '-------- INPUTS --------'
-pvmajorfits = './pvsilhouette/IRAS16253_SBLB_C18O_robust_2.0.pvmajor.fits'
-pvminorfits = './pvsilhouette/IRAS16253_SBLB_C18O_robust_2.0.pvminor.fits'
-center = '16h28m21.61526785s -24d36m24.32538414s'
+pvmajorfits = './pvfitting/IRAS16253_SBLB_C18O_robust_2.0.pvmajor.fits'
+pvminorfits = './pvfitting/IRAS16253_SBLB_C18O_robust_2.0.pvminor.fits'
 pa = 113 - 180  # deg
 incl = 65  # deg
 vsys = 4  # km/s
@@ -17,14 +16,14 @@ show_figs = True
 
 '-------- HOW TO DO EACH STEP --------'
 filehead = pvmajorfits.replace('.pvmajor.fits', '')
-pvsil = PVSilhouette()
+pvsil = PVFitting()
 pvsil.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
              dist=dist, vsys=vsys, rmax=rmax, vmin=vlim[0], vmax=vlim[1],
              sigma=sigma)
 pvsil.check_modelgrid(nsubgrid=1, n_nest=[2] * 3, reslim=10)
 pvsil.fit_mockpvd(incl=incl,
-                  Mstar_range=[0.01, 10],
-                  Rc_range=[1, 1000],
+                  Mstar_range=[0.03, 0.3],
+                  Rc_range=[10, 100],
                   taumax_range=[1e-2, 1e4],
                   frho_range=[1, 1e3],
                   fixed_params={'alphainfall': 1, 'sig_mdl': 0},
