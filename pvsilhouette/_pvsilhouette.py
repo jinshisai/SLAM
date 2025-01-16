@@ -296,8 +296,10 @@ class PVSilhouette():
         self.makemodel = makemodel
         # Fitting
         paramkeys = ['Mstar', 'Rc', 'alphainfall', 'taumax', 'frho', 'sig_mdl']
-        p_fixed = np.array([fixed_params[k] if k in fixed_params else None for k in paramkeys])
+        p_fixed = {k:fixed_params[k] if k in fixed_params else None for k in paramkeys}
         free = {k:p_fixed[k] is None for k in paramkeys}
+        p_fixed = np.array([p_fixed[k] for k in paramkeys])
+        
         runfit = None in p_fixed
         if runfit:
             notfixed = p_fixed == None
