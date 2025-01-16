@@ -33,7 +33,7 @@ pvsil.fit_mockpvd(incl=incl,
                                        'nburnin':100,
                                        'nsteps':200,
                                        'rangelevel': 0.95},
-                  signmajor=1, signminor=1,
+                  signmajor=None, signminor=None,
                   nsubgrid=1, n_nest=[2] * 3, reslim=10,
                   set_title=False, log=True,
                   zmax=1000)
