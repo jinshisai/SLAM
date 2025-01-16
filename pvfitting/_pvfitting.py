@@ -465,7 +465,7 @@ class PVFitting():
             # set figure
             fig, axes = plt.subplots(1, 2,)
             fig.set_figheight(3.2)
-            fig.set_figwidth(4)
+            fig.set_figwidth(5)
             ax1, ax2 = axes
 
             # major
@@ -496,7 +496,7 @@ class PVFitting():
             ax2.contour(self.x, self.v, data_contour[1],
                        levels = clevels, colors='k')
             cax2 = ax2.inset_axes([1.02, 0., 0.05, 1.]) # x0, y0, dx, dy
-            cb = plt.colorbar(im, cax=cax2)
+            cb = plt.colorbar(im, cax=cax2, label=r'Jy beam$^{-1}$')
             if log:
                 cbticks = np.outer([1, 2, 5], 10**np.arange(-6, 3, 1.0))
                 cbticks = np.log10(np.sort(np.ravel(cbticks)))

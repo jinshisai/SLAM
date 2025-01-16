@@ -32,6 +32,6 @@ pvsil.fit_mockpvd(Mstar_range=[0.01, 1.0],
                                        'nsteps':400,
                                        'rangelevel': 0.99},
                   signmajor=None, signminor=None,
-                  n_nest=[2] * 5, reslim=10,
+                  n_nest=[2] * 6, reslim=10,
                   log=True, zmax=1000)
 '-------------------------------------'
