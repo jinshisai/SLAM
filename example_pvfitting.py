@@ -9,8 +9,8 @@ vsys = 4  # km/s
 dist = 139  # pc
 sigma = 1.9e-3  # Jy/beam; None means automatic calculation.
 rmax = 200  # au
-vlim = (-6, 6)
-vmask = (-0.5, 0.5)
+vlim = (-3, 3)
+vmask = (-0.2, 0.4)
 show_figs = True
 '------------------------'
 
@@ -20,21 +20,20 @@ pvsil = PVFitting()
 pvsil.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
              dist=dist, vsys=vsys, rmax=rmax, vmin=vlim[0], vmax=vlim[1],
              sigma=sigma)
-pvsil.check_modelgrid(nsubgrid=1, n_nest=[2] * 3, reslim=10)
+pvsil.check_modelgrid(nsubgrid=1, n_nest=[2] * 5, reslim=10)
 pvsil.fit_mockpvd(incl=incl,
-                  Mstar_range=[0.03, 0.3],
-                  Rc_range=[10, 100],
-                  taumax_range=[1e-2, 1e4],
+                  Mstar_range=[0.01, 1.0],
+                  Rc_range=[1, 100],
+                  taumax_range=[1e-2, 1e2],
                   frho_range=[1, 1e3],
                   fixed_params={'alphainfall': 1, 'sig_mdl': 0},
                   show=False, filename=filehead, vmask=vmask,
                   pa_maj=pa, pa_min=pa+90.,
-                  kwargs_emcee_corner={'nwalkers_per_ndim':2,
+                  kwargs_emcee_corner={'nwalkers_per_ndim':4,
                                        'nburnin':100,
-                                       'nsteps':200,
-                                       'rangelevel': 0.95},
+                                       'nsteps':400,
+                                       'rangelevel': 0.99},
                   signmajor=None, signminor=None,
-                  nsubgrid=1, n_nest=[2] * 3, reslim=10,
-                  set_title=False, log=True,
-                  zmax=1000)
+                  nsubgrid=1, n_nest=[2] * 5, reslim=10,
+                  log=True, zmax=1000)
 '-------------------------------------'

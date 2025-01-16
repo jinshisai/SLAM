@@ -248,7 +248,7 @@ class PVFitting():
                     linewidth: float | None = None,
                     nsubgrid: int = 1, n_nest: list[float] = [3, 3],
                     reslim: float = 5,
-                    set_title: bool = True, title: str | None = None,
+                    title: str | None = None,
                     log: bool = False):
         # Observed PV diagrams
         majobs = self.dpvmajor.copy()
@@ -406,7 +406,7 @@ class PVFitting():
 
         # plot
         self.plot_pvds(filename=filename, color='model', contour='obs', 
-                       vmask=vmask, title=title, set_title=set_title, show=show, log=log)
+                       vmask=vmask, title=title, show=show, log=log)
 
 
     def read_fitres(self, f: str):
@@ -424,7 +424,7 @@ class PVFitting():
                   color: str = 'model', contour: str = 'obs',
                   vmask: list[float, float] = [0., 0.],
                   cmap: str = 'viridis', cmap_residual: str = 'bwr', ext: str = '.png',
-                  set_title: bool = False, title: str | None = None, show: bool = False,
+                  title: str | None = None, show: bool = False,
                   shadecolor: str = 'white', clevels: list[float] | None = None,
                   log: bool = False):
         '''
@@ -518,12 +518,6 @@ class PVFitting():
                                     np.full(len(self.x), np.min(_v) - 0.5 * self.dv), 
                                     np.full(len(self.x), np.max(_v) + 0.5 * self.dv),
                                     color=shadecolor, alpha=0.6, edgecolor=None)
-
-            if set_title:
-                ax2.set_title(r'$M_{*}$'+f'={popt[0]:.2f}'+r'$M_{\odot}$'
-                    +', '+r'$R_{c}$'+f'={popt[1]:.0f} au'
-                    +'\n'+r'$\alpha$'+f'={popt[2]:.2f}'
-                    +', '+r'$\alpha ^{2} M_{*}$'+f'={popt[0] * popt[2]**2:.2}')
             if title is not None:
                 fig.suptitle(title, y=0.92)
 
