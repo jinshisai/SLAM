@@ -21,7 +21,7 @@ from tqdm import tqdm
 import warnings
 
 from utils import emcee_corner
-from pvsilhouette.ulrichenvelope import velmax
+from pvsilhouette_org.ulrichenvelope import velmax
 
 warnings.simplefilter('ignore', RuntimeWarning)
 
