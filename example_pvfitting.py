@@ -20,20 +20,18 @@ pvsil = PVFitting()
 pvsil.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
              dist=dist, vsys=vsys, rmax=rmax, vmin=vlim[0], vmax=vlim[1],
              sigma=sigma)
-pvsil.check_modelgrid(nsubgrid=1, n_nest=[2] * 5, reslim=10)
-pvsil.fit_mockpvd(incl=incl,
-                  Mstar_range=[0.01, 1.0],
+pvsil.fit_mockpvd(Mstar_range=[0.01, 1.0],
                   Rc_range=[1, 100],
                   taumax_range=[1e-2, 1e2],
                   frho_range=[1, 1e3],
                   fixed_params={'alphainfall': 1, 'sig_mdl': 0},
                   show=False, filename=filehead, vmask=vmask,
-                  pa_maj=pa, pa_min=pa+90.,
+                  incl=incl, pa_maj=pa, pa_min=pa+90.,
                   kwargs_emcee_corner={'nwalkers_per_ndim':4,
                                        'nburnin':100,
                                        'nsteps':400,
                                        'rangelevel': 0.99},
                   signmajor=None, signminor=None,
-                  nsubgrid=1, n_nest=[2] * 5, reslim=10,
+                  n_nest=[2] * 5, reslim=10,
                   log=True, zmax=1000)
 '-------------------------------------'
