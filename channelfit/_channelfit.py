@@ -710,7 +710,7 @@ class ChannelFit():
             kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':200, 'nsteps':500,
                        'labels': labels,
                        'rangelevel':None, 'range_corner':None,
-                       'figname':filename+'.png', 'show_corner':show}
+                       'figname':filename+'.corner.png', 'show_corner':show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
             if self.progressbar:
                 total = kw['nwalkers_per_ndim'] * len(p_fixed[notfixed])

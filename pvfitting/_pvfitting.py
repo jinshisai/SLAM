@@ -312,7 +312,7 @@ class PVFitting():
             labels = labels[notfixed]
             kwargs0 = {'nwalkers_per_ndim':4, 'nburnin':500, 'nsteps':500,
                        'rangelevel':None, 'range_corner':None, 'labels':labels,
-                       'figname':filename+'.png', 'show_corner':show,
+                       'figname':filename+'.corner.png', 'show_corner':show,
                        'plot_chain':True, 'show_chain':show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
             # progress bar
