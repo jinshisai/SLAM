@@ -82,7 +82,7 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
                       quantiles=[0.16, 0.5, 0.84], show_titles=True,
                       range=r_c, labels=labels),
         if figname is not None:
-            plt.savefig(figname.replace('.png', '.corner.png'))
+            plt.savefig(figname)
         if show_corner: plt.show()
         plt.close()
 
