@@ -1243,7 +1243,7 @@ class PVAnalysis():
             x = np.geomspace(xmin, xmax, 100)
             y = (fx_model(x) - fx_model(-x)) / 2.
         else:
-            x = np.linspace(-xmax, xmax, 100)
+            x = np.linspace(-xmax, xmax, 101)
             x[(-xmin < x) * (x < xmin)] = None
             y = fx_model(self.xsign * x)
         if flipaxis: x, y = y, x
