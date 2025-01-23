@@ -1,6 +1,7 @@
 import numpy as np
 from astropy import constants, units
 from scipy.signal import convolve
+import time
 
 from pvfitting.grid import Nested3DGrid
 from pvfitting.precalculation import XYZ2rtp
@@ -228,7 +229,10 @@ class MockPVD(object):
             precalculation.vedge = np.hstack([v - delv * 0.5, v[-1] + 0.5 * delv])
 
         # to tau cube
+        start = time.time()
         rho_v = rho2rhocube(vlos, rho,)
+        end = time.time()
+        print('takes %.2fs'%(end-start))
         tau_v = self.grid.integrate_along(rho_v, axis = 'z') # v, x, y
         #tau_v = np.transpose(tau_v, (0,2,1)) # to (v, y, x)
 
