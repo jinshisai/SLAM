@@ -134,14 +134,24 @@ gauss_xy = None
 gauss_v = None
 vedge = None
 @jit(parallel=True)
-def rho2tau(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
+def rho2tau(vlos: np.ndarray, rho: np.ndarray, dz: np.ndarray | float) -> np.ndarray:
     nv = len(vedge) - 1
-    nx, ny, _ = np.shape(vlos)
-    tau = np.zeros((nv, ny, nx))
+    nd = vlos.size
+    tau = np.zeros((nv, nd))
     for i in prange(nv):
         mask = (vedge[i] <= vlos) * (vlos < vedge[i + 1])
-        tau[i] = np.sum(mask * rho, axis=2).T
+        tau[i] = np.sum(mask * rho * dz, axis=2)
     return tau
+
+@jit(parallel=True)
+def rho2rhocube(vlos: np.ndarray, rho: np.ndarray,) -> np.ndarray:
+    nv = len(vedge) - 1
+    nd = vlos.size
+    cube = np.zeros((nv, nd))
+    for i in prange(nv):
+        mask = (vedge[i] <= vlos) * (vlos < vedge[i + 1])
+        cube[i,:] = mask * rho
+    return cube
 
 Nr = 1600
 lnr = np.linspace(np.log(1e-4), np.log(1e4), Nr)  # dr/r ~ dtheta ~ 0.01
@@ -159,34 +169,35 @@ vp_disk, rho_disk = m.disk()
 vp_all = vp_env + vp_disk
 
 lmax = 10
-elos_r = {'major' : [None] * lmax, 'minor' : [None] * lmax}
-elos_t = {'major' : [None] * lmax, 'minor' : [None] * lmax}
-elos_p = {'major' : [None] * lmax, 'minor' : [None] * lmax}
-t = {'major' : [None] * lmax, 'minor' : [None] * lmax}
-idx_t = {'major' : [None] * lmax, 'minor' : [None] * lmax}
-r_org = {'major' : [None] * lmax, 'minor' : [None] * lmax}
-j_org = {'major' : [None] * lmax, 'minor' : [None] * lmax}
+elos_r = {'major' : np.array([]), 'minor' : np.array([])}
+elos_t = {'major' : np.array([]), 'minor' : np.array([])}
+elos_p = {'major' : np.array([]), 'minor' : np.array([])}
+t = {'major' : np.array([]), 'minor' : np.array([])}
+idx_t = {'major' : np.array([]), 'minor' : np.array([])}
+r_org = {'major' : np.array([]), 'minor' : np.array([])}
+j_org = {'major' : np.array([]), 'minor' : np.array([])}
+
 def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: float,
-           axis: str, l: int) -> None:
+           axis: str,) -> None:
     m = diskenvelope(theta=theta, phi=phi, incl=incl)
-    elos_r[axis][l] = m.elos_r
-    elos_t[axis][l] = m.elos_t
-    elos_p[axis][l] = m.elos_p
-    t[axis][l] = m.theta
+    elos_r[axis] = m.elos_r
+    elos_t[axis] = m.elos_t
+    elos_p[axis] = m.elos_p
+    t[axis] = m.theta
     i = (m.theta - theta0) / dtheta + 0.5
-    idx_t[axis][l] = i.astype(int)
-    r_org[axis][l] = radius_org
-    j_org[axis][l] = (np.log(radius_org) - lnr0) / dlnr + 0.5
+    idx_t[axis] = i.astype(int)
+    r_org[axis] = radius_org
+    j_org[axis] = (np.log(radius_org) - lnr0) / dlnr + 0.5
 
 def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
-                 axis: str, l: int) -> tuple[np.ndarray, np.ndarray]:
-    i = idx_t[axis][l]
-    j = j_org[axis][l] - np.log(Rc) / dlnr
+                 axis: str,) -> tuple[np.ndarray, np.ndarray]:
+    i = idx_t[axis]
+    j = j_org[axis] - np.log(Rc) / dlnr
     j = np.clip(j, 0, Nr - 1) 
     j = j.astype(int)
     rho = rho_env[i, j] + rho_disk[i, j] * rho_jump
     vr = vr_env[i, j] * alphainfall
     vt = vt_env[i, j]
     vp = vp_all[i, j]
-    vlos = vr * elos_r[axis][l] + vt * elos_t[axis][l] + vp * elos_p[axis][l]
+    vlos = vr * elos_r[axis] + vt * elos_t[axis] + vp * elos_p[axis]
     return rho, vlos

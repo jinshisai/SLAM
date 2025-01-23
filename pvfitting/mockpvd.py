@@ -5,7 +5,7 @@ from scipy.signal import convolve
 from pvfitting.grid import Nested3DGrid
 from pvfitting.precalculation import XYZ2rtp
 from pvfitting import precalculation
-from pvfitting.precalculation import rho2tau
+from pvfitting.precalculation import rho2tau, rho2rhocube
 
 au = units.au.to('m')
 GG = constants.G.si.value
@@ -102,8 +102,8 @@ class MockPVD(object):
                 rho.append(_rho)
                 vlos.append(_vlos)
             # density normalization
-            rho_max = np.nanmax([np.nanmax([np.nanmax(i) for i in _rho]) for _rho in rho])
-            rho = [ [i / rho_max for i in _rho] for _rho in rho] # normalized rho
+            rho_max = np.nanmax([np.nanmax(_rho) for _rho in rho])
+            rho = [ _rho / rho_max for _rho in rho] # normalized rho
             # get PV diagrams
             for _rho, _vlos, _pa in zip(rho, vlos, pa):
                 # PV cut
@@ -134,7 +134,7 @@ class MockPVD(object):
 
 
     def makegrid(self, xlim: list | None = None, ylim: list | None = None,
-                 zlim: list | None = None, reslim: float = 5):
+                 zlim: list | None = None, reslim: float = 10):
         # parental grid
         # x and z
         x = self.x
@@ -154,9 +154,9 @@ class MockPVD(object):
 
         if self.nnest is not None:
             grid = Nested3DGrid(x, y, z, xlim, ylim, zlim, self.nnest,
-                                nlevels=len(self.nnest), reslim=reslim)
+                                reslim=reslim)
         else:
-            grid = Nested3DGrid(x, y, z, None, None, None, [1], nlevels=0)
+            grid = Nested3DGrid(x, y, z, None, None, None, [1])
         self.grid = grid
 
 
@@ -173,40 +173,34 @@ class MockPVD(object):
         irad = np.radians(incl)
         vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
 
-        # for each nested level
-        d_rho = [None] * self.grid.nlevels
-        d_vlos = [None] * self.grid.nlevels
-        for l in range(self.grid.nlevels):
-            if precalculation.elos_r[axis][l] is None:
-                X = self.grid.xnest[l] / Rc
-                Y = self.grid.ynest[l] / Rc
-                Z = self.grid.znest[l] / Rc
-                # along which axis
-                if axis == 'major':
-                    r, t, p = XYZ2rtp(irad, 0, X, Y, Z)
-                else:
-                    r, t, p = XYZ2rtp(irad, 0, Y, X, Z)
-                precalculation.update(r * Rc, t, p, irad, axis, l)
-            r_org = precalculation.r_org[axis][l]
-            # get density and velocity
-            rho, vlos = precalculation.get_rho_vlos(Rc, frho, alphainfall, axis, l)
-            vlos = vlos * vunit
-            #if len(rho.shape) != 3: rho = rho.reshape(nx, ny, nz) # in 3D
-            #if len(vlos.shape) != 3: vlos = vlos.reshape(nx, ny, nz) # in 3D
+        # rotate coordinates
+        X = self.grid.xnest / Rc
+        Y = self.grid.ynest / Rc
+        Z = self.grid.znest / Rc
+        # along which axis
+        if axis == 'major':
+            r, t, p = XYZ2rtp(irad, 0, X, Y, Z)
+        else:
+            r, t, p = XYZ2rtp(irad, 0, Y, X, Z)
+        precalculation.update(r * Rc, t, p, irad, axis)
+        r_org = precalculation.r_org[axis]
+        # get density and velocity
+        rho, vlos = precalculation.get_rho_vlos(Rc, frho, alphainfall, axis)
+        vlos = vlos * vunit
+        #if len(rho.shape) != 3: rho = rho.reshape(nx, ny, nz) # in 3D
+        #if len(vlos.shape) != 3: vlos = vlos.reshape(nx, ny, nz) # in 3D
 
-            # inner and outer edge
-            rho[r_org <= rin] = 0.
-            if rout is not None: rho[np.where(r_org > rout)] = 0
-
-            d_rho[l] = rho
-            d_vlos[l] = vlos
+        # inner and outer edge
+        rho[r_org <= rin] = 0.
+        if rout is not None: rho[np.where(r_org > rout)] = 0.
 
         # normalize
         if normalize:
-            rho_max = np.nanmax([np.nanmax(i) for i in d_rho])
-            d_rho = [i / rho_max for i in d_rho]
+            rho_max = np.nanmax(rho)
+            rho /= rho_max
 
         # collapse
+        ''' Don't collapse
         if collapse:
             if self.grid.nlevels >= 2:
                 d_rho = self.grid.collapse(d_rho)
@@ -216,8 +210,9 @@ class MockPVD(object):
                 d_vlos = d_vlos[0]
             d_rho = d_rho.reshape(self.grid.nx, self.grid.ny, self.grid.nz)
             d_vlos = d_vlos.reshape(self.grid.nx, self.grid.ny, self.grid.nz)
+        '''
 
-        return d_rho, d_vlos
+        return rho, vlos
 
 
 
@@ -232,48 +227,11 @@ class MockPVD(object):
         if precalculation.vedge is None:
             precalculation.vedge = np.hstack([v - delv * 0.5, v[-1] + 0.5 * delv])
 
-        if type(rho) == np.ndarray: rho = [rho.ravel()]
-        if type(vlos) == np.ndarray: vlos = [vlos.ravel()]
+        # to tau cube
+        rho_v = rho2rhocube(vlos, rho,)
+        tau_v = self.grid.integrate_along(rho_v, axis = 'z') # v, x, y
+        #tau_v = np.transpose(tau_v, (0,2,1)) # to (v, y, x)
 
-        #tau_v  = np.zeros((nv, ny, nx)) # mock tau
-        # go up from the deepest layer to the upper layer
-        rho_col = [self.grid.collapse(rho, upto=l) for l in range(self.grid.nlevels)]
-        vlos_col = [self.grid.collapse(vlos, upto=l) for l in range(self.grid.nlevels)]
-
-        # binning
-        def binning(data, nbin):
-            d_avg = np.array([
-                data[:, i::nbin, i::nbin]
-                for i in range(nbin)
-                ])
-            return np.nanmean(d_avg, axis=0)
-
-        # innermost grid
-        _nx, _ny, _nz = self.grid.ngrids[-1] # dimension of the l-th layer
-        rho_l = rho_col[-1].reshape(_nx, _ny, _nz)
-        vlos_l = vlos_col[-1].reshape(_nx, _ny, _nz)
-        dz = self.grid.zaxes[-1][1] - self.grid.zaxes[-1][0]
-        tau_v = rho2tau(vlos_l, rho_l) * dz
-        # if nested grid
-        if self.grid.nlevels >= 2:
-            for l in range(self.grid.nlevels-2,-1,-1):
-                _nx, _ny, _nz = self.grid.ngrids[l] # dimension of the l-th layer
-                rho_l = rho_col[l].reshape(_nx, _ny, _nz)
-                vlos_l = vlos_col[l].reshape(_nx, _ny, _nz)
-                dz = self.grid.zaxes[l][1] - self.grid.zaxes[l][0]
-
-                if l < (self.grid.nlevels - 1):
-                    # starting & ending indices of the inner grid
-                    ximin, ximax = self.grid.xinest[l+1]
-                    yimin, yimax = self.grid.yinest[l+1]
-                    zimin, zimax = self.grid.zinest[l+1]
-                    rho_l[ximin:ximax+1, yimin:yimax+1, zimin:zimax+1] = 0.
-
-                tau_vl = rho2tau(vlos_l, rho_l) * dz
-                # add values from the inner grid
-                _tau_v = binning(tau_v, self.grid.nsub[l])
-                tau_vl[:, yimin:yimax+1, ximin:ximax+1] += _tau_v
-                tau_v = tau_vl
 
         # convolution along the spectral direction
         if linewidth is not None:
@@ -285,7 +243,7 @@ class MockPVD(object):
             g = precalculation.gauss_v
             tau_v = convolve(tau_v, g, mode='same') # conserve integrated value
 
-        I_cube = 1. - np.exp(-tau_v / np.nanmax(tau_v) * taumax)
+        I_cube = 1. - np.exp(- tau_v / np.nanmax(tau_v) * taumax)
 
         # beam convolution
         if beam is not None:
@@ -299,12 +257,16 @@ class MockPVD(object):
             g = precalculation.gauss_xy
             I_cube = convolve(I_cube, g, mode='same')
 
-        # output
+        I_cube = np.transpose(I_cube, (0,2,1)) # to v, y, x
+
         I_pv = I_cube[:, ny//2, :]
 
+        # output
         if self.nsubgrid > 1:
-            I_pv = np.nanmean(np.array([I_pv[:, i::self.nsubgrid] 
-                                        for i in range(self.nsubgrid)]), axis=0)
+            I_pv = np.nanmean(
+                np.array([
+                    I_pv[:,i::self.nsubgrid] for i in range(self.nsubgrid)])
+                , axis = 0)
         return I_pv
 
 
@@ -312,3 +274,12 @@ def rot(x, y, pa):
     s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
     t = x * np.sin(pa) + y * np.cos(pa)  # along major axis
     return np.array([s, t])
+
+
+# binning
+def binning(data, nbin):
+    d_avg = np.array([
+        data[:, j::nbin, i::nbin]
+        for j in range(nbin) for i in range(nbin)
+        ])
+    return np.nanmean(d_avg, axis=0)
