@@ -134,13 +134,13 @@ gauss_xy = None
 gauss_v = None
 vedge = None
 @jit(parallel=True)
-def rho2tau(vlos: np.ndarray, rho: np.ndarray, dz: np.ndarray | float) -> np.ndarray:
+def rho2tau(vlos: np.ndarray, rho: np.ndarray,) -> np.ndarray:
     nv = len(vedge) - 1
-    nd = vlos.size
-    tau = np.zeros((nv, nd))
+    nx, ny, _ = vlos.size
+    tau = np.zeros((nv, ny, nx))
     for i in prange(nv):
         mask = (vedge[i] <= vlos) * (vlos < vedge[i + 1])
-        tau[i] = np.sum(mask * rho * dz, axis=2)
+        tau[i] = np.sum(mask * rho, axis=2).T
     return tau
 
 @jit(parallel=True)
@@ -169,13 +169,13 @@ vp_disk, rho_disk = m.disk()
 vp_all = vp_env + vp_disk
 
 lmax = 10
-elos_r = {'major' : np.array([]), 'minor' : np.array([])}
-elos_t = {'major' : np.array([]), 'minor' : np.array([])}
-elos_p = {'major' : np.array([]), 'minor' : np.array([])}
-t = {'major' : np.array([]), 'minor' : np.array([])}
-idx_t = {'major' : np.array([]), 'minor' : np.array([])}
-r_org = {'major' : np.array([]), 'minor' : np.array([])}
-j_org = {'major' : np.array([]), 'minor' : np.array([])}
+elos_r = {'major' : None, 'minor' : None}
+elos_t = {'major' : None, 'minor' : None}
+elos_p = {'major' : None, 'minor' : None}
+t = {'major' : None, 'minor' : None}
+idx_t = {'major' : None, 'minor' : None}
+r_org = {'major' : None, 'minor' : None}
+j_org = {'major' : None, 'minor' : None}
 
 def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: float,
            axis: str,) -> None:

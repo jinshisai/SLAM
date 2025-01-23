@@ -447,7 +447,7 @@ class Nested3DGrid(object):
         return _d.reshape(outshape)
 
 
-    def integrate_along_z(self, d, fill = 'nan'):
+    def integrate_along_z(self, d):
         '''
         Collapse given data to the mother grid.
 
@@ -520,7 +520,8 @@ class Nested3DGrid(object):
             z = self.zaxes[l-1] # parental axis
             dz = z[1] - z[0]
 
-        return np.nansum(d_col * dz, axis = 3)
+        d_col *= dz
+        return np.nansum(d_col, axis = 3)
 
 
     def binning_z_integrated(self, data, nbin):

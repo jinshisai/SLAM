@@ -233,8 +233,10 @@ class MockPVD(object):
         rho_v = rho2rhocube(vlos, rho,)
         end = time.time()
         print('takes %.2fs'%(end-start))
+        start = time.time()
         tau_v = self.grid.integrate_along(rho_v, axis = 'z') # v, x, y
-        #tau_v = np.transpose(tau_v, (0,2,1)) # to (v, y, x)
+        end = time.time()
+        print('takes %.2fs'%(end-start))
 
 
         # convolution along the spectral direction
