@@ -16,11 +16,11 @@ show_figs = True
 
 '-------- HOW TO DO EACH STEP --------'
 filehead = pvmajorfits.replace('.pvmajor.fits', '')
-pvsil = PVFitting()
-pvsil.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
+pvfit = PVFitting()
+pvfit.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
              dist=dist, vsys=vsys, rmax=rmax, vmin=vlim[0], vmax=vlim[1],
              sigma=sigma)
-pvsil.fit_mockpvd(Mstar_range=[0.01, 1.0],
+pvfit.fit_mockpvd(Mstar_range=[0.01, 1.0],
                   Rc_range=[1, 100],
                   taumax_range=[1e-1, 1e2],
                   frho_range=[1, 1e3],
