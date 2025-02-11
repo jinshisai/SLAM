@@ -240,13 +240,13 @@ class MockPVD(object):
         '''
 
         # to tau cube
-        start = time.time()
+        #start = time.time()
         rho_v = rho2rhocube(vlos, rho,)
-        end = time.time()
+        #end = time.time()
         #print('Rho2rhocube takes %.2fs'%(end-start))
-        start = time.time()
+        #start = time.time()
         tau_v = self.grid.integrate_along(rho_v, axis = 'z') # v, x, y
-        end = time.time()
+        #end = time.time()
         #print('Integration takes %.2fs'%(end-start))
 
 
