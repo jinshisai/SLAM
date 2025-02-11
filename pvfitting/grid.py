@@ -1,6 +1,7 @@
 # modules
 import numpy as np
 import math
+from .fast_collapse import fast_binning_z_integrated
 
 
 class Nested3DGrid(object):
@@ -457,6 +458,7 @@ class Nested3DGrid(object):
         '''
         lmax = 0
         nv, nd = d.shape
+        #d[np.isnan(d)] = 0.
         d_col = d[:, self.partition[-2]:self.partition[-1]] # starting from the inner most grid
         d_col = d_col.reshape((nv, self.ngrids[-1,:][0], self.ngrids[-1,:][1], self.ngrids[-1,:][2]))
 
@@ -470,8 +472,9 @@ class Nested3DGrid(object):
             yimin, yimax = self.yinest[l*2:(l+1)*2]
             zimin, zimax = self.zinest[l*2:(l+1)*2]
             # collapse data on the inner grid
-            _d = self.binning_z_integrated(d_col, nsub) # integration along z within each parental cell
-            _d *= dz
+            #_d = self.binning_z_integrated(d_col, nsub) # integration along z within each parental cell
+            #_d *= dz
+            _d = fast_binning_z_integrated(d_col, nsub, dz)
 
             # go upper layer
             nx, ny, nz = self.ngrids[l-1,:] # size of the upper layer
@@ -520,8 +523,8 @@ class Nested3DGrid(object):
             z = self.zaxes[l-1] # parental axis
             dz = z[1] - z[0]
 
-        d_col *= dz
-        return np.nansum(d_col, axis = 3)
+        #d_col *= dz
+        return np.nansum(d_col, axis = 3) * dz
 
 
     def binning_z_integrated(self, data, nbin):

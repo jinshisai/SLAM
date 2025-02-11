@@ -228,15 +228,26 @@ class MockPVD(object):
         if precalculation.vedge is None:
             precalculation.vedge = np.hstack([v - delv * 0.5, v[-1] + 0.5 * delv])
 
+
+        # collapse first to save time
+        '''
+        start = time.time()
+        vlos = self.grid.collapse(vlos)
+        rho = self.grid.collapse(rho)
+        tau_v = rho2tau(vlos, rho,)
+        end = time.time()
+        print('takes %.2fs'%(end-start))
+        '''
+
         # to tau cube
         start = time.time()
         rho_v = rho2rhocube(vlos, rho,)
         end = time.time()
-        print('takes %.2fs'%(end-start))
+        #print('Rho2rhocube takes %.2fs'%(end-start))
         start = time.time()
         tau_v = self.grid.integrate_along(rho_v, axis = 'z') # v, x, y
         end = time.time()
-        print('takes %.2fs'%(end-start))
+        #print('Integration takes %.2fs'%(end-start))
 
 
         # convolution along the spectral direction

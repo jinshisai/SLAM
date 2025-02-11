@@ -136,7 +136,7 @@ vedge = None
 @jit(parallel=True)
 def rho2tau(vlos: np.ndarray, rho: np.ndarray,) -> np.ndarray:
     nv = len(vedge) - 1
-    nx, ny, _ = vlos.size
+    nx, ny, _ = vlos.shape
     tau = np.zeros((nv, ny, nx))
     for i in prange(nv):
         mask = (vedge[i] <= vlos) * (vlos < vedge[i + 1])
