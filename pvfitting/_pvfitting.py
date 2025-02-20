@@ -465,7 +465,7 @@ class PVFitting():
             # set figure
             fig, axes = plt.subplots(1, 2,)
             fig.set_figheight(3.2)
-            fig.set_figwidth(5)
+            fig.set_figwidth(4)
             ax1, ax2 = axes
 
             # major
