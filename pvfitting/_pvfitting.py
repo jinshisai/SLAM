@@ -330,8 +330,8 @@ class PVFitting():
                 q[notfixed] = p # in linear scale
                 q[ilog] = 10**q[ilog]
                 # updated sigma
-                majsig2 = ((1. + q[-1]) * majsig)**2.
-                minsig2 = ((1. + q[-1]) * minsig)**2.
+                majsig2 = (1. + q[-1]**2) * majsig**2
+                minsig2 = (1. + q[-1]**2) * minsig**2
                 # make model
                 majmod, minmod = self.makemodel(*q[:-1])
                 chi2maj = np.nansum((majobs - majmod)**2 / majsig2 + np.log(majsig2))
@@ -366,8 +366,8 @@ class PVFitting():
                 # parameter
                 q = p_fixed.copy()
                 # updated sigma
-                majsig2 = ((1. + q[-1]) * majsig)**2.
-                minsig2 = ((1. + q[-1]) * minsig)**2.
+                majsig2 = (1. + q[-1]**2) * majsig**2
+                minsig2 = (1. + q[-1]**2) * minsig**2
                 # make model
                 majmod, minmod = self.makemodel(*q[:-1])
                 # chi2 does not use log(majsig2) and log(minsig2).
