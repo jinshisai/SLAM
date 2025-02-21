@@ -628,7 +628,6 @@ class TwoDGrad():
         ax.set_aspect('equal', adjustable='box')
         ax.set_xlabel('Offset along v-grad (au)')
         ax.set_ylabel(r'Velocity (km s$^{-1}$)')
-        ax.grid()
         if title is not None:
             ax.set_title(title)
         fig.tight_layout()
