@@ -544,12 +544,12 @@ class TwoDGrad():
         ax.set_aspect('equal', adjustable='box')
         ax.set_xlabel('R.A. offset (au)')
         ax.set_ylabel('Dec. offset (au)')
-        ax.set_xlim(xmax * 1.001, -xmax * 1.001)  # au
-        ax.set_ylim(-ymax * 1.001, ymax * 1.001)  # au
+        ax.set_xlim(xmax * 1.01, -xmax * 1.01)  # au
+        ax.set_ylim(-ymax * 1.01, ymax * 1.01)  # au
         ax.set_xticks(ax.get_yticks())
         ax.set_yticks(ax.get_xticks())
-        ax.set_xlim(xmax * 1.001, -xmax * 1.001)  # au
-        ax.set_ylim(-ymax * 1.001, ymax * 1.001)  # au
+        ax.set_xlim(xmax * 1.01, -xmax * 1.01)  # au
+        ax.set_ylim(-ymax * 1.01, ymax * 1.01)  # au
         if title is not None:
             ax.set_title(title)
         fig.tight_layout()
@@ -590,8 +590,8 @@ class TwoDGrad():
         
         fig = plt.figure(figsize=(5.3, 5.3))
         ax = fig.add_subplot(1, 1, 1)
-        ax.set_xlim(xmin * 0.999, xmax * 1.001)  # au
-        ax.set_ylim(vmin * 0.999, vmax * 1.001)  # km/s
+        ax.set_xlim(xmin * 0.99, xmax * 1.01)  # au
+        ax.set_ylim(vmin * 0.99, vmax * 1.01)  # km/s
         ax.errorbar(x, v, xerr=dx, fmt='o', color='k', zorder=2)
         ax.plot(x[w < 0], v[w < 0], 'bo', zorder=3)
         ax.plot(x[w > 0], v[w > 0], 'ro', zorder=3)
@@ -622,8 +622,8 @@ class TwoDGrad():
             return [f'{t:.{d:d}f}' for t, d in zip(ticks, -digits)]
         ax.set_xticklabels(nice_labels(xticks))
         ax.set_yticklabels(nice_labels(yticks))
-        ax.set_xlim(xmin * 0.999, xmax * 1.001)  # au
-        ax.set_ylim(vmin * 0.999, vmax * 1.001)  # km/s
+        ax.set_xlim(xmin * 0.99, xmax * 1.01)  # au
+        ax.set_ylim(vmin * 0.99, vmax * 1.01)  # km/s
         ax.set_aspect('equal', adjustable='box')
         ax.set_xlabel('Offset along v-grad (au)')
         ax.set_ylabel(r'Velocity (km s$^{-1}$)')
