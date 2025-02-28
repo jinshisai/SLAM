@@ -550,7 +550,6 @@ class TwoDGrad():
         ax.set_yticks(ax.get_xticks())
         ax.set_xlim(xmax * 1.001, -xmax * 1.001)  # au
         ax.set_ylim(-ymax * 1.001, ymax * 1.001)  # au
-        ax.grid()
         if title is not None:
             ax.set_title(title)
         fig.tight_layout()
