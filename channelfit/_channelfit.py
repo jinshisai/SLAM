@@ -801,10 +801,9 @@ class ChannelFit():
         ny = h['NAXIS2']
         for k in self.free.keys():
             self.free[k] = True
-        if kwargs != {}:
-            self.popt = kwargs
-        m = self.cubemodel(**self.popt)
-        m0 = self.cubemodel(**self.popt, convolving=False)
+        p = self.popt if kwargs == {} else kwargs 
+        m = self.cubemodel(**p)
+        m0 = self.cubemodel(**p, convolving=False)
         
         def concat(m):
             if len(self.v_red) > 0:

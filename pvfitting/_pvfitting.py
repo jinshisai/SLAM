@@ -15,7 +15,7 @@ Note. FITS files with multiple beams are not supported. The dynamic range for xl
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
-from astropy import constants
+from astropy import constants, wcs
 from astropy.coordinates import SkyCoord
 from scipy.interpolate import RegularGridInterpolator as RGI
 from tqdm import tqdm
@@ -110,7 +110,7 @@ class PVFitting():
                     dist: float = 1, vsys: float = 0,
                     xmax: float = 1e4,
                     vmin: float = -100, vmax: float = 100,
-                    sigma: float = None) -> dict:
+                    sigma: float | None = None) -> dict:
         """
         Read a position-velocity diagram in the FITS format.
 
@@ -149,6 +149,7 @@ class PVFitting():
         v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
         i0, i1 = np.argmin(np.abs(x + xmax)), np.argmin(np.abs(x - xmax))
         j0, j1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
+        self.offpix = (i0, j0)
         x, v, d = x[i0:i1 + 1], v[j0:j1 + 1], d[j0:j1 + 1, i0:i1 + 1]
         dx, dv = x[1] - x[0], v[1] - v[0]
         if 'BMAJ' in h.keys():
@@ -194,12 +195,18 @@ class PVFitting():
     def put_PV(self, pvmajorfits: str, pvminorfits: str,
                dist: float, vsys: float,
                rmax: float, vmin: float, vmax: float, sigma: float,
-               dNsampling = [5, 1]):
+               dNsampling: list | None = [5, 1]):
+        self.read_pvfits(pvmajorfits, dist, vsys, rmax, sigma=sigma)
+        self.vorg = self.v
         self.read_pvfits(pvmajorfits, dist, vsys, rmax, vmin, vmax, sigma)
-        if dNsampling is not None: self.sampling(dNsampling)
+        if dNsampling is not None:
+            self.sampling(dNsampling)
         self.dpvmajor = self.data
+        self.read_pvfits(pvminorfits, dist, vsys, rmax, sigma=sigma)
+        self.vorg = self.v
         self.read_pvfits(pvminorfits, dist, vsys, rmax, vmin, vmax, sigma)
-        if dNsampling is not None: self.sampling(dNsampling)
+        if dNsampling is not None:
+            self.sampling(dNsampling)
         self.dpvminor = self.data
 
 
@@ -214,6 +221,10 @@ class PVFitting():
         self.x = self.x[x_smpl//2::x_smpl]
         self.dx = self.x[1] - self.x[0]
         self.dv = self.v[1] - self.v[0]
+        h = self.header
+        h['CRPIX1'] = (h['CRPIX1'] - 1 - self.offpix[0] - x_smpl//2) // x_smpl + 1
+        h['CDELT1'] = h['CDELT1'] * x_smpl
+        self.header = h
         ibmaj = self.bmaj / self.dx
         ibmin = self.bmin / self.dx
         print(f'Adopt xskip={x_smpl:d} and vskip={y_smpl:d}.')
@@ -555,6 +566,40 @@ class PVFitting():
             if show: plt.show()
 
         return figs
+
+    def modeltofits(self, filehead: str = 'best', **kwargs):
+        w = wcs.WCS(naxis=2)
+        h = self.header
+        h['NAXIS1'] = len(self.x)
+        nx = h['NAXIS1']
+        p = self.popt if kwargs == {} else kwargs 
+        if 'sig_mdl' in p.keys():
+            del p['sig_mdl']
+        majmod, minmod = self.makemodel(**p)
+        majres = self.dpvmajor - majmod
+        minres = self.dpvminor - minmod
+        v_nanblue = self.vorg[self.vorg < np.min(self.v)]
+        v_nanred = self.vorg[np.max(self.v) < self.vorg]
+        nanblue = np.full((len(v_nanblue), nx), np.nan)
+        nanred = np.full((len(v_nanred), nx), np.nan)
+        majmod = np.concatenate((nanblue, majmod, nanred), axis=0)
+        minmod = np.concatenate((nanblue, minmod, nanred), axis=0)
+        majres = np.concatenate((nanblue, majres, nanred), axis=0)
+        minres = np.concatenate((nanblue, minres, nanred), axis=0)
+        
+        def tofits(d: np.ndarray, ext: str):
+            header = w.to_header()
+            hdu = fits.PrimaryHDU(d, header=header)
+            for k in h.keys():
+                if not ('COMMENT' in k or 'HISTORY' in k):
+                    hdu.header[k]=h[k]
+            hdu = fits.HDUList([hdu])
+            hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
+            
+        tofits(majmod, 'model.major')
+        tofits(minmod, 'model.minor')
+        tofits(majres, 'residual.major')
+        tofits(minres, 'residual.minor')
 
 
 def getquad(m):

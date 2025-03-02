@@ -34,4 +34,5 @@ pvfit.fit_mockpvd(Mstar_range=[0.01, 1.0],
                   signmajor=None, signminor=None,
                   n_nest=[2] * 6, reslim=10,
                   log=True, zmax=1000)
+pvfit.modeltofits(**pvfit.popt, filehead=filehead)
 '-------------------------------------'
