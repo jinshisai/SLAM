@@ -262,10 +262,8 @@ class ChannelFit():
             The R.A. axis is limited to (xmin, xmax) in the unit of au.
         ymin, ymax : float
             The Dec. axis is limited to (ymin, ymax) in the unit of au.
-        vmax : float
-            The velocity axis of the PV diagram is limited to (vmin, vmax).
-        vmin : float
-            The velocity axis of the PV diagram is limited to (vmin, vmax).
+        vmin, vmax : float
+            The velocity axis is limited to (vmin, vmax) in the unit of km/s.
         xskip : int
             Skip xskip pixels in the x axis.
         yskip : int
@@ -325,16 +323,16 @@ class ChannelFit():
         elif h['CUNIT3'] == 'm/s':
             v = v * 1e-3 - vsys
         i0 = 0 if xmax is None else np.argmin(np.abs(x - xmax))
-        i1 = len(x) if xmin is None else np.argmin(np.abs(x - xmin))
+        i1 = len(x) - 1 if xmin is None else np.argmin(np.abs(x - xmin))
         j0 = 0 if ymin is None else np.argmin(np.abs(y - ymin))
-        j1 = len(y) if ymax is None else np.argmin(np.abs(y - ymax))
+        j1 = len(y) - 1 if ymax is None else np.argmin(np.abs(y - ymax))
         x, y = x[i0:i1 + 1], y[j0:j1 + 1]
         if centering_velocity:
             f = interp1d(v, d, kind='cubic', bounds_error=False,
                          fill_value=0, axis=0)
             d = f(v := v - v[np.argmin(np.abs(v))])
         k0 = 0 if vmin is None else np.argmin(np.abs(v - vmin))
-        k1 = len(v) if vmax is None else np.argmin(np.abs(v - vmax))
+        k1 = len(v) - 1 if vmax is None else np.argmin(np.abs(v - vmax))
         self.offpix = (i0, j0, k0)
         v = v[k0:k1 + 1]
         d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
@@ -351,6 +349,7 @@ class ChannelFit():
         self.v, self.dv, self.nv = v, dv, len(v)
         self.data, self.header, self.sigma = d, h, sigma
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
+        self.beam = np.array([bmaj, bmin, bpa])
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
