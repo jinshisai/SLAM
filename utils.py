@@ -101,7 +101,11 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
         axes[-1].tick_params(labelbottom=True)
         axes[-1].set_xlabel('Step number')
         if figname is not None:
-            fig.savefig(figname.replace('.png', '.chains.png'))
+            if '.corner' in figname:
+                fname = figname.replace('.corner', '.chains')
+            else:
+                fname = figname.replace('.png', '.chains.png')
+            fig.savefig(fname)
         if show_chain:
             plt.show()
         plt.close()
