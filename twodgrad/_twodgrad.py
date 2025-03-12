@@ -19,11 +19,9 @@ from astropy.io import fits
 from astropy import constants, units
 from astropy.coordinates import SkyCoord
 from scipy.optimize import curve_fit
-from scipy.optimize import differential_evolution as diffevo
-from scipy.interpolate import interp1d
 
 from utils import emcee_corner
-from pvanalysis.analysis_tools import doublepower_r
+
 
 GG = constants.G.si.value
 M_sun = constants.M_sun.si.value
@@ -69,8 +67,7 @@ class TwoDGrad():
                       ymin: float = None, ymax: float = None,
                       vmin: float = None, vmax: float = None,
                       xskip: int = 1, yskip: int = 1,
-                      sigma: float | None = None,
-                      centering_velocity: bool = False) -> dict:
+                      sigma: float | None = None) -> dict:
         """
         Read a position-velocity diagram in the FITS format.
 
@@ -98,8 +95,6 @@ class TwoDGrad():
             Skip yskip pixels in the y axis.
         sigma : float
             Standard deviation of the FITS data. None means automatic.
-        centering_velocity : bool
-            One channel has the exact velocity of vsys by interpolation.
 
         Returns
         ----------
@@ -155,10 +150,6 @@ class TwoDGrad():
         j0 = 0 if ymin is None else np.argmin(np.abs(y - ymin))
         j1 = len(y) if ymax is None else np.argmin(np.abs(y - ymax))
         x, y = x[i0:i1 + 1], y[j0:j1 + 1]
-        if centering_velocity:
-            f = interp1d(v, d, kind='cubic', bounds_error=False,
-                         fill_value=0, axis=0)
-            d = f(v := v - v[np.argmin(np.abs(v))])
         k0 = 0 if vmin is None else np.argmin(np.abs(v - vmin))
         k1 = len(v) if vmax is None else np.argmin(np.abs(v - vmax))
         self.offpix = (i0, j0, k0)

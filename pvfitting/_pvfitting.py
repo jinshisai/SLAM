@@ -18,7 +18,6 @@ from astropy.io import fits
 from astropy import constants, wcs
 from astropy.coordinates import SkyCoord
 from scipy.interpolate import RegularGridInterpolator as RGI
-from scipy.interpolate import interp1d
 import warnings
 from tqdm import tqdm
 from utils import emcee_corner
@@ -111,8 +110,7 @@ class PVFitting():
                     xmin: float | None = None, xmax: float | None = None,
                     vmin: float | None = None, vmax: float | None = None,
                     xskip: int = 1,
-                    sigma: float | None = None,
-                    centering_velocity: bool = False) -> dict:
+                    sigma: float | None = None) -> dict:
         """
         Read a position-velocity diagram in the FITS format.
 
@@ -132,8 +130,6 @@ class PVFitting():
             Skip xskip pixels in the x axis.
         sigma : float
             Standard deviation of the FITS data. None means automatic.
-        centering_velocity : bool
-            One channel has the exact velocity of vsys by interpolation.
 
         Returns
         ----------
@@ -170,10 +166,6 @@ class PVFitting():
         i0 = 0 if xmin is None else np.argmin(np.abs(x - xmin))
         i1 = len(x) - 1 if xmax is None else np.argmin(np.abs(x - xmax))
         x = x[i0:i1 + 1]
-        if centering_velocity:
-            f = interp1d(v, d, kind='cubic', bounds_error=False,
-                         fill_value=0, axis=0)
-            d = f(v := v - v[np.argmin(np.abs(v))])
         k0 = 0 if vmin is None else np.argmin(np.abs(v - vmin))
         k1 = len(v) - 1 if vmax is None else np.argmin(np.abs(v - vmax))
         v = v[k0:k1 + 1]
