@@ -431,7 +431,7 @@ class TwoDGrad():
             Mmin = np.min(np.abs(r)) * np.min(np.abs(v))**2
             Mmax = np.max(np.abs(r)) * np.max(np.abs(v))**2
             plim = np.array([[Mmin, np.min(np.abs(v)), -10, voff_range[0]],
-                             [Mmax, np.max(np.abs(v)), 10, voff_range[1]]])
+                             [Mmax, np.max(np.abs(v)), 2, voff_range[1]]])
             if len(v) < 3:
                 plim[0, 2] = 1.999
                 plim[1, 2] = 2.001
