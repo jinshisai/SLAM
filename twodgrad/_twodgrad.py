@@ -432,6 +432,9 @@ class TwoDGrad():
             Mmax = np.max(np.abs(r)) * np.max(np.abs(v))**2
             plim = np.array([[Mmin, np.min(np.abs(v)), -10, voff_range[0]],
                              [Mmax, np.max(np.abs(v)), 10, voff_range[1]]])
+            if len(v) < 3:
+                plim[0, 2] = 1.999
+                plim[1, 2] = 2.001
             if voff_fixed is not None:
                 plim = plim[:, :-1]
             popt, perr = emcee_custom(plim, lnprob, False)
@@ -592,6 +595,9 @@ class TwoDGrad():
         ax.plot(xn[w > 0], v[w > 0], 'wo', zorder=1, markersize=4)
         if ~np.isnan(self.Mstar):
             vp = np.abs(v[~np.isnan(x)])
+            if vp.max() - vp.min() < 0.1:
+                vp = (vp.max() + vp.min()) / 2.
+                vp = np.array([vp - 0.05, vp + 0.05])
             vp = np.geomspace(vp.min(), vp.max(), 100)
             M_p, v_break, p_low, _ = self.popt
             rp = r_kep_out(vp, M_p, v_break, p_low, 0)
