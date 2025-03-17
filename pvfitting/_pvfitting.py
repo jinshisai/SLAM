@@ -290,7 +290,7 @@ class PVFitting():
                     show: bool = False, progressbar: bool = True,
                     kwargs_emcee_corner: dict = {},
                     signmajor: int | None = None, signminor: int | None = None,
-                    pa_maj: float | None = None, pa_min: float | None = None,
+                    pa_major: float | None = None,
                     linewidth: float | None = None,
                     nsubgrid: int = 1, n_nest: list[float] = [3, 3],
                     reslim: float = 5,
@@ -324,14 +324,15 @@ class PVFitting():
             z = (np.arange(2 * nz + 1) - nz) * dx
         mpvd = MockPVD(self.x, z, self.v,
                        nsubgrid=nsubgrid, nnest=n_nest,
-                       beam=self.beam, reslim=reslim)
+                       beam=self.beam, reslim=reslim,
+                       signmajor=majquad, signminor=minquad)
         rout = np.max(z)
         def makemodel(Mstar, Rc, alphainfall, taumax, frho):
             major, minor = mpvd.generate_mockpvd(Mstar=Mstar, Rc=Rc,
                                                  alphainfall=alphainfall,
                                                  taumax=taumax, frho=frho,
                                                  incl=incl, linewidth=linewidth,
-                                                 rout=rout, pa=[pa_maj, pa_min],
+                                                 rout=rout, pa_major=pa_major,
                                                  axis='both')
             # quadrant
             major = major[:, ::majquad]

@@ -22,7 +22,8 @@ class MockPVD(object):
     def __init__(self, x:np.ndarray, z:np.ndarray, v:np.ndarray, 
                  nnest:list | None = None, nsubgrid: int = 1, 
                  xlim:list | None = None, ylim: list | None = None, zlim:list | None = None,
-                 beam:list | None = None, reslim: float = 5):
+                 beam:list | None = None, reslim: float = 5,
+                 signmajor: int = 1, signminor: int = 1):
         '''
         Initialize MockPVD with a given grid. z is the line of sight axis.
 
@@ -36,6 +37,8 @@ class MockPVD(object):
          each has a four times better resolution than its parental grid.
         xlim, zlim (list): x and z ranges for the nested grid. Must be given as [[xmin0, xmax0], [xmin1, xmax1]].
         beam (list): Beam info, which must be give [major, minor, pa].
+        signmajor: 1 for the case where the positive offset is on the redshifted side in the PV diagram along the major axis; otherwise -1.
+        signminor: 1 for the case where the negative offset is on the redshifted side in the PV diagram along the minor axis; otherwise -1.
         '''
         super(MockPVD, self).__init__()
 
@@ -55,6 +58,8 @@ class MockPVD(object):
         self.nnest = nnest
         # beam
         self.beam = beam
+        self.signmajor = signmajor
+        self.signminor = signminor
 
         # make grid
         self.makegrid(xlim, ylim, zlim, reslim = reslim)
@@ -65,7 +70,7 @@ class MockPVD(object):
 
     def generate_mockpvd(self, Mstar:float, Rc:float, alphainfall: float = 1., 
                          taumax: float = 1., frho: float = 1.,
-                         incl: float = 89., pa: float | list = 0.,
+                         incl: float = 89., pa_major: float | list = 0.,
                          linewidth: float | None = None, rin: float = 1., 
                          rout: float | None = None, axis: str = 'both'):
         '''
@@ -105,7 +110,7 @@ class MockPVD(object):
             rho_max = np.nanmax([np.nanmax([np.nanmax(i) for i in _rho]) for _rho in rho])
             rho = [ [i / rho_max for i in _rho] for _rho in rho] # normalized rho
             # get PV diagrams
-            for _rho, _vlos, _pa in zip(rho, vlos, pa):
+            for _rho, _vlos, _pa in zip(rho, vlos, [pa_major, pa_major + 90]):
                 # PV cut
                 I_pv = self.generate_pvd(rho=_rho, vlos=_vlos, taumax=taumax,
                                          beam=self.beam, linewidth=linewidth, pa=_pa)
@@ -183,9 +188,9 @@ class MockPVD(object):
                 Z = self.grid.znest[l] / Rc
                 # along which axis
                 if axis == 'major':
-                    r, t, p = XYZ2rtp(irad, 0, X, Y, Z)
+                    r, t, p = XYZ2rtp(irad, 0, X * self.signmajor, Y * self.signminor, Z)
                 else:
-                    r, t, p = XYZ2rtp(irad, 0, -Y, X, Z)
+                    r, t, p = XYZ2rtp(irad, 0, -Y * self.signmajor, X * self.signminor, Z)
                 precalculation.update(r * Rc, t, p, irad, axis, l)
             r_org = precalculation.r_org[axis][l]
             # get density and velocity
