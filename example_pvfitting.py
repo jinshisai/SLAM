@@ -3,7 +3,10 @@ from pvfitting import PVFitting
 '-------- INPUTS --------'
 pvmajorfits = './pvfitting/IRAS16253_SBLB_C18O_robust_2.0.pvmajor.fits'
 pvminorfits = './pvfitting/IRAS16253_SBLB_C18O_robust_2.0.pvminor.fits'
-pa = 113 - 180  # deg
+pa_major = 113  # deg
+pa_minor = 23  # deg
+signmajor = -1  # Positive offset is redshifted --> 1
+signminor = 1  # Positive offset is blueshifted --> 1
 incl = 65  # deg
 vsys = 4  # km/s
 dist = 139  # pc
@@ -26,12 +29,12 @@ pvfit.fit_mockpvd(Mstar_range=[0.01, 1.0],
                   frho_range=[1, 1e3],
                   fixed_params={'alphainfall': 1, 'sig_mdl': 0},
                   show=False, filename=filehead, vmask=vmask,
-                  incl=incl, pa_major=pa,
+                  incl=incl, pa_major=pa_major, pa_minor=pa_minor,
                   kwargs_emcee_corner={'nwalkers_per_ndim': 4,
                                        'nburnin': 300,
                                        'nsteps': 700,
                                        'rangelevel': 0.99},
-                  signmajor=None, signminor=None,
+                  signmajor=signmajor, signminor=signminor,
                   n_nest=[2] * 6, reslim=10,
                   log=True, zmax=1000)
 pvfit.modeltofits(**pvfit.popt, filehead=filehead)
