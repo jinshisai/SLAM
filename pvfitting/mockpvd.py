@@ -185,7 +185,7 @@ class MockPVD(object):
                 if axis == 'major':
                     r, t, p = XYZ2rtp(irad, 0, X, Y, Z)
                 else:
-                    r, t, p = XYZ2rtp(irad, 0, Y, X, Z)
+                    r, t, p = XYZ2rtp(irad, 0, -Y, X, Z)
                 precalculation.update(r * Rc, t, p, irad, axis, l)
             r_org = precalculation.r_org[axis][l]
             # get density and velocity
