@@ -4,8 +4,8 @@ from pvfitting import PVFitting
 pvmajorfits = './pvfitting/IRAS16253_SBLB_C18O_robust_2.0.pvmajor.fits'
 pvminorfits = './pvfitting/IRAS16253_SBLB_C18O_robust_2.0.pvminor.fits'
 pa_major = 113  # deg
-pa_minor = 23  # deg
-signmajor = -1  # Positive offset is redshifted --> 1
+pa_minor = 203  # deg
+signmajor = 1  # Positive offset is redshifted --> 1
 signminor = 1  # Positive offset is blueshifted --> 1
 incl = 65  # deg
 vsys = 4  # km/s
