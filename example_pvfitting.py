@@ -7,7 +7,7 @@ pa_major = 113  # deg
 pa_minor = 203  # deg
 signmajor = 1  # Positive offset is redshifted --> 1
 signminor = 1  # Positive offset is blueshifted --> 1
-incl = 65  # deg
+incl = 65  # deg; 0<= incl <= 90
 vsys = 4  # km/s
 dist = 139  # pc
 sigma = 1.9e-3  # Jy/beam; None means automatic calculation.
