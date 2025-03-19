@@ -55,11 +55,11 @@ class PVFitting(ReadFits):
             self.read_pvfits(pvfits=pvfits, dist=dist, vsys=vsys,
                              xmin=-rmax, xmax=rmax, xskip=iskip, sigma=sigma,
                              vmin=vmin, vmax=vmax)
-            if dNsampling is not None:
-                self.sampling(dNsampling)
+            #if dNsampling is not None:
+            #    self.sampling(dNsampling)
             d.append(self.data)
         self.dpvmajor, self.dpvminor = d
-
+    '''
     def sampling(self, steps):
         x_smpl, y_smpl = steps
         x_smpl = int(self.bmin / x_smpl / self.dx )
@@ -71,15 +71,11 @@ class PVFitting(ReadFits):
         self.x = self.x[x_smpl//2::x_smpl]
         self.dx = self.x[1] - self.x[0]
         self.dv = self.v[1] - self.v[0]
-        h = self.header
-        h['CRPIX1'] = (h['CRPIX1'] - 1 - self.offpix[0] - x_smpl//2) // x_smpl + 1
-        h['CDELT1'] = h['CDELT1'] * x_smpl
-        self.header = h
         ibmaj = self.bmaj / self.dx
         ibmin = self.bmin / self.dx
         print(f'Adopt xskip={x_smpl:d} and vskip={y_smpl:d}.')
         print(f'Beam major/minor axis is {ibmaj:.1f}/{ibmin:.1f} pixels.')
-
+    '''
     def check_modelgrid(self, nsubgrid: float = 1,
                         n_nest: list | None = None, reslim: float = 5):
         # model grid
@@ -417,6 +413,7 @@ class PVFitting(ReadFits):
         w = wcs.WCS(naxis=2)
         h = self.header
         h['NAXIS1'] = len(self.x)
+        h['CRPIX1'] = h['CRPIX1'] - self.offpix[0]
         nx = h['NAXIS1']
         p = self.popt if kwargs == {} else kwargs 
         if 'sig_mdl' in p.keys():

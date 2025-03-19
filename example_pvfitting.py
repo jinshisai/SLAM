@@ -22,7 +22,7 @@ filehead = pvmajorfits.replace('.pvmajor.fits', '')
 pvfit = PVFitting()
 pvfit.put_PV(pvmajorfits=pvmajorfits, pvminorfits=pvminorfits,
              dist=dist, vsys=vsys, rmax=rmax, vmin=vlim[0], vmax=vlim[1],
-             sigma=sigma)
+             sigma=sigma, skipto=5)
 pvfit.fit_mockpvd(Mstar_range=[0.01, 1.0],
                   Rc_range=[1, 100],
                   taumax_range=[1e-1, 1e2],
