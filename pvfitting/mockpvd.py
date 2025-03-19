@@ -183,7 +183,7 @@ class MockPVD(object):
               collapse: bool = False, normalize: bool = True,
               axis: str = 'major'):
         # parameters/units
-        irad = np.abs(np.asin(np.sin(np.radians(incl)))) + self.iradshift
+        irad = np.abs(np.arcsin(np.sin(np.radians(incl)))) + self.iradshift
         vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
 
         # for each nested level
