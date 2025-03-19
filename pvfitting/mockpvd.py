@@ -6,6 +6,7 @@ from pvfitting.grid import Nested3DGrid
 from pvfitting.precalculation import XYZ2rtp
 from pvfitting import precalculation
 from pvfitting.precalculation import rho2tau
+from utils import rot
 
 au = units.au.to('m')
 GG = constants.G.si.value
@@ -310,7 +311,7 @@ class MockPVD(object):
             if precalculation.gauss_xy is None:
                 bmaj, bmin, bpa = beam
                 xb, yb = rot(*np.meshgrid(self.x, self.y), -np.radians(bpa - pa))
-                gaussbeam = np.exp(-4*np.log(2) * ((yb/bmin)**2 + (xb/bmaj)**2))
+                gaussbeam = np.exp2(-4 * ((xb / bmaj)**2 + (yb / bmin)**2))
                 gaussbeam /= np.sum(gaussbeam)
                 precalculation.gauss_xy = gaussbeam[np.newaxis, :, :]
             g = precalculation.gauss_xy
@@ -323,9 +324,3 @@ class MockPVD(object):
             I_pv = np.nanmean(np.array([I_pv[:, i::self.nsubgrid] 
                                         for i in range(self.nsubgrid)]), axis=0)
         return I_pv
-
-
-def rot(x, y, pa):
-    s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
-    t = x * np.sin(pa) + y * np.cos(pa)  # along major axis
-    return np.array([s, t])

@@ -350,3 +350,8 @@ class ReadFits():
         self.beam = np.array([bmaj, bmin, bpa])
         self.pvfits, self.dist, self.vsys = pvfits, dist, vsys
         return {'x':x, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
+
+def rot(x, y, pa):
+    s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
+    t = x * np.sin(pa) + y * np.cos(pa)  # along major axis
+    return np.array([s, t])

@@ -15,9 +15,7 @@ Note. FITS files with multiple beams are not supported. The dynamic range for xl
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
-from astropy import constants, wcs
-from astropy.coordinates import SkyCoord
-from scipy.interpolate import RegularGridInterpolator as RGI
+from astropy import wcs
 import warnings
 from tqdm import tqdm
 from utils import emcee_corner, ReadFits
@@ -29,106 +27,6 @@ warnings.simplefilter('ignore', RuntimeWarning)
 class PVFitting(ReadFits):
 
 #    def __init__(self):
-
-    def read_cubefits(self, cubefits: str, center: str = None,
-                      dist: float = 1, vsys: float = 0,
-                      xmax: float = 1e4, ymax: float = 1e4,
-                      vmin: float = -100, vmax: float = 100,
-                      sigma: float = None) -> dict:
-        """
-        Read a position-velocity diagram in the FITS format.
-
-        Parameters
-        ----------
-        cubefits : str
-            Name of the input FITS file including the extension.
-        center : str
-            Coordinates of the target: e.g., "01h23m45.6s 01d23m45.6s".
-        dist : float
-            Distance of the target, used to convert arcsec to au.
-        vsys : float
-            Systemic velocity of the target.
-        xmax : float
-            The R.A. axis is limited to (-xmax, xmax) in the unit of au.
-        ymax : float
-            The Dec. axis is limited to (-xmax, xmax) in the unit of au.
-        vmax : float
-            The velocity axis of the PV diagram is limited to (vmin, vmax).
-        vmin : float
-            The velocity axis of the PV diagram is limited to (vmin, vmax).
-        sigma : float
-            Standard deviation of the FITS data. None means automatic.
-
-        Returns
-        ----------
-        fitsdata : dict
-            x (1D array), v (1D array), data (2D array), header, and sigma.
-        """
-        cc = constants.c.si.value
-        f = fits.open(cubefits)[0]
-        d, h = np.squeeze(f.data), f.header
-        if center is None:
-            cx, cy = 0, 0
-        else:
-            coord = SkyCoord(center, frame='icrs')
-            cx = coord.ra.degree - h['CRVAL1']
-            cy = coord.dec.degree - h['CRVAL2']
-        if sigma is None:
-            sigma = np.mean([np.nanstd(d[:2]), np.std(d[-2:])])
-            print(f'sigma = {sigma:.3e}')
-        x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
-        y = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
-        v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
-        v = v + h['CRVAL3']
-        x = (x - cx) * 3600. * dist  # au
-        y = (y - cy) * 3600. * dist  # au
-        v = (1. - v / h['RESTFRQ']) * cc / 1.e3 - vsys  # km/s
-        i0, i1 = np.argmin(np.abs(x - xmax)), np.argmin(np.abs(x + xmax))
-        j0, j1 = np.argmin(np.abs(y + ymax)), np.argmin(np.abs(y - ymax))
-        k0, k1 = np.argmin(np.abs(v - vmin)), np.argmin(np.abs(v - vmax))
-        self.offpix = (i0, j0, k0)
-        x, y, v = x[i0:i1 + 1], y[j0:j1 + 1], v[k0:k1 + 1],
-        d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
-        dx, dy, dv = x[1] - x[0], y[1] - y[0], v[1] - v[0]
-        if 'BMAJ' in h.keys():
-            bmaj = h['BMAJ'] * 3600. * dist  # au
-            bmin = h['BMIN'] * 3600. * dist  # au
-            bpa = h['BPA']  # deg
-        else:
-            bmaj, bmin, bpa = dy, -dx, 0
-            print('No valid beam in the FITS file.')
-        self.x, self.dx = x, dx
-        self.y, self.dy = y, dy
-        self.v, self.dv = v, dv
-        self.data, self.header, self.sigma = d, h, sigma
-        self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
-        self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
-        return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
-
-    def get_PV(self, cubefits: str = None,
-               pa: float = 0, center: str = None,
-               dist: float = 1, vsys: float = 0,
-               xmax: float = 1e4,
-               vmin: float = -100, vmax: float = 100,
-               sigma: float = None):
-        if not (cubefits is None):
-            self.read_cubefits(cubefits, center, dist, vsys,
-                               xmax, xmax, vmin, vmax, sigma)
-        x, y, v = self.x, self.y, self.v
-        sigma, d = self.sigma, self.data
-        n = np.floor(xmax / self.dy)
-        r = (np.arange(2 * n + 1) - n) * self.dy
-        ry = r * np.cos(np.radians(pa))
-        rx = r * np.sin(np.radians(pa))
-        dpvmajor = [None] * len(v)
-        dpvminor = [None] * len(v)
-        for i in range(len(v)):
-            interp = RGI((-x, y), d[i], bounds_error=False)
-            dpvmajor[i] = interp((-rx, ry))
-            dpvminor[i] = interp((ry, rx))
-        self.dpvmajor = np.array(dpvmajor)
-        self.dpvminor = np.array(dpvminor)
-        self.x = r
     
     def put_PV(self, pvmajorfits: str, pvminorfits: str,
                dist: float, vsys: float,

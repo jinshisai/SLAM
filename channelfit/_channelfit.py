@@ -22,7 +22,7 @@ from scipy.optimize import curve_fit
 from scipy.special import erf
 import warnings
 from tqdm import tqdm
-from utils import emcee_corner, ReadFits
+from utils import emcee_corner, ReadFits, rot
 
 warnings.simplefilter('ignore', RuntimeWarning)
 
@@ -31,10 +31,6 @@ M_sun = constants.M_sun.si.value
 au = units.au.to('m')
 vunit = np.sqrt(GG * M_sun / au) * 1e-3
 
-def rot(x, y, pa):
-    s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
-    t = x * np.sin(pa) + y * np.cos(pa)  # along major axis
-    return np.array([s, t])
 
 def avefour(a: np.ndarray) -> np.ndarray:
     b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
@@ -56,7 +52,7 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
 def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
           threshold: float = 2, gain: float = 0.01,
           weakestcomponent: float = 0.3,
-          savetxt: str = None, loadtxt: str = None) -> np.ndarray:
+          savetxt: str | None = None, loadtxt: str | None = None) -> np.ndarray:
     if loadtxt is not None:
         print(f'Load clean components of moment 0 from {loadtxt}.')
         cleancomponent = np.loadtxt(loadtxt)
@@ -66,7 +62,7 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     cleanresidual = data * 1
     beamarea = np.sum(beam)  # pixel/beam
     cc0 = np.zeros_like(data)
-    rms0, rms = 10000 * sigma, 10000 * sigma
+    rms = 10000 * sigma
     for i in range(10000000):
         if i == 10000000 - 1:
             print('\n10,000,000 iterations achived in CLEAN.')
@@ -83,13 +79,6 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         cc[ip, jp] = max(gain * lp, weakestcomponent * sigma) / beamarea  # Jy/pixel
         newresidual = cleanresidual - convolve(cc, beam, mode='same')
         rms = np.sqrt(np.nanmean(newresidual**2))
-        #if rms > rms0:
-        #    print('RMS increased in CLEAN. '
-        #          f'(rms={rms / sigma:.2f}sigma, '
-        #          f'peak={peak / sigma:.2f}sigma)')
-        #    break
-        #else:
-        #    rms0 = rms
         cleancomponent = cleancomponent + cc
         cleanresidual = newresidual
     cleancomponent = cleancomponent + cleanresidual / beamarea
@@ -358,7 +347,7 @@ class ChannelFit(ReadFits):
                                    sigma=self.sigma_mom0,
                                    savetxt=savedeconvolved,
                                    loadtxt=loaddeconvolved)
-        if self.scaling == 'mom0model':
+        elif self.scaling == 'mom0model':
             d = modeldeconvolve(x=self.x, y=self.y, data=self.mom0,
                                 bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
                                 sigma=self.sigma_mom0,
@@ -367,7 +356,7 @@ class ChannelFit(ReadFits):
                                 progressbar=self.progressbar)
             self.mom0decon, self.xdecon, self.ydecon, self.zdecon = d
             print('Found a deconvolved solution.')
-        if self.scaling == 'mom0ft':
+        elif self.scaling == 'mom0ft':
             self.mom0decon = ftdeconvolve(x=self.x, y=self.y, data=self.mom0,
                                            bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
                                            sigma = self.sigma_mom0, threshold=3)
