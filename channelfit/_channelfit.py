@@ -16,14 +16,13 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 from astropy.io import fits
 from astropy import constants, units, wcs
-from astropy.coordinates import SkyCoord
 from scipy.signal import convolve
 from scipy.interpolate import RegularGridInterpolator as RGI
 from scipy.optimize import curve_fit
 from scipy.special import erf
 import warnings
 from tqdm import tqdm
-from utils import emcee_corner
+from utils import emcee_corner, ReadFits
 
 warnings.simplefilter('ignore', RuntimeWarning)
 
@@ -221,7 +220,7 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         dnew = np.concatenate((np.zeros((1, np.shape(dnew)[1])), dnew), axis=0)
     return dnew
 
-class ChannelFit():
+class ChannelFit(ReadFits):
 
     def __init__(self,
                  disk: bool = True,
@@ -230,109 +229,11 @@ class ChannelFit():
                  progressbar: bool = True):
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2',
                           'pI', 'Rin', 'Ienv',
-                          'xoff', 'yoff', 'voff', 'incl', 'pa']
+                          'xoff', 'yoff', 'voff', 'incloff', 'paoff']
         self.disk = disk
         self.envelope = envelope
         self.scaling = scaling
         self.progressbar = progressbar
-
-    def read_cubefits(self, cubefits: str, center: str | None = None,
-                      dist: float = 1, vsys: float = 0,
-                      xmin: float | None = None, xmax: float | None = None,
-                      ymin: float | None = None, ymax: float | None = None,
-                      vmin: float | None = None, vmax: float | None = None,
-                      xskip: int = 1, yskip: int = 1,
-                      sigma: float | None = None) -> dict:
-        """Read channel maps in the FITS format.
-
-        Args:
-            cubefits (str): Name of the input FITS file including the extension.
-            center (str | None, optional): Coordinates of the target: e.g., "01h23m45.6s 01d23m45.6s". Defaults to None.
-            dist (float, optional): Distance of the target in the unit of pc, used to convert arcsec to au. Defaults to 1.
-            vsys (float, optional): Systemic velocity of the target in the unit of km/s. Defaults to 0.
-            xmin (float | None, optional): The x-axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
-            xmax (float | None, optional): The x-axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
-            ymin (float | None, optional): The y-axis is limited to (ymin, ymax) in the unit of au. Defaults to None.
-            ymax (float | None, optional): The y-axis is limited to (ymin, ymax) in the unit of au. Defaults to None.
-            vmin (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
-            vmax (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
-            xskip (int, optional): Skip xskip pixels in the x axis. Defaults to 1.
-            yskip (int, optional): Skip yskip pixels in the y axis. Defaults to 1.
-            sigma (float | None, optional): Standard deviation of the FITS data. None means automatic. Defaults to None.
-
-        Returns:
-            dict: x (1D array), y (1D array), v (1D array), data (2D array), header, and sigma.
-        """
-        cc = constants.c.si.value
-        f = fits.open(cubefits)[0]
-        d, h = np.squeeze(f.data), f.header
-        if center is None:
-            cx, cy = 0, 0
-        else:
-            c0 = SkyCoord('00h00m00s 00d00m00s', frame='icrs')
-            c1 = [h['CRVAL1'] * units.degree, h['CRVAL2'] * units.degree]
-            c1 = c0.spherical_offsets_by(*c1)
-            c3 = c1.spherical_offsets_to(SkyCoord(center, frame='icrs'))
-            cx = c3[0].degree
-            cy = c3[1].degree
-        if sigma is None:
-            sigma = np.mean([np.nanstd(d[:2]), np.std(d[-2:])])
-            print(f'sigma = {sigma:.3e}')
-        x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
-        y = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
-        v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
-        crpix = int(h['CRPIX1']) - 1
-        startpix = crpix % xskip
-        x = x[startpix::xskip]
-        h['CRPIX1'] = (crpix - startpix) // xskip + 1
-        h['CDELT1'] = h['CDELT1'] * xskip
-        d = d[:, :, startpix::xskip]
-        crpix = int(h['CRPIX2']) - 1
-        startpix = crpix % yskip
-        y = y[startpix::yskip]
-        h['CRPIX2'] = (crpix - startpix) // yskip + 1
-        h['CDELT2'] = h['CDELT2'] * yskip
-        d = d[:, startpix::yskip, :]
-        v = v + h['CRVAL3']
-        x = (x - cx) * 3600. * dist  # au
-        y = (y - cy) * 3600. * dist  # au
-        if h['CUNIT3'] == 'Hz':
-            restfreq = np.mean(v)
-            if 'RESTFRQ' in h:
-                restfreq = h['RESTFRQ']
-            elif 'RESTFREQ' in h:
-                restfreq = h['RESTFREQ']
-            else:
-                print('No rest frequency found. The middle frequency adopted.')
-            v = (1. - v / restfreq) * cc / 1.e3 - vsys  # km/s
-        elif h['CUNIT3'] == 'm/s':
-            v = v * 1e-3 - vsys
-        i0 = 0 if xmax is None else np.argmin(np.abs(x - xmax))
-        i1 = len(x) - 1 if xmin is None else np.argmin(np.abs(x - xmin))
-        j0 = 0 if ymin is None else np.argmin(np.abs(y - ymin))
-        j1 = len(y) - 1 if ymax is None else np.argmin(np.abs(y - ymax))
-        x, y = x[i0:i1 + 1], y[j0:j1 + 1]
-        k0 = 0 if vmin is None else np.argmin(np.abs(v - vmin))
-        k1 = len(v) - 1 if vmax is None else np.argmin(np.abs(v - vmax))
-        self.offpix = (i0, j0, k0)
-        v = v[k0:k1 + 1]
-        d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
-        dx, dy, dv = x[1] - x[0], y[1] - y[0], v[1] - v[0]
-        if 'BMAJ' in h.keys():
-            bmaj = h['BMAJ'] * 3600. * dist  # au
-            bmin = h['BMIN'] * 3600. * dist  # au
-            bpa = h['BPA']  # deg
-        else:
-            bmaj, bmin, bpa = dy, -dx, 0
-            print('No valid beam in the FITS file.')
-        self.x, self.dx, self.nx = x, dx, len(x)
-        self.y, self.dy, self.ny = y, dy, len(y)
-        self.v, self.dv, self.nv = v, dv, len(v)
-        self.data, self.header, self.sigma = d, h, sigma
-        self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
-        self.beam = np.array([bmaj, bmin, bpa])
-        self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
-        return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
     def makegrid(self, cubefits: str | None = None,
                  pa: float = 0, incl: float = 90, dist: float = 1,
@@ -366,7 +267,6 @@ class ChannelFit():
                 print(f'Beam major/minor axis is {ibmaj:.1f}/{ibmin:.1f} pixels.')
             v = self.v
         self.incl0 = incl
-        self.update_incl(incl)
         pa_rad = np.radians(pa)
         self.pa_rad = pa_rad
         self.cospa = np.cos(pa_rad)
@@ -607,21 +507,22 @@ class ChannelFit():
         return Iout
 
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
-                  h1: float, h2: float, pI: float, Rin: float, Ienv: float, 
+                  h1: float = 0, h2: float = -1, pI: float = 0,
+                  Rin: float = 0, Ienv: float = 0, 
                   xoff: float = 0, yoff: float = 0, voff: float = 0,
-                  incl: float = 90, pa: float = 0,
+                  incloff: float = 90, paoff: float = 0,
                   convolving: bool = True):
-        if self.free['pa']:
-            self.update_pa(pa)
-        if self.free['incl']:
-            self.update_incl(incl)
+        if self.free['paoff']:
+            self.update_pa(paoff)
+        if self.free['incloff']:
+            self.update_incl(incloff)
         if self.free['cs']:
             self.update_prof(cs)
-        if self.free['pa'] or self.free['h1'] or self.free['h2']:
+        if self.free['paoff'] or self.free['h1'] or self.free['h2']:
             self.update_xdisk(h1, h2)
-        if self.free['pa'] or self.free['Rc'] or self.free['Rin']:
+        if self.free['paoff'] or self.free['Rc'] or self.free['Rin']:
             self.update_getvlos(Rc, Rin)
-        if self.free['pa'] or self.free['h1'] or self.free['h2'] \
+        if self.free['paoff'] or self.free['h1'] or self.free['h2'] \
             or self.free['Rc'] or self.free['Rin']:
             self.update_vlos(h1, h2)
 
@@ -663,17 +564,17 @@ class ChannelFit():
         p_fixed = {k:fixed_params[k] if k in fixed_params else None for k in self.paramkeys}
         self.free = {k:p_fixed[k] is None for k in self.paramkeys}
 
-        if not self.free['pa']:
-            self.update_pa(p_fixed['pa'])
-        if not self.free['incl']:
-            self.update_incl(p_fixed['incl'])
+        if not self.free['paoff']:
+            self.update_pa(p_fixed['paoff'])
+        if not self.free['incloff']:
+            self.update_incl(p_fixed['incloff'])
         if not self.free['cs']:
             self.update_prof(p_fixed['cs'])
-        if not (self.free['pa'] or self.free['h1'] or self.free['h2']):
+        if not (self.free['paoff'] or self.free['h1'] or self.free['h2']):
             self.update_xdisk(p_fixed['h1'], p_fixed['h2'])
-        if not (self.free['pa'] or self.free['Rc'] or self.free['Rin']):
+        if not (self.free['paoff'] or self.free['Rc'] or self.free['Rin']):
             self.update_getvlos(p_fixed['Rc'], p_fixed['Rin'])
-        if not (self.free['pa'] or self.free['h1'] or self.free['h2'] 
+        if not (self.free['paoff'] or self.free['h1'] or self.free['h2'] 
                 or self.free['Rc'] or self.free['Rin']):
             self.update_vlos(p_fixed['h1'], p_fixed['h2'])
         

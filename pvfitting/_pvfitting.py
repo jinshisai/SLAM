@@ -20,13 +20,13 @@ from astropy.coordinates import SkyCoord
 from scipy.interpolate import RegularGridInterpolator as RGI
 import warnings
 from tqdm import tqdm
-from utils import emcee_corner
+from utils import emcee_corner, ReadFits
 from pvfitting.mockpvd import MockPVD
 
 warnings.simplefilter('ignore', RuntimeWarning)
 
 
-class PVFitting():
+class PVFitting(ReadFits):
 
 #    def __init__(self):
 
@@ -104,79 +104,6 @@ class PVFitting():
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
-
-    def read_pvfits(self, pvfits: str,
-                    dist: float = 1, vsys: float = 0,
-                    xmin: float | None = None, xmax: float | None = None,
-                    vmin: float | None = None, vmax: float | None = None,
-                    xskip: int = 1,
-                    sigma: float | None = None) -> dict:
-        """Read a position-velocity diagram in the FITS format.
-
-        Args:
-            pvfits (str): Name of the input FITS file including the extension.
-            dist (float, optional): Distance of the target in the unit of pc, used to convert arcsec to au. Defaults to 1.
-            vsys (float, optional): Systemic velocity of the target in the unit of km/s. Defaults to 0.
-            xmin (float | None, optional): The positional axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
-            xmax (float | None, optional): The positional axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
-            vmin (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
-            vmax (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
-            xskip (int, optional): Skip xskip pixels in the x axis. Defaults to 1.
-            sigma (float | None, optional): Standard deviation of the FITS data. None means automatic. Defaults to None.
-
-        Returns:
-            dict: The keys are x (1D array), v (1D array), data (2D array), header, and sigma.
-        """
-        cc = constants.c.si.value
-        f = fits.open(pvfits)[0]
-        d, h = np.squeeze(f.data), f.header
-        if sigma is None:
-            sigma = np.mean([np.std(d[:2, 10:-10]), np.std(d[-2:, 10:-10]),
-                             np.std(d[2:-2, :10]), np.std(d[2:-2, -10:])])
-            print(f'sigma = {sigma:.3e}')
-        x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1'] + h['CRVAL1']
-        v = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2'] + h['CRVAL2']
-        crpix = int(h['CRPIX1']) - 1
-        startpix = crpix % xskip
-        x = x[startpix::xskip]
-        h['CRPIX1'] = (crpix - startpix) // xskip + 1
-        h['CDELT1'] = h['CDELT1'] * xskip
-        d = d[:, startpix::xskip]
-        x = x * dist  # au
-        if h['CUNIT2'] == 'Hz':
-            restfreq = np.mean(v)
-            if 'RESTFRQ' in h:
-                restfreq = h['RESTFRQ']
-            elif 'RESTFREQ' in h:
-                restfreq = h['RESTFREQ']
-            else:
-                print('No rest frequency found. The middle frequency adopted.')
-            v = (1. - v / restfreq) * cc / 1.e3 - vsys  # km/s
-        elif h['CUNIT2'] == 'm/s':
-            v = v * 1e-3 - vsys
-        i0 = 0 if xmin is None else np.argmin(np.abs(x - xmin))
-        i1 = len(x) - 1 if xmax is None else np.argmin(np.abs(x - xmax))
-        x = x[i0:i1 + 1]
-        k0 = 0 if vmin is None else np.argmin(np.abs(v - vmin))
-        k1 = len(v) - 1 if vmax is None else np.argmin(np.abs(v - vmax))
-        v = v[k0:k1 + 1]
-        self.offpix = (i0, k0)
-        d = d[k0:k1 + 1, i0:i1 + 1]
-        dx, dv = x[1] - x[0], v[1] - v[0]
-        if 'BMAJ' in h.keys():
-            bmaj = h['BMAJ'] * 3600. * dist  # au
-            bmin = h['BMIN'] * 3600. * dist  # au
-            bpa = h['BPA']  # deg
-        else:
-            bmaj, bmin, bpa = dx, dx, 0
-            print('No valid beam in the FITS file.')
-        self.x, self.dx, self.nx = x, dx, len(x)
-        self.v, self.dv, self.nv = v, dv, len(v)
-        self.data, self.header, self.sigma = d, h, sigma
-        self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
-        self.beam = np.array([bmaj, bmin, bpa])
-        self.pvfits, self.dist, self.vsys = pvfits, dist, vsys
-        return {'x':x, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 
     def get_PV(self, cubefits: str = None,
                pa: float = 0, center: str = None,

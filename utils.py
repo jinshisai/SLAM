@@ -6,6 +6,9 @@ from dynesty import DynamicNestedSampler as DNS
 from dynesty import NestedSampler as NS
 from dynesty import utils as dyfunc
 from dynesty import plotting as dyplot
+from astropy.io import fits
+from astropy import constants, units
+from astropy.coordinates import SkyCoord
 
 
 def gauss1d(x, amp, mean, fwhm):
@@ -116,7 +119,6 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
         return [popt, plow, pmid, phigh]
 
 
-
 def dynesty_corner(bounds, 
     log_prob_fn, args: list = [],
     labels: list = None, 
@@ -170,3 +172,181 @@ def dynesty_corner(bounds,
         popt = results.samples[np.argmax(results.logl), :] # highest probability
         plow, pmid, phigh = np.array(quantiles).T
         return [popt, plow, pmid, phigh]
+
+
+class ReadFits():
+    def read_cubefits(self, cubefits: str, center: str | None = None,
+                      dist: float = 1, vsys: float = 0,
+                      xmin: float | None = None, xmax: float | None = None,
+                      ymin: float | None = None, ymax: float | None = None,
+                      vmin: float | None = None, vmax: float | None = None,
+                      xskip: int = 1, yskip: int = 1,
+                      sigma: float | None = None) -> dict:
+        """Read channel maps in the FITS format.
+
+        Args:
+            cubefits (str): Name of the input FITS file including the extension.
+            center (str | None, optional): Coordinates of the target: e.g., "01h23m45.6s 01d23m45.6s". Defaults to None.
+            dist (float, optional): Distance of the target in the unit of pc, used to convert arcsec to au. Defaults to 1.
+            vsys (float, optional): Systemic velocity of the target in the unit of km/s. Defaults to 0.
+            xmin (float | None, optional): The x-axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
+            xmax (float | None, optional): The x-axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
+            ymin (float | None, optional): The y-axis is limited to (ymin, ymax) in the unit of au. Defaults to None.
+            ymax (float | None, optional): The y-axis is limited to (ymin, ymax) in the unit of au. Defaults to None.
+            vmin (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
+            vmax (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
+            xskip (int, optional): Skip xskip pixels in the x axis. Defaults to 1.
+            yskip (int, optional): Skip yskip pixels in the y axis. Defaults to 1.
+            sigma (float | None, optional): Standard deviation of the FITS data. None means automatic. Defaults to None.
+
+        Returns:
+            dict: x (1D array), y (1D array), v (1D array), data (2D array), header, and sigma.
+        """
+        cc = constants.c.si.value
+        f = fits.open(cubefits)[0]
+        d, h = np.squeeze(f.data), f.header
+        if center is None:
+            cx, cy = 0, 0
+        else:
+            c0 = SkyCoord('00h00m00s 00d00m00s', frame='icrs')
+            c1 = [h['CRVAL1'] * units.degree, h['CRVAL2'] * units.degree]
+            c1 = c0.spherical_offsets_by(*c1)
+            c3 = c1.spherical_offsets_to(SkyCoord(center, frame='icrs'))
+            cx = c3[0].degree
+            cy = c3[1].degree
+        if sigma is None:
+            sigma = np.mean([np.nanstd(d[:2]), np.std(d[-2:])])
+            print(f'sigma = {sigma:.3e}')
+        x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
+        y = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
+        v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
+        crpix = int(h['CRPIX1']) - 1
+        startpix = crpix % xskip
+        x = x[startpix::xskip]
+        h['CRPIX1'] = (crpix - startpix) // xskip + 1
+        h['CDELT1'] = h['CDELT1'] * xskip
+        d = d[:, :, startpix::xskip]
+        crpix = int(h['CRPIX2']) - 1
+        startpix = crpix % yskip
+        y = y[startpix::yskip]
+        h['CRPIX2'] = (crpix - startpix) // yskip + 1
+        h['CDELT2'] = h['CDELT2'] * yskip
+        d = d[:, startpix::yskip, :]
+        v = v + h['CRVAL3']
+        x = (x - cx) * 3600. * dist  # au
+        y = (y - cy) * 3600. * dist  # au
+        if h['CUNIT3'] == 'Hz':
+            if 'RESTFRQ' in h:
+                restfreq = h['RESTFRQ']
+            elif 'RESTFREQ' in h:
+                restfreq = h['RESTFREQ']
+            else:
+                restfreq = np.mean(v)
+                print('No rest frequency found. The middle frequency adopted.')
+            v = (1. - v / restfreq) * cc / 1.e3 - vsys  # km/s
+        elif h['CUNIT3'] == 'm/s':
+            v = v * 1e-3 - vsys
+        i0 = 0 if xmax is None else np.argmin(np.abs(x - xmax))
+        i1 = len(x) - 1 if xmin is None else np.argmin(np.abs(x - xmin))
+        x = x[i0:i1 + 1]
+        j0 = 0 if ymin is None else np.argmin(np.abs(y - ymin))
+        j1 = len(y) - 1 if ymax is None else np.argmin(np.abs(y - ymax))
+        y = y[j0:j1 + 1]
+        k0 = 0 if vmin is None else np.argmin(np.abs(v - vmin))
+        k1 = len(v) - 1 if vmax is None else np.argmin(np.abs(v - vmax))
+        v = v[k0:k1 + 1]
+        d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
+        self.offpix = (i0, j0, k0)
+        dx = x[1] - x[0]
+        dy = y[1] - y[0]
+        dv = v[1] - v[0]
+        if 'BMAJ' in h.keys():
+            bmaj = h['BMAJ'] * 3600. * dist  # au
+            bmin = h['BMIN'] * 3600. * dist  # au
+            bpa = h['BPA']  # deg
+        else:
+            bmaj, bmin, bpa = dy, -dx, 0
+            print('No valid beam in the FITS file.')
+        self.x, self.dx, self.nx = x, dx, len(x)
+        self.y, self.dy, self.ny = y, dy, len(y)
+        self.v, self.dv, self.nv = v, dv, len(v)
+        self.data, self.header, self.sigma = d, h, sigma
+        self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
+        self.beam = np.array([bmaj, bmin, bpa])
+        self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
+        return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
+
+    def read_pvfits(self, pvfits: str,
+                    dist: float = 1, vsys: float = 0,
+                    xmin: float | None = None, xmax: float | None = None,
+                    vmin: float | None = None, vmax: float | None = None,
+                    xskip: int = 1,
+                    sigma: float | None = None) -> dict:
+        """Read a position-velocity diagram in the FITS format.
+
+        Args:
+            pvfits (str): Name of the input FITS file including the extension.
+            dist (float, optional): Distance of the target in the unit of pc, used to convert arcsec to au. Defaults to 1.
+            vsys (float, optional): Systemic velocity of the target in the unit of km/s. Defaults to 0.
+            xmin (float | None, optional): The positional axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
+            xmax (float | None, optional): The positional axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
+            vmin (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
+            vmax (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
+            xskip (int, optional): Skip xskip pixels in the x axis. Defaults to 1.
+            sigma (float | None, optional): Standard deviation of the FITS data. None means automatic. Defaults to None.
+
+        Returns:
+            dict: The keys are x (1D array), v (1D array), data (2D array), header, and sigma.
+        """
+        cc = constants.c.si.value
+        f = fits.open(pvfits)[0]
+        d, h = np.squeeze(f.data), f.header
+        if sigma is None:
+            sigma = np.mean([np.std(d[:2, 10:-10]), np.std(d[-2:, 10:-10]),
+                             np.std(d[2:-2, :10]), np.std(d[2:-2, -10:])])
+            print(f'sigma = {sigma:.3e}')
+        x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
+        v = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
+        crpix = int(h['CRPIX1']) - 1
+        startpix = crpix % xskip
+        x = x[startpix::xskip]
+        h['CRPIX1'] = (crpix - startpix) // xskip + 1
+        h['CDELT1'] = h['CDELT1'] * xskip
+        d = d[:, startpix::xskip]
+        v = v + h['CRVAL2']
+        x = (x + h['CRVAL1']) * dist  # au
+        if h['CUNIT2'] == 'Hz':
+            if 'RESTFRQ' in h:
+                restfreq = h['RESTFRQ']
+            elif 'RESTFREQ' in h:
+                restfreq = h['RESTFREQ']
+            else:
+                restfreq = np.mean(v)
+                print('No rest frequency found. The middle frequency adopted.')
+            v = (1. - v / restfreq) * cc / 1.e3 - vsys  # km/s
+        elif h['CUNIT2'] == 'm/s':
+            v = v * 1e-3 - vsys
+        i0 = 0 if xmin is None else np.argmin(np.abs(x - xmin))
+        i1 = len(x) - 1 if xmax is None else np.argmin(np.abs(x - xmax))
+        x = x[i0:i1 + 1]
+        k0 = 0 if vmin is None else np.argmin(np.abs(v - vmin))
+        k1 = len(v) - 1 if vmax is None else np.argmin(np.abs(v - vmax))
+        v = v[k0:k1 + 1]
+        d = d[k0:k1 + 1, i0:i1 + 1]
+        self.offpix = (i0, k0)
+        dx = x[1] - x[0]
+        dv = v[1] - v[0]
+        if 'BMAJ' in h.keys():
+            bmaj = h['BMAJ'] * 3600. * dist  # au
+            bmin = h['BMIN'] * 3600. * dist  # au
+            bpa = h['BPA']  # deg
+        else:
+            bmaj, bmin, bpa = dx, dx, 0
+            print('No valid beam in the FITS file.')
+        self.x, self.dx, self.nx = x, dx, len(x)
+        self.v, self.dv, self.nv = v, dv, len(v)
+        self.data, self.header, self.sigma = d, h, sigma
+        self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
+        self.beam = np.array([bmaj, bmin, bpa])
+        self.pvfits, self.dist, self.vsys = pvfits, dist, vsys
+        return {'x':x, 'v':v, 'data':d, 'header':h, 'sigma':sigma}

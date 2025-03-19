@@ -15,12 +15,10 @@ Note. FITS files with multiple beams are not supported. The dynamic range for xl
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
-from astropy.io import fits
 from astropy import constants, units
-from astropy.coordinates import SkyCoord
 from scipy.optimize import curve_fit
 
-from utils import emcee_corner
+from utils import emcee_corner, ReadFits
 
 
 GG = constants.G.si.value
@@ -56,144 +54,10 @@ def r_kep_out(v, M_p, v_break, p_low, vsys):
     return v_s * r_break * (v_a / v_break)**(-p)
 
 
-class TwoDGrad():
+class TwoDGrad(ReadFits):
 
     #def __init__(self):
-
-
-    def read_cubefits(self, cubefits: str, center: str | None = None,
-                      dist: float = 1, vsys: float = 0,
-                      xmin: float | None = None, xmax: float | None = None,
-                      ymin: float | None = None, ymax: float | None = None,
-                      vmin: float | None = None, vmax: float | None = None,
-                      xskip: int = 1, yskip: int = 1,
-                      sigma: float | None = None) -> dict:
-        """Read channel maps in the FITS format.
-
-        Args:
-            cubefits (str): Name of the input FITS file including the extension.
-            center (str | None, optional): Coordinates of the target: e.g., "01h23m45.6s 01d23m45.6s". Defaults to None.
-            dist (float, optional): Distance of the target in the unit of pc, used to convert arcsec to au. Defaults to 1.
-            vsys (float, optional): Systemic velocity of the target in the unit of km/s. Defaults to 0.
-            xmin (float | None, optional): The x-axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
-            xmax (float | None, optional): The x-axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
-            ymin (float | None, optional): The y-axis is limited to (ymin, ymax) in the unit of au. Defaults to None.
-            ymax (float | None, optional): The y-axis is limited to (ymin, ymax) in the unit of au. Defaults to None.
-            vmin (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
-            vmax (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
-            xskip (int, optional): Skip xskip pixels in the x axis. Defaults to 1.
-            yskip (int, optional): Skip yskip pixels in the y axis. Defaults to 1.
-            sigma (float | None, optional): Standard deviation of the FITS data. None means automatic. Defaults to None.
-
-        Returns:
-            dict: x (1D array), y (1D array), v (1D array), data (2D array), header, and sigma.
-        """
-        cc = constants.c.si.value
-        f = fits.open(cubefits)[0]
-        d, h = np.squeeze(f.data), f.header
-        if center is None:
-            cx, cy = 0, 0
-        else:
-            c0 = SkyCoord('00h00m00s 00d00m00s', frame='icrs')
-            c1 = [h['CRVAL1'] * units.degree, h['CRVAL2'] * units.degree]
-            c1 = c0.spherical_offsets_by(*c1)
-            c3 = c1.spherical_offsets_to(SkyCoord(center, frame='icrs'))
-            cx = c3[0].degree
-            cy = c3[1].degree
-        if sigma is None:
-            sigma = np.mean([np.nanstd(d[:2]), np.std(d[-2:])])
-            print(f'sigma = {sigma:.3e}')
-        x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
-        y = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
-        v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
-        crpix = int(h['CRPIX1']) - 1
-        startpix = crpix % xskip
-        x = x[startpix::xskip]
-        h['CRPIX1'] = (crpix - startpix) // xskip + 1
-        h['CDELT1'] = h['CDELT1'] * xskip
-        d = d[:, :, startpix::xskip]
-        crpix = int(h['CRPIX2']) - 1
-        startpix = crpix % yskip
-        y = y[startpix::yskip]
-        h['CRPIX2'] = (crpix - startpix) // yskip + 1
-        h['CDELT2'] = h['CDELT2'] * yskip
-        d = d[:, startpix::yskip, :]
-        v = v + h['CRVAL3']
-        x = (x - cx) * 3600. * dist  # au
-        y = (y - cy) * 3600. * dist  # au
-        if h['CUNIT3'] == 'Hz':
-            restfreq = np.mean(v)
-            if 'RESTFRQ' in h:
-                restfreq = h['RESTFRQ']
-            elif 'RESTFREQ' in h:
-                restfreq = h['RESTFREQ']
-            else:
-                print('No rest frequency found. The middle frequency adopted.')
-            v = (1. - v / restfreq) * cc / 1.e3 - vsys  # km/s
-        elif h['CUNIT3'] == 'm/s':
-            v = v * 1e-3 - vsys
-        i0 = 0 if xmax is None else np.argmin(np.abs(x - xmax))
-        i1 = len(x) - 1 if xmin is None else np.argmin(np.abs(x - xmin))
-        j0 = 0 if ymin is None else np.argmin(np.abs(y - ymin))
-        j1 = len(y) - 1 if ymax is None else np.argmin(np.abs(y - ymax))
-        x, y = x[i0:i1 + 1], y[j0:j1 + 1]
-        k0 = 0 if vmin is None else np.argmin(np.abs(v - vmin))
-        k1 = len(v) - 1 if vmax is None else np.argmin(np.abs(v - vmax))
-        self.offpix = (i0, j0, k0)
-        v = v[k0:k1 + 1]
-        d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
-        dx, dy, dv = x[1] - x[0], y[1] - y[0], v[1] - v[0]
-        if 'BMAJ' in h.keys():
-            bmaj = h['BMAJ'] * 3600. * dist  # au
-            bmin = h['BMIN'] * 3600. * dist  # au
-            bpa = h['BPA']  # deg
-        else:
-            bmaj, bmin, bpa = dy, -dx, 0
-            print('No valid beam in the FITS file.')
-        self.x, self.dx, self.nx = x, dx, len(x)
-        self.y, self.dy, self.ny = y, dy, len(y)
-        self.v, self.dv, self.nv = v, dv, len(v)
-        self.data, self.header, self.sigma = d, h, sigma
-        self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
-        self.beam = np.array([bmaj, bmin, bpa])
-        self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
-        return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
-
-
-    def get_mom1grad(self, cutoff: float = 5, vmask: list = [0, 0],
-                     weights: np.ndarray = 1):
-        self.make_moment01(vmask=vmask)
-        mom0, mom1, sigma_mom0 = self.mom0, self.mom1, self.sigma_mom0
-        mom1[mom0 < cutoff * sigma_mom0] = np.nan
-        x, y = np.meshgrid(self.x, self.y)
-        x = x[~np.isnan(mom1)]
-        y = y[~np.isnan(mom1)]
-        mom0 = mom0[~np.isnan(mom1)]
-        mom1 = mom1[~np.isnan(mom1)]
-        w = weights
-        xx = np.sum(x**2 * w)
-        yy = np.sum(y**2 * w)
-        xy = np.sum(x * y * w)
-        x1 = np.sum(x * w)
-        y1 = np.sum(y * w)
-        one = np.sum(w)
-        m = [[xx, xy, x1],
-             [xy, yy, y1],
-             [x1, y1, one]]
-        a = [np.sum(mom1 * x * w), np.sum(mom1 * y * w), np.sum(mom1 * w)]
-        a, b, v0 = np.dot(np.linalg.inv(m), a)
-        amp_g = np.hypot(a, b)
-        ang_g = np.arctan2(a, b)
-        roff = -v0 / amp_g
-        self.xoff = x0 = roff * np.sin(ang_g)
-        self.yoff = y0 = roff * np.cos(ang_g)
-        ang_g = np.degrees(ang_g)
-        print(f'Gradient amp. : {amp_g:.2e} km/s/au')
-        print(f'Gradient angle: {ang_g:.2f} degree')
-        print(f'Offset: v={v0:.2f} km/s or (x,y)=({x0:.2f}, {y0:.2f}) au')
-        return {'xoff':x0, 'yoff':y0, 'amp':amp_g, 'ang':ang_g}
-
-        
+    
     def get_2Dcenter(self, cutoff: float = 5, vmask: list = [0, 0],
                      minrelerr: float = 0.01, minabserr: float = 0.1,
                      method: str = 'mean'):
