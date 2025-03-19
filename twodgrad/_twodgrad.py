@@ -61,45 +61,32 @@ class TwoDGrad():
     #def __init__(self):
 
 
-    def read_cubefits(self, cubefits: str, center: str = None,
+    def read_cubefits(self, cubefits: str, center: str | None = None,
                       dist: float = 1, vsys: float = 0,
-                      xmin: float = None, xmax: float = None,
-                      ymin: float = None, ymax: float = None,
-                      vmin: float = None, vmax: float = None,
+                      xmin: float | None = None, xmax: float | None = None,
+                      ymin: float | None = None, ymax: float | None = None,
+                      vmin: float | None = None, vmax: float | None = None,
                       xskip: int = 1, yskip: int = 1,
                       sigma: float | None = None) -> dict:
-        """
-        Read a position-velocity diagram in the FITS format.
+        """Read channel maps in the FITS format.
 
-        Parameters
-        ----------
-        cubefits : str
-            Name of the input FITS file including the extension.
-        center : str
-            Coordinates of the target: e.g., "01h23m45.6s 01d23m45.6s".
-        dist : float
-            Distance of the target, used to convert arcsec to au.
-        vsys : float
-            Systemic velocity of the target.
-        xmin, xmax : float
-            The R.A. axis is limited to (xmin, xmax) in the unit of au.
-        ymin, ymax : float
-            The Dec. axis is limited to (ymin, ymax) in the unit of au.
-        vmax : float
-            The velocity axis of the PV diagram is limited to (vmin, vmax).
-        vmin : float
-            The velocity axis of the PV diagram is limited to (vmin, vmax).
-        xskip : int
-            Skip xskip pixels in the x axis.
-        yskip : int
-            Skip yskip pixels in the y axis.
-        sigma : float
-            Standard deviation of the FITS data. None means automatic.
+        Args:
+            cubefits (str): Name of the input FITS file including the extension.
+            center (str | None, optional): Coordinates of the target: e.g., "01h23m45.6s 01d23m45.6s". Defaults to None.
+            dist (float, optional): Distance of the target in the unit of pc, used to convert arcsec to au. Defaults to 1.
+            vsys (float, optional): Systemic velocity of the target in the unit of km/s. Defaults to 0.
+            xmin (float | None, optional): The x-axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
+            xmax (float | None, optional): The x-axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
+            ymin (float | None, optional): The y-axis is limited to (ymin, ymax) in the unit of au. Defaults to None.
+            ymax (float | None, optional): The y-axis is limited to (ymin, ymax) in the unit of au. Defaults to None.
+            vmin (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
+            vmax (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
+            xskip (int, optional): Skip xskip pixels in the x axis. Defaults to 1.
+            yskip (int, optional): Skip yskip pixels in the y axis. Defaults to 1.
+            sigma (float | None, optional): Standard deviation of the FITS data. None means automatic. Defaults to None.
 
-        Returns
-        ----------
-        fitsdata : dict
-            x (1D array), v (1D array), data (2D array), header, and sigma.
+        Returns:
+            dict: x (1D array), y (1D array), v (1D array), data (2D array), header, and sigma.
         """
         cc = constants.c.si.value
         f = fits.open(cubefits)[0]
@@ -146,12 +133,12 @@ class TwoDGrad():
         elif h['CUNIT3'] == 'm/s':
             v = v * 1e-3 - vsys
         i0 = 0 if xmax is None else np.argmin(np.abs(x - xmax))
-        i1 = len(x) if xmin is None else np.argmin(np.abs(x - xmin))
+        i1 = len(x) - 1 if xmin is None else np.argmin(np.abs(x - xmin))
         j0 = 0 if ymin is None else np.argmin(np.abs(y - ymin))
-        j1 = len(y) if ymax is None else np.argmin(np.abs(y - ymax))
+        j1 = len(y) - 1 if ymax is None else np.argmin(np.abs(y - ymax))
         x, y = x[i0:i1 + 1], y[j0:j1 + 1]
         k0 = 0 if vmin is None else np.argmin(np.abs(v - vmin))
-        k1 = len(v) if vmax is None else np.argmin(np.abs(v - vmax))
+        k1 = len(v) - 1 if vmax is None else np.argmin(np.abs(v - vmax))
         self.offpix = (i0, j0, k0)
         v = v[k0:k1 + 1]
         d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
@@ -168,6 +155,7 @@ class TwoDGrad():
         self.v, self.dv, self.nv = v, dv, len(v)
         self.data, self.header, self.sigma = d, h, sigma
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
+        self.beam = np.array([bmaj, bmin, bpa])
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
         return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
 

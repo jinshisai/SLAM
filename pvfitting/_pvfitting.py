@@ -111,30 +111,21 @@ class PVFitting():
                     vmin: float | None = None, vmax: float | None = None,
                     xskip: int = 1,
                     sigma: float | None = None) -> dict:
-        """
-        Read a position-velocity diagram in the FITS format.
+        """Read a position-velocity diagram in the FITS format.
 
-        Parameters
-        ----------
-        pvfits : str
-            Name of the input FITS file including the extension.
-        dist : float
-            Distance of the target, used to convert arcsec to au.
-        vsys : float
-            Systemic velocity of the target.
-        xmin, xmax : float
-            The positional axis is limited to (xmin, xmax) in the unit of au.
-        vmin, vmax : float
-            The velocity axis is limited to (vmin, vmax) in the unit of km/s.
-        xskip : int
-            Skip xskip pixels in the x axis.
-        sigma : float
-            Standard deviation of the FITS data. None means automatic.
+        Args:
+            pvfits (str): Name of the input FITS file including the extension.
+            dist (float, optional): Distance of the target in the unit of pc, used to convert arcsec to au. Defaults to 1.
+            vsys (float, optional): Systemic velocity of the target in the unit of km/s. Defaults to 0.
+            xmin (float | None, optional): The positional axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
+            xmax (float | None, optional): The positional axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
+            vmin (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
+            vmax (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
+            xskip (int, optional): Skip xskip pixels in the x axis. Defaults to 1.
+            sigma (float | None, optional): Standard deviation of the FITS data. None means automatic. Defaults to None.
 
-        Returns
-        ----------
-        fitsdata : dict
-            x (1D array), v (1D array), data (2D array), header, and sigma.
+        Returns:
+            dict: The keys are x (1D array), v (1D array), data (2D array), header, and sigma.
         """
         cc = constants.c.si.value
         f = fits.open(pvfits)[0]
@@ -176,7 +167,6 @@ class PVFitting():
             bmaj = h['BMAJ'] * 3600. * dist  # au
             bmin = h['BMIN'] * 3600. * dist  # au
             bpa = h['BPA']  # deg
-            
         else:
             bmaj, bmin, bpa = dx, dx, 0
             print('No valid beam in the FITS file.')
