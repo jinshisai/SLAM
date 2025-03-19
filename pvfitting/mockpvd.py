@@ -78,7 +78,6 @@ class MockPVD(object):
         self.xx, self.vv = np.meshgrid(self._x, self.v)
 
 
-
     def generate_mockpvd(self, Mstar:float, Rc:float, alphainfall: float = 1., 
                          taumax: float = 1., frho: float = 1.,
                          incl: float = 89., pa: float | list = 0.,
@@ -237,7 +236,6 @@ class MockPVD(object):
             d_vlos = d_vlos.reshape(self.grid.nx, self.grid.ny, self.grid.nz)
 
         return d_rho, d_vlos
-
 
 
     def generate_pvd(self, rho:np.ndarray | list, vlos:np.ndarray | list, 
