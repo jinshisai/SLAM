@@ -88,7 +88,6 @@ class PVFitting(ReadFits):
                        beam=self.beam, reslim=reslim)
         mpvd.grid.gridinfo()
 
-
     def fit_mockpvd(self, incl: float = 89.,
                     Mstar_range: list[float, float] = [0.01, 10],
                     Rc_range: list[float, float] = [1., 1000.],
@@ -268,7 +267,6 @@ class PVFitting(ReadFits):
         self.plot_pvds(filename=filename, color='model', contour='obs', 
                        vmask=vmask, title=title, show=show, log=log)
 
-
     def read_fitres(self, f: str):
         '''
         Read fitting result.
@@ -278,7 +276,6 @@ class PVFitting(ReadFits):
         f (str): Path to a file containing the fitting result.
         '''
         self.popt, self.plow, self.pmid, self.phigh = np.loadtxt(f).T
-
 
     def plot_pvds(self, filename: str = 'PVsilhouette', 
                   color: str = 'model', contour: str = 'obs',

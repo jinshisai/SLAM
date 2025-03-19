@@ -77,7 +77,6 @@ class MockPVD(object):
         #print(self.grid.xnest)
         self.xx, self.vv = np.meshgrid(self._x, self.v)
 
-
     def generate_mockpvd(self, Mstar:float, Rc:float, alphainfall: float = 1., 
                          taumax: float = 1., frho: float = 1.,
                          incl: float = 89., pa: float | list = 0.,
@@ -139,7 +138,6 @@ class MockPVD(object):
             return self.generate_pvd(rho=rho, vlos=vlos, taumax=taumax,
                                      beam=self.beam, linewidth=linewidth, pa=pa)
 
-
     def subgrid(self, axes:list, nsubgrid:int):
         axes_out = []
         for x in axes:
@@ -149,7 +147,6 @@ class MockPVD(object):
             x = 0.5 * (x_e[:-1] + x_e[1:])
             axes_out.append(x)
         return axes_out
-
 
     def makegrid(self, xlim: list | None = None, ylim: list | None = None,
                  zlim: list | None = None, reslim: float = 5):
@@ -177,10 +174,8 @@ class MockPVD(object):
             grid = Nested3DGrid(x, y, z, None, None, None, [1], nlevels=0)
         self.grid = grid
 
-
     def gridinfo(self):
         self.grid.gridinfo(units=['au', 'au', 'au'])
-
 
     def build(self, Mstar:float, Rc:float, incl:float,
               alphainfall: float = 1., frho: float = 1.,
@@ -236,7 +231,6 @@ class MockPVD(object):
             d_vlos = d_vlos.reshape(self.grid.nx, self.grid.ny, self.grid.nz)
 
         return d_rho, d_vlos
-
 
     def generate_pvd(self, rho:np.ndarray | list, vlos:np.ndarray | list, 
                      taumax: float = 1., beam: list | None = None,

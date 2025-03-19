@@ -18,18 +18,13 @@ from matplotlib.patches import Ellipse
 from astropy import constants, units
 from scipy.optimize import curve_fit
 
-from utils import emcee_corner, ReadFits
+from utils import emcee_corner, ReadFits, rot
 
 
 GG = constants.G.si.value
 M_sun = constants.M_sun.si.value
 au = units.au.to('m')
 unit = 1.e6 * au / GG / M_sun
-        
-def rot(x, y, pa):
-    s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
-    t = x * np.sin(pa) + y * np.cos(pa)  # along major axis
-    return np.array([s, t])
 
 def gauss2d(xy, peak, cx, cy, wx, wy, pa):
     x, y = xy
@@ -108,7 +103,6 @@ class TwoDGrad(ReadFits):
             dyc.append(yerr)
         xc, dxc, yc, dyc = np.array([xc, dxc, yc, dyc])
         self.center = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
-        
         
     def filtering(self, pa0: float = 0.0, fixcenter: bool = False,
                   axisfilter: bool = True, lowvelfilter: bool = True):
@@ -238,7 +232,6 @@ class TwoDGrad(ReadFits):
         dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.) - 1
         self.chi2r_grad = chi2(popt, xc, yc, dxc, dyc) / dof
         
-
     def calc_mstar(self, incl: float = 90,
                    voff_range: list = [-0.5, 0.5],
                    voff_fixed: float | None = None,
@@ -313,7 +306,6 @@ class TwoDGrad(ReadFits):
             print(f'pout = {p_low:.3f} +/- {dp_low:.3f}')
             print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun (1/0.76 corrected)')
         
-
     def make_moment01(self, vmask: list = [0, 0]):
         v = self.v * 1
         v[(vmask[0] < v) * (v < vmask[1])] = np.nan
@@ -324,7 +316,6 @@ class TwoDGrad(ReadFits):
         self.mom0 = total * self.dv
         self.mom1 = mom1
         
-
     def plot_center(self, pa: float = None,
                      filehead: str = 'channelanalysis',
                      show_figs: bool = False,
