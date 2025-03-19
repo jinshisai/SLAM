@@ -332,7 +332,7 @@ class ChannelFit(ReadFits):
         xb, yb = rot(*np.meshgrid(xb, yb), np.radians(self.bpa))
         gaussbeam = np.exp2(-4 *((yb / self.bmaj)**2 + (xb / self.bmin)**2))
         self.pixperbeam = np.sum(gaussbeam)
-        self.gaussbeam = gaussbeam
+        self.gaussbeam = gaussbeam  # The 1st (x) axis is in the model order.
         
         n_need = int(r_need / dpix + 0.5)
         self.ineed0 = npix // 2 - n_need
@@ -341,7 +341,8 @@ class ChannelFit(ReadFits):
         self.yneed = self.ynest[0][self.ineed0:self.ineed1]
 
         if 'mom0' in self.scaling:
-            self.gaussbeam = self.gaussbeam[:, ::-1]
+            # Change the 1st (x) axis to the observational order.
+            self.gaussbeam = self.gaussbeam[:, ::-1]  
         if self.scaling == 'mom0clean':
             self.mom0decon = clean(data=self.mom0, beam=self.gaussbeam,
                                    sigma=self.sigma_mom0,
@@ -426,7 +427,7 @@ class ChannelFit(ReadFits):
         self.prof, self.prof_n, self.prof_d = p, n - 1, d
 
     def update_getvlos(self, Rc: float, Rin: float):
-        def getvlos(x_in: np.ndarray, h_in: float):
+        def getvlos(x_in: np.ndarray | None, h_in: float):
             if x_in is None:
                 return None
             r = np.hypot(x_in, self.Ynest)
@@ -517,17 +518,20 @@ class ChannelFit(ReadFits):
 
         Iunif = self.get_Iunif(Mstar, Rc, pI, Ienv, voff)
         if 'mom0' in self.scaling:
-            Iunif = self.rgi2d(xoff, yoff, Iunif)
+            Iunif = self.rgi2d(xoff, yoff, Iunif)  # 1st axis in the observational order
             mom0unif = np.sum(Iunif, axis=0) * self.dv
             mom0unif[mom0unif < 0] = np.nan
             Iunif = Iunif * self.mom0decon / mom0unif
             Iunif = np.nan_to_num(Iunif)
         if convolving:
+            # The 1st (x) axis of Iunif is in the observational order
+            # if 'mom0' in self.scaling because of rgi2d.
+            # For this reason, self.gaussbeam is inverted in the x direction in advance.
             Iout = convolve(Iunif, [self.gaussbeam], mode='same')
         else:
             Iout = self.peaktounity(Iunif)
         if not ('mom0' in self.scaling):
-            Iout = self.rgi2d(xoff, yoff, Iout)
+            Iout = self.rgi2d(xoff, yoff, Iout)  # 1st axis in the observational order
             scale = self.get_scale(Iout)
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
         return Iout
