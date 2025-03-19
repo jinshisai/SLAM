@@ -61,12 +61,15 @@ class MockPVD(object):
         self.nnest = nnest
         # beam
         self.beam = beam
-        self.pa_major_red = pa_major + (0. if signmajor > 0 else 180.)
-        self.pa_minor_blue = pa_minor + (0. if signminor > 0 else 180.)
-        dpa = np.radians(self.pa_minor_blue - self.pa_major_red)
-        self.signbeam = np.sign(np.angle(np.exp(1j * dpa)))
-        self.signmajbeam = signmajor * self.signbeam
-        self.signminbeam = signminor * self.signbeam
+        self.pa_major = pa_major
+        self.pa_minor = pa_minor
+        pa_major_red = pa_major + (0. if signmajor > 0 else 180.)
+        pa_minor_blue = pa_minor + (0. if signminor > 0 else 180.)
+        dpa = np.radians(pa_minor_blue - pa_major_red)
+        dpa = np.angle(np.exp(1j * dpa))
+        self.iradshift = 0 if dpa > 0 else np.pi
+        self.signmajor = signmajor if dpa > 0 else -signmajor
+        self.signminor = signminor
 
         # make grid
         self.makegrid(xlim, ylim, zlim, reslim = reslim)
@@ -117,10 +120,13 @@ class MockPVD(object):
             rho_max = np.nanmax([np.nanmax([np.nanmax(i) for i in _rho]) for _rho in rho])
             rho = [ [i / rho_max for i in _rho] for _rho in rho] # normalized rho
             # get PV diagrams
-            for _rho, _vlos, _pa in zip(rho, vlos, [self.pa_major_red, self.pa_minor_blue]):
+            palist = [self.pa_major, self.pa_minor]
+            signlist = [self.signmajor, self.signminor]
+            for _rho, _vlos, _pa, _sign in zip(rho, vlos, palist, signlist):
                 # PV cut
                 I_pv = self.generate_pvd(rho=_rho, vlos=_vlos, taumax=taumax,
                                          beam=self.beam, linewidth=linewidth, pa=_pa)
+                I_pv = I_pv[:, ::_sign]
                 I_out.append(I_pv)
             return I_out
         else:
@@ -182,7 +188,7 @@ class MockPVD(object):
               collapse: bool = False, normalize: bool = True,
               axis: str = 'major'):
         # parameters/units
-        irad = np.radians(incl)
+        irad = np.abs(np.asin(np.sin(np.radians(incl)))) + self.iradshift
         vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
 
         # for each nested level
@@ -195,9 +201,9 @@ class MockPVD(object):
                 Z = self.grid.znest[l] / Rc
                 # along which axis
                 if axis == 'major':
-                    r, t, p = XYZ2rtp(irad, 0, X * self.signmajbeam, Y * self.signmajbeam, Z)
+                    r, t, p = XYZ2rtp(irad, 0, X, Y, Z)
                 else:
-                    r, t, p = XYZ2rtp(irad, 0, -Y * self.signminbeam, X * self.signminbeam, Z)
+                    r, t, p = XYZ2rtp(irad, 0, -Y, X, Z)
                 precalculation.update(r * Rc, t, p, irad, axis, l)
             r_org = precalculation.r_org[axis][l]
             # get density and velocity
@@ -303,10 +309,8 @@ class MockPVD(object):
         if beam is not None:
             if precalculation.gauss_xy is None:
                 bmaj, bmin, bpa = beam
-                xb, yb = rot(*np.meshgrid(self.x, self.y),
-                             -self.signbeam * np.radians(bpa - pa))
-                gaussbeam = np.exp(-0.5 * (yb /(bmin / 2.35))**2. 
-                                   - 0.5 * (xb /(bmaj / 2.35))**2.)
+                xb, yb = rot(*np.meshgrid(self.x, self.y), -np.radians(bpa - pa))
+                gaussbeam = np.exp(-4*np.log(2) * ((yb/bmin)**2 + (xb/bmaj)**2))
                 gaussbeam /= np.sum(gaussbeam)
                 precalculation.gauss_xy = gaussbeam[np.newaxis, :, :]
             g = precalculation.gauss_xy

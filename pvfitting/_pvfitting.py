@@ -335,8 +335,6 @@ class PVFitting():
                                                  incl=incl, linewidth=linewidth,
                                                  rout=rout, axis='both')
             # quadrant
-            major = major[:, ::majquad]
-            minor = minor[:, ::minquad]
             fflux = (np.nansum(majobs * major) + np.nansum(minobs * minor)) \
                     / (np.nansum(major * major) + np.nansum(minor * minor))
             return fflux * major, fflux * minor
