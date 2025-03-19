@@ -305,17 +305,7 @@ class TwoDGrad(ReadFits):
             print(f'vb = {vb:.3f} +/- {dvb:.3f}')
             print(f'pout = {p_low:.3f} +/- {dp_low:.3f}')
             print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun (1/0.76 corrected)')
-        
-    def make_moment01(self, vmask: list = [0, 0]):
-        v = self.v * 1
-        v[(vmask[0] < v) * (v < vmask[1])] = np.nan
-        self.sigma_mom0 = self.sigma * self.dv * np.sqrt(len(v[~np.isnan(v)]))
-        v = np.moveaxis([[v]], 2, 0)
-        total = np.nansum(self.data + v * 0, axis=0)
-        mom1 = np.nansum(self.data * v, axis=0) / total
-        self.mom0 = total * self.dv
-        self.mom1 = mom1
-        
+
     def plot_center(self, pa: float = None,
                      filehead: str = 'channelanalysis',
                      show_figs: bool = False,
