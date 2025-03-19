@@ -33,7 +33,7 @@ class PVFitting(ReadFits):
                rmax: float | None,
                vmin: float | None, vmax: float | None,
                sigma: float | None,
-               xskip: int = 1, skipto: bool | int = False,
+               xskip: int = 1, skipto: int | None = None,
                dNsampling: list | None = [5, 1]):
         d = []
         for pvfits in [pvmajorfits, pvminorfits]:

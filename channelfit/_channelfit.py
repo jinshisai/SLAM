@@ -230,7 +230,7 @@ class ChannelFit(ReadFits):
                  rmax: float = 1e4,
                  vlim: tuple[float, float, float, float] = (-100, 0, 0, 100),
                  sigma: float | None = None, nlayer: int = 3,
-                 xskip: int = 1, yskip: int = 1, skipto: bool | int = False,
+                 xskip: int = 1, yskip: int = 1, skipto: int | None = False,
                  gaussmargin: float = 1.6,
                  savedeconvolved: str | None = None,
                  loaddeconvolved: str | None = None,
