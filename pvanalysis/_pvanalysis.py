@@ -902,6 +902,13 @@ class PVAnalysis():
             (qopt := q0 * 1)[np.isnan(q0)] = popt
             (qerr := q0 * 0)[np.isnan(q0)] = perr
             res[:] = [qopt, qerr]
+            dof = len(v0) + len(x0) - len(plim[0]) - 1
+            chi2 = -2 * lnprob(popt, *args)
+            if ext == '_e':
+                self.chi2r_e = chi2 / dof
+            else:
+                self.chi2r_r = chi2 / dof
+
         print(f'Corner plots in {outname}.corner_e.png '
               + f'and {outname}.corner_r.png')
         self.popt = {'edge':popt_e, 'ridge':popt_r}
