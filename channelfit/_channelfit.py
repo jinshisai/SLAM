@@ -788,5 +788,5 @@ class ChannelFit(ReadFits):
             ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
             ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
             ax.set_aspect(1)
-            fig.savefig(filename.replace('.png', '') + f'.clean{s}.png')
+            fig.savefig(filename)
             plt.close()
