@@ -761,21 +761,21 @@ class ChannelFit(ReadFits):
         fig.savefig(filename)
         plt.close()
 
-    def plotclean(self, filename: str = 'clean.png'):
+    def plotdecon(self, filename: str = 'decon.png'):
         if not(hasattr(self, 'mom0decon') and hasattr(self, 'resdecon')):
-            print('No CLEAN component and residual generated.')
+            print('No deconvolution solutions and residual generated.')
             return 
         cc = self.mom0decon / self.sigma_mom0
         cr = self.resdecon / self.sigma_mom0
         ccmax = np.max(cc)
         ccmin = np.min(cc)
         for c, vmin, vmax, s in zip([cc, cr], [ccmin, -6], [ccmax, 6],
-                                    ['component', 'residual']):
+                                    ['deconvolved mom0', 'mom0 residual']):
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
             m = ax.pcolormesh(self.x, self.y, c, cmap='jet',
                               shading='nearest', vmin=vmin, vmax=vmax)
-            fig.colorbar(m, ax=ax, label=f'CLEAN {s} / ' + r'$\sigma$')
+            fig.colorbar(m, ax=ax, label=f'{s} / ' + r'$\sigma$')
             r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
             ax.plot(r * self.sinpa, r * self.cospa, 'k:')
             ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
@@ -790,30 +790,3 @@ class ChannelFit(ReadFits):
             ax.set_aspect(1)
             fig.savefig(filename.replace('.png', '') + f'.clean{s}.png')
             plt.close()
-
-    def plotdeconvolution(self, filename: str = 'deconvolution.png'):
-        if not(hasattr(self, 'xdecon') and hasattr(self, 'ydecon') and hasattr(self, 'zdecon')):
-            print('No deconvolution solution generated.')
-            return 
-        x, y, z = self.xdecon, self.ydecon, self.zdecon / self.sigma
-        fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
-        m = ax.pcolormesh(x, y, z, cmap='jet',
-                          shading='nearest', vmin=z.min(), vmax=z.max())
-        fig.colorbar(m, ax=ax, label=f'Deconvolution / ' + r'$\sigma$')
-        r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
-        pa = self.pa_rad - np.radians(self.bpa)
-        sinpa, cospa = np.sin(pa), np.cos(pa)
-        ax.plot(r * sinpa, r * cospa, 'k:')
-        ax.plot(r * cospa, -r * sinpa, 'k:')
-        bpos = np.max(self.x) - 0.7 * self.bmaj
-        e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
-                    angle=0, facecolor='gray')
-        ax.add_patch(e)
-        ax.set_xlabel('Beam minor offset (au)')
-        ax.set_ylabel('Beam major offset (au)')
-        ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
-        ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
-        ax.set_aspect(1)
-        fig.savefig(filename.replace('.png', '') + f'.deconvolution.png')
-        plt.close()
