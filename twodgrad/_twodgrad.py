@@ -35,7 +35,7 @@ def emcee_custom(plim, lnprob, fixcenter):
     popt, perr = emcee_corner(plim[:, -1:] if fixcenter else plim,
                               lnprob,
                               nwalkers_per_ndim=8,
-                              nburnin=1000, nsteps=1000,
+                              nburnin=1000, nsteps=4000,
                               simpleoutput=True)
     if fixcenter:
        popt = np.array([0, 0, popt[0]])
