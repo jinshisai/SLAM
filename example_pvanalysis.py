@@ -2,7 +2,7 @@ import numpy as np
 from pvanalysis import PVAnalysis
 
 '-------- INPUTS --------'
-fitsfile = './testfits/test.fits'
+fitsfile = './testfits/test.pvanalysis.fits'
 outname = 'pvanalysis'  # file name header for outputs
 incl = 48.  # deg
 vsys = 6.4  # km/s
