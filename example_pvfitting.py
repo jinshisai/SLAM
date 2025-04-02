@@ -31,11 +31,10 @@ pvfit.fit_mockpvd(Mstar_range=[0.01, 1.0],
                   show=False, filename=filehead, vmask=vmask,
                   incl=incl, pa_major=pa_major, pa_minor=pa_minor,
                   kwargs_emcee_corner={'nwalkers_per_ndim': 4,
-                                       'nburnin': 300,
-                                       'nsteps': 700,
+                                       'nburnin': 30,
+                                       'nsteps': 70,
                                        'rangelevel': 0.99},
                   signmajor=signmajor, signminor=signminor,
-                  n_nest=[2] * 6, reslim=10,
-                  log=True, zmax=1000)
+                  n_nest=[2] * 6, reslim=10, zmax=1000)
 pvfit.modeltofits(**pvfit.popt, filehead=filehead)
 '-------------------------------------'

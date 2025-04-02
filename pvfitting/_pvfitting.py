@@ -273,7 +273,7 @@ class PVFitting(ReadFits):
         '''
         self.popt, self.plow, self.pmid, self.phigh = np.loadtxt(f).T
 
-    def plot_pvds(self, filename: str = 'PVsilhouette', 
+    def plot_pvds(self, filename: str = 'PVfitting', 
                   color: str = 'model', contour: str = 'obs',
                   vmask: list[float, float] = [0., 0.],
                   cmap: str = 'viridis', cmap_residual: str = 'bwr', ext: str = '.png',
@@ -313,23 +313,34 @@ class PVFitting(ReadFits):
 
         if clevels is None:
             clevels = (2**np.arange(0, 10) if log else np.arange(1, 11)) * 3 * self.sigma
-        def makeplots(data_color, data_contour, cmap, vmin=None,
-                      vmax=None, vmask=None, alpha=1.):
+        def makeplots(data_color, data_contour, cmap,
+                      vmin=None, vmax=None, vmask=None,
+                      alpha=1., mode='model'):
             # set figure
             fig, axes = plt.subplots(1, 2,)
             fig.set_figheight(3.2)
-            fig.set_figwidth(4)
+            fig.set_figwidth(5)
             ax1, ax2 = axes
-
+            ax1.tick_params("x", rotation=30)
+            ax2.tick_params("x", rotation=30)
+            cblabel = r'Jy beam$^{-1}$' if mode == 'model' else r'Noise level ($\sigma$)'
             # major
-            if log:
+            if log and mode == 'model':
                 vmin_plot = np.log10(2 * self.sigma) if vmin is None else np.log10(vmin)
                 vmax_plot = None if vmax is None else np.log10(vmax)
+            elif mode == 'residual':
+                vabsmax = None
+                if vmin is not None:
+                    vabsmax = np.abs(vmin)
+                if vmax is not None:
+                    vabsmax = max(np.abs(vmax), vabsmax)
+                vmin_plot = -vabsmax
+                vmax_plot = vabsmax
             else:
                 vmin_plot = vmin
                 vmax_plot = vmax
             d_plot = data_color[0] * 1
-            if log:
+            if log and mode == 'model':
                 d_plot = np.log10(d_plot.clip(vmin, None))
             im = ax1.pcolormesh(self.x, self.v, d_plot, 
                                 cmap=cmap, vmin=vmin_plot, vmax=vmax_plot,
@@ -341,7 +352,7 @@ class PVFitting(ReadFits):
 
             # minor
             d_plot = data_color[1] * 1
-            if log:
+            if log and mode == 'model':
                 d_plot = np.log10(d_plot.clip(vmin, None))
             im = ax2.pcolormesh(self.x, self.v, d_plot,
                                 cmap=cmap, vmin=vmin_plot, vmax=vmax_plot,
@@ -349,8 +360,8 @@ class PVFitting(ReadFits):
             ax2.contour(self.x, self.v, data_contour[1],
                        levels = clevels, colors='k')
             cax2 = ax2.inset_axes([1.02, 0., 0.05, 1.]) # x0, y0, dx, dy
-            cb = plt.colorbar(im, cax=cax2, label=r'Jy beam$^{-1}$')
-            if log:
+            cb = plt.colorbar(im, cax=cax2, label=cblabel)
+            if log and mode == 'model':
                 cbticks = np.outer([1, 2, 5], 10**np.arange(-6, 3, 1.0))
                 cbticks = np.log10(np.sort(np.ravel(cbticks)))
                 cbticks = cbticks[(vmin_plot < cbticks) * (cbticks < vmax_plot)]
@@ -373,7 +384,7 @@ class PVFitting(ReadFits):
                                     color=shadecolor, alpha=0.6, edgecolor=None)
             if title is not None:
                 fig.suptitle(title, y=0.92)
-
+            
             return fig
 
 
@@ -390,6 +401,7 @@ class PVFitting(ReadFits):
         fig = makeplots(d_col, d_con, cmap, vmin=vmin, vmax=vmax,
                         vmask=vmask, alpha=0.8)
         fig.tight_layout()
+        fig.subplots_adjust(wspace=0.1)
         fig.savefig(filename + outlabel + ext, dpi=300)
         figs.append(fig)
         if show: plt.show()
@@ -401,8 +413,9 @@ class PVFitting(ReadFits):
             vmin, vmax = np.nanmin(np.array(d_col)), np.nanmax(np.array(d_col))
             # plot
             fig2 = makeplots(d_col, d_con, cmap_residual, vmin=vmin, vmax=vmax,
-                             vmask=None, alpha=0.5)
+                             vmask=None, alpha=0.5, mode='residual')
             fig2.tight_layout()
+            fig2.subplots_adjust(wspace=0.1)
             fig2.savefig(filename + '.residual' + ext, dpi=300)
             figs.append(fig2)
             if show: plt.show()
