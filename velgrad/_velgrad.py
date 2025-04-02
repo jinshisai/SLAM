@@ -106,7 +106,7 @@ class VelGrad(ReadFits):
         
     def filtering(self, pa0: float = 0.0, fixcenter: bool = False,
                   axisfilter: bool = True, lowvelfilter: bool = True,
-                  filename: str | None = None):
+                  filename: str = 'velgrad'):
         xc = self.center['xc'] * 1
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
@@ -233,12 +233,11 @@ class VelGrad(ReadFits):
         dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.) - 1
         self.chi2r_grad = chi2(popt, xc, yc, dxc, dyc) / dof
 
-        if type(filename) is str:
-            fname = filename + '.points.dat'
-            res = np.c_[self.v, xc, dxc, yc, dyc][~np.isnan(xc)]
-            np.savetxt(fname, res,
-                       header='v (km/s), x (au), dx (au), y (au), dy (au)')
-            print(f'- Wrote to {fname}')
+        fname = filename + '.points.dat'
+        res = np.c_[self.v, xc, dxc, yc, dyc][~np.isnan(xc)]
+        np.savetxt(fname, res,
+                   header='v (km/s), x (au), dx (au), y (au), dy (au)')
+        print(f'- Wrote to {fname}')
         
     def calc_mstar(self, incl: float = 90,
                    voff_range: list = [-0.5, 0.5],
