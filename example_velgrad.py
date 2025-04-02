@@ -31,7 +31,8 @@ vg.read_cubefits(cubefits=cubefits, center=center,
                  vmin=vmin, vmax=vmax)
 vg.get_2Dcenter(cutoff=cutoff, vmask=vmask,
                 minrelerr=minrelerr, minabserr=minabserr, method=method)
-vg.filtering(pa0=pa, fixcenter=True, axisfilter=False, lowvelfilter=False)
+vg.filtering(pa0=pa, fixcenter=True, axisfilter=False, lowvelfilter=False,
+             filename=filehead)
 vg.calc_mstar(incl=incl, voff_fixed=0)
 vg.plot_center(filehead=filehead, pa=pa, show_figs=show_figs)
 '-------------------------------------'
