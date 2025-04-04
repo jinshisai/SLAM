@@ -806,8 +806,8 @@ class PVAnalysis():
                       include_pin: bool = False,
                       fixed_pin: float = 0.5,
                       fixed_dp: float = 0,
-                      rb_range: list = None,
-                      vb_range: list = None,
+                      rb_range: list | None = None,
+                      vb_range: list | None = None,
                       pin_range: list = [0.01, 10],
                       dp_range: list = [0, 10],
                       vsys_range: list = [-1, 1],
@@ -919,6 +919,13 @@ class PVAnalysis():
             (qopt := q0 * 1)[np.isnan(q0)] = popt
             (qerr := q0 * 0)[np.isnan(q0)] = perr
             res[:] = [qopt, qerr]
+            dof = len(args[0]) + len(args[3]) - len(plim[0]) - 1
+            chi2 = -2 * lnprob(popt, *args)
+            if ext == '_e':
+                self.chi2r_e = chi2 / dof
+            else:
+                self.chi2r_r = chi2 / dof
+
         print(f'Corner plots in {outname}.corner_e.png '
               + f'and {outname}.corner_r.png')
         self.popt = {'edge':popt_e, 'ridge':popt_r}
@@ -1260,7 +1267,7 @@ class PVAnalysis():
             x = np.geomspace(xmin, xmax, 100)
             y = (fx_model(x) - fx_model(-x)) / 2.
         else:
-            x = np.linspace(-xmax, xmax, 100)
+            x = np.linspace(-xmax, xmax, 101)
             x[(-xmin < x) * (x < xmin)] = None
             y = fx_model(self.xsign * x)
         if flipaxis: x, y = y, x
