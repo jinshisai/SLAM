@@ -26,9 +26,9 @@ chan.fitting(Mstar_range=[0.1, 1.0],
              fixed_params={'cs': 0.4, 'Rin': 0, 'Ienv': 0,
                            'xoff': 0, 'yoff': 0, 'voff': 0,
                            'incloff': 0, 'paoff':0},
-             kwargs_emcee_corner={'nwalkers_per_ndim': 4,
+             kwargs_emcee_corner={'nwalkers_per_ndim': 2,
                                   'nburnin': 100,
-                                  'nsteps': 200,
+                                  'nsteps': 100,
                                   'rangelevel': 0.99},
              filename=filehead)
 p = chan.popt
