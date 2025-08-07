@@ -352,7 +352,9 @@ class VelGrad(ReadFits):
         if np.any(kep):
             x, y = self.x, self.y
             z = np.sum(self.data[kep], axis=0) * self.dv
-            ax.pcolormesh(x, y, z, shading='nearest', cmap='binary', zorder=1)
+            mom0sigma = self.sigma * self.dv * np.sqrt(len(kep))
+            levels = np.array([3, 6, 12, 24, 48, 96, 192]) * mom0sigma
+            ax.contour(x, y, z, levels=levels, colors='gray', linewidths=2)
         x = self.kepler['xc'] + self.xoff
         y = self.kepler['yc'] + self.yoff
         dx, dy = self.kepler['dxc'], self.kepler['dyc']
