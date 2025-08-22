@@ -77,7 +77,7 @@ git clone https://github.com/jinshisai/SLAM
 * Software in Zenodo
 
 Aso & Sai (2023)
-
+```
 @software{2023zndo...7783868A,
        author = {{Aso}, Yusuke and {Sai}, Jinshi},
         title = "{jinshisai/SLAM: First Release of SLAM}",
@@ -90,6 +90,7 @@ Aso & Sai (2023)
        adsurl = {https://ui.adsabs.harvard.edu/abs/2023zndo...7783868A},
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
 }
+```
 
 * Related paper
   
