@@ -74,7 +74,7 @@ git clone https://github.com/jinshisai/SLAM
     * E-mail: yaso@kasi.re.kr
 
 ## Citation
-* Release in Zenodo
+==== Release in Zenodo ====
 
 Aso & Sai (2023) (https://zenodo.org/records/7783868)
 ```
@@ -92,7 +92,7 @@ Aso & Sai (2023) (https://zenodo.org/records/7783868)
 }
 ```
 
-* Manual paper
+==== Manual paper ====
   
 Aso & Sai (2024) (https://pkas.kas.org/journal/article.php?code=91201&list.php?m=1)
 ```
