@@ -76,6 +76,8 @@ git clone https://github.com/jinshisai/SLAM
 ## Citation
 * Software in Zenodo
 
+Aso & Sai (2023)
+
 @software{2023zndo...7783868A,
 
        author = {{Aso}, Yusuke and {Sai}, Jinshi},
@@ -101,7 +103,8 @@ git clone https://github.com/jinshisai/SLAM
 }
 
 * Related paper
-https://pkas.kas.org/journal/article.php?code=91201&list.php?m=1
+  
+Aso & Sai (2024) (https://pkas.kas.org/journal/article.php?code=91201&list.php?m=1)
 
 @article{2024PKAS...39...2A,
 
