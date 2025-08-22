@@ -74,9 +74,9 @@ git clone https://github.com/jinshisai/SLAM
     * E-mail: yaso@kasi.re.kr
 
 ## Citation
-* Software in Zenodo
+* Release in Zenodo
 
-Aso & Sai (2023)
+Aso & Sai (2023) (https://zenodo.org/records/7783868)
 ```
 @software{2023zndo...7783868A,
        author = {{Aso}, Yusuke and {Sai}, Jinshi},
