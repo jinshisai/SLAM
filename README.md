@@ -75,32 +75,58 @@ git clone https://github.com/jinshisai/SLAM
 
 ## Citation
 * Software in Zenodo
+
 @software{2023zndo...7783868A,
+
        author = {{Aso}, Yusuke and {Sai}, Jinshi},
+       
         title = "{jinshisai/SLAM: First Release of SLAM}",
+        
          year = 2023,
+         
         month = mar,
+        
           eid = {10.5281/zenodo.7783868},
+          
           doi = {10.5281/zenodo.7783868},
+          
       version = {v1.0.0},
+      
     publisher = {Zenodo},
+    
        adsurl = {https://ui.adsabs.harvard.edu/abs/2023zndo...7783868A},
+       
       adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+      
 }
+
 * Related paper
 https://pkas.kas.org/journal/article.php?code=91201&list.php?m=1
+
 @article{2024PKAS...39...2A,
+
     author      = {{Aso}, Yusuke and {Sai}, Jinshi},
+    
     title       = {{SPECTRAL LINE ANALYSIS/MODELING (SLAM) I: PVANALYSIS}},
+    
     booltitle   = {{Vol.39 No.2}},
+    
     journal     = {{PKAS}},
+    
     volume      = {{39}},
+    
     issue       = {{2}},
+    
     publisher   = {Korean Astronomical Society},
+    
     year        = {2024},
+    
     pages       = {27-38},
+    
     doi         = {10.5303/PKAS.2024.39.2.027},
+    
     URL         = {http://pkas.kas.org/journal/article.php?code=91201}
+    
 }
 
 ## License
