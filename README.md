@@ -92,7 +92,7 @@ Aso & Sai (2023) (https://zenodo.org/records/7783868)
 }
 ```
 
-* Related paper
+* Manual paper
   
 Aso & Sai (2024) (https://pkas.kas.org/journal/article.php?code=91201&list.php?m=1)
 ```
