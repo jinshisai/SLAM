@@ -72,7 +72,7 @@ class VelGrad(ReadFits):
             if len(d) > 1 and (v < vmask[0] or vmask[1] < v):
                 if method == 'mean':
                     beamarea = np.pi * self.bmaj * self.bmin / 4 / np.log(2)
-                    beamarea = beamarea / (self.dx * self.dy)  # pixel/beam
+                    beamarea = beamarea / np.abs(self.dx * self.dy)  # pixel/beam
                     xval = np.sum(d * X) / np.sum(d)
                     xerr = np.sqrt(beamarea) * sigma \
                            * np.sqrt(np.sum((X - xval)**2)) / np.sum(d)
