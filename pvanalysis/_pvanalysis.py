@@ -631,6 +631,8 @@ class PVAnalysis():
         res_off = self.fitsdata.res_off
         self.res_off = res_off
         self.delv = self.fitsdata.delv
+        beamlength = res_off / self.fitsdata.delx \
+                     * np.sqrt(np.pi / 4 / np.log(2))  # pixel/beam
         # harf of beamsize [pix]
         hob  = int(np.round((res_off*0.5/self.fitsdata.delx)))
         # x & v ranges used for calculation for fitting
@@ -703,7 +705,7 @@ class PVAnalysis():
             if ridgemode == 'mean':
                 c = (d_i >= thr*rms)
                 x_i, d_i = x_i[c], d_i[c]
-                mx, mx_err = ridge_mean(x_i, d_i, rms)
+                mx, mx_err = ridge_mean(x_i, d_i, rms * np.sqrt(beamlength))
                 # plot
                 if ~np.isnan(mx):
                     ax.vlines(mx, 0., dlim[-1], lw=1.5, color='r',
