@@ -71,10 +71,14 @@ class VelGrad(ReadFits):
             xval, xerr, yval, yerr = np.nan, np.nan, np.nan, np.nan
             if len(d) > 1 and (v < vmask[0] or vmask[1] < v):
                 if method == 'mean':
+                    beamarea = np.pi * self.bmaj * self.bmin / 4 / np.log(2)
+                    beamarea = beamarea / (self.dx * self.dy)  # pixel/beam
                     xval = np.sum(d * X) / np.sum(d)
-                    xerr = sigma * np.sqrt(np.sum((X - xval)**2)) / np.sum(d)
+                    xerr = np.sqrt(beamarea) * sigma \
+                           * np.sqrt(np.sum((X - xval)**2)) / np.sum(d)
                     yval = np.sum(d * Y) / np.sum(d)
-                    yerr = sigma * np.sqrt(np.sum((Y - yval)**2)) / np.sum(d)
+                    yerr = np.sqrt(beamarea) * sigma \
+                           * np.sqrt(np.sum((Y - yval)**2)) / np.sum(d)
                 elif method == 'peak':
                     xval = X[np.argmax(d)]
                     xerr = self.bmaj / (np.max(d) / sigma)
