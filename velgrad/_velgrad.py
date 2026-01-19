@@ -70,14 +70,15 @@ class VelGrad(ReadFits):
             d, X, Y = d_org[cond], X_org[cond], Y_org[cond]
             xval, xerr, yval, yerr = np.nan, np.nan, np.nan, np.nan
             if len(d) > 1 and (v < vmask[0] or vmask[1] < v):
+                beamarea = np.pi * self.bmaj * self.bmin / 4 / np.log(2)
+                beamarea = beamarea / np.abs(self.dx * self.dy)  # pixel/beam
+                corr = np.sqrt(beamarea)
                 if method == 'mean':
-                    beamarea = np.pi * self.bmaj * self.bmin / 4 / np.log(2)
-                    beamarea = beamarea / np.abs(self.dx * self.dy)  # pixel/beam
                     xval = np.sum(d * X) / np.sum(d)
-                    xerr = np.sqrt(beamarea) * sigma \
+                    xerr = corr * sigma \
                            * np.sqrt(np.sum((X - xval)**2)) / np.sum(d)
                     yval = np.sum(d * Y) / np.sum(d)
-                    yerr = np.sqrt(beamarea) * sigma \
+                    yerr = corr * sigma \
                            * np.sqrt(np.sum((Y - yval)**2)) / np.sum(d)
                 elif method == 'peak':
                     xval = X[np.argmax(d)]
@@ -92,7 +93,7 @@ class VelGrad(ReadFits):
                         popt, pcov = curve_fit(gauss2d,
                                                (X.ravel(), Y.ravel()),
                                                d.ravel(), max_nfev=1000,
-                                               sigma=X.ravel() * 0 + sigma,
+                                               sigma=X.ravel() * 0 + corr * sigma,
                                                absolute_sigma=True,
                                                bounds=bounds)
                         xval, yval = popt[[1, 2]]
