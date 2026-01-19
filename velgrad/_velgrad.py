@@ -72,13 +72,13 @@ class VelGrad(ReadFits):
             if len(d) > 1 and (v < vmask[0] or vmask[1] < v):
                 beamarea = np.pi * self.bmaj * self.bmin / 4 / np.log(2)
                 beamarea = beamarea / np.abs(self.dx * self.dy)  # pixel/beam
-                corr = np.sqrt(beamarea)
+                corrected_sigma = sigma * np.sqrt(beamarea)
                 if method == 'mean':
                     xval = np.sum(d * X) / np.sum(d)
-                    xerr = corr * sigma \
+                    xerr = corrected_sigma \
                            * np.sqrt(np.sum((X - xval)**2)) / np.sum(d)
                     yval = np.sum(d * Y) / np.sum(d)
-                    yerr = corr * sigma \
+                    yerr = corrected_sigma \
                            * np.sqrt(np.sum((Y - yval)**2)) / np.sum(d)
                 elif method == 'peak':
                     xval = X[np.argmax(d)]
@@ -91,11 +91,11 @@ class VelGrad(ReadFits):
                               [d.max() * 2, xmax, ymax, xmax, ymax, np.pi]]
                     try:
                         popt, pcov = curve_fit(gauss2d,
-                                               (X.ravel(), Y.ravel()),
-                                               d.ravel(), max_nfev=1000,
-                                               sigma=X.ravel() * 0 + corr * sigma,
-                                               absolute_sigma=True,
-                                               bounds=bounds)
+                                         (X.ravel(), Y.ravel()),
+                                         d.ravel(), max_nfev=1000,
+                                         sigma=X.ravel() * 0 + corrected_sigma,
+                                         absolute_sigma=True,
+                                         bounds=bounds)
                         xval, yval = popt[[1, 2]]
                         xerr, yerr = np.sqrt(np.diag(pcov))[[1, 2]]
                     except RuntimeError:
