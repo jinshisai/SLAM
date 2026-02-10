@@ -109,8 +109,8 @@ class VelGrad(ReadFits):
         xc, dxc, yc, dyc = np.array([xc, dxc, yc, dyc])
         self.center = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
         
-    def filtering(self, pa0: float = 0.0, fixcenter: bool = False,
-                  axisfilter: bool = True, lowvelfilter: bool = True,
+    def filtering(self, pa0: float = 0.0, fixcenter: bool = True,
+                  axisfilter: bool = False, lowvelfilter: bool = False,
                   filename: str = 'velgrad'):
         xc = self.center['xc'] * 1
         yc = self.center['yc'] * 1
@@ -246,7 +246,7 @@ class VelGrad(ReadFits):
         
     def calc_mstar(self, incl: float = 90,
                    voff_range: list = [-0.5, 0.5],
-                   voff_fixed: float | None = None,
+                   voff_fixed: float | None = 0,
                    minabserr: float = 0.1, minrelerr: float = 0.01):
         self.incl = incl
         sini2 = np.sin(np.radians(incl))**2

@@ -7,16 +7,16 @@ pa = 2.0  # deg
 incl = 85  # deg
 vsys = 5.9  # km/s
 dist = 140  # pc
-sigma = 1.7e-3  # Jy/beam; None means automatic calculation.
+sigma = 1.7e-3  # Jy/beam
 cutoff = 5.0  # sigma
-xmax = 200  # au
-ymax = xmax  # au
-vmax = 3.6  # km/s
-vmin = -3.6  # km/s
-vmask = [-2.0, 2.0]  # km/s
+xmax = 200  # au; The fitted area is [-xmax, xamx] x [-ymax, ymax].
+ymax = xmax  # au The fitted area is [-xmax, xamx] x [-ymax, ymax].
+vmax = 3.6  # km/s; relative to vsys.
+vmin = -3.6  # km/s; relative to vsys.
+vmask = [-2.0, 2.0]  # km/s; relative to vsys. To exclude low velocity channels.
 show_figs = True
-minrelerr = 0.01
-minabserr = 0.1
+minabserr = 0.1  # minimum absolute errorbar in the unit of bmaj or dv.
+minrelerr = 0.01  # minimum relative errorbar.
 method = 'mean'  # mean or gauss
 '------------------------'
 
@@ -31,8 +31,7 @@ vg.read_cubefits(cubefits=cubefits, center=center,
                  vmin=vmin, vmax=vmax)
 vg.get_2Dcenter(cutoff=cutoff, vmask=vmask,
                 minrelerr=minrelerr, minabserr=minabserr, method=method)
-vg.filtering(pa0=pa, fixcenter=True, axisfilter=False, lowvelfilter=False,
-             filename=filehead)
-vg.calc_mstar(incl=incl, voff_fixed=0)
+vg.filtering(pa0=pa, filename=filehead)
+vg.calc_mstar(incl=incl)
 vg.plot_center(filehead=filehead, pa=pa, show_figs=show_figs)
 '-------------------------------------'
