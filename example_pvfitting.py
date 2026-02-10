@@ -14,7 +14,6 @@ sigma = 1.7e-3  # Jy/beam
 rmax = 200  # au; The fitted area is [-rmax, ramx] x [-rmax, rmax].
 vlim = [-3.6, 3.6]  # km/s; relative to vsys
 vmask = [-0.3, 0.3]  # km/s; relative to vsys. To exclude channels with large missing flux
-show_figs = True
 '------------------------'
 
 '-------- HOW TO DO EACH STEP --------'
