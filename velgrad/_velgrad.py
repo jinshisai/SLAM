@@ -238,7 +238,7 @@ class VelGrad(ReadFits):
         dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.) - 1
         self.chi2r_grad = chi2(popt, xc, yc, dxc, dyc) / dof
 
-        fname = filename + '.points.dat'
+        fname = filename + '.points.txt'
         res = np.c_[self.v, xc, dxc, yc, dyc][~np.isnan(xc)]
         np.savetxt(fname, res,
                    header='v (km/s), x (au), dx (au), y (au), dy (au)')
