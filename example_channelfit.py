@@ -7,7 +7,7 @@ pa = 2.0  # deg
 incl = 85  # deg
 vsys = 5.9  # km/s
 dist = 140  # pc
-sigma = 1.7e-3  # Jy/beam; None means automatic calculation.
+sigma = 1.7e-3  # Jy/beam
 rmax = 200  # au; The fitted area is [-rmax, ramx] x [-rmax, rmax].
 vlim = [-3.6, -2.0, 2.0, 3.6]  # km/s; Relative to vsys.
 '------------------------'
