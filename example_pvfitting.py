@@ -28,7 +28,7 @@ pvfit.fit_mockpvd(Mstar_range=[0.1, 1.0],  # Msun; stellar mass
                   taumax_range=[1e-2, 1e4],  # maximum optical depth
                   frho_range=[1, 1e3],  # density jump at (R,z)=(Rc,0). 1 means no jump. A larger value means a higher jump.
                   fixed_params={'alphainfall': 0.6,  # a scaling factor for the radial infall velocity
-                                'sig_mdl': 5  # model uncertainty compared to the observational noise level
+                                'sig_mdl': 5  # sigma; model uncertainty. Chi squared uses sigma^2 * (1 + sig_mdl^2).
                                 },
                   show=False, filename=filehead, vmask=vmask,
                   incl=incl, pa_major=pa_major, pa_minor=pa_minor,
