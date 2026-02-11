@@ -36,6 +36,8 @@ pvfit.fit_mockpvd(Mstar_range=[0.1, 1.0],  # Msun; stellar mass
                                        'nsteps': 70,
                                        'rangelevel': 0.99},
                   signmajor=signmajor, signminor=signminor,
+                  n_nest=[2, 2, 2, 2, 2, 2],
+                  reslim=10,
                   zmax=1000  # au; length along the line of sight, from -zmax to zmax.
                   )
 pvfit.modeltofits(**pvfit.popt, filehead=filehead)
