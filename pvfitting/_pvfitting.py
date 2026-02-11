@@ -102,8 +102,9 @@ class PVFitting(ReadFits):
                     signmajor: int | None = None, signminor: int | None = None,
                     pa_major: float = 0., pa_minor: float = 90.,
                     linewidth: float | None = None,
-                    nsubgrid: int = 1, n_nest: list[float] = [3, 3],
-                    reslim: float = 5,
+                    nsubgrid: int = 1,
+                    n_nest: list[float] = [2, 2, 2, 2, 2, 2],
+                    reslim: float = 10,
                     title: str | None = None,
                     log: bool = False):
         # Observed PV diagrams
