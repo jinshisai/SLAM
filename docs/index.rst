@@ -28,7 +28,7 @@ Also, setting the path in .bashrc (or .zshrc etc.) will be useful.
 Versions
 ==================
 
-The latest, stable version is v1.2.0.
+The latest, stable version is v2.0.0.
 
 To use the stable version, go to the SLAM directory and type
 
@@ -37,7 +37,7 @@ To use the stable version, go to the SLAM directory and type
 
    git tag -l # list tags (versions)
 
-   git checkout tags/v1.2.0 # choose v1.2.0
+   git checkout tags/v2.0.0 # choose v2.0.0
 
 
 Contents
