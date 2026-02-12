@@ -43,13 +43,18 @@ To use the stable version, go to the SLAM directory and type
 Contents
 =================
 
+PV Analysis
+------------
+
 .. toctree::
    :maxdepth: 2
-   :caption: PV Analysis
 
    tutorials/example_pvanalysis
    tutorials/notes_pvanalysis.md
 
+
+More documents are coming soon
+----------
+
 .. toctree::
    :maxdepth: 2
-   :caption: More documents are coming soon
