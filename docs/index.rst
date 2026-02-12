@@ -45,7 +45,11 @@ Contents
 
 .. toctree::
    :maxdepth: 2
-   :caption: Tutorials
+   :caption: PV Analysis
 
    tutorials/example_pvanalysis
    tutorials/notes_pvanalysis.md
+
+.. toctree::
+   :maxdepth: 2
+   :caption: More documents are coming soon
