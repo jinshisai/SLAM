@@ -17,13 +17,21 @@ deg = units.deg.to('radian')
 
 class MockPVD(object):
     """
-    MockPVD is a class to generate mock PV diagram.
+    MockPVD is a class to generate mock position-velocity (PV) diagrams of a protostellar 
+    disk-envelope system assuming a cut-off disk and the UCM envelope model.
 
+    The mock PV diagram is calculated with the scaled optical depth, computed by summing up 
+    the gas density along the line-of-sight and rescaling the integrated value, and the 
+    radiative transfer equation of Iv = (1 - exp(-tau_v)) for normalized intensity.
+
+    Physical assumptions behind the intensity calculation is the isothermal disk and envelope, 
+    and a constant molecular abundance. To match the mock PV diagram with observational data, 
+    it must be rescaled by the observed flux.
     """
     def __init__(self, x:np.ndarray, z:np.ndarray, v:np.ndarray, 
                  nnest:list | None = None, nsubgrid: int = 1, 
                  xlim:list | None = None, ylim: list | None = None, zlim:list | None = None,
-                 beam:list | None = None, reslim: float = 5,
+                 beam:list | None = None, reslim: float = 10,
                  signmajor: int = 1, signminor: int = 1,
                  pa_major: float = 0, pa_minor: float = 90):
         '''
@@ -32,13 +40,22 @@ class MockPVD(object):
         Parameters
         ----------
         x, z, v (array): 1D arrays for x, z and v axes.
-        nsubgrid (int): Number of sub pixels to which the original pixel is divided.
-        nnest (list): Number of sub pixels of the nested grid, to which the parental pixel is divided.
-         E.g., if nnest=[4], a nested grid having a resolution four times finer than the resolution
-         of the parental grid is created. If [4, 4], the grid is nested to two levels and 
-         each has a four times better resolution than its parental grid.
-        xlim, zlim (list): x and z ranges for the nested grid. Must be given as [[xmin0, xmax0], [xmin1, xmax1]].
+        nsubgrid (int): A refinement factor for the subgrid, in which the pixel resolution 
+         of the entire original grid is refined by the refining factor.
+        nnest (list): A list of refinement factors for each nesting level of the nested 
+         grid; pixel resolution increases by the given factor at each nesting level. 
+         For example, if nnest=[4, 2], the grid is nested to three levels (original, 
+         first nesting level, and second nesting level), and the pixel resolution increases
+         by a factor of 4 and 2 at the first- and second nesting levels, respectively.
+        xlim, zlim (list): x and z ranges for the nested grid. 
+         Must be given as [[xmin0, xmax0], [xmin1, xmax1]] and [[zmin0, zmax0], [zmin1, zmax1]].
         beam (list): Beam info, which must be give [major, minor, pa].
+        reslim (float or int): Resolution threshold that triggers nesting. It is used as an 
+         alternative way to set xlim and zlim for the nested grid instead of givin exact
+         x and z ranges. When nnest is given but either xlim or zlim is not provided, 
+         the grid is nested when the spatial scale hits the resolution threshold. 
+         For example, if reslim=10, xlim will be set to [-10 x upper-level resolution, 
+         upper-level resolution]. Same for zlim.
         signmajor: 1 for the case where the positive offset is on the redshifted side in the PV diagram along the major axis; otherwise -1.
         signminor: 1 for the case where the negative offset is on the redshifted side in the PV diagram along the minor axis; otherwise -1.
         pa_major: PA of the positive offset of the PV diagram along the major axis.
@@ -149,7 +166,7 @@ class MockPVD(object):
         return axes_out
 
     def makegrid(self, xlim: list | None = None, ylim: list | None = None,
-                 zlim: list | None = None, reslim: float = 5):
+                 zlim: list | None = None, reslim: float = 10):
         # parental grid
         # x and z
         x = self.x

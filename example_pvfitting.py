@@ -36,8 +36,8 @@ pvfit.fit_mockpvd(Mstar_range=[0.1, 1.0],  # Msun; stellar mass
                                        'nsteps': 70,
                                        'rangelevel': 0.99},
                   signmajor=signmajor, signminor=signminor,
-                  n_nest=[2, 2, 2, 2, 2, 2],
-                  reslim=10,
+                  n_nest=[2, 2, 2, 2, 2, 2], # Refinement factors for each nesting level of the nested grid; pixel resolution increases by the given factor at each level.
+                  reslim=10, # Resolution threshold that triggers nesting; defines the spatial extent of the next-level subgrid.
                   zmax=1000  # au; length along the line of sight, from -zmax to zmax.
                   )
 pvfit.modeltofits(**pvfit.popt, filehead=filehead)
