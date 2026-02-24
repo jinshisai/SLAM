@@ -1,0 +1,792 @@
+# -*- coding: utf-8 -*-
+#----------------------------------------------------------------------------
+# Created By  : Yusuke Aso
+# Created Date: 2022 Jan 27
+# version = alpha
+# ---------------------------------------------------------------------------
+"""
+This script makes model channel maps from the observed mom0 by assuming 2D velocity pattern.
+The main class ChannelFit can be imported to do each steps separately.
+
+Note. FITS files with multiple beams are not supported. The dynamic range for xlim_plot and vlim_plot should be >10 for nice tick labels.
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Ellipse
+from astropy.io import fits
+from astropy import constants, units, wcs
+from scipy.signal import convolve
+from scipy.interpolate import RegularGridInterpolator as RGI
+from scipy.optimize import curve_fit
+from scipy.special import erf
+import warnings
+from tqdm import tqdm
+from utils import emcee_corner, ReadFits, rot
+
+warnings.simplefilter('ignore', RuntimeWarning)
+
+GG = constants.G.si.value
+M_sun = constants.M_sun.si.value
+au = units.au.to('m')
+vunit = np.sqrt(GG * M_sun / au) * 1e-3
+
+
+def avefour(a: np.ndarray) -> np.ndarray:
+    b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
+         + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
+    return b
+    
+def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
+    dmasked = np.nan_to_num(d)
+    dv = np.min(v[1:] - v[:-1])
+    mom0 = np.sum(d, axis=0) * dv
+    sigma_mom0 = sigma * dv * np.sqrt(len(d))
+    vv = np.moveaxis([[v]], 2, 0)
+    dmasked[dmasked < 3 * sigma] = 0
+    mom1 = np.sum(d * vv, axis=0) / np.sum(d, axis=0)
+    mom2 = np.sqrt(np.sum(d * (vv - mom1)**2, axis=0), np.sum(d, axis=0))
+    mom1[mom0 < 3 * sigma_mom0] = np.nan
+    return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
+    
+def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
+          threshold: float = 2, gain: float = 0.01,
+          weakestcomponent: float = 0.3,
+          savetxt: str | None = None, loadtxt: str | None = None) -> np.ndarray:
+    if loadtxt is not None:
+        print(f'Load clean components of moment 0 from {loadtxt}.')
+        cleancomponent = np.loadtxt(loadtxt)
+        return cleancomponent
+    shape = np.shape(data)
+    cleancomponent = data * 0
+    cleanresidual = data * 1
+    beamarea = np.sum(beam)  # pixel/beam
+    cc0 = np.zeros_like(data)
+    rms = 10000 * sigma
+    for i in range(10000000):
+        if i == 10000000 - 1:
+            print('\n10,000,000 iterations achived in CLEAN.')
+            break
+        if (peak := np.nanmax(cleanresidual)) < threshold * sigma:
+            print('\nThreshold achieved in CLEAN. '
+                  f'(rms={rms / sigma:.2f}sigma, '
+                  f'peak={peak / sigma:.2f}sigma)')
+            break
+        print(f'\rCLEAN reached {peak / sigma:.2f}sigma in Moment 0.  ', end='')
+        ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
+        cc = cc0 * 1  # for deep copy
+        lp = cleanresidual[ip, jp]
+        cc[ip, jp] = max(gain * lp, weakestcomponent * sigma) / beamarea  # Jy/pixel
+        newresidual = cleanresidual - convolve(cc, beam, mode='same')
+        rms = np.sqrt(np.nanmean(newresidual**2))
+        cleancomponent = cleancomponent + cc
+        cleanresidual = newresidual
+    cleancomponent = cleancomponent + cleanresidual / beamarea
+    if savetxt is not None:
+        np.savetxt(savetxt, cleancomponent)
+    return cleancomponent
+    
+def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
+                    bmaj: float, bmin: float, bpa: float, sigma: float,
+                    savetxt: str | None = None, loadtxt: str | None = None,
+                    direct: bool = False, progressbar: bool = True) -> tuple:
+    nx = len(x)
+    ny = len(y)
+    dx = np.abs(x[1] - x[0])
+    dy = np.abs(y[1] - y[0])
+    xskip = int(np.floor(bmin / 2 / dx))
+    yskip = int(np.floor(bmaj / 2 / dy))
+    nxh = int(np.floor((nx - 1) / 2 / xskip)) * xskip
+    nyh = int(np.floor((ny - 1) / 2 / yskip)) * yskip
+    nxnew = 2 * nxh + 1
+    nynew = 2 * nyh + 1
+    xoff = int((nx - nxnew) / 2)
+    yoff = int((ny - nynew) / 2)
+    xi = x[::-1]
+    yi = y
+    di = data[:, ::-1]
+    xi = xi[xoff:nxnew + xoff]
+    yi = yi[yoff:nynew + yoff]
+    di = di[yoff:nynew + yoff, xoff:nxnew + xoff]
+    Xi, Yi = np.meshgrid(xi, yi)
+    Xg = (Xi - xi[nxh]) / (bmin / 2)
+    Yg = (Yi - yi[nyh]) / (bmaj / 2)
+    g = np.exp2(-Xg**2 - Yg**2)
+    gsum = np.sum(g)
+    xmodel = xi[::xskip]
+    ymodel = yi[::yskip]
+    xnpar = len(xmodel)
+    ynpar = len(ymodel)
+    f = RGI((yi, xi), di, method='linear',
+            bounds_error=False, fill_value=0)
+    drot = f(tuple(rot(Xi, Yi, -np.radians(bpa)))[::-1])
+    Par0 = drot[::yskip, ::xskip].clip(0, None) / gsum
+    if loadtxt is not None:
+        popt = np.loadtxt(loadtxt)
+        print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
+    elif direct:
+        def model(x, *par):
+            values = np.reshape(par, (ynpar, xnpar))
+            f = RGI((ymodel, xmodel), values, method='linear',
+                    bounds_error=False, fill_value=0)
+            f = convolve(f(tuple(x)), g, mode='same')
+            return np.ravel(f)
+        p0 = np.ravel(Par0)
+        bounds = [np.zeros_like(p0), np.full_like(p0, np.max(drot))]
+        popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
+                            p0=p0, bounds=bounds)
+    else:
+        niter = 20
+        if progressbar:
+            bar = tqdm(total=niter * ynpar * xnpar)
+            bar.set_description('Deconvolution')
+        for _ in range(niter):
+            ilist = np.arange(ynpar)
+            jlist = np.arange(xnpar)
+            for i_p in ilist:
+                i_d = i_p * yskip
+                for j_p in jlist:
+                    j_d = j_p * xskip
+                    if progressbar:
+                        bar.update(1)
+                    p0 = Par0[i_p, j_p]
+                    dd = drot[i_d, j_d]
+                    if dd < 2 * sigma:
+                        Par0[i_p, j_p] = 0
+                    else:
+                        bounds = [0, dd]
+                        def model(x, par):
+                            values = Par0 + 0
+                            values[i_p, j_p] = par
+                            f = RGI((ymodel, xmodel), values, method='linear',
+                                    bounds_error=False, fill_value=0)
+                            ff = f(tuple(x))
+                            gg = np.roll(g, (i_d - nyh, j_d - nxh), axis=(0, 1))
+                            return np.sum(ff * gg)
+                        popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
+                                            sigma=[sigma], absolute_sigma=True,
+                                            bounds=bounds)
+                        Par0[i_p, j_p] = popt
+        print('')
+        popt = np.ravel(Par0)
+    if savetxt is not None:
+        np.savetxt(savetxt, popt)
+    zmodel = np.reshape(popt, (ynpar, xnpar))
+    f = RGI((ymodel, xmodel), zmodel,
+            method='linear', bounds_error=False, fill_value=0)
+    decon = f(tuple(rot(*np.meshgrid(x, y), np.radians(bpa)))[::-1])
+    return decon, xmodel, ymodel, zmodel
+
+def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
+                  bmaj: float, bmin: float, bpa: float,
+                  sigma: float, threshold: float = 3) -> np.ndarray:
+    xd = x[int(len(x) % 2 == 0):]
+    yd = y[int(len(y) % 2 == 0):]
+    d = data[int(len(y) % 2 == 0):, int(len(x) % 2 == 0):]
+    ny, nx = np.shape(d)
+    nyh, nxh = (ny - 1) // 2, (nx - 1) // 2
+    dx, dy = x[1] - x[0], y[1] - y[0]
+    xg = np.linspace(-nxh * dx, nxh * dx, nx)
+    yg = np.linspace(-nyh * dy, nyh * dy, ny)
+    s, t = rot(*np.meshgrid(xg, yg), np.radians(bpa))
+    g = np.exp2(-4 * ((t / bmaj)**2 + (s / bmin)**2))
+    u = np.fft.fftshift(np.fft.fftfreq(nx, d=dx))
+    v = np.fft.fftshift(np.fft.fftfreq(ny, d=dy))
+    u, v = np.meshgrid(u, v)
+    phase0 = 2 * np.pi * (u * (xg[-1] + dx) + v * (yg[-1] + dy))
+    FTg = np.fft.fftshift(np.fft.fft2(g)) * np.exp(-1j * phase0)
+    rFTg = np.real(FTg)
+    FTg = rFTg + 1j * 0
+    FTg[rFTg < np.max(rFTg) * 1e-2] = 1 + 1j * 0
+    phase0 = 2 * np.pi * (u * (xd[-1] + dx) + v * (yd[-1] + dy))
+    FTd = np.fft.fftshift(np.fft.fft2(d)) * np.exp(-1j * phase0)
+    FTdnew = FTd / FTg
+    dnew = np.real(np.fft.ifft2(np.fft.ifftshift(FTdnew * np.exp(1j * phase0))))
+    dnew[np.abs(d) < sigma * threshold] = 0
+    if len(x) % 2 == 0:
+        dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
+    if len(y) % 2 == 0:
+        dnew = np.concatenate((np.zeros((1, np.shape(dnew)[1])), dnew), axis=0)
+    return dnew
+
+class ChannelFit(ReadFits):
+
+    def __init__(self,
+                 disk: bool = True,
+                 envelope: bool = False,
+                 scaling: str = 'uniform',
+                 progressbar: bool = True):
+        self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2',
+                          'pI', 'Rin', 'Ienv',
+                          'xoff', 'yoff', 'voff', 'incloff', 'paoff']
+        self.disk = disk
+        self.envelope = envelope
+        self.scaling = scaling
+        self.progressbar = progressbar
+
+    def makegrid(self, cubefits: str | None = None,
+                 pa: float = 0, incl: float = 90, dist: float = 1,
+                 center: str | None = None, vsys: float = 0,
+                 rmax: float = 1e4,
+                 vlim: tuple[float, float, float, float] = (-100, 0, 0, 100),
+                 sigma: float | None = None, nlayer: int = 3,
+                 xskip: int = 1, yskip: int = 1, skipto: int | None = False,
+                 gaussmargin: float = 1.6,
+                 savedeconvolved: str | None = None,
+                 loaddeconvolved: str | None = None,
+                 signmajor: int | None = None,
+                 signminor: int | None = None):
+        if not (cubefits is None):
+            self.read_cubefits(cubefits, center, dist, vsys,
+                               -rmax, rmax, -rmax, rmax, None, None,
+                               xskip, yskip, sigma)
+            dpix = min([np.abs(self.dx), np.abs(self.dy)])
+            if type(skipto) is int:
+                iskip = int(self.bmin / (dpix / xskip) / skipto)
+                if iskip == 0:
+                    print('WARNING: \'skipto\' is ignored because the beam minor axis is smaller than \'skipto\' pixels.')
+                    iskip = 1
+                self.read_cubefits(cubefits, center, dist, vsys,
+                                   -rmax, rmax, -rmax, rmax, None, None,
+                                   iskip, iskip, sigma)
+                dpix = min([np.abs(self.dx), np.abs(self.dy)])
+                ibmaj = self.bmaj / dpix
+                ibmin = self.bmin / dpix
+                print(f'Adopt xskip={iskip:d} and yskip={iskip:d}.')
+                print(f'Beam major/minor axis is {ibmaj:.1f}/{ibmin:.1f} pixels.')
+            v = self.v
+        self.incl0 = incl
+        pa_rad = np.radians(pa)
+        self.pa_rad = pa_rad
+        self.cospa = np.cos(pa_rad)
+        self.sinpa = np.sin(pa_rad)
+        self.X, self.Y = np.meshgrid(self.x, self.y)
+        
+        self.v_nanblue = v[v < vlim[0]]
+        self.v_blue = v[(vlim[0] <= v) * (v <= vlim[1])]
+        self.v_nanmid = v[(vlim[1] < v) * (v < vlim[2])]
+        self.v_red = v[(vlim[2] <= v) * (v <= vlim[3])]
+        self.v_nanred = v[vlim[3] < v]
+        self.v_valid = np.r_[self.v_blue, self.v_red]
+
+        self.data_blue = self.data[(vlim[0] <= v) * (v <= vlim[1])]
+        self.data_red = self.data[(vlim[2] <= v) * (v <= vlim[3])]
+        self.data_valid = np.append(self.data_blue, self.data_red, axis=0) 
+        
+        m = makemom01(self.data_valid, self.v_valid, sigma)
+        self.mom0 = m['mom0']
+        self.mom1 = m['mom1']
+        self.mom2 = m['mom2']
+        self.sigma_mom0 = m['sigma_mom0']
+        X, Y = rot(self.X, self.Y, pa_rad)
+        if signmajor is None:
+            self.signmajor = np.sign(np.nansum(self.mom1 * Y))
+        else:
+            self.signmajor = signmajor
+        if signminor is None:
+            self.signminor = np.sign(np.nansum(self.mom1 * X)) * (-1)
+        else:
+            self.signminor = signminor
+        
+        # 2d nested grid on the disk plane.
+        # x and y are minor and major axis coordinates before projection.
+        r_need = rmax + gaussmargin * self.bmaj
+        npix = int(2 * r_need / dpix + 0.5)
+        npix = int(4 * np.ceil(npix / 4))
+        self.nq1 = npix // 2 - npix // 2 // 2
+        self.nq3 = self.nq1 + npix // 2
+        self.nlayer = nlayer  # down to dpix / 2**(nlayer-1)
+        xnest = [None] * nlayer
+        ynest = [None] * nlayer
+        Xnest = [None] * nlayer
+        Ynest = [None] * nlayer
+        Rnest = [None] * nlayer
+        for l in range(nlayer):
+            n = npix // 2 - 0.5
+            s = np.linspace(-n, n, npix) * dpix / 2**l
+            X, Y = np.meshgrid(s, s)
+            R = np.hypot(X, Y)
+            xnest[l] = s
+            ynest[l] = s
+            Xnest[l] = X
+            Ynest[l] = Y
+            Rnest[l] = R
+        self.xnest = np.array(xnest)
+        self.ynest = np.array(ynest)
+        self.Xnest = np.array(Xnest)
+        self.Ynest = np.array(Ynest)
+        self.Xnest, self.Ynest = rot(self.Xnest, self.Ynest, pa_rad)
+        self.Xnest0 = self.Xnest * 1
+        self.Ynest0 = self.Ynest * 1
+        print(f'{len(self.v_valid):d} channels will be fitted.')
+        print('-------- nested grid --------')
+        for l in range(len(xnest)):
+            print(f'x, dx, npix: +/-{xnest[l][-1]:.2f},'
+                  + f' {xnest[l][1]-xnest[l][0]:.2f} au,'
+                  + f' {npix:d}')
+        print('-----------------------------')
+        
+        ngauss = int(gaussmargin * self.bmaj / dpix + 0.5)  # 0.5 is for rounding
+        xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
+        yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
+        xb, yb = rot(*np.meshgrid(xb, yb), np.radians(self.bpa))
+        gaussbeam = np.exp2(-4 *((yb / self.bmaj)**2 + (xb / self.bmin)**2))
+        self.pixperbeam = np.sum(gaussbeam)
+        self.gaussbeam = gaussbeam  # The 1st (x) axis is in the model order.
+        
+        n_need = int(r_need / dpix + 0.5)
+        self.ineed0 = npix // 2 - n_need
+        self.ineed1 = npix // 2 + n_need
+        self.xneed = self.xnest[0][self.ineed0:self.ineed1]
+        self.yneed = self.ynest[0][self.ineed0:self.ineed1]
+
+        if 'mom0' in self.scaling:
+            # Change the 1st (x) axis to the observational order.
+            self.gaussbeam = self.gaussbeam[:, ::-1]  
+        if self.scaling == 'mom0clean':
+            self.mom0decon = clean(data=self.mom0, beam=self.gaussbeam,
+                                   sigma=self.sigma_mom0,
+                                   savetxt=savedeconvolved,
+                                   loadtxt=loaddeconvolved)
+        elif self.scaling == 'mom0model':
+            d = modeldeconvolve(x=self.x, y=self.y, data=self.mom0,
+                                bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
+                                sigma=self.sigma_mom0,
+                                savetxt=savedeconvolved,
+                                loadtxt=loaddeconvolved,
+                                progressbar=self.progressbar)
+            self.mom0decon, self.xdecon, self.ydecon, self.zdecon = d
+            print('Found a deconvolved solution.')
+        elif self.scaling == 'mom0ft':
+            self.mom0decon = ftdeconvolve(x=self.x, y=self.y, data=self.mom0,
+                                           bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
+                                           sigma = self.sigma_mom0, threshold=3)
+            print('Divided in the Fourier space.')
+        if 'mom0' in self.scaling:
+            c = convolve(self.mom0decon, self.gaussbeam, mode='same')
+            self.resdecon = self.mom0 - c
+            maxres = np.max(self.resdecon) / self.sigma_mom0
+            rmsres = np.sqrt(np.mean(self.resdecon**2)) / self.sigma_mom0
+            print(f'Max and rms are {maxres:.1f}sigma '
+                  + f'and {rmsres:.1f}sigma in Moment 0 residual.')
+
+    def update_pa(self, pa: float):
+        self.Xnest, self.Ynest = rot(self.Xnest0, self.Ynest0, np.radians(pa))
+
+    def update_incl(self, incl: float):
+        i = np.radians(self.incl0 + incl)
+        self.sini = np.sin(i)
+        self.cosi = np.cos(i)
+        self.tani = np.tan(i)
+        
+    def update_xdisk(self, h1: float, h2: float = -1):
+        x = [None] * 4
+        for i, hdisk in zip([0, 2], [h1, h2]):
+            if hdisk < 0:
+                x1 = None
+                x2 = None
+            elif hdisk < 0.01:
+                x1 = self.Xnest / self.cosi
+                x2 = self.Xnest / self.cosi
+            else:
+                Xcosi = self.Xnest * self.cosi
+                a = self.tani**(-2) - hdisk**2
+                b = (1 + hdisk**2) * Xcosi
+                c = (self.tani**2 - hdisk**2) * Xcosi**2 \
+                    - hdisk**2 * self.Ynest**2
+                if -1e-3 < a < 1e-3:
+                    x1 = Xcosi + c / b / 2
+                    x2 = None
+                else:
+                    zsini1 = np.full_like(self.Xnest, np.nan)
+                    zsini2 = np.full_like(self.Xnest, np.nan)
+                    c = (D := b**2 - a * c) >= 0
+                    sqrtD = np.sqrt(D[c])
+                    zsini1[c] = (b[c] + sqrtD) / a
+                    zsini2[c] = (b[c] - sqrtD) / a
+                    x1 = Xcosi + zsini1
+                    x2 = Xcosi + zsini2
+            x[i], x[i + 1] = x1, x2
+        self.xdisk = x
+
+    def update_prof(self, cs: float):
+        cs_over_dv = cs / self.dv
+        w = max([cs_over_dv * 2.35482, 1])  # 2.35482 ~ sqrt(8ln2)
+        vmax_over_w = 2  # in the unit of max(FWHM, dv)
+        w_over_d = 11
+        vmax = vmax_over_w * w
+        d = w / w_over_d
+        n = 2 * int(vmax_over_w * w_over_d) + 1
+        v = np.linspace(-vmax, vmax, n)
+        if cs_over_dv < 0.01:
+            p = (1 + np.sign(v + 0.5)) * (1 - np.sign(v - 0.5)) / 4
+        else:
+            p = erf((v + 0.5) / np.sqrt(2) / cs_over_dv) \
+                - erf((v - 0.5) / np.sqrt(2) / cs_over_dv)
+            p[0] = p[n - 1] = 0
+        self.prof, self.prof_n, self.prof_d = p, n - 1, d
+
+    def update_getvlos(self, Rc: float, Rin: float):
+        def getvlos(x_in: np.ndarray | None, h_in: float):
+            if x_in is None:
+                return None
+            r = np.hypot(x_in, self.Ynest)
+            c = r > Rc
+            vp = r**(-1/2) * (1 + h_in**2)**(-3/4)
+            vr = r * 0
+            if self.envelope:
+                vp[c] = np.sqrt(Rc) / r[c]
+                vr[c] = -r[c]**(-1/2) * np.sqrt(2 - Rc / r[c])
+            erot = self.Ynest * self.signmajor / r
+            erad = x_in * self.signminor / r
+            vlos = (vp * erot + vr * erad) * self.sini * vunit
+            vlos[r < Rin] = np.nan
+            if not self.envelope:
+                vlos[c] = np.nan
+            if not self.disk:
+                vlos[~c] = np.nan
+            return vlos
+        self.getvlos = getvlos
+        
+    def update_vlos(self, h1: float, h2: float):
+        self.vlos = [self.getvlos(x, h) for x, h in zip(self.xdisk, [h1, h1, h2, h2])]
+    
+    def get_Iunif(self, Mstar: float, Rc: float, pI: float,
+                  Ienv: float, offvsys: float) -> np.ndarray:
+        Iunif = 0
+        for vlos_in, x_in in zip(self.vlos, self.xdisk):
+            if vlos_in is None:
+                continue
+            vlos = vlos_in * np.sqrt(Mstar)
+            v = np.subtract.outer(self.v_valid, vlos) - offvsys  # v, layer, y, x
+            iv = v / self.dv / self.prof_d + self.prof_n // 2 + 0.5  # 0.5 is for rounding
+            p = self.prof[iv.astype('int').clip(0, self.prof_n)]
+            r = np.hypot(x_in, self.Ynest)
+            p = np.where(r < Rc, p, p * Ienv) / (Ienv + 1)
+            if pI != 0:
+                p = p * r**(-pI)
+            Iunif = Iunif + np.nan_to_num(p)
+        for l in range(self.nlayer - 1, 0, -1):
+            Iunif[:, l - 1, self.nq1:self.nq3, self.nq1:self.nq3] \
+                = avefour(Iunif[:, l, :, :])
+        Iunif = Iunif[:, 0, self.ineed0:self.ineed1, self.ineed0:self.ineed1]  # v, y, x
+        return Iunif
+
+    def rgi2d(self, xoff: float, yoff:float,
+              I_in: np.ndarray) -> np.ndarray:
+        Iout = [None] * len(I_in)
+        for i, c in enumerate(I_in):
+            interp = RGI((self.yneed, self.xneed), c, method='linear',
+                         bounds_error=False, fill_value=0)
+            Iout[i] = interp((self.Y - yoff, self.X - xoff))
+        Iout = np.array(Iout)
+        return Iout
+
+    def get_scale(self, Iout) -> np.ndarray:
+        gf = np.full_like(self.v_valid, np.sum(Iout * self.data_valid))
+        ff = np.full_like(self.v_valid, np.sum(Iout * Iout))
+        scale = gf / ff
+        scale[(ff == 0) + (scale < 0)] = 0
+        return scale
+
+    def peaktounity(self, I_in: np.ndarray) -> np.ndarray:
+        xypeak = np.max(I_in, axis=(1, 2))
+        scale = 1 / xypeak
+        scale[xypeak == 0] = 0
+        Iout = I_in * np.moveaxis([[scale]], 2, 0)
+        return Iout
+
+    def cubemodel(self, Mstar: float, Rc: float, cs: float,
+                  h1: float = 0, h2: float = -1, pI: float = 0,
+                  Rin: float = 0, Ienv: float = 0, 
+                  xoff: float = 0, yoff: float = 0, voff: float = 0,
+                  incloff: float = 90, paoff: float = 0,
+                  convolving: bool = True):
+        if self.free['paoff']:
+            self.update_pa(paoff)
+        if self.free['incloff']:
+            self.update_incl(incloff)
+        if self.free['cs']:
+            self.update_prof(cs)
+        if self.free['paoff'] or self.free['h1'] or self.free['h2']:
+            self.update_xdisk(h1, h2)
+        if self.free['paoff'] or self.free['Rc'] or self.free['Rin']:
+            self.update_getvlos(Rc, Rin)
+        if self.free['paoff'] or self.free['h1'] or self.free['h2'] \
+            or self.free['Rc'] or self.free['Rin']:
+            self.update_vlos(h1, h2)
+
+        Iunif = self.get_Iunif(Mstar, Rc, pI, Ienv, voff)
+        if 'mom0' in self.scaling:
+            Iunif = self.rgi2d(xoff, yoff, Iunif)  # 1st axis in the observational order
+            mom0unif = np.sum(Iunif, axis=0) * self.dv
+            mom0unif[mom0unif < 0] = np.nan
+            Iunif = Iunif * self.mom0decon / mom0unif
+            Iunif = np.nan_to_num(Iunif)
+        if convolving:
+            # The 1st (x) axis of Iunif is in the observational order
+            # if 'mom0' in self.scaling because of rgi2d.
+            # For this reason, self.gaussbeam is inverted in the x direction in advance.
+            Iout = convolve(Iunif, [self.gaussbeam], mode='same')
+        else:
+            Iout = self.peaktounity(Iunif)
+        if not ('mom0' in self.scaling):
+            Iout = self.rgi2d(xoff, yoff, Iout)  # 1st axis in the observational order
+            scale = self.get_scale(Iout)
+            Iout = Iout * np.moveaxis([[scale]], 2, 0)
+        return Iout
+                  
+    def fitting(self, Mstar_range: list = [0.01, 10],
+                Rc_range: list = [1, 1000],
+                cs_range: list = [0.01, 1],
+                h1_range: list = [0.01, 1],
+                h2_range: list = [0.01, 1],
+                pI_range: list = [-2, 2],
+                Rin_range: list = [0, 1000],
+                Ienv_range: list = [0.01, 100],
+                xoff_range: list = [-100, 100],
+                yoff_range: list = [-100, 100],
+                voff_range: list = [-0.2, 0.2],
+                incl_range: list = [-45, 45],
+                pa_range: list = [-45, 45],
+                fixed_params: dict = {},
+                filename: str = 'channelfit',
+                show: bool = False,
+                kwargs_emcee_corner: dict = {}):
+
+        p_fixed = {k:fixed_params[k] if k in fixed_params else None for k in self.paramkeys}
+        self.free = {k:p_fixed[k] is None for k in self.paramkeys}
+
+        if not self.free['paoff']:
+            self.update_pa(p_fixed['paoff'])
+        if not self.free['incloff']:
+            self.update_incl(p_fixed['incloff'])
+        if not self.free['cs']:
+            self.update_prof(p_fixed['cs'])
+        if not (self.free['paoff'] or self.free['h1'] or self.free['h2']):
+            self.update_xdisk(p_fixed['h1'], p_fixed['h2'])
+        if not (self.free['paoff'] or self.free['Rc'] or self.free['Rin']):
+            self.update_getvlos(p_fixed['Rc'], p_fixed['Rin'])
+        if not (self.free['paoff'] or self.free['h1'] or self.free['h2'] 
+                or self.free['Rc'] or self.free['Rin']):
+            self.update_vlos(p_fixed['h1'], p_fixed['h2'])
+        
+        p_fixed = np.array([p_fixed[k] for k in self.paramkeys])
+        runfit = None in p_fixed
+        if runfit:
+            notfixed = p_fixed == None
+            ilog = np.array([0, 1, 7])
+            i = ilog[p_fixed[ilog] != None]
+            p_fixed[i] = np.log10(p_fixed[i].astype('float'))
+            labels = np.array(self.paramkeys).copy()
+            labels[ilog] = ['log'+labels[i] for i in ilog]
+            labels = labels[notfixed]
+            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':200, 'nsteps':500,
+                       'labels': labels,
+                       'rangelevel':None, 'range_corner':None,
+                       'figname':filename+'.corner.png', 'show_corner':show}
+            kw = dict(kwargs0, **kwargs_emcee_corner)
+            if self.progressbar:
+                total = kw['nwalkers_per_ndim'] * len(p_fixed[notfixed])
+                total *= kw['nburnin'] + kw['nsteps'] + 2
+                bar = tqdm(total=total)
+                bar.set_description('Within the ranges')
+            def lnprob(p):
+                if self.progressbar:
+                    bar.update(1)
+                q = p_fixed.copy()
+                q[notfixed] = p
+                q[ilog] = 10**q[ilog]
+                model = self.cubemodel(*q)
+                chi2 = np.nansum((self.data_valid - model)**2) \
+                       / self.sigma**2 / self.pixperbeam
+                return -0.5 * chi2
+            plim = np.array([Mstar_range, Rc_range,
+                             cs_range, h1_range, h2_range,
+                             pI_range, Rin_range, Ienv_range,
+                             xoff_range, yoff_range, voff_range,
+                             incl_range, pa_range])
+            plim[ilog] = np.log10(plim[ilog])
+            plim = plim[notfixed].T
+            if type(r_c := kw['range_corner']) is dict:
+                r_c = [r_c[k] if k in r_c else 0.8 for k in self.paramkeys]
+                for i in ilog:
+                    r_c[i] = r_c[i] if type(r_c[i]) is float else np.log10(r_c[i])
+                r_c = [a for a, k in zip(r_c, self.paramkeys) if self.free[k]]
+                kw['range_corner'] = r_c
+                    
+            mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
+            def get_p(i: int):
+                p = p_fixed.copy()
+                p[notfixed] = mcmc[i]
+                p[ilog] = 10**p[ilog]
+                return p
+            self.popt = get_p(0)
+            self.plow = get_p(1)
+            self.pmid = get_p(2)
+            self.phigh = get_p(3)
+        else:
+            def chi2():
+                q = p_fixed.copy()
+                model = self.cubemodel(*q)
+                chi2 = np.nansum((self.data_valid - model)**2) \
+                       / self.sigma**2 / self.pixperbeam
+                return chi2
+            dof = np.prod(np.shape(self.data_valid))
+            # The number of paramter is assumed to be 6 but won't change dof much.
+            dof = dof / self.pixperbeam - 6 - 1
+            self.chi2r = chi2() / dof
+
+            self.popt = p_fixed
+            self.plow = p_fixed
+            self.pmid = p_fixed
+            self.phigh = p_fixed
+            
+        self.pa_rad = self.pa_rad + np.radians(self.popt[12])
+        self.sinpa = np.sin(self.pa_rad)
+        self.cospa = np.cos(self.pa_rad)
+        ulist = ['Msun', 'au', 'km/s', '', '', '', 'au', '',
+                 'au', 'au', 'km/s', 'deg', 'deg']
+        digits = [2, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+        for i, (k, d, u) in enumerate(zip(self.paramkeys, digits, ulist)):
+            p = [self.plow[i], self.popt[i], self.phigh[i]]
+            print(f'{k} = {p[0]:.{d:d}f}, {p[1]:.{d:d}f}, {p[2]:.{d:d}f} {u}')
+        if runfit:
+            plist = [self.popt, self.plow, self.pmid, self.phigh]
+            with open(filename+'.popt.txt', 'w') as f:
+                f.write('#Rows:' + ','.join(self.paramkeys) + '\n')
+                f.write('#Columns:' + ','.join(['popt', 'plow', 'pmid', 'phigh']) + '\n')
+                np.savetxt(f, np.transpose(plist))
+        self.popt = dict(zip(self.paramkeys, self.popt))
+        self.plow = dict(zip(self.paramkeys, self.plow))
+        self.pmid = dict(zip(self.paramkeys, self.pmid))
+        self.phigh = dict(zip(self.paramkeys, self.phigh))
+ 
+    def modeltofits(self, filehead: str = 'best', **kwargs):
+        w = wcs.WCS(naxis=3)
+        h = self.header
+        h['NAXIS1'] = len(self.x)
+        h['NAXIS2'] = len(self.y)
+        h['NAXIS3'] = len(self.v)
+        h['CRPIX1'] = h['CRPIX1'] - self.offpix[0]
+        h['CRPIX2'] = h['CRPIX2'] - self.offpix[1]
+        h['CRPIX3'] = h['CRPIX3'] - self.offpix[2]
+        nx = h['NAXIS1']
+        ny = h['NAXIS2']
+        for k in self.free.keys():
+            self.free[k] = True
+        p = self.popt if kwargs == {} else kwargs 
+        m = self.cubemodel(**p)
+        m0 = self.cubemodel(**p, convolving=False)
+        
+        def concat(m):
+            if len(self.v_red) > 0:
+                m_blue = m[self.v_valid < np.min(self.v_red)]
+            else:
+                m_blue = m * 1
+                m_red = np.full((0, ny, nx), np.nan)
+            if len(self.v_blue) > 0:
+                m_red = m[np.max(self.v_blue) < self.v_valid]
+            else:
+                m_red = m * 1
+                m_blue = np.full((0, ny, nx), np.nan)
+            nanblue = np.full((len(self.v_nanblue), ny, nx), np.nan)
+            nanmid = np.full((len(self.v_nanmid), ny, nx), np.nan)
+            nanred = np.full((len(self.v_nanred), ny, nx), np.nan)
+            model = nanblue
+            if len(m_blue) > 0:
+                model = np.append(model, m_blue, axis=0)
+            if len(nanmid) > 0:
+                model = np.append(model, nanmid, axis=0)
+            if len(m_red) > 0:
+                model = np.append(model, m_red, axis=0)
+            if len(nanred) > 0:
+                model = np.append(model, nanred, axis=0)
+            return model
+                
+        def tofits(d: np.ndarray, ext: str):
+            header = w.to_header()
+            hdu = fits.PrimaryHDU(d, header=header)
+            for k in h.keys():
+                if not ('COMMENT' in k or 'HISTORY' in k):
+                    hdu.header[k]=h[k]
+            hdu = fits.HDUList([hdu])
+            hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
+            
+        tofits((model := concat(m)), 'model')
+        tofits(self.data - model, 'residual')
+        tofits(concat(m0), 'beforeconvolving')
+        
+    def plotmom(self, mode: str, filename: str = 'mom01.png', **kwargs):
+        if 'mod' in mode or 'res' in mode or 'clean' in mode:
+            if kwargs != {}:
+                self.popt = kwargs
+            d = self.cubemodel(**self.popt)
+            m = makemom01(d, self.v_valid, self.sigma)
+        if 'obs' in mode:
+            mom0 = self.mom0
+            mom1 = self.mom1
+            label = 'Obs.'
+        elif 'mod' in mode:
+            mom0 = m['mom0']
+            mom1 = m['mom1']
+            label = 'Model'
+        elif 'res' in mode:
+            mom0 = self.mom0 - m['mom0']
+            mom1 = self.mom1 - m['mom1']
+            label = r'Obs. $-$ model'
+        levels = (3 if 'res' in mode else 6) * self.sigma_mom0
+        levels = np.arange(1, 20) * levels
+        levels = np.sort(np.r_[-levels, levels])
+        fig = plt.figure()
+        ax = fig.add_subplot(1, 1, 1)
+        vplot = (np.nanpercentile(self.mom1, 99) 
+                 - np.nanpercentile(self.mom1, 1)) / 2.
+        m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
+                          shading='nearest', vmin=-vplot, vmax=vplot)
+        fig.colorbar(m, ax=ax, label=label + r' mom1 (km s$^{-1}$)')
+        ax.contour(self.x, self.y, mom0, colors='gray', levels=levels)
+        r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
+        ax.plot(r * self.sinpa, r * self.cospa, 'k:')
+        ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
+        bpos = np.max(self.x) - 0.7 * self.bmaj
+        e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
+                    angle=self.bpa * np.sign(self.dx), facecolor='gray')
+        ax.add_patch(e)
+        ax.set_xlabel('R.A. offset (au)')
+        ax.set_ylabel('Dec. offset (au)')
+        ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
+        ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
+        ax.set_aspect(1)
+        fig.savefig(filename)
+        plt.close()
+
+    def plotdecon(self, filename: str = 'decon.png'):
+        if not(hasattr(self, 'mom0decon') and hasattr(self, 'resdecon')):
+            print('No deconvolution solutions and residual generated.')
+            return 
+        cc = self.mom0decon / self.sigma_mom0
+        cr = self.resdecon / self.sigma_mom0
+        ccmax = np.max(cc)
+        ccmin = np.min(cc)
+        for c, vmin, vmax, s in zip([cc, cr], [ccmin, -6], [ccmax, 6],
+                                    ['deconvolved mom0', 'mom0 residual']):
+            fig = plt.figure()
+            ax = fig.add_subplot(1, 1, 1)
+            m = ax.pcolormesh(self.x, self.y, c, cmap='jet',
+                              shading='nearest', vmin=vmin, vmax=vmax)
+            fig.colorbar(m, ax=ax, label=f'{s} / ' + r'$\sigma$')
+            r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
+            ax.plot(r * self.sinpa, r * self.cospa, 'k:')
+            ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
+            bpos = np.max(self.x) - 0.7 * self.bmaj
+            e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
+                        angle=self.bpa * np.sign(self.dx), facecolor='gray')
+            ax.add_patch(e)
+            ax.set_xlabel('R.A. offset (au)')
+            ax.set_ylabel('Dec. offset (au)')
+            ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
+            ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
+            ax.set_aspect(1)
+            fig.savefig(filename)
+            plt.close()

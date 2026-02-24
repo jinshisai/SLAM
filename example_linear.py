@@ -2,7 +2,7 @@ import numpy as np
 from pvanalysis import PVAnalysis
 
 '-------- INPUTS --------'
-fitsfile = './testfits/testlinear.fits'
+fitsfile = './testfits/test.pvanalysis.linear.fits'
 outname = 'linear'  # file name header for outputs
 incl = 65.  # deg
 vsys = 4.0  # km/s
