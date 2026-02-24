@@ -6,7 +6,7 @@
 SLAM: Spectral Line Analysis/Modeling
 ================================
 
-**SLAM (Spectral Line Analysis/Modeling)** is a Python library for analyzing and modeling spectral line data at (sub)millimeter wavelengths, with a particular focus on rotational motions around (proto)stellar objects. The current release (v2) includes several packages for deriving rotation curves and estimating the dynamical mass of the central object. Details of the methods are presented `Aso & Sai (2024) <https://ui.adsabs.harvard.edu/abs/2024PKAS...39...27A/abstract>`_ and Aso, Sai et al. (2026) in prep.
+**SLAM (Spectral Line Analysis/Modeling)** is a Python library for analyzing and modeling spectral line data at (sub)millimeter wavelengths, with a particular focus on rotational motions around (proto)stellar objects. The second release includes several packages for deriving rotation curves and estimating the dynamical mass of the central object. Details of the methods are presented `Aso & Sai (2024) <https://ui.adsabs.harvard.edu/abs/2024PKAS...39...27A/abstract>`_ and Aso, Sai et al. (2026) in prep.
 
 
 Installation
