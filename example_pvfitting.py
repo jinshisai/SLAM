@@ -32,8 +32,8 @@ pvfit.fit_mockpvd(Mstar_range=[0.1, 1.0],  # Msun; stellar mass
                   show=False, filename=filehead, vmask=vmask,
                   incl=incl, pa_major=pa_major, pa_minor=pa_minor,
                   kwargs_emcee_corner={'nwalkers_per_ndim': 4,
-                                       'nburnin': 30,
-                                       'nsteps': 70,
+                                       'nburnin': 30, # number of burn-in steps. Set a larger number for practical use.
+                                       'nsteps': 70, # number of steps used for posterior.  Set a larger number for practical use.
                                        'rangelevel': 0.99},
                   signmajor=signmajor, signminor=signminor,
                   n_nest=[2, 2, 2, 2, 2, 2], # Refinement factors for each nesting level of the nested grid; pixel resolution increases by the given factor at each level.

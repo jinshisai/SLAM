@@ -31,8 +31,8 @@ chan.fitting(Mstar_range=[0.1, 1.0],  # Msun; stellar mass
                            'incloff': 0, 'paoff':0  # deg, deg; offsets
                            },
              kwargs_emcee_corner={'nwalkers_per_ndim': 2,
-                                  'nburnin': 100,
-                                  'nsteps': 100,
+                                  'nburnin': 100, # number of burn-in steps. Set a larger number for practical use.
+                                  'nsteps': 100, # number of steps used for posterior.  Set a larger number for practical use.
                                   'rangelevel': 0.99},
              filename=filehead)
 p = chan.popt
