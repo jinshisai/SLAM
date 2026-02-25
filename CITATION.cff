@@ -1,4 +1,4 @@
-cff-version: 1.2.0
+cff-version: 2.0.0
 message: "Please cite SLAM as below if you use."
 authors:
   - family-names: Aso
@@ -7,7 +7,7 @@ authors:
   - family-names: Sai
     given-names: Jinshi
     orcid: https://orcid.org/0000-0003-4361-5577
-title: SLAM v1.2.0
-version: 1.2.0
-date-released: 2023-10-12
+title: SLAM v2.0.0
+version: 2.0.0
+date-released: 2026-02-25
 url: https://github.com/jinshisai/SLAM
