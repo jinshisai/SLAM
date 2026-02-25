@@ -1,4 +1,5 @@
 [![Documentation Status](https://readthedocs.org/projects/slam-astro/badge/?version=latest)](https://slam-astro.readthedocs.io/en/latest/?badge=latest)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7944158.svg)](https://doi.org/10.5281/zenodo.7944158)
 
 
 # SLAM: Spectral Line Analysis/Modeling
@@ -7,27 +8,26 @@
 
 ## Features
 
-- **pvanalysis** extracts rotational curves from position-velocity (PV) diagrams and fits them with a power-law (or double-power-law) function. The detail of the method is presented in [Aso et al. 2015](https://ui.adsabs.harvard.edu/abs/2015ApJ...812...27A/abstract), [Sai et al. 2020](https://ui.adsabs.harvard.edu/abs/2020ApJ...893...51S/abstract), [Aso & Sai (2024)](https://ui.adsabs.harvard.edu/abs/2024PKAS...39...27A/abstract), and references therein.
-- **velgrad** extracts rotation curves using the velocity gradient method, which derives two dimensional mean positions as a function of velocity.
-- **pvfitting** package fits observed PV diagrams (taken along the disk major and/or minor axes) with model PV diagrams that include a Keplerian disk and a UCM envelope (Ulrich 1976; Cassen & Moosman 1981). This package enables simultaneous estimation of rotational and infalling velocities, from which the dynamical mass of the central object and deceleration factor for infall motion can be derived.
-- **channelfit** package fits the velocity channel maps with a Keplerian disk model to estimate the dynamical mass of the central object.
+- `pvanalysis` extracts rotational curves from position-velocity (PV) diagrams and fits them with a power-law (or double-power-law) function. The detail of the method is presented in [Aso et al. 2015](https://ui.adsabs.harvard.edu/abs/2015ApJ...812...27A/abstract), [Sai et al. 2020](https://ui.adsabs.harvard.edu/abs/2020ApJ...893...51S/abstract), [Aso & Sai (2024)](https://ui.adsabs.harvard.edu/abs/2024PKAS...39...27A/abstract), and references therein.
+- `velgrad` extracts rotation curves using the velocity gradient method, which derives two dimensional mean positions as a function of velocity.
+- `pvfitting` fits observed PV diagrams (taken along the disk major and/or minor axes) with model PV diagrams of a protostellar system that consists of a Keplerian disk and a UCM envelope (Ulrich 1976; Cassen & Moosman 1981). This package enables simultaneous estimation of rotational and infalling velocities, from which the dynamical mass of the central object and deceleration factor for infall motion can be derived.
+- `channelfit` fits the velocity channel maps with a Keplerian disk model to estimate the dynamical mass of the central object.
 
 For basic usages, please see `example_xxx.py` in this library, where xxx is the name of each package.
 
  
 ## Requirement
 
-* astropy
+* numpy
+* scipy
 * copy
-* corner
-* emcee
-* dynesty
 * math
 * matplotlib
 * mpl_toolkits
-* numpy
-* scipy
-
+* astropy
+* emcee
+* corner
+* dynesty
  
 ## Installation
  
@@ -48,8 +48,6 @@ Also, setting the path in .bashrc (or .zshrc etc.) will be useful.
 ```bash
 export PYTHONPATH=${PYTHONPATH}:/YOUR_PATH_TO/SLAM
 ``` 
-
-
  
 ## Authors
 
@@ -57,25 +55,23 @@ export PYTHONPATH=${PYTHONPATH}:/YOUR_PATH_TO/SLAM
 * *Yusuke Aso*, Korea Astronomy and Space Science Institute (yaso@kasi.re.kr)
 
 ## Citation
-Release in Zenodo: [Aso & Sai (2023)] (https://zenodo.org/records/7783868)
+
+If you use SLAM for publications, please cite Aso, Sai et al. (2026 in prep) after it comes out, as well as [the latest release in Zenodo](https://doi.org/10.5281/zenodo.7944158):
 
 ```
-@software{2023zndo...7783868A,
-       author = {{Aso}, Yusuke and {Sai}, Jinshi},
-        title = "{jinshisai/SLAM: First Release of SLAM}",
-         year = 2023,
-        month = mar,
-          eid = {10.5281/zenodo.7783868},
-          doi = {10.5281/zenodo.7783868},
-      version = {v1.0.0},
-    publisher = {Zenodo},
-       adsurl = {https://ui.adsabs.harvard.edu/abs/2023zndo...7783868A},
-      adsnote = {Provided by the SAO/NASA Astrophysics Data System}
+@software{aso_2026_7944158,
+  author       = {{Aso}, Yusuke and {Sai}, Jinshi},
+  title        = {SLAM v2.0.0},
+  month        = feb,
+  year         = 2026,
+  publisher    = {Zenodo},
+  version      = {v2.0.0},
+  doi          = {10.5281/zenodo.7944158},
+  url          = {https://doi.org/10.5281/zenodo.7944158},
 }
 ```
 
-  
-Manual: [Aso & Sai (2024)](https://pkas.kas.org/journal/article.php?code=91201&list.php?m=1)
+For details of the methodology of `pvanalysis`, the manual paper [Aso & Sai (2024)](https://pkas.kas.org/journal/article.php?code=91201&list.php?m=1) can be also referred:
 
 ```
 @article{2024PKAS...39...2A,
