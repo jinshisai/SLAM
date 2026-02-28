@@ -235,7 +235,7 @@ def estimate_perror(params, func, x, y, xerr, yerr, niter=3000):
 
 	plt.subplots_adjust(wspace=0.4, hspace=0.4)
 	#plt.show()
-	fig_errest.savefig(outname + '_errest.pdf', transparent=True)
+	fig_errest.savefig('errest.pdf', transparent=True)
 	fig_errest.clf()
 
 	return sigmas
