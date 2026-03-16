@@ -1,3 +1,3 @@
 from ._velgrad import VelGrad
 
-__all__ = ['TwoDGrad']
+__all__ = ['VelGrad']
