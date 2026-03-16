@@ -284,7 +284,7 @@ class Nested3DGrid(object):
         z_sub = 0.5 * (ze_sub[:-1] + ze_sub[1:])
         xx_sub, yy_sub, zz_sub = np.meshgrid(x_sub, y_sub, z_sub, indexing = 'ij')
         self.xe_sub, self.ye_sub, self.ze_sub = xe_sub, ye_sub, ze_sub
-        self.x_sub, self.y_sub, z_sub = x_sub, y_sub, z_sub
+        self.x_sub, self.y_sub, self.z_sub = x_sub, y_sub, z_sub
         self.xx_sub, self.yy_sub, self.zz_sub = xx_sub, yy_sub, zz_sub
         self.dx_sub, self.dy_sub, self.dz_sub = self.dx / nsub, self.dy / nsub, self.dz / nsub
         self.nx_sub, self.ny_sub, self.nz_sub = len(x_sub), len(y_sub), len(z_sub)
