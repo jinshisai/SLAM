@@ -28,11 +28,11 @@ chan.fitting(Mstar_range=[0.1, 1.0],  # Msun; stellar mass
                            'Rin': 0,  # au; innermost radius
                            'Ienv': 0,  # intensity scaling for the >Rc region, relative to the inner region.
                            'xoff': 0, 'yoff': 0, 'voff': 0,  # au, au, km/s; offsets
-                           'incloff': 0, 'paoff':0  # deg, deg; offsets
+                           'incloff': 0, 'paoff': 0  # deg, deg; offsets
                            },
              kwargs_emcee_corner={'nwalkers_per_ndim': 2,
-                                  'nburnin': 100, # number of burn-in steps. Set a larger number for practical use.
-                                  'nsteps': 100, # number of steps used for posterior.  Set a larger number for practical use.
+                                  'nburnin': 100,  # number of burn-in steps. Set a larger number for practical use.
+                                  'nsteps': 100,  # number of steps used for posterior.  Set a larger number for practical use.
                                   'rangelevel': 0.99},
              filename=filehead)
 p = chan.popt
