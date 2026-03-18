@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # Created By  : Yusuke Aso
 # Created Date: 2022 Jan 27
 # version = alpha
@@ -33,10 +33,11 @@ vunit = np.sqrt(GG * M_sun / au) * 1e-3
 
 
 def avefour(a: np.ndarray) -> np.ndarray:
-    b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
+    b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2]
          + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
     return b
-    
+
+
 def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     dmasked = np.nan_to_num(d)
     dv = np.min(v[1:] - v[:-1])
@@ -47,8 +48,10 @@ def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
     mom1 = np.sum(d * vv, axis=0) / np.sum(d, axis=0)
     mom2 = np.sqrt(np.sum(d * (vv - mom1)**2, axis=0), np.sum(d, axis=0))
     mom1[mom0 < 3 * sigma_mom0] = np.nan
-    return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
-    
+    return {'mom0': mom0, 'mom1': mom1, 'mom2': mom2,
+            'sigma_mom0': sigma_mom0}
+
+
 def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
           threshold: float = 2, gain: float = 0.01,
           weakestcomponent: float = 0.3,
@@ -85,7 +88,8 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     if savetxt is not None:
         np.savetxt(savetxt, cleancomponent)
     return cleancomponent
-    
+
+
 def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bmaj: float, bmin: float, bpa: float, sigma: float,
                     savetxt: str | None = None, loadtxt: str | None = None,
@@ -155,6 +159,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         Par0[i_p, j_p] = 0
                     else:
                         bounds = [0, dd]
+
                         def model(x, par):
                             values = Par0 + 0
                             values[i_p, j_p] = par
@@ -176,6 +181,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
             method='linear', bounds_error=False, fill_value=0)
     decon = f(tuple(rot(*np.meshgrid(x, y), np.radians(bpa)))[::-1])
     return decon, xmodel, ymodel, zmodel
+
 
 def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                   bmaj: float, bmin: float, bpa: float,
@@ -208,6 +214,7 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     if len(y) % 2 == 0:
         dnew = np.concatenate((np.zeros((1, np.shape(dnew)[1])), dnew), axis=0)
     return dnew
+
 
 class ChannelFit(ReadFits):
 
@@ -261,7 +268,7 @@ class ChannelFit(ReadFits):
         self.cospa = np.cos(pa_rad)
         self.sinpa = np.sin(pa_rad)
         self.X, self.Y = np.meshgrid(self.x, self.y)
-        
+
         self.v_nanblue = v[v < vlim[0]]
         self.v_blue = v[(vlim[0] <= v) * (v <= vlim[1])]
         self.v_nanmid = v[(vlim[1] < v) * (v < vlim[2])]
@@ -271,8 +278,8 @@ class ChannelFit(ReadFits):
 
         self.data_blue = self.data[(vlim[0] <= v) * (v <= vlim[1])]
         self.data_red = self.data[(vlim[2] <= v) * (v <= vlim[3])]
-        self.data_valid = np.append(self.data_blue, self.data_red, axis=0) 
-        
+        self.data_valid = np.append(self.data_blue, self.data_red, axis=0)
+
         m = makemom01(self.data_valid, self.v_valid, sigma)
         self.mom0 = m['mom0']
         self.mom1 = m['mom1']
@@ -287,7 +294,7 @@ class ChannelFit(ReadFits):
             self.signminor = np.sign(np.nansum(self.mom1 * X)) * (-1)
         else:
             self.signminor = signminor
-        
+
         # 2d nested grid on the disk plane.
         # x and y are minor and major axis coordinates before projection.
         r_need = rmax + gaussmargin * self.bmaj
@@ -325,7 +332,7 @@ class ChannelFit(ReadFits):
                   + f' {xnest[l][1]-xnest[l][0]:.2f} au,'
                   + f' {npix:d}')
         print('-----------------------------')
-        
+
         ngauss = int(gaussmargin * self.bmaj / dpix + 0.5)  # 0.5 is for rounding
         xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
@@ -333,7 +340,7 @@ class ChannelFit(ReadFits):
         gaussbeam = np.exp2(-4 *((yb / self.bmaj)**2 + (xb / self.bmin)**2))
         self.pixperbeam = np.sum(gaussbeam)
         self.gaussbeam = gaussbeam  # The 1st (x) axis is in the model order.
-        
+
         n_need = int(r_need / dpix + 0.5)
         self.ineed0 = npix // 2 - n_need
         self.ineed1 = npix // 2 + n_need
@@ -342,7 +349,7 @@ class ChannelFit(ReadFits):
 
         if 'mom0' in self.scaling:
             # Change the 1st (x) axis to the observational order.
-            self.gaussbeam = self.gaussbeam[:, ::-1]  
+            self.gaussbeam = self.gaussbeam[:, ::-1]
         if self.scaling == 'mom0clean':
             self.mom0decon = clean(data=self.mom0, beam=self.gaussbeam,
                                    sigma=self.sigma_mom0,
@@ -360,7 +367,7 @@ class ChannelFit(ReadFits):
         elif self.scaling == 'mom0ft':
             self.mom0decon = ftdeconvolve(x=self.x, y=self.y, data=self.mom0,
                                            bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
-                                           sigma = self.sigma_mom0, threshold=3)
+                                           sigma=self.sigma_mom0, threshold=3)
             print('Divided in the Fourier space.')
         if 'mom0' in self.scaling:
             c = convolve(self.mom0decon, self.gaussbeam, mode='same')
@@ -378,7 +385,7 @@ class ChannelFit(ReadFits):
         self.sini = np.sin(i)
         self.cosi = np.cos(i)
         self.tani = np.tan(i)
-        
+
     def update_xdisk(self, h1: float, h2: float = -1):
         x = [None] * 4
         for i, hdisk in zip([0, 2], [h1, h2]):
@@ -447,10 +454,10 @@ class ChannelFit(ReadFits):
                 vlos[~c] = np.nan
             return vlos
         self.getvlos = getvlos
-        
+
     def update_vlos(self, h1: float, h2: float):
         self.vlos = [self.getvlos(x, h) for x, h in zip(self.xdisk, [h1, h1, h2, h2])]
-    
+
     def get_Iunif(self, Mstar: float, Rc: float, pI: float,
                   Ienv: float, offvsys: float) -> np.ndarray:
         Iunif = 0
@@ -472,7 +479,7 @@ class ChannelFit(ReadFits):
         Iunif = Iunif[:, 0, self.ineed0:self.ineed1, self.ineed0:self.ineed1]  # v, y, x
         return Iunif
 
-    def rgi2d(self, xoff: float, yoff:float,
+    def rgi2d(self, xoff: float, yoff: float,
               I_in: np.ndarray) -> np.ndarray:
         Iout = [None] * len(I_in)
         for i, c in enumerate(I_in):
@@ -498,7 +505,7 @@ class ChannelFit(ReadFits):
 
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   h1: float = 0, h2: float = -1, pI: float = 0,
-                  Rin: float = 0, Ienv: float = 0, 
+                  Rin: float = 0, Ienv: float = 0,
                   xoff: float = 0, yoff: float = 0, voff: float = 0,
                   incloff: float = 90, paoff: float = 0,
                   convolving: bool = True):
@@ -535,7 +542,7 @@ class ChannelFit(ReadFits):
             scale = self.get_scale(Iout)
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
         return Iout
-                  
+
     def fitting(self, Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
                 cs_range: list = [0.01, 1],
@@ -554,8 +561,8 @@ class ChannelFit(ReadFits):
                 show: bool = False,
                 kwargs_emcee_corner: dict = {}):
 
-        p_fixed = {k:fixed_params[k] if k in fixed_params else None for k in self.paramkeys}
-        self.free = {k:p_fixed[k] is None for k in self.paramkeys}
+        p_fixed = {k: fixed_params[k] if k in fixed_params else None for k in self.paramkeys}
+        self.free = {k: p_fixed[k] is None for k in self.paramkeys}
 
         if not self.free['paoff']:
             self.update_pa(p_fixed['paoff'])
@@ -567,30 +574,32 @@ class ChannelFit(ReadFits):
             self.update_xdisk(p_fixed['h1'], p_fixed['h2'])
         if not (self.free['paoff'] or self.free['Rc'] or self.free['Rin']):
             self.update_getvlos(p_fixed['Rc'], p_fixed['Rin'])
-        if not (self.free['paoff'] or self.free['h1'] or self.free['h2'] 
+        if not (self.free['paoff'] or self.free['h1'] or self.free['h2']
                 or self.free['Rc'] or self.free['Rin']):
             self.update_vlos(p_fixed['h1'], p_fixed['h2'])
-        
+
         p_fixed = np.array([p_fixed[k] for k in self.paramkeys])
         runfit = None in p_fixed
         if runfit:
-            notfixed = p_fixed == None
+            notfixed = np.equal(p_fixed, None)
             ilog = np.array([0, 1, 7])
-            i = ilog[p_fixed[ilog] != None]
+            i = ilog[np.not_equal(p_fixed[ilog], None)]
             p_fixed[i] = np.log10(p_fixed[i].astype('float'))
             labels = np.array(self.paramkeys).copy()
             labels[ilog] = ['log'+labels[i] for i in ilog]
             labels = labels[notfixed]
-            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':200, 'nsteps':500,
-                       'labels': labels,
-                       'rangelevel':None, 'range_corner':None,
-                       'figname':filename+'.corner.png', 'show_corner':show}
+            kwargs0 = {'nwalkers_per_ndim': 16, 'nburnin': 200,
+                       'nsteps': 500, 'labels': labels,
+                       'rangelevel': None, 'range_corner': None,
+                       'figname': filename+'.corner.png',
+                       'show_corner': show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
             if self.progressbar:
                 total = kw['nwalkers_per_ndim'] * len(p_fixed[notfixed])
                 total *= kw['nburnin'] + kw['nsteps'] + 2
                 bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
+
             def lnprob(p):
                 if self.progressbar:
                     bar.update(1)
@@ -614,8 +623,9 @@ class ChannelFit(ReadFits):
                     r_c[i] = r_c[i] if type(r_c[i]) is float else np.log10(r_c[i])
                 r_c = [a for a, k in zip(r_c, self.paramkeys) if self.free[k]]
                 kw['range_corner'] = r_c
-                    
+
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
+
             def get_p(i: int):
                 p = p_fixed.copy()
                 p[notfixed] = mcmc[i]
@@ -641,7 +651,7 @@ class ChannelFit(ReadFits):
             self.plow = p_fixed
             self.pmid = p_fixed
             self.phigh = p_fixed
-            
+
         self.pa_rad = self.pa_rad + np.radians(self.popt[12])
         self.sinpa = np.sin(self.pa_rad)
         self.cospa = np.cos(self.pa_rad)
@@ -661,7 +671,7 @@ class ChannelFit(ReadFits):
         self.plow = dict(zip(self.paramkeys, self.plow))
         self.pmid = dict(zip(self.paramkeys, self.pmid))
         self.phigh = dict(zip(self.paramkeys, self.phigh))
- 
+
     def modeltofits(self, filehead: str = 'best', **kwargs):
         w = wcs.WCS(naxis=3)
         h = self.header
@@ -675,10 +685,10 @@ class ChannelFit(ReadFits):
         ny = h['NAXIS2']
         for k in self.free.keys():
             self.free[k] = True
-        p = self.popt if kwargs == {} else kwargs 
+        p = self.popt if kwargs == {} else kwargs
         m = self.cubemodel(**p)
         m0 = self.cubemodel(**p, convolving=False)
-        
+
         def concat(m):
             if len(self.v_red) > 0:
                 m_blue = m[self.v_valid < np.min(self.v_red)]
@@ -703,20 +713,20 @@ class ChannelFit(ReadFits):
             if len(nanred) > 0:
                 model = np.append(model, nanred, axis=0)
             return model
-                
+
         def tofits(d: np.ndarray, ext: str):
             header = w.to_header()
             hdu = fits.PrimaryHDU(d, header=header)
             for k in h.keys():
                 if not ('COMMENT' in k or 'HISTORY' in k):
-                    hdu.header[k]=h[k]
+                    hdu.header[k] = h[k]
             hdu = fits.HDUList([hdu])
             hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
-            
+
         tofits((model := concat(m)), 'model')
         tofits(self.data - model, 'residual')
         tofits(concat(m0), 'beforeconvolving')
-        
+
     def plotmom(self, mode: str, filename: str = 'mom01.png', **kwargs):
         if 'mod' in mode or 'res' in mode or 'clean' in mode:
             if kwargs != {}:
@@ -740,7 +750,7 @@ class ChannelFit(ReadFits):
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
-        vplot = (np.nanpercentile(self.mom1, 99) 
+        vplot = (np.nanpercentile(self.mom1, 99)
                  - np.nanpercentile(self.mom1, 1)) / 2.
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
                           shading='nearest', vmin=-vplot, vmax=vplot)
@@ -762,9 +772,9 @@ class ChannelFit(ReadFits):
         plt.close()
 
     def plotdecon(self, filename: str = 'decon.png'):
-        if not(hasattr(self, 'mom0decon') and hasattr(self, 'resdecon')):
+        if not (hasattr(self, 'mom0decon') and hasattr(self, 'resdecon')):
             print('No deconvolution solutions and residual generated.')
-            return 
+            return
         cc = self.mom0decon / self.sigma_mom0
         cr = self.resdecon / self.sigma_mom0
         ccmax = np.max(cc)
