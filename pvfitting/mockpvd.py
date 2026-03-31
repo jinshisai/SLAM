@@ -13,8 +13,6 @@ GG = constants.G.si.value
 M_sun = constants.M_sun.si.value
 deg = units.deg.to('radian')
 
-
-
 class MockPVD(object):
     """
     MockPVD is a class to generate mock position-velocity (PV) diagrams of a protostellar 
@@ -28,10 +26,10 @@ class MockPVD(object):
     and a constant molecular abundance. To match the mock PV diagram with observational data, 
     it must be rescaled by the observed flux.
     """
-    def __init__(self, x:np.ndarray, z:np.ndarray, v:np.ndarray, 
-                 nnest:list | None = None, nsubgrid: int = 1, 
-                 xlim:list | None = None, ylim: list | None = None, zlim:list | None = None,
-                 beam:list | None = None, reslim: float = 10,
+    def __init__(self, x: np.ndarray, z: np.ndarray, v: np.ndarray,
+                 nnest: list | None = None, nsubgrid: int = 1,
+                 xlim: list | None = None, ylim: list | None = None, zlim:list | None = None,
+                 beam: list | None = None, reslim: float = 10,
                  signmajor: int = 1, signminor: int = 1,
                  pa_major: float = 0, pa_minor: float = 90):
         '''
@@ -40,24 +38,26 @@ class MockPVD(object):
         Parameters
         ----------
         x, z, v (array): 1D arrays for x, z and v axes.
-        nsubgrid (int): A refinement factor for the subgrid, in which the pixel resolution 
+        nsubgrid (int): A refinement factor for the subgrid, in which the pixel resolution
          of the entire original grid is refined by the refining factor.
-        nnest (list): A list of refinement factors for each nesting level of the nested 
-         grid; pixel resolution increases by the given factor at each nesting level. 
-         For example, if nnest=[4, 2], the grid is nested to three levels (original, 
+        nnest (list): A list of refinement factors for each nesting level of the nested
+         grid; pixel resolution increases by the given factor at each nesting level.
+         For example, if nnest=[4, 2], the grid is nested to three levels (original,
          first nesting level, and second nesting level), and the pixel resolution increases
          by a factor of 4 and 2 at the first- and second nesting levels, respectively.
-        xlim, zlim (list): x and z ranges for the nested grid. 
+        xlim, zlim (list): x and z ranges for the nested grid.
          Must be given as [[xmin0, xmax0], [xmin1, xmax1]] and [[zmin0, zmax0], [zmin1, zmax1]].
         beam (list): Beam info, which must be give [major, minor, pa].
-        reslim (float or int): Resolution threshold that triggers nesting. It is used as an 
+        reslim (float or int): Resolution threshold that triggers nesting. It is used as an
          alternative way to set xlim and zlim for the nested grid instead of givin exact
-         x and z ranges. When nnest is given but either xlim or zlim is not provided, 
-         the grid is nested when the spatial scale hits the resolution threshold. 
-         For example, if reslim=10, xlim will be set to [-10 x upper-level resolution, 
+         x and z ranges. When nnest is given but either xlim or zlim is not provided,
+         the grid is nested when the spatial scale hits the resolution threshold.
+         For example, if reslim=10, xlim will be set to [-10 x upper-level resolution,
          upper-level resolution]. Same for zlim.
-        signmajor: 1 for the case where the positive offset is on the redshifted side in the PV diagram along the major axis; otherwise -1.
-        signminor: 1 for the case where the negative offset is on the redshifted side in the PV diagram along the minor axis; otherwise -1.
+        signmajor: 1 for the case where the positive offset is on the redshifted side in the PV diagram
+         along the major axis; otherwise -1.
+        signminor: 1 for the case where the negative offset is on the redshifted side in the PV diagram
+         along the minor axis; otherwise -1.
         pa_major: PA of the positive offset of the PV diagram along the major axis.
         pa_minor: PA of the positive offset of the PV diagram along the minor axis.
         '''
@@ -91,13 +91,12 @@ class MockPVD(object):
 
         # make grid
         self.makegrid(xlim, ylim, zlim, reslim = reslim)
-        #print(self.grid.xnest)
         self.xx, self.vv = np.meshgrid(self._x, self.v)
 
-    def generate_mockpvd(self, Mstar:float, Rc:float, alphainfall: float = 1., 
+    def generate_mockpvd(self, Mstar: float, Rc: float, alphainfall: float = 1.,
                          taumax: float = 1., frho: float = 1.,
                          incl: float = 89., pa: float | list = 0.,
-                         linewidth: float | None = None, rin: float = 1., 
+                         linewidth: float | None = None, rin: float = 1.,
                          rout: float | None = None, axis: str = 'both'):
         '''
         Generate a mock PV diagram.
@@ -134,7 +133,7 @@ class MockPVD(object):
                 vlos.append(_vlos)
             # density normalization
             rho_max = np.nanmax([np.nanmax([np.nanmax(i) for i in _rho]) for _rho in rho])
-            rho = [ [i / rho_max for i in _rho] for _rho in rho] # normalized rho
+            rho = [[i / rho_max for i in _rho] for _rho in rho]  # normalized rho
             # get PV diagrams
             palist = [self.pa_major, self.pa_minor]
             signlist = [self.signmajor, self.signminor]
@@ -155,12 +154,12 @@ class MockPVD(object):
             return self.generate_pvd(rho=rho, vlos=vlos, taumax=taumax,
                                      beam=self.beam, linewidth=linewidth, pa=pa)
 
-    def subgrid(self, axes:list, nsubgrid:int):
+    def subgrid(self, axes: list, nsubgrid: int):
         axes_out = []
         for x in axes:
             nx = len(x)
             dx = x[1] - x[0]
-            x_e = np.linspace( x[0] - 0.5 * dx, x[-1] + 0.5 * dx, nx*nsubgrid + 1)
+            x_e = np.linspace(x[0] - 0.5 * dx, x[-1] + 0.5 * dx, nx*nsubgrid + 1)
             x = 0.5 * (x_e[:-1] + x_e[1:])
             axes_out.append(x)
         return axes_out
@@ -176,9 +175,9 @@ class MockPVD(object):
         if self.beam is not None:
             bmaj, bmin, bpa = self.beam
             y = np.arange(
-                -int(bmaj / dx * 3. / 2.35) -1, 
-                int(bmaj / dx * 3. / 2.35) + 2, 
-                1) * dx # +/- 3 sigma
+                -int(bmaj / dx * 3. / 2.35) -1,
+                int(bmaj / dx * 3. / 2.35) + 2,
+                1) * dx  # +/- 3 sigma
             self.y = y
         else:
             y = np.array([-dx, 0., dx])
@@ -194,7 +193,7 @@ class MockPVD(object):
     def gridinfo(self):
         self.grid.gridinfo(units=['au', 'au', 'au'])
 
-    def build(self, Mstar:float, Rc:float, incl:float,
+    def build(self, Mstar: float, Rc: float, incl: float,
               alphainfall: float = 1., frho: float = 1.,
               rin: float = 1.0, rout: float | None = None,
               collapse: bool = False, normalize: bool = True,
@@ -221,8 +220,6 @@ class MockPVD(object):
             # get density and velocity
             rho, vlos = precalculation.get_rho_vlos(Rc, frho, alphainfall, axis, l)
             vlos = vlos * vunit
-            #if len(rho.shape) != 3: rho = rho.reshape(nx, ny, nz) # in 3D
-            #if len(vlos.shape) != 3: vlos = vlos.reshape(nx, ny, nz) # in 3D
 
             # inner and outer edge
             rho[r_org <= rin] = 0.
@@ -249,7 +246,7 @@ class MockPVD(object):
 
         return d_rho, d_vlos
 
-    def generate_pvd(self, rho:np.ndarray | list, vlos:np.ndarray | list, 
+    def generate_pvd(self, rho: np.ndarray | list, vlos: np.ndarray | list,
                      taumax: float = 1., beam: list | None = None,
                      linewidth: float | None = None, pa: float = 0.):
         ny = self.grid.ny
@@ -260,10 +257,11 @@ class MockPVD(object):
         if precalculation.vedge is None:
             precalculation.vedge = np.hstack([v - delv * 0.5, v[-1] + 0.5 * delv])
 
-        if type(rho) == np.ndarray: rho = [rho.ravel()]
-        if type(vlos) == np.ndarray: vlos = [vlos.ravel()]
+        if type(rho) is np.ndarray:
+            rho = [rho.ravel()]
+        if type(vlos) is np.ndarray:
+            vlos = [vlos.ravel()]
 
-        #tau_v  = np.zeros((nv, ny, nx)) # mock tau
         # go up from the deepest layer to the upper layer
         rho_col = [self.grid.collapse(rho, upto=l) for l in range(self.grid.nlevels)]
         vlos_col = [self.grid.collapse(vlos, upto=l) for l in range(self.grid.nlevels)]
@@ -277,15 +275,15 @@ class MockPVD(object):
             return np.nanmean(d_avg, axis=0)
 
         # innermost grid
-        _nx, _ny, _nz = self.grid.ngrids[-1] # dimension of the l-th layer
+        _nx, _ny, _nz = self.grid.ngrids[-1]  # dimension of the l-th layer
         rho_l = rho_col[-1].reshape(_nx, _ny, _nz)
         vlos_l = vlos_col[-1].reshape(_nx, _ny, _nz)
         dz = self.grid.zaxes[-1][1] - self.grid.zaxes[-1][0]
         tau_v = rho2tau(vlos_l, rho_l) * dz
         # if nested grid
         if self.grid.nlevels >= 2:
-            for l in range(self.grid.nlevels-2,-1,-1):
-                _nx, _ny, _nz = self.grid.ngrids[l] # dimension of the l-th layer
+            for l in range(self.grid.nlevels-2, -1, -1):
+                _nx, _ny, _nz = self.grid.ngrids[l]  # dimension of the l-th layer
                 rho_l = rho_col[l].reshape(_nx, _ny, _nz)
                 vlos_l = vlos_col[l].reshape(_nx, _ny, _nz)
                 dz = self.grid.zaxes[l][1] - self.grid.zaxes[l][0]
@@ -306,12 +304,11 @@ class MockPVD(object):
         # convolution along the spectral direction
         if linewidth is not None:
             if precalculation.gauss_v is None:
-                #gaussbeam = np.exp(- 0.5 * (v /(linewidth / 2.35))**2.)
                 gaussbeam = np.exp(-(v - v[nv//2 - 1 + nv%2])**2. / linewidth**2.)
                 gaussbeam /= np.sum(gaussbeam)
                 precalculation.gauss_v = gaussbeam[:, np.newaxis, np.newaxis]
             g = precalculation.gauss_v
-            tau_v = convolve(tau_v, g, mode='same') # conserve integrated value
+            tau_v = convolve(tau_v, g, mode='same')  # conserve integrated value
 
         I_cube = 1. - np.exp(-tau_v / np.nanmax(tau_v) * taumax)
 
@@ -330,6 +327,6 @@ class MockPVD(object):
         I_pv = I_cube[:, ny//2, :]
 
         if self.nsubgrid > 1:
-            I_pv = np.nanmean(np.array([I_pv[:, i::self.nsubgrid] 
+            I_pv = np.nanmean(np.array([I_pv[:, i::self.nsubgrid]
                                         for i in range(self.nsubgrid)]), axis=0)
         return I_pv
