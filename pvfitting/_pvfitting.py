@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-#----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Created By  : Yusuke Aso
 # Created Date: 2022 Jan 27
 # Updated Date: 2023 Nov 21 by J.Sai
@@ -27,7 +27,6 @@ warnings.simplefilter('ignore', RuntimeWarning)
 
 
 class PVFitting(ReadFits):
-
 
     def put_PV(self, pvmajorfits: str, pvminorfits: str,
                dist: float, vsys: float,
@@ -59,7 +58,6 @@ class PVFitting(ReadFits):
             d.append(self.data)
         self.dpvmajor, self.dpvminor = d
 
-
     def check_modelgrid(self, nsubgrid: float = 1,
                         n_nest: list | None = None, reslim: float = 5):
         # model grid
@@ -67,7 +65,6 @@ class PVFitting(ReadFits):
                        nsubgrid=nsubgrid, nnest=n_nest,
                        beam=self.beam, reslim=reslim)
         mpvd.grid.gridinfo()
-
 
     def fit_mockpvd(self, incl: float = 89.,
                     Mstar_range: list[float, float] = [0.01, 10],
@@ -132,7 +129,7 @@ class PVFitting(ReadFits):
                                                  rout=rout, axis='both')
             # quadrant
             fflux = (np.nansum(majobs * major) + np.nansum(minobs * minor)) \
-            / (np.nansum(major * major) + np.nansum(minor * minor))
+                / (np.nansum(major * major) + np.nansum(minor * minor))
             return fflux * major, fflux * minor
         self.makemodel = makemodel
 
@@ -144,13 +141,13 @@ class PVFitting(ReadFits):
 
         runfit = None in p_fixed
         if runfit:
-            notfixed = (p_fixed is None)
+            notfixed = [x is None for x in p_fixed]
             ilog = np.array([0, 1, 2, 3, 4], dtype=int)
-            i = ilog[p_fixed[ilog] is not None]
+            i = ilog[[p_fixed[i] is not None for i in ilog]]
             p_fixed[i] = np.log10(p_fixed[i].astype('float'))
             labels = np.array(['Mstar', 'Rc', r'$\alpha$', r'$\tau_\mathrm{max}$',
                                r'$f_\rho$', r'$\sigma_\mathrm{model}$'])
-            labels[ilog] = ['log'+labels[i] for i in ilog]
+            labels[ilog] = ['log' + labels[i] for i in ilog]
             labels = labels[notfixed]
             kwargs0 = {'nwalkers_per_ndim': 4, 'nburnin': 500, 'nsteps': 500,
                        'rangelevel': None, 'range_corner': None, 'labels': labels,
@@ -171,7 +168,7 @@ class PVFitting(ReadFits):
                     bar.update(1)
                 # parameter
                 q = p_fixed.copy()
-                q[notfixed] = p # in linear scale
+                q[notfixed] = p  # in linear scale
                 q[ilog] = 10**q[ilog]
                 # updated sigma
                 majsig2 = (1. + q[-1]**2) * majsig**2
@@ -179,7 +176,7 @@ class PVFitting(ReadFits):
                 # make model
                 majmod, minmod = self.makemodel(*q[:-1])
                 chi2maj = np.nansum((majobs - majmod)**2 / majsig2 + np.log(majsig2))
-                chi2min = np.nansum((minobs - minmod)**2 / minsig2 + np.log(minsig2)) 
+                chi2min = np.nansum((minobs - minmod)**2 / minsig2 + np.log(minsig2))
                 return -0.5 * (chi2maj + chi2min) / np.sqrt(Rarea)
             # prior
             plim = np.array([Mstar_range, Rc_range, alphainfall_range,
@@ -195,6 +192,7 @@ class PVFitting(ReadFits):
 
             # run mcmc fitting
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
+
             # best parameters & errors
             def get_p(i: int):
                 p = p_fixed.copy()
@@ -236,7 +234,7 @@ class PVFitting(ReadFits):
         flist = ['f', 'f', 'f', 'e', 'e', 'f']
         for i, (k, d, u, f) in enumerate(zip(paramkeys, digits, ulist, flist)):
             p = [self.plow[i], self.popt[i], self.phigh[i]]
-            print(f'{k} = {p[0]:.{d:d}{f}}, {p[1]:.{d:d}{f}}, {p[2]:.{d:d}{f}} {u}')
+            print(f'{k} = {p[0]: .{d:d}{f}}, {p[1]: .{d:d}{f}}, {p[2]: .{d:d}{f}} {u}')
         if runfit:
             plist = [self.popt, self.plow, self.pmid, self.phigh]
             with open(filename+'.popt.txt', 'w') as f:
@@ -337,7 +335,7 @@ class PVFitting(ReadFits):
                                 cmap=cmap, vmin=vmin_plot, vmax=vmax_plot,
                                 alpha=alpha, rasterized=True)
             ax1.contour(self.x, self.v, data_contour[0],
-                       levels=clevels, colors='k')
+                        levels=clevels, colors='k')
             ax1.set_xlabel('Major offset (au)')
             ax1.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
 
@@ -378,11 +376,9 @@ class PVFitting(ReadFits):
 
             return fig
 
-
         # color images and model images
         d_col = [majmod, minmod] if color == 'model' else [majobs, minobs]
         d_con = [majmod, minmod] if contour == 'model' else [majobs, minobs]
-
 
         figs = []
         # main plot
@@ -441,7 +437,7 @@ class PVFitting(ReadFits):
             hdu = fits.PrimaryHDU(d, header=header)
             for k in h.keys():
                 if not ('COMMENT' in k or 'HISTORY' in k):
-                    hdu.header[k]=h[k]
+                    hdu.header[k] = h[k]
             hdu = fits.HDUList([hdu])
             hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
 

@@ -15,20 +15,21 @@ deg = units.deg.to('radian')
 
 class MockPVD(object):
     """
-    MockPVD is a class to generate mock position-velocity (PV) diagrams of a protostellar 
+    MockPVD is a class to generate mock position-velocity (PV) diagrams of a protostellar
     disk-envelope system assuming a cut-off disk and the UCM envelope model.
 
-    The mock PV diagram is calculated with the scaled optical depth, computed by summing up 
-    the gas density along the line-of-sight and rescaling the integrated value, and the 
+    The mock PV diagram is calculated with the scaled optical depth, computed by summing up
+    the gas density along the line-of-sight and rescaling the integrated value, and the
     radiative transfer equation of Iv = (1 - exp(-tau_v)) for normalized intensity.
 
-    Physical assumptions behind the intensity calculation is the isothermal disk and envelope, 
-    and a constant molecular abundance. To match the mock PV diagram with observational data, 
+    Physical assumptions behind the intensity calculation is the isothermal disk and envelope,
+    and a constant molecular abundance. To match the mock PV diagram with observational data,
     it must be rescaled by the observed flux.
     """
+
     def __init__(self, x: np.ndarray, z: np.ndarray, v: np.ndarray,
                  nnest: list | None = None, nsubgrid: int = 1,
-                 xlim: list | None = None, ylim: list | None = None, zlim:list | None = None,
+                 xlim: list | None = None, ylim: list | None = None, zlim: list | None = None,
                  beam: list | None = None, reslim: float = 10,
                  signmajor: int = 1, signminor: int = 1,
                  pa_major: float = 0, pa_minor: float = 90):
@@ -90,7 +91,7 @@ class MockPVD(object):
         self.signminor = signminor
 
         # make grid
-        self.makegrid(xlim, ylim, zlim, reslim = reslim)
+        self.makegrid(xlim, ylim, zlim, reslim=reslim)
         self.xx, self.vv = np.meshgrid(self._x, self.v)
 
     def generate_mockpvd(self, Mstar: float, Rc: float, alphainfall: float = 1.,
@@ -149,7 +150,7 @@ class MockPVD(object):
             rho, vlos = self.build(Mstar=Mstar, Rc=Rc, incl=incl,
                                    alphainfall=alphainfall, frho=frho,
                                    rin=rin, rout=rout, axis=axis,
-                                   collapse=False)
+                                   collapse=False, normalize=True)
             # PV cut
             return self.generate_pvd(rho=rho, vlos=vlos, taumax=taumax,
                                      beam=self.beam, linewidth=linewidth, pa=pa)
@@ -175,13 +176,12 @@ class MockPVD(object):
         if self.beam is not None:
             bmaj, bmin, bpa = self.beam
             y = np.arange(
-                -int(bmaj / dx * 3. / 2.35) -1,
+                - int(bmaj / dx * 3. / 2.35) -1,
                 int(bmaj / dx * 3. / 2.35) + 2,
                 1) * dx  # +/- 3 sigma
             self.y = y
         else:
             y = np.array([-dx, 0., dx])
-
 
         if self.nnest is not None:
             grid = Nested3DGrid(x, y, z, xlim, ylim, zlim, self.nnest,
@@ -223,7 +223,8 @@ class MockPVD(object):
 
             # inner and outer edge
             rho[r_org <= rin] = 0.
-            if rout is not None: rho[np.where(r_org > rout)] = 0
+            if rout is not None:
+                rho[np.where(r_org > rout)] = 0
 
             d_rho[l] = rho
             d_vlos[l] = vlos
@@ -266,14 +267,6 @@ class MockPVD(object):
         rho_col = [self.grid.collapse(rho, upto=l) for l in range(self.grid.nlevels)]
         vlos_col = [self.grid.collapse(vlos, upto=l) for l in range(self.grid.nlevels)]
 
-        # binning
-        def binning(data, nbin):
-            d_avg = np.array([
-                data[:, i::nbin, i::nbin]
-                for j in range(nbin) for i in range(nbin)
-                ])
-            return np.nanmean(d_avg, axis=0)
-
         # innermost grid
         _nx, _ny, _nz = self.grid.ngrids[-1]  # dimension of the l-th layer
         rho_l = rho_col[-1].reshape(_nx, _ny, _nz)
@@ -304,7 +297,7 @@ class MockPVD(object):
         # convolution along the spectral direction
         if linewidth is not None:
             if precalculation.gauss_v is None:
-                gaussbeam = np.exp(-(v - v[nv//2 - 1 + nv%2])**2. / linewidth**2.)
+                gaussbeam = np.exp(- (v - v[nv//2 - 1 + nv%2])**2. / linewidth**2.)
                 gaussbeam /= np.sum(gaussbeam)
                 precalculation.gauss_v = gaussbeam[:, np.newaxis, np.newaxis]
             g = precalculation.gauss_v
@@ -330,3 +323,11 @@ class MockPVD(object):
             I_pv = np.nanmean(np.array([I_pv[:, i::self.nsubgrid]
                                         for i in range(self.nsubgrid)]), axis=0)
         return I_pv
+
+# binning
+def binning(data, nbin):
+    d_avg = np.array([
+        data[:, i::nbin, i::nbin]
+        for j in range(nbin) for i in range(nbin)
+        ])
+    return np.nanmean(d_avg, axis=0)

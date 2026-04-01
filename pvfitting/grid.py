@@ -6,27 +6,26 @@ class Nested3DGrid(object):
     """docstring for NestedGrid"""
     def __init__(self, x, y, z,
                  xlim, ylim, zlim, nsub,
-                 nlevels = 1, reslim = 5,):
+                 nlevels=1, reslim=5,):
         super(Nested3DGrid, self).__init__()
         # save axes of the mother grid
-        self.x=x
-        self.y=y
-        self.z=z
-        dx=x[1] - x[0]
-        dy=y[1] - y[0]
-        dz=z[1] - z[0]
-        self.dx=dx
-        self.dy=dy
-        self.dz=dz
-        xe=np.hstack([x - self.dx * 0.5, x[-1] + self.dx * 0.5])
-        ye=np.hstack([y - self.dy * 0.5, y[-1] + self.dy * 0.5])
-        ze=np.hstack([z - self.dz * 0.5, z[-1] + self.dz * 0.5])
-        self.xe, self.ye, self.ze=xe, ye, ze
-        nz, ny, nx=len(z), len(y), len(x)
-        self.nz, self.ny, self.nx=nz, ny, nx
-        self.xx, self.yy, self.zz=np.meshgrid(x, y, z, indexing='ij')
-        self.Lx, self.Ly, self.Lz=xe[-1] - xe[0], ye[-1] - ye[0], ze[-1] - ze[0]
-
+        self.x = x
+        self.y = y
+        self.z = z
+        dx = x[1] - x[0]
+        dy = y[1] - y[0]
+        dz = z[1] - z[0]
+        self.dx = dx
+        self.dy = dy
+        self.dz = dz
+        xe = np.hstack([x - self.dx * 0.5, x[-1] + self.dx * 0.5])
+        ye = np.hstack([y - self.dy * 0.5, y[-1] + self.dy * 0.5])
+        ze = np.hstack([z - self.dz * 0.5, z[-1] + self.dz * 0.5])
+        self.xe, self.ye, self.ze = xe, ye, ze
+        nz, ny, nx = len(z), len(y), len(x)
+        self.nz, self.ny, self.nx = nz, ny, nx
+        self.xx, self.yy, self.zz = np.meshgrid(x, y, z, indexing='ij')
+        self.Lx, self.Ly, self.Lz = xe[-1] - xe[0], ye[-1] - ye[0], ze[-1] - ze[0]
 
         # nested grid
         self.nsub = nsub
@@ -53,7 +52,7 @@ class Nested3DGrid(object):
         # nest
         if self.nlevels > 1:
             if any([xlim is None, ylim is None, zlim is None]):
-                _xlim, _ylim, _zlim = self.get_nestinglim(reslim = reslim)
+                _xlim, _ylim, _zlim = self.get_nestinglim(reslim=reslim)
                 if xlim is None:
                     xlim = _xlim
                 if ylim is None:
@@ -71,8 +70,7 @@ class Nested3DGrid(object):
             self.ylim = [ye[0], ye[-1]]
             self.zlim = [ze[0], ze[-1]]
 
-
-    def get_nestinglim(self, reslim = 5):
+    def get_nestinglim(self, reslim=5):
         xlim = []
         ylim = []
         zlim = []
@@ -84,19 +82,6 @@ class Nested3DGrid(object):
             _dx, _dy, _dz = np.array([_dx, _dy, _dz]) / self.nsub[l]
 
         return xlim, ylim, zlim
-
-
-    def check_symmetry(self, decimals = 5):
-        nx, ny = self.nx, self.ny
-        xc = np.round(self.xc, decimals)
-        yc = np.round(self.yc, decimals)
-        delxs = (self.xx[1:, 1:] - self.xx[:-1, :-1]) / self.dx
-        delys = (self.yy[1:, 1:] - self.yy[:-1, :-1]) / self.dy
-        _xdel = (np.round(delxs, decimals) == 1.).all()
-        _ydel = (np.round(delys, decimals)  == 1.).all()
-        cond = [_xdel, _ydel]
-        return all(cond), cond
-
 
     def get_grid(self, l):
         '''
@@ -111,9 +96,8 @@ class Nested3DGrid(object):
         else:
             # else
             x, y, z = self.xaxes[l], self.yaxes[l], self.zaxes[l]
-            xx, yy, zz = np.meshgrid(x, y, z, indexing = 'ij')
+            xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
         return xx, yy, zz
-
 
     def nest(self, l, xlim, ylim, zlim, nsub):
         '''
@@ -134,7 +118,7 @@ class Nested3DGrid(object):
             yy = self.ynest[l-1].reshape(_nx, _ny, _nz)
             zz = self.znest[l-1].reshape(_nx, _ny, _nz)
         else:
-            xx, yy, zz = np.meshgrid(x, y, z, indexing = 'ij')
+            xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
         # devide the upper grid into six sub-regions
         # Region 1:  x from 0 to ximin, all y and z
         R1x = xx[:ximin, :, :].ravel()
@@ -165,14 +149,13 @@ class Nested3DGrid(object):
         self.znest[l-1] = np.concatenate([R1z, R2z, R3z, R4z, R5z, R6z])  # update
 
         # child grid
-        xx_sub, yy_sub, zz_sub = np.meshgrid(x_sub, y_sub, z_sub, indexing = 'ij')
+        xx_sub, yy_sub, zz_sub = np.meshgrid(x_sub, y_sub, z_sub, indexing='ij')
         self.xnest[l] = xx_sub.ravel()
         self.ynest[l] = yy_sub.ravel()
         self.znest[l] = zz_sub.ravel()
         self.ngrids[l] = (len(x_sub), len(y_sub), len(z_sub))
 
-
-    def collapse(self, d, upto = None):
+    def collapse(self, d, upto=None):
         '''
         Collapse given data to the mother grid.
 
@@ -224,8 +207,8 @@ class Nested3DGrid(object):
             i0 = i1
             i1 = i0 + (ximax + 1 - ximin) * (yimax + 1 - yimin) * zimin
             d_col[ximin:ximax+1, yimin:yimax+1, :zimin] = \
-            d[l-1][i0:i1].reshape(
-                (ximax + 1 - ximin, yimax + 1 - yimin, zimin))
+                d[l-1][i0:i1].reshape(
+                    (ximax + 1 - ximin, yimax + 1 - yimin, zimin))
             # Region 6
             i0 = i1
             i1 = i0 + (ximax + 1 - ximin) * (yimax + 1 - yimin) * (nz - zimax -1)
@@ -235,55 +218,13 @@ class Nested3DGrid(object):
 
         return d_col
 
-
-    def nest_sub(self, xlim,  ylim, zlim, nsub):
-        # error check
-        if (len(xlim) != 2) | (len(ylim) != 2) | (len(zlim) != 2):
-            print('ERROR\tnest: Input xlim/ylim/zlim must be list as [min, max].')
-            return 0
-        # decimals
-        xlim = [np.round(xlim[0], self.decimals), np.round(xlim[1], self.decimals)]
-        ylim = [np.round(ylim[0], self.decimals), np.round(ylim[1], self.decimals)]
-
-        self.nsub = nsub
-        self.xlim_sub, self.ylim_sub, self.zlim_sub = xlim, ylim, zlim
-        ximin, ximax = index_between(self.x, xlim, mode='edge')[0]
-        yimin, yimax = index_between(self.y, ylim, mode='edge')[0]
-        zimin, zimax = index_between(self.z, zlim, mode='edge')[0]
-        _nx = ximax - ximin + 1
-        _ny = yimax - yimin + 1
-        _nz = zimax - zimin + 1
-        xemin, xemax = self.xe[ximin], self.xe[ximax + 1]
-        yemin, yemax = self.ye[yimin], self.ye[yimax + 1]
-        zemin, zemax = self.ze[zimin], self.ze[zimax + 1]
-        self.xi0, self.xi1 = ximin, ximax  # Starting and ending indices of nested grid
-        self.yi0, self.yi1 = yimin, yimax  # Starting and ending indices of nested grid
-        self.zi0, self.zi1 = zimin, zimax  # Starting and ending indices of nested grid
-
-        # nested grid
-        xe_sub = np.linspace(xemin, xemax, _nx * nsub + 1)
-        ye_sub = np.linspace(yemin, yemax, _ny * nsub + 1)
-        ze_sub = np.linspace(zemin, zemax, _nz * nsub + 1)
-        x_sub = 0.5 * (xe_sub[:-1] + xe_sub[1:])
-        y_sub = 0.5 * (ye_sub[:-1] + ye_sub[1:])
-        z_sub = 0.5 * (ze_sub[:-1] + ze_sub[1:])
-        xx_sub, yy_sub, zz_sub = np.meshgrid(x_sub, y_sub, z_sub, indexing = 'ij')
-        self.xe_sub, self.ye_sub, self.ze_sub = xe_sub, ye_sub, ze_sub
-        self.x_sub, self.y_sub, self.z_sub = x_sub, y_sub, z_sub
-        self.xx_sub, self.yy_sub, self.zz_sub = xx_sub, yy_sub, zz_sub
-        self.dx_sub, self.dy_sub, self.dz_sub = self.dx / nsub, self.dy / nsub, self.dz / nsub
-        self.nx_sub, self.ny_sub, self.nz_sub = len(x_sub), len(y_sub), len(z_sub)
-        return xx_sub, yy_sub, zz_sub
-
-
     def binning_onsubgrid(self, data):
         nbin = self.nsub
         d_avg = np.array([
             data[k::nbin, j::nbin, i::nbin]
             for k in range(nbin) for j in range(nbin) for i in range(nbin)
             ])
-        return np.nanmean(d_avg, axis = 0)
-
+        return np.nanmean(d_avg, axis=0)
 
     def binning_onsubgrid_layered(self, data, nbin):
         dshape = len(data.shape)
@@ -305,10 +246,9 @@ class Nested3DGrid(object):
         else:
             print('ERROR\tbinning_onsubgrid_layered: only Nd of data of 3-5 is now supported.')
             return 0
-        return np.nanmean(d_avg, axis = 0)
+        return np.nanmean(d_avg, axis=0)
 
-
-    def gridinfo(self, units = ['au', 'au', 'au']):
+    def gridinfo(self, units=['au', 'au', 'au']):
         ux, uy, uz = units
         print('Nesting level: %i'%self.nlevels)
         print('Resolutions:')
@@ -322,10 +262,9 @@ class Nested3DGrid(object):
                 self.ylim[l][0], self.ylim[l][1], uy,
                 self.zlim[l][0], self.zlim[l][1], uz))
 
-
 def index_between(t, tlim, mode='all'):
     if not (len(tlim) == 2):
-        if mode=='all':
+        if mode == 'all':
             return np.full(np.shape(t), True)
         elif mode == 'edge':
             if len(t.shape) == 1:
@@ -336,7 +275,7 @@ def index_between(t, tlim, mode='all'):
             print('index_between: mode parameter is not right.')
             return np.full(np.shape(t), True)
     else:
-        if mode=='all':
+        if mode == 'all':
             return (tlim[0] <= t) * (t <= tlim[1])
         elif mode == 'edge':
             nonzero = np.nonzero((tlim[0] <= t) * (t <= tlim[1]))
@@ -344,7 +283,6 @@ def index_between(t, tlim, mode='all'):
         else:
             print('index_between: mode parameter is not right.')
             return (tlim[0] <= t) * (t <= tlim[1])
-
 
 def nestgrid_3D(x, y, z, xlim, ylim, zlim, nsub):
     # error check

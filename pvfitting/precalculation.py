@@ -4,6 +4,7 @@ from numba import prange
 
 
 class diskenvelope():
+
     def __init__(self, radius: np.ndarray = None,
                  theta: np.ndarray = None,
                  phi: np.ndarray = None, incl: float = 0,
@@ -100,6 +101,7 @@ class diskenvelope():
         rho[~c] = 0
         return vp, rho
 
+
 def rotbase(t: np.ndarray, p: np.ndarray
             ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
@@ -111,6 +113,7 @@ def rotbase(t: np.ndarray, p: np.ndarray
     ep = np.array([np.cos(p), np.sin(p), np.zeros_like(p)])
     return er, et, ep
 
+
 def XYZ2rtp(incl: float, phi: float,
             X: np.ndarray, Y: np.ndarray, Z: np.ndarray
             ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -121,7 +124,7 @@ def XYZ2rtp(incl: float, phi: float,
     er, et, ep = rotbase(incl, phi)
     x, y, z = np.outer(ep, X.ravel()) \
         + np.outer(-et, Y.ravel()) \
-            + np.outer(er, Z.ravel())
+        + np.outer(er, Z.ravel())
     r = np.linalg.norm([x, y, z], axis=0).clip(1e-10, None)
     t = np.arccos(z / r)
     p = np.arctan2(x, -y)
@@ -134,6 +137,8 @@ def XYZ2rtp(incl: float, phi: float,
 gauss_xy = None
 gauss_v = None
 vedge = None
+
+
 @jit(parallel=True)
 def rho2tau(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
     nv = len(vedge) - 1
@@ -181,6 +186,7 @@ def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: flo
     idx_t[axis][l] = i.astype(int)
     r_org[axis][l] = radius_org
     j_org[axis][l] = (np.log(radius_org) - lnr0) / dlnr + 0.5
+
 
 def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
                  axis: str, l: int) -> tuple[np.ndarray, np.ndarray]:
