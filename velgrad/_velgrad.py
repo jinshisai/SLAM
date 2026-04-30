@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-#----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------
 # Created By  : Yusuke Aso
 # Created Date: 2022 Jan 27
 # version = alpha
@@ -26,10 +26,12 @@ M_sun = constants.M_sun.si.value
 au = units.au.to('m')
 unit = 1.e6 * au / GG / M_sun
 
+
 def gauss2d(xy, peak, cx, cy, wx, wy, pa):
     x, y = xy
     s, t = rot(x - cx, y - cy, pa)
     return np.ravel(peak * np.exp2(-s**2 / wx**2 - t**2 / wy**2))
+
 
 def emcee_custom(plim, lnprob, fixcenter):
     popt, perr = emcee_corner(plim[:, -1:] if fixcenter else plim,
@@ -42,6 +44,7 @@ def emcee_custom(plim, lnprob, fixcenter):
        perr = np.array([0, 0, perr[0]])
     return popt, perr
 
+
 def r_kep_out(v, M_p, v_break, p_low, vsys):
     v_s, v_a = np.sign(v - vsys), np.abs(v - vsys)
     p = 2. + (p_low - 2.) * (1 + np.sign(v_break - v_a)) / 2.
@@ -51,8 +54,6 @@ def r_kep_out(v, M_p, v_break, p_low, vsys):
 
 class VelGrad(ReadFits):
 
-    #def __init__(self):
-    
     def get_2Dcenter(self, cutoff: float = 5, vmask: list = [0, 0],
                      minrelerr: float = 0.01, minabserr: float = 0.1,
                      method: str = 'mean'):
@@ -107,8 +108,8 @@ class VelGrad(ReadFits):
             yc.append(yval)
             dyc.append(yerr)
         xc, dxc, yc, dyc = np.array([xc, dxc, yc, dyc])
-        self.center = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
-        
+        self.center = {'xc': xc, 'dxc': dxc, 'yc': yc, 'dyc': dyc}
+
     def filtering(self, pa0: float = 0.0, fixcenter: bool = True,
                   axisfilter: bool = False, lowvelfilter: bool = False,
                   filename: str = 'velgrad'):
@@ -127,8 +128,8 @@ class VelGrad(ReadFits):
                     xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
                     xc[j] = yc[j] = dxc[j] = dyc[j] = np.nan
         if not np.any(~np.isnan(xc) * ~np.isnan(yc)):
-                print('No blue-red pair.')
-        
+            print('No blue-red pair.')
+
         def bad_channels(x_in, y_in, xoff, yoff, pa):
             if np.all(np.isnan(x_in) | np.isnan(y_in)):
                 return np.full_like(x_in, False)
@@ -169,7 +170,7 @@ class VelGrad(ReadFits):
             d3 = (x * np.cos(parad) - y * np.sin(parad))**2
             d3 = d3 / ((dx**2 + dy**2) / 2)
             return np.sum(d1 + d2 + d3)
-            
+
         def low_velocity(x_in, y_in, pa_in):
             parad = np.radians(pa_in)
             cospa = np.cos(parad)
@@ -203,9 +204,11 @@ class VelGrad(ReadFits):
                     args = np.array([xc, yc, dxc, dyc]) * 1
                     args[0][c1] = args[1][c1] = args[2][c1] = args[3][c1] = np.nan
                     if fixcenter:
-                        lnprob = lambda p: -0.5 * chi2([0, 0, p], *args)
+                        def lnprob(p):
+                            return -0.5 * chi2([0, 0, p], *args)
                     else:
-                        lnprob = lambda p: -0.5 * chi2(p, *args)
+                        def lnprob(p):
+                            return -0.5 * chi2(p, *args)
                     popt, perr = emcee_custom(plim, lnprob, fixcenter)
                     xoff, yoff, pa_grad = popt
                     print('xoff, yoff, pa ='
@@ -216,9 +219,11 @@ class VelGrad(ReadFits):
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
             args = np.array([xc, yc, dxc, dyc])
             if fixcenter:
-                lnprob = lambda p: -0.5 * chi2([0, 0, p], *args)
+                def lnprob(p):
+                    return -0.5 * chi2([0, 0, p], *args)
             else:
-                lnprob = lambda p: -0.5 * chi2(p, *args)
+                def lnprob(p):
+                    return -0.5 * chi2(p, *args)
             popt, perr = emcee_custom(plim, lnprob, fixcenter)
             xoff, yoff, pa_grad = popt
             print('xoff, yoff, pa ='
@@ -230,11 +235,11 @@ class VelGrad(ReadFits):
                 xc[c2] = yc[c2] = dxc[c2] = dyc[c2] = np.nan
             else:
                 goodsolution = True
-        
+
         xc, yc = xc - xoff, yc - yoff
         self.xoff, self.yoff, self.pa_grad = popt
         self.dxoff, self.dyoff, self.dpa_grad = perr
-        self.kepler = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
+        self.kepler = {'xc': xc, 'dxc': dxc, 'yc': yc, 'dyc': dyc}
         dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.) - 1
         self.chi2r_grad = chi2(popt, xc, yc, dxc, dyc) / dof
 
@@ -243,7 +248,7 @@ class VelGrad(ReadFits):
         np.savetxt(fname, res,
                    header='v (km/s), x (au), dx (au), y (au), dy (au)')
         print(f'- Wrote to {fname}')
-        
+
     def calc_mstar(self, incl: float = 90,
                    voff_range: list = [-0.5, 0.5],
                    voff_fixed: float | None = 0,
@@ -276,13 +281,14 @@ class VelGrad(ReadFits):
                   + ' (1/0.76 corrected)')
             self.Rkep = Rkep
             self.Vkep = Vkep
+
             def lnprob(p):
                 if voff_fixed is None:
                     M_p, v_break, p_low, vsys = p
                 else:
                     M_p, v_break, p_low = p
                     vsys = voff_fixed
-                r_model =  r_kep_out(v, M_p, v_break, p_low, vsys)
+                r_model = r_kep_out(v, M_p, v_break, p_low, vsys)
                 chi2 = np.sum(((r - s_model * r_model) / dr)**2)
                 return -0.5 * chi2
             Mmin = np.min(np.abs(r)) * np.min(np.abs(v))**2
@@ -300,7 +306,7 @@ class VelGrad(ReadFits):
             if voff_fixed is not None:
                 popt = np.r_[popt, 0]
                 perr = np.r_[perr, 0]
-            
+
             M_p, vb, p_low, voff = popt
             dM_p, dvb, dp_low, dvoff = perr
             Mstar = M_p * unit / sini2
@@ -334,14 +340,14 @@ class VelGrad(ReadFits):
         plt.rcParams['ytick.major.width'] = 1.5
         plt.rcParams['xtick.minor.width'] = 1.5
         plt.rcParams['ytick.minor.width'] = 1.5
-        
+
         kep = ~np.isnan(self.kepler['xc']) * ~np.isnan(self.kepler['yc'])
         if np.any(kep) > 0:
             vmax = np.abs(np.max(self.v[kep]))
         else:
             vmax = 1
         xmax, ymax = np.max(self.x), np.max(self.y)
-        
+
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         r = np.linspace(-xmax * 1.5, xmax * 1.5, 5)
@@ -398,7 +404,7 @@ class VelGrad(ReadFits):
         if show_figs: plt.show()
         plt.close()
         print(f'- Plotted in {filehead}.radec.png')
-        
+
         x, y = self.kepler['xc'], self.kepler['yc']
         dx, dy = self.kepler['dxc'], self.kepler['dyc']
         x = np.abs(x * np.sin(p) + y * np.cos(p))
@@ -428,7 +434,7 @@ class VelGrad(ReadFits):
             xmin = xmax / 30
             vmax = np.max(self.v) * 1.5
             vmin = vmax / 30
-        
+
         fig = plt.figure(figsize=(5.3, 5.3))
         ax = fig.add_subplot(1, 1, 1)
         ax.set_xlim(xmin * 0.99, xmax * 1.01)  # au
@@ -451,6 +457,7 @@ class VelGrad(ReadFits):
             ax.plot(rp, vp, 'g-', zorder=4)
         ax.set_xscale('log')
         ax.set_yscale('log')
+
         def nice_ticks(ticks, tlim):
             order = 10**np.floor(np.log10(tlow := tlim[0]))
             tlow = np.ceil(tlow / order) * order
@@ -461,6 +468,7 @@ class VelGrad(ReadFits):
         yticks = nice_ticks(ax.get_yticks(), (vmin, vmax))
         ax.set_xticks(xticks)
         ax.set_yticks(yticks)
+
         def nice_labels(ticks):
             digits = np.floor(np.log10(ticks)).astype('int').clip(None, 0)
             return [f'{t:.{d:d}f}' for t, d in zip(ticks, -digits)]
