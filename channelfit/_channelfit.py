@@ -530,17 +530,20 @@ class ChannelFit(ReadFits):
             mom0unif[mom0unif < 0] = np.nan
             Iunif = Iunif * self.mom0decon / mom0unif
             Iunif = np.nan_to_num(Iunif)
-        if convolving:
-            # The 1st (x) axis of Iunif is in the observational order
-            # if 'mom0' in self.scaling because of rgi2d.
-            # For this reason, self.gaussbeam is inverted in the x direction in advance.
-            Iout = convolve(Iunif, [self.gaussbeam], mode='same')
-        else:
-            Iout = self.peaktounity(Iunif)
+        # The 1st (x) axis of Iunif is in the observational order
+        # if 'mom0' in self.scaling because of rgi2d.
+        # For this reason, self.gaussbeam is inverted in the x direction
+        # in advance.
+        Iout = convolve(Iunif, [self.gaussbeam], mode='same')
         if not ('mom0' in self.scaling):
             Iout = self.rgi2d(xoff, yoff, Iout)  # 1st axis in the observational order
             scale = self.get_scale(Iout)
             Iout = Iout * np.moveaxis([[scale]], 2, 0)
+            if not convolving:
+                Iunif = self.rgi2d(xoff, yoff, Iunif)
+                Iunif = Iunif * np.moveaxis([[scale]], 2, 0)
+        if not convolving:
+            Iout = Iunif
         return Iout
 
     def fitting(self, Mstar_range: list = [0.01, 10],
@@ -715,6 +718,11 @@ class ChannelFit(ReadFits):
             return model
 
         def tofits(d: np.ndarray, ext: str):
+            if ext == 'beforeconvolving':
+                h['BUNIT'] = 'Jy/pixel'
+                del h['BMAJ']
+                del h['BMIn']
+                del h['BPA']
             header = w.to_header()
             hdu = fits.PrimaryHDU(d, header=header)
             for k in h.keys():
