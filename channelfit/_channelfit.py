@@ -490,10 +490,9 @@ class ChannelFit(ReadFits):
         return Iout
 
     def get_scale(self, Iout) -> np.ndarray:
-        gf = np.full_like(self.v_valid, np.sum(Iout * self.data_valid))
-        ff = np.full_like(self.v_valid, np.sum(Iout * Iout))
-        scale = gf / ff
-        scale[(ff == 0) + (scale < 0)] = 0
+        fg = np.sum(Iout * self.data_valid)
+        ff = np.sum(Iout * Iout)
+        scale = fg / ff
         return scale
 
     def peaktounity(self, I_in: np.ndarray) -> np.ndarray:
@@ -535,13 +534,13 @@ class ChannelFit(ReadFits):
         # For this reason, self.gaussbeam is inverted in the x direction
         # in advance.
         Iout = convolve(Iunif, [self.gaussbeam], mode='same')
-        if not ('mom0' in self.scaling):
+        if 'mom0' not in self.scaling:
             Iout = self.rgi2d(xoff, yoff, Iout)  # 1st axis in the observational order
             scale = self.get_scale(Iout)
-            Iout = Iout * np.moveaxis([[scale]], 2, 0)
+            Iout = Iout * scale
             if not convolving:
                 Iunif = self.rgi2d(xoff, yoff, Iunif)
-                Iunif = Iunif * np.moveaxis([[scale]], 2, 0)
+                Iunif = Iunif * scale
         if not convolving:
             Iout = Iunif
         return Iout
