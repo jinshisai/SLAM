@@ -232,7 +232,7 @@ class PVFitting(ReadFits):
                 return (chi2maj + chi2min) / np.sqrt(Rarea)
             dof = np.prod(np.shape(majobs)) + np.prod(np.shape(minobs))
             # The number of paramter is assumed to be 6 but won't change dof much.
-            dof = dof / np.sqrt(Rarea) - 6 - 1
+            dof = dof / np.sqrt(Rarea) - 6
             self.chi2r = chi2() / dof
             
             popt = p_fixed

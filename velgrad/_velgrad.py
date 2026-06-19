@@ -240,7 +240,7 @@ class VelGrad(ReadFits):
         self.xoff, self.yoff, self.pa_grad = popt
         self.dxoff, self.dyoff, self.dpa_grad = perr
         self.kepler = {'xc': xc, 'dxc': dxc, 'yc': yc, 'dyc': dyc}
-        dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.) - 1
+        dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.)
         self.chi2r_grad = chi2(popt, xc, yc, dxc, dyc) / dof
 
         fname = filename + '.points.txt'

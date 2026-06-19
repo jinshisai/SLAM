@@ -931,7 +931,7 @@ class PVAnalysis():
             (qopt := q0 * 1)[np.isnan(q0)] = popt
             (qerr := q0 * 0)[np.isnan(q0)] = perr
             res[:] = [qopt, qerr]
-            dof = len(args[0]) + len(args[3]) - len(plim[0]) - 1
+            dof = len(args[0]) + len(args[3]) - len(plim[0])
             chi2 = -2 * lnprob(popt, *args)
             if ext == '_e':
                 self.chi2r_e = chi2 / dof

@@ -646,7 +646,7 @@ class ChannelFit(ReadFits):
                 return chi2
             dof = np.prod(np.shape(self.data_valid))
             # The number of paramter is assumed to be 6 but won't change dof much.
-            dof = dof / self.pixperbeam - 6 - 1
+            dof = dof / self.pixperbeam - 6
             self.chi2r = chi2() / dof
 
             self.popt = p_fixed
