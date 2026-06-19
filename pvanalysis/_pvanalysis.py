@@ -909,11 +909,20 @@ class PVAnalysis():
                        + np.sum(((v1 - wpow_v_custom(x0, *p)) / dv1)**2)
                 return -0.5 * chi2
             plim = plim[:, include]
-            popt, perr = emcee_corner(plim, lnprob, args=args,
-                                      labels=labels, rangelevel=rangelevel,
-                                      figname=outname+'.corner'+ext+'.png',
-                                      show_corner=show_corner,
-                                      ndata=len(args[0]) + len(args[3]))
+            #popt, perr = emcee_corner(plim, lnprob, args=args,
+            #                          labels=labels, rangelevel=rangelevel,
+            #                          figname=outname+'.corner'+ext+'.png',
+            #                          show_corner=show_corner,
+            #                          ndata=len(args[0]) + len(args[3]))
+            popt, plow, pmid, phigh = emcee_corner(
+                plim, lnprob, args=args,
+                labels=labels, rangelevel=rangelevel,
+                figname=outname+'.corner'+ext+'.png',
+                show_corner=show_corner,
+                simpleoutput=False,
+                ndata=len(args[0]) + len(args[3]))
+            perr = (np.clip(phigh - popt, 0, None)
+                    + np.clip(popt - plow, 0, None)) / 2
             if calc_evidence:
                 dynesty_corner(plim, lnprob, args=args,
                     figname=None, show_corner=False, return_evidence=True)
