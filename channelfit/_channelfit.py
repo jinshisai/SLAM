@@ -581,6 +581,8 @@ class ChannelFit(ReadFits):
             self.update_vlos(p_fixed['h1'], p_fixed['h2'])
 
         p_fixed = np.array([p_fixed[k] for k in self.paramkeys])
+        self.chain = None
+        self.lnp = None
         runfit = None in p_fixed
         if runfit:
             notfixed = np.equal(p_fixed, None)
@@ -627,6 +629,17 @@ class ChannelFit(ReadFits):
                 kw['range_corner'] = r_c
 
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
+            i_mcmc = 4
+            if kw.get('return_chain', False):
+                chain_free = mcmc[i_mcmc]
+                i_mcmc += 1
+                chain = np.empty((len(p_fixed), chain_free.shape[1]), dtype=float)
+                chain[notfixed] = chain_free
+                chain[~notfixed] = p_fixed[~notfixed].astype(float)[:, None]
+                chain[ilog] = 10**chain[ilog]
+                self.chain = chain
+            if kw.get('return_lnp', False):
+                self.lnp = mcmc[i_mcmc]
 
             def get_p(i: int):
                 p = p_fixed.copy()
