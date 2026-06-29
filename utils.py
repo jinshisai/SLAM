@@ -23,7 +23,9 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
                  range_corner: list | None = None,
                  figname: str = None, show_corner: bool = False,
                  plot_chain: bool = False, show_chain: bool = False,
-                 ncore: int = 1, simpleoutput: bool = True, 
+                 ncore: int = 1, simpleoutput: bool = True,
+                 return_chain: bool = False,
+                 return_lnp: bool = False,
                  moves = emcee.moves.StretchMove()):
     ndim = len(bounds[0])
     nwalkers = ndim * nwalkers_per_ndim
@@ -114,9 +116,14 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
         plt.close()
 
     if simpleoutput:
-        return [pmid, perr]
+        output = [pmid, perr]
     else:
-        return [popt, plow, pmid, phigh]
+        output = [popt, plow, pmid, phigh]
+    if return_chain:
+        output.append(samples.T)
+    if return_lnp:
+        output.append(lnp.reshape(-1))
+    return output
 
 
 def dynesty_corner(bounds, 

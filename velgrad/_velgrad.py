@@ -33,15 +33,33 @@ def gauss2d(xy, peak, cx, cy, wx, wy, pa):
     return np.ravel(peak * np.exp2(-s**2 / wx**2 - t**2 / wy**2))
 
 
-def emcee_custom(plim, lnprob, fixcenter):
-    popt, perr = emcee_corner(plim[:, -1:] if fixcenter else plim,
-                              lnprob,
-                              nwalkers_per_ndim=8,
-                              nburnin=2000, nsteps=8000,
-                              simpleoutput=True)
+def emcee_custom(plim, lnprob, fixcenter,
+                 return_chain=False, return_lnp=False):
+    mcmc = emcee_corner(plim[:, -1:] if fixcenter else plim,
+                        lnprob,
+                        nwalkers_per_ndim=8,
+                        nburnin=2000, nsteps=8000,
+                        simpleoutput=True,
+                        return_chain=return_chain,
+                        return_lnp=return_lnp)
+    popt, perr = mcmc[:2]
+    i_mcmc = 2
     if fixcenter:
-       popt = np.array([0, 0, popt[0]])
-       perr = np.array([0, 0, perr[0]])
+        popt = np.array([0, 0, popt[0]])
+        perr = np.array([0, 0, perr[0]])
+        if return_chain:
+            mcmc[i_mcmc] = np.vstack([np.zeros_like(mcmc[i_mcmc][0]),
+                                      np.zeros_like(mcmc[i_mcmc][0]),
+                                      mcmc[i_mcmc][0]])
+    if return_chain:
+        i_mcmc += 1
+    output = [popt, perr]
+    if return_chain:
+        output.append(mcmc[2])
+    if return_lnp:
+        output.append(mcmc[i_mcmc])
+    if return_chain or return_lnp:
+        return output
     return popt, perr
 
 
@@ -112,7 +130,9 @@ class VelGrad(ReadFits):
 
     def filtering(self, pa0: float = 0.0, fixcenter: bool = True,
                   axisfilter: bool = False, lowvelfilter: bool = False,
-                  filename: str = 'velgrad'):
+                  filename: str = 'velgrad',
+                  return_chain: bool = False,
+                  return_lnp: bool = False):
         xc = self.center['xc'] * 1
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
@@ -192,6 +212,8 @@ class VelGrad(ReadFits):
 
         goodsolution = False
         xoff = yoff = pa_grad = np.nan
+        self.chain_grad = None
+        self.lnp_grad = None
         while not goodsolution:
             if np.all(np.isnan(xc) | np.isnan(yc)):
                 print('No point survived.')
@@ -224,7 +246,16 @@ class VelGrad(ReadFits):
             else:
                 def lnprob(p):
                     return -0.5 * chi2(p, *args)
-            popt, perr = emcee_custom(plim, lnprob, fixcenter)
+            mcmc = emcee_custom(plim, lnprob, fixcenter,
+                                return_chain=return_chain,
+                                return_lnp=return_lnp)
+            popt, perr = mcmc[:2]
+            i_mcmc = 2
+            if return_chain:
+                self.chain_grad = mcmc[i_mcmc]
+                i_mcmc += 1
+            if return_lnp:
+                self.lnp_grad = mcmc[i_mcmc]
             xoff, yoff, pa_grad = popt
             print('xoff, yoff, pa ='
                   + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
@@ -252,7 +283,9 @@ class VelGrad(ReadFits):
     def calc_mstar(self, incl: float = 90,
                    voff_range: list = [-0.5, 0.5],
                    voff_fixed: float | None = 0,
-                   minabserr: float = 0.1, minrelerr: float = 0.01):
+                   minabserr: float = 0.1, minrelerr: float = 0.01,
+                   return_chain: bool = False,
+                   return_lnp: bool = False):
         self.incl = incl
         sini2 = np.sin(np.radians(incl))**2
         xc = self.kepler['xc'] * 1
@@ -264,6 +297,8 @@ class VelGrad(ReadFits):
         self.vmid = np.nan
         self.Mstar = np.nan
         self.popt = None
+        self.chain_mstar = None
+        self.lnp_mstar = None
         if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
             print('No point to calculate Rkep, Vkep, and Mstar.')
         else:
@@ -300,12 +335,24 @@ class VelGrad(ReadFits):
                 plim[1, 2] = 2.001
             if voff_fixed is not None:
                 plim = plim[:, :-1]
-            popt, perr = emcee_custom(plim, lnprob, False)
+            mcmc = emcee_custom(plim, lnprob, False,
+                                return_chain=return_chain,
+                                return_lnp=return_lnp)
+            popt, perr = mcmc[:2]
+            i_mcmc = 2
+            if return_chain:
+                self.chain_mstar = mcmc[i_mcmc]
+                i_mcmc += 1
+            if return_lnp:
+                self.lnp_mstar = mcmc[i_mcmc]
             dof = len(v) - len(popt) - 1
             self.chi2r_mass = -2. * lnprob(popt) / dof
             if voff_fixed is not None:
                 popt = np.r_[popt, 0]
                 perr = np.r_[perr, 0]
+                if return_chain:
+                    dummy = np.zeros_like(self.chain_mstar[0])
+                    self.chain_mstar = np.vstack([self.chain_mstar, dummy])
 
             M_p, vb, p_low, voff = popt
             dM_p, dvb, dp_low, dvoff = perr

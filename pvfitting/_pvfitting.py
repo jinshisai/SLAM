@@ -155,6 +155,8 @@ class PVFitting(ReadFits):
         p_fixed = {k:fixed_params[k] if k in fixed_params else None for k in paramkeys}
         free = {k:p_fixed[k] is None for k in paramkeys}
         p_fixed = np.array([p_fixed[k] for k in paramkeys])
+        self.chain = None
+        self.lnp = None
         
         runfit = None in p_fixed
         if runfit:
@@ -207,6 +209,17 @@ class PVFitting(ReadFits):
 
             # run mcmc fitting
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
+            i_mcmc = 4
+            if kw.get('return_chain', False):
+                chain_free = mcmc[i_mcmc]
+                i_mcmc += 1
+                chain = np.empty((len(p_fixed), chain_free.shape[1]), dtype=float)
+                chain[notfixed] = chain_free
+                chain[~notfixed] = p_fixed[~notfixed].astype(float)[:, None]
+                chain[ilog] = 10**chain[ilog]
+                self.chain = chain
+            if kw.get('return_lnp', False):
+                self.lnp = mcmc[i_mcmc]
             # best parameters & errors
             def get_p(i: int):
                 p = p_fixed.copy()
