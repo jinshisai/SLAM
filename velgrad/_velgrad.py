@@ -345,7 +345,7 @@ class VelGrad(ReadFits):
                 i_mcmc += 1
             if return_lnp:
                 self.lnp_mstar = mcmc[i_mcmc]
-            dof = len(v) - len(popt) - 1
+            dof = len(v) - len(popt)
             self.chi2r_mass = -2. * lnprob(popt) / dof
             if voff_fixed is not None:
                 popt = np.r_[popt, 0]
