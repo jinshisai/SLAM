@@ -47,20 +47,13 @@ def emcee_custom(plim, lnprob, fixcenter,
     if fixcenter:
         popt = np.array([0, 0, popt[0]])
         perr = np.array([0, 0, perr[0]])
-        if return_chain:
-            mcmc[i_mcmc] = np.vstack([np.zeros_like(mcmc[i_mcmc][0]),
-                                      np.zeros_like(mcmc[i_mcmc][0]),
-                                      mcmc[i_mcmc][0]])
-    if return_chain:
-        i_mcmc += 1
     output = [popt, perr]
     if return_chain:
-        output.append(mcmc[2])
+        output.append(mcmc[i_mcmc])
+        i_mcmc += 1
     if return_lnp:
         output.append(mcmc[i_mcmc])
-    if return_chain or return_lnp:
-        return output
-    return popt, perr
+    return output
 
 
 def r_kep_out(v, M_p, v_break, p_low, vsys):
@@ -350,9 +343,6 @@ class VelGrad(ReadFits):
             if voff_fixed is not None:
                 popt = np.r_[popt, 0]
                 perr = np.r_[perr, 0]
-                if return_chain:
-                    dummy = np.zeros_like(self.chain_mstar[0])
-                    self.chain_mstar = np.vstack([self.chain_mstar, dummy])
 
             M_p, vb, p_low, voff = popt
             dM_p, dvb, dp_low, dvoff = perr

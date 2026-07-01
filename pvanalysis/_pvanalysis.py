@@ -853,7 +853,7 @@ class PVAnalysis():
                True means the corner figures are shown. These figures are also
                plotted in two png files.
             return_chain : bool
-               True stores the MCMC chains in self.chain. Each chain is a 2D numpy array with rows for parameters and columns for samples.
+               True stores the MCMC chains in self.chain. Each chain is a 2D numpy array with rows for varied parameters and columns for samples.
             return_lnp : bool
                True stores the log probability arrays in self.lnp. The sample order matches the columns of self.chain when return_chain is True.
 
@@ -928,11 +928,8 @@ class PVAnalysis():
             popt, perr = mcmc[:2]
             i_mcmc = 2
             if return_chain:
-                chain_free = mcmc[i_mcmc]
+                self.chain[key] = mcmc[i_mcmc]
                 i_mcmc += 1
-                chain = np.tile(q0[:, None], (1, chain_free.shape[1]))
-                chain[np.isnan(q0)] = chain_free
-                self.chain[key] = chain
             if return_lnp:
                 self.lnp[key] = mcmc[i_mcmc]
             if calc_evidence:
