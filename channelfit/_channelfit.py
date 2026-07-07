@@ -793,7 +793,7 @@ class ChannelFit(ReadFits):
         fig.savefig(filename)
         plt.close()
 
-    def plotdecon(self, filename: str = 'decon.png'):
+    def plotdecon(self, filehead: str = 'test'):
         if not (hasattr(self, 'mom0decon') and hasattr(self, 'resdecon')):
             print('No deconvolution solutions and residual generated.')
             return
@@ -801,8 +801,11 @@ class ChannelFit(ReadFits):
         cr = self.resdecon / self.sigma_mom0
         ccmax = np.max(cc)
         ccmin = np.min(cc)
-        for c, vmin, vmax, s in zip([cc, cr], [ccmin, -6], [ccmax, 6],
-                                    ['deconvolved mom0', 'mom0 residual']):
+        for c, vmin, vmax, s, ext in zip([cc, cr],
+                                         [ccmin, -6],
+                                         [ccmax, 6],
+                                         ['deconvolved mom0', 'mom0 residual'],
+                                         ['decon', 'resdecon']):
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
             m = ax.pcolormesh(self.x, self.y, c, cmap='jet',
@@ -820,5 +823,5 @@ class ChannelFit(ReadFits):
             ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
             ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
             ax.set_aspect(1)
-            fig.savefig(filename)
+            fig.savefig(f'{filehead}.{ext}.png')
             plt.close()
