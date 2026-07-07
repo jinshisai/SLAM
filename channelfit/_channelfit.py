@@ -57,9 +57,10 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
           weakestcomponent: float = 0.3,
           savetxt: str | None = None, loadtxt: str | None = None) -> np.ndarray:
     if loadtxt is not None:
-        print(f'Load clean components of moment 0 from {loadtxt}.')
+        print(f'Load deconvolved moment 0 from {loadtxt}.')
         cleancomponent = np.loadtxt(loadtxt)
         return cleancomponent
+
     shape = np.shape(data)
     cleancomponent = data * 0
     cleanresidual = data * 1
@@ -184,8 +185,15 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
 
 
 def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
-                  bmaj: float, bmin: float, bpa: float,
-                  sigma: float, threshold: float = 3) -> np.ndarray:
+                 bmaj: float, bmin: float, bpa: float,
+                 sigma: float, threshold: float = 3,
+                 savetxt: str | None = None, loadtxt: str | None = None
+                 ) -> np.ndarray:
+    if loadtxt is not None:
+        print(f'Load deconvolved moment 0 from {loadtxt}.')
+        dnew = np.loadtxt(loadtxt)
+        return dnew
+
     xd = x[int(len(x) % 2 == 0):]
     yd = y[int(len(y) % 2 == 0):]
     d = data[int(len(y) % 2 == 0):, int(len(x) % 2 == 0):]
@@ -213,6 +221,8 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
     if len(y) % 2 == 0:
         dnew = np.concatenate((np.zeros((1, np.shape(dnew)[1])), dnew), axis=0)
+    if savetxt is not None:
+        np.savetxt(savetxt, dnew)
     return dnew
 
 
@@ -352,7 +362,7 @@ class ChannelFit(ReadFits):
             self.gaussbeam = self.gaussbeam[:, ::-1]
         if self.scaling == 'mom0clean':
             self.mom0decon = clean(data=self.mom0, beam=self.gaussbeam,
-                                   sigma=self.sigma_mom0,
+                                   sigma=self.sigma_mom0, threshold=2,
                                    savetxt=savedeconvolved,
                                    loadtxt=loaddeconvolved)
         elif self.scaling == 'mom0model':
@@ -366,8 +376,10 @@ class ChannelFit(ReadFits):
             print('Found a deconvolved solution.')
         elif self.scaling == 'mom0ft':
             self.mom0decon = ftdeconvolve(x=self.x, y=self.y, data=self.mom0,
-                                           bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
-                                           sigma=self.sigma_mom0, threshold=3)
+                                          bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
+                                          sigma=self.sigma_mom0, threshold=3,
+                                          savetxt=savedeconvolved,
+                                          loadtxt=loaddeconvolved)
             print('Divided in the Fourier space.')
         if 'mom0' in self.scaling:
             c = convolve(self.mom0decon, self.gaussbeam, mode='same')
