@@ -219,6 +219,7 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     phase0 = 2 * np.pi * (u * (xd[-1] + dx) + v * (yd[-1] + dy))
     FTd = np.fft.fftshift(np.fft.fft2(d)) * np.exp(-1j * phase0)
     FTdnew = FTd / FTg
+    print('Divided in the Fourier space.')
     dnew = np.real(np.fft.ifft2(np.fft.ifftshift(FTdnew * np.exp(1j * phase0))))
     dnew[np.abs(d) < sigma * threshold] = 0
     if len(x) % 2 == 0:
@@ -384,7 +385,6 @@ class ChannelFit(ReadFits):
                                           sigma=self.sigma_mom0, threshold=3,
                                           savetxt=savedeconvolved,
                                           loadtxt=loaddeconvolved)
-            print('Divided in the Fourier space.')
         if 'mom0' in self.scaling:
             c = convolve(self.mom0decon, self.gaussbeam, mode='same')
             self.resdecon = self.mom0 - c
