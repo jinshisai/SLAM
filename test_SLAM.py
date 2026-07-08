@@ -16,8 +16,6 @@ from velgrad import VelGrad
 
 
 DATA = Path(__file__).parent / "testfits"
-CUBE = DATA / "test.cube.fits"
-CENTER = "04h39m53.878s +26d03m09.43s"
 DIST = 140.0
 SIGMA = 1.7e-3
 RMAX = 200.0
@@ -25,8 +23,8 @@ RMAX = 200.0
 
 def read_velgrad_test_cube(vg):
     vg.read_cubefits(
-        cubefits=CUBE,
-        center=CENTER,
+        cubefits=DATA / "test.cube.fits",
+        center="04h39m53.878s +26d03m09.43s",
         vsys=5.9,
         dist=DIST,
         sigma=SIGMA,
@@ -42,8 +40,8 @@ def read_velgrad_test_cube(vg):
 def make_test_channelfit():
     chan = ChannelFit(scaling="uniform", progressbar=False)
     chan.makegrid(
-        cubefits=CUBE,
-        center=CENTER,
+        cubefits=DATA / "test.cube.fits",
+        center="04h39m53.878s +26d03m09.43s",
         pa=2.0,
         incl=85.0,
         vsys=5.9,
