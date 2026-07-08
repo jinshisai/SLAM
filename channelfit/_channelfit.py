@@ -144,6 +144,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         bounds = [np.zeros_like(p0), np.full_like(p0, np.max(drot))]
         popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
                             p0=p0, bounds=bounds)
+        print('Found a deconvolved solution.')
     else:
         niter = 20
         if progressbar:
@@ -177,6 +178,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                                             sigma=[sigma], absolute_sigma=True,
                                             bounds=bounds)
                         Par0[i_p, j_p] = popt
+        print('Found a deconvolved solution.')
         print('')
         popt = np.ravel(Par0)
     if savetxt is not None:
@@ -378,7 +380,6 @@ class ChannelFit(ReadFits):
                                 loadtxt=loaddeconvolved,
                                 progressbar=self.progressbar)
             self.mom0decon, self.xdecon, self.ydecon, self.zdecon = d
-            print('Found a deconvolved solution.')
         elif self.scaling == 'mom0ft':
             self.mom0decon = ftdeconvolve(x=self.x, y=self.y, data=self.mom0,
                                           bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
