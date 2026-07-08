@@ -16,12 +16,49 @@ from velgrad import VelGrad
 
 
 DATA = Path(__file__).parent / "testfits"
+CUBE = DATA / "test.cube.fits"
 CENTER = "04h39m53.878s +26d03m09.43s"
+DIST = 140.0
+SIGMA = 1.7e-3
+RMAX = 200.0
+
+
+def read_velgrad_test_cube(vg):
+    vg.read_cubefits(
+        cubefits=CUBE,
+        center=CENTER,
+        vsys=5.9,
+        dist=DIST,
+        sigma=SIGMA,
+        xmin=-RMAX,
+        xmax=RMAX,
+        ymin=-RMAX,
+        ymax=RMAX,
+        vmin=-3.6,
+        vmax=3.6,
+    )
+
+
+def make_test_channelfit():
+    chan = ChannelFit(scaling="uniform", progressbar=False)
+    chan.makegrid(
+        cubefits=CUBE,
+        center=CENTER,
+        pa=2.0,
+        incl=85.0,
+        vsys=5.9,
+        dist=DIST,
+        sigma=SIGMA,
+        rmax=RMAX,
+        vlim=[-3.6, -2.0, 2.0, 3.6],
+        nlayer=2,
+        skipto=5,
+    )
+    return chan
 
 
 def test_import():
-    a = [ChannelFit, PVAnalysis, PVFitting, VelGrad]
-    assert None not in a
+    assert all([ChannelFit, PVAnalysis, PVFitting, VelGrad])
 
 
 def test_pvanalysis_edgeridge_workflow(tmp_path, monkeypatch):
@@ -32,9 +69,9 @@ def test_pvanalysis_edgeridge_workflow(tmp_path, monkeypatch):
     outname = tmp_path / "pvanalysis"
     impv = PVAnalysis(
         DATA / "test.pvanalysis.fits",
-        rms=1.7e-3,
+        rms=SIGMA,
         vsys=6.4,
-        dist=140.0,
+        dist=DIST,
         incl=48.0,
     )
 
@@ -45,32 +82,20 @@ def test_pvanalysis_edgeridge_workflow(tmp_path, monkeypatch):
         use_position=True,
         use_velocity=True,
         Mlim=[0, 10],
-        xlim=np.array([-200, 0, 0, 200]) / 140.0,
+        xlim=np.array([-RMAX, 0, 0, RMAX]) / DIST,
         vlim=np.array([-5, 0, 0, 5]) + 6.4,
     )
     impv.write_edgeridge(str(outname))
 
     assert (tmp_path / "pvanalysis.edge.dat").exists()
     assert (tmp_path / "pvanalysis.ridge.dat").exists()
-    assert len(impv.results_filtered["ridge"]["xcut"]["red"]) == 4
-    assert len(impv.results_filtered["ridge"]["vcut"]["red"]) == 4
+    ridge = impv.results_filtered["ridge"]
+    assert all(len(ridge[cut]["red"]) == 4 for cut in ["xcut", "vcut"])
 
 
 def test_velgrad_center_extraction():
     vg = VelGrad()
-    vg.read_cubefits(
-        cubefits=DATA / "test.cube.fits",
-        center=CENTER,
-        vsys=5.9,
-        dist=140.0,
-        sigma=1.7e-3,
-        xmin=-200,
-        xmax=200,
-        ymin=-200,
-        ymax=200,
-        vmin=-3.6,
-        vmax=3.6,
-    )
+    read_velgrad_test_cube(vg)
     vg.get_2Dcenter(cutoff=5.0, vmask=[-2.0, 2.0], method="mean")
 
     assert vg.data.shape == (len(vg.v), len(vg.y), len(vg.x))
@@ -85,12 +110,12 @@ def test_pvfitting_loads_pv_and_generates_mock_diagrams():
     pvfit.put_PV(
         pvmajorfits=DATA / "test.pvfitting.major.fits",
         pvminorfits=DATA / "test.pvfitting.minor.fits",
-        dist=140.0,
+        dist=DIST,
         vsys=5.9,
-        rmax=200.0,
+        rmax=RMAX,
         vmin=-3.6,
         vmax=3.6,
-        sigma=1.7e-3,
+        sigma=SIGMA,
         skipto=5,
     )
 
@@ -127,20 +152,7 @@ def test_pvfitting_loads_pv_and_generates_mock_diagrams():
 
 
 def test_channelfit_makegrid_builds_deterministic_state():
-    chan = ChannelFit(scaling="uniform", progressbar=False)
-    chan.makegrid(
-        cubefits=DATA / "test.cube.fits",
-        center=CENTER,
-        pa=2.0,
-        incl=85.0,
-        vsys=5.9,
-        dist=140.0,
-        sigma=1.7e-3,
-        rmax=200.0,
-        vlim=[-3.6, -2.0, 2.0, 3.6],
-        nlayer=2,
-        skipto=5,
-    )
+    chan = make_test_channelfit()
 
     assert chan.data_valid.shape[0] == len(chan.v_valid)
     assert chan.mom0.shape == (len(chan.y), len(chan.x))
