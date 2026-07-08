@@ -577,6 +577,9 @@ class ChannelFit(ReadFits):
                 fixed_params: dict = {},
                 filename: str = 'channelfit',
                 show: bool = False,
+                save_result: bool = True,
+                save_corner: bool = True,
+                print_result: bool = True,
                 kwargs_emcee_corner: dict = {}):
 
         p_fixed = {k: fixed_params[k] if k in fixed_params else None for k in self.paramkeys}
@@ -611,9 +614,11 @@ class ChannelFit(ReadFits):
             kwargs0 = {'nwalkers_per_ndim': 16, 'nburnin': 200,
                        'nsteps': 500, 'labels': labels,
                        'rangelevel': None, 'range_corner': None,
-                       'figname': filename+'.corner.png',
+                       'figname': f'{filename}.corner.png',
                        'show_corner': show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
+            if not save_corner:
+                kw['figname'] = None
             if self.progressbar:
                 total = kw['nwalkers_per_ndim'] * len(p_fixed[notfixed])
                 total *= kw['nburnin'] + kw['nsteps'] + 2
@@ -686,15 +691,16 @@ class ChannelFit(ReadFits):
         self.pa_rad = self.pa_rad + np.radians(self.popt[12])
         self.sinpa = np.sin(self.pa_rad)
         self.cospa = np.cos(self.pa_rad)
-        print('Parameter values (opt, low, mid, high):')
         ulist = ['Msun', 'au', 'km/s', '', '', '', 'au', '',
                  'au', 'au', 'km/s', 'deg', 'deg']
         digits = [2, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
-        for i, (k, d, u) in enumerate(zip(self.paramkeys, digits, ulist)):
-            p = [self.popt[i], self.plow[i], self.pmid[i], self.phigh[i]]
-            print(f'{k} = {p[0]:.{d:d}f}, {p[1]:.{d:d}f},'
-                  + f' {p[2]:.{d:d}f}, {p[3]:.{d:d}f} {u}')
-        if runfit:
+        if print_result:
+            print('Parameter values (opt, low, mid, high):')
+            for i, (k, d, u) in enumerate(zip(self.paramkeys, digits, ulist)):
+                p = [self.popt[i], self.plow[i], self.pmid[i], self.phigh[i]]
+                print(f'{k} = {p[0]:.{d:d}f}, {p[1]:.{d:d}f},'
+                      + f' {p[2]:.{d:d}f}, {p[3]:.{d:d}f} {u}')
+        if runfit and save_result:
             plist = [self.popt, self.plow, self.pmid, self.phigh]
             with open(filename+'.popt.txt', 'w') as f:
                 f.write('#Rows:' + ','.join(self.paramkeys) + '\n')
@@ -704,10 +710,11 @@ class ChannelFit(ReadFits):
         self.plow = dict(zip(self.paramkeys, self.plow))
         self.pmid = dict(zip(self.paramkeys, self.pmid))
         self.phigh = dict(zip(self.paramkeys, self.phigh))
+        return {'popt': self.popt, 'plow': self.plow, 'pmid': self.pmid,
+                'phigh': self.phigh, 'chi2r': getattr(self, 'chi2r', None)}
 
-    def modeltofits(self, filehead: str = 'best', **kwargs):
-        w = wcs.WCS(naxis=3)
-        h = self.header
+    def make_model_products(self, **kwargs):
+        h = self.header.copy()
         h['NAXIS1'] = len(self.x)
         h['NAXIS2'] = len(self.y)
         h['NAXIS3'] = len(self.v)
@@ -747,12 +754,23 @@ class ChannelFit(ReadFits):
                 model = np.append(model, nanred, axis=0)
             return model
 
+        model = concat(m)
+        return {'model': model,
+                'residual': self.data - model,
+                'beforeconvolving': concat(m0),
+                'header': h}
+
+    def modeltofits(self, filehead: str = 'best', **kwargs):
+        w = wcs.WCS(naxis=3)
+        products = self.make_model_products(**kwargs)
+
         def tofits(d: np.ndarray, ext: str):
+            h = products['header'].copy()
             if ext == 'beforeconvolving':
                 h['BUNIT'] = 'Jy/pixel'
-                del h['BMAJ']
-                del h['BMIn']
-                del h['BPA']
+                for k in ['BMAJ', 'BMIN', 'BPA']:
+                    if k in h:
+                        del h[k]
             header = w.to_header()
             hdu = fits.PrimaryHDU(d, header=header)
             for k in h.keys():
@@ -761,11 +779,12 @@ class ChannelFit(ReadFits):
             hdu = fits.HDUList([hdu])
             hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
 
-        tofits((model := concat(m)), 'model')
-        tofits(self.data - model, 'residual')
-        tofits(concat(m0), 'beforeconvolving')
+        tofits(products['model'], 'model')
+        tofits(products['residual'], 'residual')
+        tofits(products['beforeconvolving'], 'beforeconvolving')
 
-    def plotmom(self, mode: str, filename: str = 'mom01.png', **kwargs):
+    def plotmom(self, mode: str, filename: str = 'mom01.png',
+                save: bool = True, show: bool = False, **kwargs):
         if 'mod' in mode or 'res' in mode or 'clean' in mode:
             if kwargs != {}:
                 self.popt = kwargs
@@ -805,10 +824,14 @@ class ChannelFit(ReadFits):
         ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
         ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
         ax.set_aspect(1)
-        fig.savefig(filename)
+        if save:
+            fig.savefig(filename)
+        if show:
+            plt.show()
         plt.close()
 
-    def plotdecon(self, filehead: str = 'test'):
+    def plotdecon(self, filehead: str = 'test', save: bool = True,
+                  show: bool = False):
         if not (hasattr(self, 'mom0decon') and hasattr(self, 'resdecon')):
             print('No deconvolution solutions and residual generated.')
             return
@@ -838,5 +861,8 @@ class ChannelFit(ReadFits):
             ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
             ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
             ax.set_aspect(1)
-            fig.savefig(f'{filehead}.{ext}.png')
+            if save:
+                fig.savefig(f'{filehead}.{ext}.png')
+            if show:
+                plt.show()
             plt.close()

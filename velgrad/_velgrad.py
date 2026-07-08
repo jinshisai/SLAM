@@ -124,6 +124,8 @@ class VelGrad(ReadFits):
     def filtering(self, pa0: float = 0.0, fixcenter: bool = True,
                   axisfilter: bool = False, lowvelfilter: bool = False,
                   filename: str = 'velgrad',
+                  save_points: bool = True,
+                  print_result: bool = True,
                   return_chain: bool = False,
                   return_lnp: bool = False):
         xc = self.center['xc'] * 1
@@ -226,10 +228,11 @@ class VelGrad(ReadFits):
                             return -0.5 * chi2(p, *args)
                     popt, perr = emcee_custom(plim, lnprob, fixcenter)
                     xoff, yoff, pa_grad = popt
-                    print('xoff, yoff, pa ='
-                          + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
-                          + f' {popt[1]:.2f}+/-{perr[1]:.2f} au,'
-                          + f' {popt[2]:.2f}+/-{perr[2]:.2f} deg')
+                    if print_result:
+                        print('xoff, yoff, pa ='
+                              + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
+                              + f' {popt[1]:.2f}+/-{perr[1]:.2f} au,'
+                              + f' {popt[2]:.2f}+/-{perr[2]:.2f} deg')
                     c1 = low_velocity(args[0] - xoff, args[1] - yoff, pa_grad)
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
             args = np.array([xc, yc, dxc, dyc])
@@ -250,10 +253,11 @@ class VelGrad(ReadFits):
             if return_lnp:
                 self.lnp_grad = mcmc[i_mcmc]
             xoff, yoff, pa_grad = popt
-            print('xoff, yoff, pa ='
-                  + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
-                  + f' {popt[1]:.2f}+/-{perr[1]:.2f} au,'
-                  + f' {popt[2]:.2f}+/-{perr[2]:.2f} deg')
+            if print_result:
+                print('xoff, yoff, pa ='
+                      + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
+                      + f' {popt[1]:.2f}+/-{perr[1]:.2f} au,'
+                      + f' {popt[2]:.2f}+/-{perr[2]:.2f} deg')
             c2 = bad_channels(xc, yc, xoff, yoff, pa_grad)
             if np.any(c2):
                 xc[c2] = yc[c2] = dxc[c2] = dyc[c2] = np.nan
@@ -267,16 +271,32 @@ class VelGrad(ReadFits):
         dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.)
         self.chi2r_grad = chi2(popt, xc, yc, dxc, dyc) / dof
 
+        if save_points:
+            self.write_points(filename=filename, print_result=print_result)
+        return {'xoff': self.xoff, 'yoff': self.yoff,
+                'pa_grad': self.pa_grad,
+                'dxoff': self.dxoff, 'dyoff': self.dyoff,
+                'dpa_grad': self.dpa_grad,
+                'chi2r_grad': self.chi2r_grad,
+                'kepler': self.kepler}
+
+    def write_points(self, filename: str = 'velgrad',
+                     print_result: bool = True):
         fname = filename + '.points.txt'
-        res = np.c_[self.v, xc, dxc, yc, dyc][~np.isnan(xc)]
+        res = np.c_[self.v, self.kepler['xc'], self.kepler['dxc'],
+                    self.kepler['yc'], self.kepler['dyc']]
+        res = res[~np.isnan(self.kepler['xc'])]
         np.savetxt(fname, res,
                    header='v (km/s), x (au), dx (au), y (au), dy (au)')
-        print(f'- Wrote to {fname}')
+        if print_result:
+            print(f'- Wrote to {fname}')
+        return res
 
     def calc_mstar(self, incl: float = 90,
                    voff_range: list = [-0.5, 0.5],
                    voff_fixed: float | None = 0,
                    minabserr: float = 0.1, minrelerr: float = 0.01,
+                   print_result: bool = True,
                    return_chain: bool = False,
                    return_lnp: bool = False):
         self.incl = incl
@@ -305,8 +325,9 @@ class VelGrad(ReadFits):
             s_model = np.sign(np.sum(r * v))
             Rkep = np.max(np.abs(r)) / 0.760  # Appendix A in Aso+15_ApJ_812_27
             Vkep = np.min(np.abs(v))
-            print(f'Max r = {Rkep:.1f} au at v = {Vkep:.2f} km/s'
-                  + ' (1/0.76 corrected)')
+            if print_result:
+                print(f'Max r = {Rkep:.1f} au at v = {Vkep:.2f} km/s'
+                      + ' (1/0.76 corrected)')
             self.Rkep = Rkep
             self.Vkep = Vkep
 
@@ -356,15 +377,21 @@ class VelGrad(ReadFits):
             self.perr = perr
             self.Mstar = Mstar
             self.dMstar = dMstar
-            print(f'voff = {voff:.3f} +/- {dvoff:.3f}')
-            print(f'vb = {vb:.3f} +/- {dvb:.3f}')
-            print(f'pout = {p_low:.3f} +/- {dp_low:.3f}')
-            print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun (1/0.76 corrected)')
+            if print_result:
+                print(f'voff = {voff:.3f} +/- {dvoff:.3f}')
+                print(f'vb = {vb:.3f} +/- {dvb:.3f}')
+                print(f'pout = {p_low:.3f} +/- {dp_low:.3f}')
+                print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun (1/0.76 corrected)')
+        return {'Mstar': self.Mstar, 'dMstar': getattr(self, 'dMstar', np.nan),
+                'Rkep': self.Rkep, 'Vkep': self.Vkep,
+                'popt': self.popt, 'perr': getattr(self, 'perr', None),
+                'chi2r_mstar': getattr(self, 'chi2r_mstar', np.nan)}
 
     def plot_center(self, pa: float = None,
                      filehead: str = 'channelanalysis',
                      show_figs: bool = False,
-                     title: str = None):
+                     title: str = None,
+                     save: bool = True):
         plt.rcParams['font.size'] = 20
         plt.rcParams['axes.linewidth'] = 1.5
         plt.rcParams['xtick.direction'] = 'out'
@@ -437,10 +464,12 @@ class VelGrad(ReadFits):
         if title is not None:
             ax.set_title(title)
         fig.tight_layout()
-        fig.savefig(filehead + '.radec.png', transparent=True)
-        if show_figs: plt.show()
+        if save:
+            fig.savefig(filehead + '.radec.png', transparent=True)
+            print(f'- Plotted in {filehead}.radec.png')
+        if show_figs:
+            plt.show()
         plt.close()
-        print(f'- Plotted in {filehead}.radec.png')
 
         x, y = self.kepler['xc'], self.kepler['yc']
         dx, dy = self.kepler['dxc'], self.kepler['dyc']
@@ -519,7 +548,9 @@ class VelGrad(ReadFits):
         if title is not None:
             ax.set_title(title)
         fig.tight_layout()
-        fig.savefig(filehead + '.majvel.png', transparent=True)
-        if show_figs: plt.show()
+        if save:
+            fig.savefig(f'{filehead}.majvel.png', transparent=True)
+            print(f'- Plotted in {filehead}.majvel.png')
+        if show_figs:
+            plt.show()
         plt.close()
-        print(f'- Plotted in {filehead}.majvel.png')
