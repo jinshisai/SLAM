@@ -38,16 +38,20 @@ def avefour(a: np.ndarray) -> np.ndarray:
     return b
 
 
-def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
+def makemom012(d: np.ndarray, v: np.ndarray, sigma: float,
+              threshold: float = 3) -> dict:
     dmasked = np.nan_to_num(d)
     dv = np.min(v[1:] - v[:-1])
-    mom0 = np.sum(d, axis=0) * dv
+    mom0 = np.sum(dmasked, axis=0) * dv
     sigma_mom0 = sigma * dv * np.sqrt(len(d))
-    vv = np.moveaxis([[v]], 2, 0)
-    dmasked[dmasked < 3 * sigma] = 0
-    mom1 = np.sum(d * vv, axis=0) / np.sum(d, axis=0)
-    mom2 = np.sqrt(np.sum(d * (vv - mom1)**2, axis=0), np.sum(d, axis=0))
-    mom1[mom0 < 3 * sigma_mom0] = np.nan
+    dmasked[dmasked < threshold * sigma] = 0
+    dsum = np.sum(dmasked, axis=0)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        mom1 = np.sum(dmasked * v[:, None, None], axis=0) / dsum
+        Iv2 = np.sum(dmasked * (v[:, None, None] - mom1)**2, axis=0)
+        mom2 = np.sqrt(Iv2 / dsum)
+    mom1[mom0 < threshold * sigma_mom0] = np.nan
+    mom2[mom0 < threshold * sigma_mom0] = np.nan
     return {'mom0': mom0, 'mom1': mom1, 'mom2': mom2,
             'sigma_mom0': sigma_mom0}
 
@@ -290,7 +294,7 @@ class ChannelFit(ReadFits):
         self.data_red = self.data[(vlim[2] <= v) * (v <= vlim[3])]
         self.data_valid = np.append(self.data_blue, self.data_red, axis=0)
 
-        m = makemom01(self.data_valid, self.v_valid, sigma)
+        m = makemom012(self.data_valid, self.v_valid, sigma)
         self.mom0 = m['mom0']
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
@@ -766,7 +770,7 @@ class ChannelFit(ReadFits):
             if kwargs != {}:
                 self.popt = kwargs
             d = self.cubemodel(**self.popt)
-            m = makemom01(d, self.v_valid, self.sigma)
+            m = makemom012(d, self.v_valid, self.sigma)
         if 'obs' in mode:
             mom0 = self.mom0
             mom1 = self.mom1
