@@ -24,7 +24,11 @@ def test_import():
     assert None not in a
 
 
-def test_pvanalysis_edgeridge_workflow(tmp_path):
+def test_pvanalysis_edgeridge_workflow(tmp_path, monkeypatch):
+    from matplotlib.figure import Figure
+
+    monkeypatch.setattr(Figure, "savefig", lambda self, *args, **kwargs: None)
+
     outname = tmp_path / "pvanalysis"
     impv = PVAnalysis(
         DATA / "test.pvanalysis.fits",
