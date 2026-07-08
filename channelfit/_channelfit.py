@@ -779,8 +779,7 @@ class ChannelFit(ReadFits):
             mom0 = self.mom0 - m['mom0']
             mom1 = self.mom1 - m['mom1']
             label = r'Obs. $-$ model'
-        levels = (3 if 'res' in mode else 6) * self.sigma_mom0
-        levels = np.arange(1, 20) * levels
+        levels = np.arange(1, 20) * 3 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
