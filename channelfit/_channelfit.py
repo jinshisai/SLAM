@@ -641,7 +641,7 @@ class ChannelFit(ReadFits):
                 q[notfixed] = p
                 q[ilog] = 10**q[ilog]
                 h1, h2 = q[3], q[4]
-                if min(h1, h2) >= 0 and h1 >= h2:
+                if min(h1, h2) >= 0 and h1 > h2:
                     return -np.inf
 
                 model = self.cubemodel(*q)
