@@ -226,6 +226,17 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
     if len(y) % 2 == 0:
         dnew = np.concatenate((np.zeros((1, np.shape(dnew)[1])), dnew), axis=0)
+    edge_width = int(bmaj / min(abs(dx), abs(dy)) + 0.5)
+    if edge_width > 0:
+        iy = np.arange(np.shape(dnew)[0])
+        ix = np.arange(np.shape(dnew)[1])
+        ydist = np.minimum(iy, iy[::-1])
+        xdist = np.minimum(ix, ix[::-1])
+        dist = np.minimum(ydist[:, None], xdist[None, :])
+        taper = np.ones_like(dnew)
+        edge = dist < edge_width
+        taper[edge] = 0.5 * (1 - np.cos(np.pi * dist[edge] / edge_width))
+        dnew = dnew * taper
     if savetxt is not None:
         np.savetxt(savetxt, dnew)
     return dnew
