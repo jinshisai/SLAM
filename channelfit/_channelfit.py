@@ -192,7 +192,6 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
 
 def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                  bmaj: float, bmin: float, bpa: float,
-                 sigma: float, threshold: float = 3,
                  savetxt: str | None = None, loadtxt: str | None = None
                  ) -> np.ndarray:
     if loadtxt is not None:
@@ -223,7 +222,6 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     FTdnew = FTd / FTg
     print('Divided in the Fourier space.')
     dnew = np.real(np.fft.ifft2(np.fft.ifftshift(FTdnew * np.exp(1j * phase0))))
-    dnew[np.abs(d) < sigma * threshold] = 0
     if len(x) % 2 == 0:
         dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
     if len(y) % 2 == 0:
@@ -383,7 +381,6 @@ class ChannelFit(ReadFits):
         elif self.scaling == 'mom0ft':
             self.mom0decon = ftdeconvolve(x=self.x, y=self.y, data=self.mom0,
                                           bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
-                                          sigma=self.sigma_mom0, threshold=3,
                                           savetxt=savedeconvolved,
                                           loadtxt=loaddeconvolved)
         if 'mom0' in self.scaling:
@@ -632,10 +629,15 @@ class ChannelFit(ReadFits):
                 q = p_fixed.copy()
                 q[notfixed] = p
                 q[ilog] = 10**q[ilog]
+                h1, h2 = q[3], q[4]
+                if min(h1, h2) >= 0 and h1 >= h2:
+                    return -np.inf
+
                 model = self.cubemodel(*q)
                 chi2 = np.nansum((self.data_valid - model)**2) \
                        / self.sigma**2 / self.pixperbeam
                 return -0.5 * chi2
+
             plim = np.array([Mstar_range, Rc_range,
                              cs_range, h1_range, h2_range,
                              pI_range, Rin_range, Ienv_range,
