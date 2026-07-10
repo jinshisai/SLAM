@@ -157,10 +157,27 @@ class PVFitting(ReadFits):
         p_fixed = np.array([p_fixed[k] for k in paramkeys])
         self.chain = None
         self.lnp = None
-        
+        notfixed = p_fixed == None
+
+        def chi2(q):
+            q = np.asarray(q, dtype=float)
+            majsig2 = (1. + q[-1]**2) * majsig**2
+            minsig2 = (1. + q[-1]**2) * minsig**2
+            majmod, minmod = self.makemodel(*q[:-1])
+            chi2maj = np.nansum((majobs - majmod)**2 / majsig2)
+            chi2min = np.nansum((minobs - minmod)**2 / minsig2)
+            return (chi2maj + chi2min) / np.sqrt(Rarea)
+
+        def reduced_chi2(q):
+            n_data = np.count_nonzero(np.isfinite(majobs)) \
+                     + np.count_nonzero(np.isfinite(minobs))
+            n_data = n_data / np.sqrt(Rarea)
+            n_free = np.count_nonzero(notfixed) + 1  # +1 is due to fflux
+            dof = n_data - n_free
+            return chi2(q) / dof if dof > 0 else np.nan
+
         runfit = None in p_fixed
         if runfit:
-            notfixed = p_fixed == None
             ilog = np.array([0, 1, 2, 3, 4], dtype=int)
             i = ilog[p_fixed[ilog] != None]
             p_fixed[i] = np.log10(p_fixed[i].astype('float'))
@@ -231,27 +248,11 @@ class PVFitting(ReadFits):
             pmid = get_p(2)
             phigh = get_p(3)
         else:
-            def chi2():
-                # parameter
-                q = p_fixed.copy()
-                # updated sigma
-                majsig2 = (1. + q[-1]**2) * majsig**2
-                minsig2 = (1. + q[-1]**2) * minsig**2
-                # make model
-                majmod, minmod = self.makemodel(*q[:-1])
-                # chi2 does not use log(majsig2) and log(minsig2).
-                chi2maj = np.nansum((majobs - majmod)**2 / majsig2)
-                chi2min = np.nansum((minobs - minmod)**2 / minsig2)
-                return (chi2maj + chi2min) / np.sqrt(Rarea)
-            dof = np.prod(np.shape(majobs)) + np.prod(np.shape(minobs))
-            # The number of paramter is assumed to be 6 but won't change dof much.
-            dof = dof / np.sqrt(Rarea) - 6
-            self.chi2r = chi2() / dof
-            
             popt = p_fixed
             plow = p_fixed
             pmid = p_fixed
             phigh = p_fixed
+        self.chi2r = reduced_chi2(popt)
         self.popt = popt
         self.plow = plow
         self.pmid = pmid

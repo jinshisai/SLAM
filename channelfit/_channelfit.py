@@ -611,9 +611,24 @@ class ChannelFit(ReadFits):
         p_fixed = np.array([p_fixed[k] for k in self.paramkeys])
         self.chain = None
         self.lnp = None
+        notfixed = np.equal(p_fixed, None)
         runfit = None in p_fixed
+
+        def chi2(q):
+            model = self.cubemodel(*q)
+            return np.nansum((self.data_valid - model)**2) \
+                   / self.sigma**2 / self.pixperbeam
+
+        def reduced_chi2(q):
+            n_data = np.count_nonzero(np.isfinite(self.data_valid)) \
+                     / self.pixperbeam
+            n_free = np.count_nonzero(notfixed)
+            if 'mom0' not in self.scaling:
+                n_free += 1
+            dof = n_data - n_free
+            return chi2(q) / dof if dof > 0 else np.nan
+
         if runfit:
-            notfixed = np.equal(p_fixed, None)
             ilog = np.array([0, 1, 7])
             i = ilog[np.not_equal(p_fixed[ilog], None)]
             p_fixed[i] = np.log10(p_fixed[i].astype('float'))
@@ -644,10 +659,7 @@ class ChannelFit(ReadFits):
                 if min(h1, h2) >= 0 and h1 > h2:
                     return -np.inf
 
-                model = self.cubemodel(*q)
-                chi2 = np.nansum((self.data_valid - model)**2) \
-                       / self.sigma**2 / self.pixperbeam
-                return -0.5 * chi2
+                return -0.5 * chi2(q)
 
             plim = np.array([Mstar_range, Rc_range,
                              cs_range, h1_range, h2_range,
@@ -686,21 +698,12 @@ class ChannelFit(ReadFits):
             self.pmid = get_p(2)
             self.phigh = get_p(3)
         else:
-            def chi2():
-                q = p_fixed.copy()
-                model = self.cubemodel(*q)
-                chi2 = np.nansum((self.data_valid - model)**2) \
-                       / self.sigma**2 / self.pixperbeam
-                return chi2
-            dof = np.prod(np.shape(self.data_valid))
-            # The number of paramter is assumed to be 6 but won't change dof much.
-            dof = dof / self.pixperbeam - 6
-            self.chi2r = chi2() / dof
-
             self.popt = p_fixed
             self.plow = p_fixed
             self.pmid = p_fixed
             self.phigh = p_fixed
+
+        self.chi2r = reduced_chi2(self.popt)
 
         self.pa_rad = self.pa_rad + np.radians(self.popt[12])
         self.sinpa = np.sin(self.pa_rad)
