@@ -177,7 +177,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
                                             sigma=[sigma], absolute_sigma=True,
                                             bounds=bounds)
-                        Par0[i_p, j_p] = popt
+                        Par0[i_p, j_p] = popt[0]
         print('Found a deconvolved solution.')
         print('')
         popt = np.ravel(Par0)
