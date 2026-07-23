@@ -192,7 +192,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
 
 def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                  bmaj: float, bmin: float, bpa: float,
-                 wf_threshold: float = 6.25e-2,
+                 tikhonov_threshold: float = 6.25e-2,
                  savetxt: str | None = None, loadtxt: str | None = None
                  ) -> np.ndarray:
     if loadtxt is not None:
@@ -218,11 +218,12 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     phase0 = 2 * np.pi * (u * (xd[-1] + dx) + v * (yd[-1] + dy))
     FTd = np.fft.fftshift(np.fft.fft2(d)) * np.exp(-1j * phase0)
     abs_FTg = np.abs(FTg)
-    thre = wf_threshold * np.max(abs_FTg)
+    thre = tikhonov_threshold * np.max(abs_FTg)
     inverse_filter = np.conj(FTg) / (abs_FTg**2 + thre**2)
     FTdnew = FTd * inverse_filter
-    print('Weiner filter is used in the Fourier space'
-          + f' with a threshold of {wf_threshold:.4f} times the beam peak.')
+    print('Tikhonov regularization is used for Fourier-space deconvolution '
+          + f'with a transition at {tikhonov_threshold:.4f} times'
+          + ' the FT[beam] peak.')
     dnew = np.real(np.fft.ifft2(np.fft.ifftshift(FTdnew * np.exp(1j * phase0))))
     if len(x) % 2 == 0:
         dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
@@ -383,7 +384,8 @@ class ChannelFit(ReadFits):
         elif self.scaling == 'mom0ft':
             self.mom0decon = ftdeconvolve(x=self.x, y=self.y, data=self.mom0,
                                           bmaj=self.bmaj, bmin=self.bmin,
-                                          bpa=self.bpa, wf_threshold=0.0625,
+                                          bpa=self.bpa,
+                                          tikhonov_threshold=0.0625,
                                           savetxt=savedeconvolved,
                                           loadtxt=loaddeconvolved)
         if 'mom0' in self.scaling:
