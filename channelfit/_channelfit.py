@@ -192,6 +192,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
 
 def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                  bmaj: float, bmin: float, bpa: float,
+                 wf_threshold: float = 6.25e-2,
                  savetxt: str | None = None, loadtxt: str | None = None
                  ) -> np.ndarray:
     if loadtxt is not None:
@@ -214,29 +215,19 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     u, v = np.meshgrid(u, v)
     phase0 = 2 * np.pi * (u * (xg[-1] + dx) + v * (yg[-1] + dy))
     FTg = np.fft.fftshift(np.fft.fft2(g)) * np.exp(-1j * phase0)
-    rFTg = np.real(FTg)
-    FTg = rFTg + 1j * 0
-    FTg[rFTg < np.max(rFTg) * 1e-2] = 1 + 1j * 0
     phase0 = 2 * np.pi * (u * (xd[-1] + dx) + v * (yd[-1] + dy))
     FTd = np.fft.fftshift(np.fft.fft2(d)) * np.exp(-1j * phase0)
-    FTdnew = FTd / FTg
-    print('Divided in the Fourier space.')
+    abs_FTg = np.abs(FTg)
+    thre = wf_threshold * np.max(abs_FTg)
+    inverse_filter = np.conj(FTg) / (abs_FTg**2 + thre**2)
+    FTdnew = FTd * inverse_filter
+    print('Weiner filter is used in the Fourier space'
+          + f' with a threshold of {wf_threshold:.4f} times the beam peak.')
     dnew = np.real(np.fft.ifft2(np.fft.ifftshift(FTdnew * np.exp(1j * phase0))))
     if len(x) % 2 == 0:
         dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
     if len(y) % 2 == 0:
         dnew = np.concatenate((np.zeros((1, np.shape(dnew)[1])), dnew), axis=0)
-    edge_width = int(bmaj / 2 / min(abs(dx), abs(dy)) + 0.5)
-    if edge_width > 0:
-        iy = np.arange(np.shape(dnew)[0])
-        ix = np.arange(np.shape(dnew)[1])
-        ydist = np.minimum(iy, iy[::-1])
-        xdist = np.minimum(ix, ix[::-1])
-        dist = np.minimum(ydist[:, None], xdist[None, :])
-        taper = np.ones_like(dnew)
-        edge = dist < edge_width
-        taper[edge] = 0.5 * (1 - np.cos(np.pi * dist[edge] / edge_width))
-        dnew = dnew * taper
     if savetxt is not None:
         np.savetxt(savetxt, dnew)
     return dnew
@@ -391,7 +382,8 @@ class ChannelFit(ReadFits):
             self.mom0decon, self.xdecon, self.ydecon, self.zdecon = d
         elif self.scaling == 'mom0ft':
             self.mom0decon = ftdeconvolve(x=self.x, y=self.y, data=self.mom0,
-                                          bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
+                                          bmaj=self.bmaj, bmin=self.bmin,
+                                          bpa=self.bpa, wf_threshold=0.0625,
                                           savetxt=savedeconvolved,
                                           loadtxt=loaddeconvolved)
         if 'mom0' in self.scaling:
