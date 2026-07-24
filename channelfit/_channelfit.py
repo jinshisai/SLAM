@@ -312,6 +312,7 @@ class ChannelFit(ReadFits):
                  sigma: float | None = None, nlayer: int = 3,
                  xskip: int = 1, yskip: int = 1, skipto: int | None = False,
                  gaussmargin: float = 1.6,
+                 tikhonov_threshold: float = 6.25e-2,
                  savedeconvolved: str | None = None,
                  loaddeconvolved: str | None = None,
                  signmajor: int | None = None,
@@ -440,7 +441,7 @@ class ChannelFit(ReadFits):
             self.mom0decon = ftdeconvolve(x=self.x, y=self.y, data=self.mom0,
                                           bmaj=self.bmaj, bmin=self.bmin,
                                           bpa=self.bpa,
-                                          tikhonov_threshold=0.0625,
+                                          tikhonov_threshold=tikhonov_threshold,
                                           savetxt=savedeconvolved,
                                           loadtxt=loaddeconvolved)
         if 'mom0' in self.scaling:
