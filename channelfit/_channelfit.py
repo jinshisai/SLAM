@@ -220,6 +220,13 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     abs_FTg = np.abs(FTg)
     thre = tikhonov_threshold * np.max(abs_FTg)
     inverse_filter = np.conj(FTg) / (abs_FTg**2 + thre**2)
+    # ----------------------------------------------------------------
+    # The sum of |FTg x FTdnew - FTd|^2 + thre^2 |FTdnew|^2
+    # is minimized to calculate FTdnew from FTd and the given FTg.
+    # This is equivalent to minimizing the sum of
+    # |g * dnew - d|^2 + thre^2 |dnew|^2 except for a constant factor
+    # of the number of pixels.
+    # ----------------------------------------------------------------
     FTdnew = FTd * inverse_filter
     print('Tikhonov regularization is used for Fourier-space deconvolution '
           + f'with a transition at {tikhonov_threshold:.4f} times'
@@ -229,6 +236,17 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
     if len(y) % 2 == 0:
         dnew = np.concatenate((np.zeros((1, np.shape(dnew)[1])), dnew), axis=0)
+    edge_width = int(bmaj / min(abs(dx), abs(dy)) + 0.5)
+    if edge_width > 0:
+        iy = np.arange(np.shape(dnew)[0])
+        ix = np.arange(np.shape(dnew)[1])
+        ydist = np.minimum(iy, iy[::-1])
+        xdist = np.minimum(ix, ix[::-1])
+        dist = np.minimum(ydist[:, None], xdist[None, :])
+        taper = np.ones_like(dnew)
+        edge = dist < edge_width
+        taper[edge] = 0.5 * (1 - np.cos(np.pi * dist[edge] / edge_width))
+        dnew = dnew * taper        
     if savetxt is not None:
         np.savetxt(savetxt, dnew)
     return dnew
