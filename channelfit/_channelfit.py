@@ -195,6 +195,27 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                  tikhonov_threshold: float = 6.25e-2,
                  savetxt: str | None = None, loadtxt: str | None = None
                  ) -> np.ndarray:
+    """
+    Deconvolve an image with a Gaussian beam using zero-order Tikhonov
+    regularization in Fourier space.
+
+    Notes
+    -----
+    The FFT calculation assumes periodic (circular) convolution, so boundary
+    pixels can be affected by wrap-around and other edge artifacts. The input
+    image should contain an emission-free margin of at least one beam major
+    axis around the scientifically useful region; a wider margin is
+    preferable.
+
+    A cosine taper is applied within approximately one beam major-axis width
+    of the boundary after calculating the Tikhonov solution. The returned
+    image is therefore a deliberately edge-tapered version of that solution,
+    and pixels in the tapered region should not be interpreted quantitatively.
+
+    For an even-sized axis, the first row or column is temporarily omitted to
+    construct an odd-sized FFT grid and restored as zeros after deconvolution.
+    This assumes that the input boundaries contain no significant emission.
+    """
     if loadtxt is not None:
         print(f'Load deconvolved moment 0 from {loadtxt}.')
         dnew = np.loadtxt(loadtxt)
@@ -221,11 +242,18 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     thre = tikhonov_threshold * np.max(abs_FTg)
     inverse_filter = np.conj(FTg) / (abs_FTg**2 + thre**2)
     # ----------------------------------------------------------------
-    # The sum of |FTg x FTdnew - FTd|^2 + thre^2 |FTdnew|^2
-    # is minimized to calculate FTdnew from FTd and the given FTg.
-    # This is equivalent to minimizing the sum of
-    # |g * dnew - d|^2 + thre^2 |dnew|^2 except for a constant factor
-    # of the number of pixels.
+    # FTdnew is the zero-order Tikhonov solution on the periodic FFT grid:
+    #
+    #   argmin_X sum(|FTg * X - FTd|^2 + thre^2 * |X|^2).
+    #
+    # By Parseval's theorem, this is equivalent, up to the common FFT
+    # normalization, to minimizing
+    #
+    #   sum(|g (*) dnew - d|^2 + thre^2 * |dnew|^2),
+    #
+    # where (*) denotes circular convolution. The image-domain edge taper
+    # applied below is intentional post-processing and changes the returned
+    # image from this exact minimizer.
     # ----------------------------------------------------------------
     FTdnew = FTd * inverse_filter
     print('Tikhonov regularization is used for Fourier-space deconvolution '
@@ -238,6 +266,15 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         dnew = np.concatenate((np.zeros((1, np.shape(dnew)[1])), dnew), axis=0)
     edge_width = int(bmaj / min(abs(dx), abs(dy)) + 0.5)
     if edge_width > 0:
+        # Suppress unreliable boundary behavior caused by circular
+        # convolution. This post-processing assumes that scientifically useful
+        # emission is separated from the boundary by a sufficiently wide,
+        # emission-free margin.
+        if 2 * edge_width >= min(dnew.shape):
+            warnings.warn(
+                'The edge-taper regions overlap or occupy the entire image. '
+                'Use a wider input image for mom0ft deconvolution.'
+            )
         iy = np.arange(np.shape(dnew)[0])
         ix = np.arange(np.shape(dnew)[1])
         ydist = np.minimum(iy, iy[::-1])
@@ -246,7 +283,7 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         taper = np.ones_like(dnew)
         edge = dist < edge_width
         taper[edge] = 0.5 * (1 - np.cos(np.pi * dist[edge] / edge_width))
-        dnew = dnew * taper        
+        dnew = dnew * taper
     if savetxt is not None:
         np.savetxt(savetxt, dnew)
     return dnew
