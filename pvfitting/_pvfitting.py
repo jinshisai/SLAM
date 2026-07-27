@@ -97,7 +97,11 @@ class PVFitting(ReadFits):
                     vmask: list[float, float] = [0, 0],
                     zmax: float | None = None,
                     filename: str = 'PVsilhouette',
-                    show: bool = False, progressbar: bool = True,
+                    show: bool = False,
+                    save_result: bool = True,
+                    save_corner: bool = True,
+                    print_result: bool = True,
+                    progressbar: bool = True,
                     kwargs_emcee_corner: dict = {},
                     signmajor: int | None = None, signminor: int | None = None,
                     pa_major: float = 0., pa_minor: float = 90.,
@@ -190,6 +194,8 @@ class PVFitting(ReadFits):
                        'figname':filename+'.corner.png', 'show_corner':show,
                        'plot_chain':True, 'show_chain':show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
+            if not save_corner:
+                kw['figname'] = None
             # progress bar
             if progressbar:
                 total = kw['nwalkers_per_ndim'] * len(p_fixed[notfixed])
@@ -260,10 +266,13 @@ class PVFitting(ReadFits):
         ulist = ['Msun', 'au', '', '', '', 'sig_obs']
         digits = [2, 0, 2, 2, 2, 2]
         flist = ['f', 'f', 'f', 'e', 'e', 'f']
-        for i, (k, d, u, f) in enumerate(zip(paramkeys, digits, ulist, flist)):
-            p = [self.plow[i], self.popt[i], self.phigh[i]]
-            print(f'{k} = {p[0]:.{d:d}{f}}, {p[1]:.{d:d}{f}}, {p[2]:.{d:d}{f}} {u}')
-        if runfit:
+        if print_result:
+            print('Parameter values (opt, low, mid, high):')
+            for i, (k, d, u, f) in enumerate(zip(paramkeys, digits, ulist, flist)):
+                p = [self.popt[i], self.plow[i], self.pmid[i], self.phigh[i]]
+                print(f'{k} = {p[0]:.{d:d}{f}}, {p[1]:.{d:d}{f}},'
+                      + f' {p[2]:.{d:d}{f}}, {p[3]:.{d:d}{f}} {u}')
+        if runfit and save_result:
             plist = [self.popt, self.plow, self.pmid, self.phigh]
             with open(filename+'.popt.txt', 'w') as f:
                 f.write('#Rows:' + ','.join(paramkeys) + '\n')
