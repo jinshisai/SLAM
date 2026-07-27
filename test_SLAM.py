@@ -59,6 +59,19 @@ def test_import():
     assert all([ChannelFit, PVAnalysis, PVFitting, VelGrad])
 
 
+def test_pvfitting_check_modelgrid_without_nesting(capsys):
+    pvfit = PVFitting()
+    pvfit.x = np.linspace(-20.0, 20.0, 9)
+    pvfit.v = np.linspace(-2.0, 2.0, 7)
+    pvfit.beam = None
+
+    pvfit.check_modelgrid(nsubgrid=1, n_nest=None)
+
+    output = capsys.readouterr().out
+    assert "Nesting level: 1" in output
+    assert "l=0:" in output
+
+
 def test_pvanalysis_edgeridge_workflow(tmp_path, monkeypatch):
     from matplotlib.figure import Figure
 
