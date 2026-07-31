@@ -110,7 +110,8 @@ class PVFitting(ReadFits):
                     n_nest: list[float] = [2, 2, 2, 2, 2, 2],
                     reslim: float = 10,
                     title: str | None = None,
-                    log: bool = False):
+                    log: bool = False,
+                    num_threads: int | str | None = None):
         # Observed PV diagrams
         majobs = self.dpvmajor.copy()
         minobs = self.dpvminor.copy()
@@ -141,7 +142,8 @@ class PVFitting(ReadFits):
                        nsubgrid=nsubgrid, nnest=n_nest,
                        beam=self.beam, reslim=reslim,
                        signmajor=majquad, signminor=minquad,
-                       pa_major=pa_major, pa_minor=pa_minor)
+                       pa_major=pa_major, pa_minor=pa_minor,
+                       num_threads=num_threads)
         rout = np.max(z)
         def makemodel(Mstar, Rc, alphainfall, taumax, frho):
             major, minor = mpvd.generate_mockpvd(Mstar=Mstar, Rc=Rc,

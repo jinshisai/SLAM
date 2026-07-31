@@ -1,6 +1,51 @@
+import os
+from contextlib import contextmanager
+
 import numpy as np
-from numba import jit
-from numba import prange
+from numba import config, get_num_threads, jit, prange, set_num_threads
+
+
+DEFAULT_NUMBA_THREAD_CAP = 4
+
+
+def resolve_num_threads(num_threads: int | str | None = None) -> int:
+    """Return the Numba thread budget to use for PV integration.
+
+    An existing NUMBA_NUM_THREADS setting or a runtime thread mask is respected
+    when no explicit value is supplied. Otherwise, the automatic budget uses
+    half of Numba's available threads, capped at DEFAULT_NUMBA_THREAD_CAP.
+    """
+    maximum = config.NUMBA_NUM_THREADS
+
+    if num_threads is None:
+        current = get_num_threads()
+        if "NUMBA_NUM_THREADS" in os.environ or current < maximum:
+            return current
+        return min(DEFAULT_NUMBA_THREAD_CAP, max(1, maximum // 2))
+
+    if num_threads == "all":
+        return maximum
+    if isinstance(num_threads, bool) or not isinstance(num_threads, int):
+        raise TypeError("num_threads must be a positive integer, 'all', or None")
+    if not 1 <= num_threads <= maximum:
+        raise ValueError(
+            f"num_threads must be between 1 and {maximum}, or 'all'"
+        )
+    return num_threads
+
+
+@contextmanager
+def numba_thread_limit(num_threads: int | str | None = None):
+    """Temporarily apply a Numba thread budget and restore the prior value."""
+    previous = get_num_threads()
+    requested = resolve_num_threads(num_threads)
+    if requested != previous:
+        set_num_threads(requested)
+    try:
+        yield requested
+    finally:
+        if requested != previous:
+            set_num_threads(previous)
 
 
 class diskenvelope():
@@ -134,7 +179,7 @@ gauss_xy = None
 gauss_v = None
 vedge = None
 @jit(parallel=True)
-def rho2tau(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
+def _rho2tau_parallel(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
     nv = len(vedge) - 1
     nx, ny, _ = np.shape(vlos)
     tau = np.zeros((nv, ny, nx))
@@ -142,6 +187,12 @@ def rho2tau(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
         mask = (vedge[i] <= vlos) * (vlos < vedge[i + 1])
         tau[i] = np.sum(mask * rho, axis=2).T
     return tau
+
+def rho2tau(vlos: np.ndarray, rho: np.ndarray,
+            num_threads: int | str | None = None) -> np.ndarray:
+    """Integrate density by velocity channel with bounded parallelism."""
+    with numba_thread_limit(num_threads):
+        return _rho2tau_parallel(vlos, rho)
 
 Nr = 1600
 lnr = np.linspace(np.log(1e-4), np.log(1e4), Nr)  # dr/r ~ dtheta ~ 0.01
