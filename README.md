@@ -18,6 +18,7 @@ For basic usages, please see `example_xxx.py` in this library, where xxx is the 
  
 ## Requirement
 
+* python>=3.12
 * astropy>=7.2
 * corner
 * dynesty
