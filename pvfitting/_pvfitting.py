@@ -117,7 +117,7 @@ class PVFitting(ReadFits):
         minobs = self.dpvminor.copy()
         # correction factor for over sampling
         beam_area = np.pi/(4.*np.log(2.)) * self.bmaj * self.bmin # beam area
-        Rarea = beam_area / self.dx / self.dx # area ratio
+        Rarea = beam_area / np.abs(self.dx * self.dy) # area ratio
 
 
         # grid & mask
