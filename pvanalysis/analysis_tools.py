@@ -44,7 +44,7 @@ def ridge_mean(xdata, ydata, yerr):
     val = np.average(xdata, weights=ydata)
     err = yerr * np.abs(np.sum(xdata - val)) / np.sum(ydata)
     return [val, err]
-    
+
 def p_inout(p_in, dp, t0, t1):
     return p_in + dp * (1 + np.sign(t0 - t1)) / 2.
 

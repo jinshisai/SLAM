@@ -8,7 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from scipy import optimize
-from scipy.stats import norm, uniform
+from scipy.stats import norm
 
 
 

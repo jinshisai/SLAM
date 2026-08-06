@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import emcee, corner
+import emcee
+import corner
 from multiprocessing import Pool
 from dynesty import DynamicNestedSampler as DNS
-from dynesty import NestedSampler as NS
 from dynesty import utils as dyfunc
 from dynesty import plotting as dyplot
 from astropy.io import fits
@@ -126,13 +126,13 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
     return output
 
 
-def dynesty_corner(bounds, 
+def dynesty_corner(bounds,
     log_prob_fn, args: list = [],
-    labels: list = None, 
-    figname: str = None, 
+    labels: list = None,
+    figname: str = None,
     show_corner: bool = False,
     return_evidence: bool = False,
-    simpleoutput: bool = True, 
+    simpleoutput: bool = True,
     wt_kwargs = None):
     # dimensions
     ndim = len(bounds[0])

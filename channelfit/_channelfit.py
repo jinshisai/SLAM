@@ -317,7 +317,7 @@ class ChannelFit(ReadFits):
                  loaddeconvolved: str | None = None,
                  signmajor: int | None = None,
                  signminor: int | None = None):
-        if not (cubefits is None):
+        if cubefits is not None:
             self.read_cubefits(cubefits, center, dist, vsys,
                                -rmax, rmax, -rmax, rmax, None, None,
                                xskip, yskip, sigma)

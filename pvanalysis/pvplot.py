@@ -22,7 +22,7 @@ def set_rcparams():
     plt.rcParams['xtick.minor.width'] = 1.5
     plt.rcParams['ytick.minor.width'] = 1.5
 
-       
+
 def nice_ticks(ticks, tlim):
     order = 10**np.floor(np.log10(tlow := tlim[0]))
     tlow = np.ceil(tlow / order) * order
@@ -92,7 +92,7 @@ class PVPlot():
             self.q13 = (q > 0)
         else:
             self.q13 = (quadrant == '13')
-         
+
     def gen_loglog(self) -> None:
         dx, dv = self.x[1] - self.x[0], self.v[1] - self.v[0]
         mi = int(self.x[-1] - self.x[0] / dx)
@@ -244,8 +244,8 @@ class PVPlot():
         if xticklabels: ax.set_xticklabels(xticklabels)
         if yticklabels: ax.set_yticklabels(yticklabels)
         self.fig.tight_layout()
-            
-                
+
+
     def savefig(self, figname: str = None, show: bool = False,
                 **kwargs) -> None:
         kwargs0 = {'bbox_inches': 'tight', 'transparent': True}
@@ -253,4 +253,3 @@ class PVPlot():
             self.fig.savefig(figname, **dict(kwargs0, **kwargs))
         if show: plt.show()
         plt.close()
-        

@@ -36,3 +36,10 @@ pvfitting/__pycache__/mockpvd.cpython-314.pyc
 pvfitting/__pycache__/precalculation.cpython-314.pyc
 velgrad/__pycache__/__init__.cpython-314.pyc
 velgrad/__pycache__/_velgrad.cpython-314.pyc
+__pycache__/test_SLAM.cpython-312-pytest-9.1.1.pyc
+__pycache__/test_SLAM.cpython-313-pytest-9.0.2.pyc
+__pycache__/utils.cpython-313.pyc
+channelfit/__pycache__/__init__.cpython-312.pyc
+channelfit/__pycache__/__init__.cpython-313.pyc
+channelfit/__pycache__/_channelfit.cpython-312.pyc
+channelfit/__pycache__/_channelfit.cpython-313.pyc

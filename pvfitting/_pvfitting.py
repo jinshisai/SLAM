@@ -146,7 +146,7 @@ class PVFitting(ReadFits):
         p_fixed = np.array([p_fixed[k] for k in paramkeys])
         self.chain = None
         self.lnp = None
-        notfixed = p_fixed == None
+        notfixed = np.equal(p_fixed, None)
 
         def chi2(q):
             q = np.asarray(q, dtype=float)

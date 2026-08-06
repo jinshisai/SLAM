@@ -127,7 +127,7 @@ class PVAnalysis():
         data = self.fitsdata.data
         nxh  = self.fitsdata.nx // 2
         nvh  = self.fitsdata.nv // 2
-        if not (self.fitsdata.naxis in [2, 3]):
+        if self.fitsdata.naxis not in [2, 3]:
             print('ERROR\tget_edgeridge: n_axis must be 2 or 3.')
             return
         elif self.fitsdata.naxis == 3:
@@ -259,7 +259,7 @@ class PVAnalysis():
                 store[xv]['red']  = res_red
                 store[xv]['blue'] = res_blue
             # remove low-velocity positions and inner velocities when using both positions and velocities
-            if ((self.results[re]['xcut'] is not None) 
+            if ((self.results[re]['xcut'] is not None)
                 & (self.results[re]['vcut'] is not None)):
                 for rb in ['red', 'blue']:
                     if not nanbeforecross: break
@@ -280,7 +280,7 @@ class PVAnalysis():
                      'vcut':{'red':np.array([[], [], [], []]),
                              'blue':np.array([[], [], [], []])}}
             for rb in ['red', 'blue']:
-                if ((self.results[re]['xcut'] is not None) 
+                if ((self.results[re]['xcut'] is not None)
                     & (self.results[re]['vcut'] is not None)):
                     # remove nan
                     for xv, ival in zip(['xcut', 'vcut'], [0, 1]):
@@ -375,7 +375,7 @@ class PVAnalysis():
         print('Along velocity axis.')
         # data
         data = self.fitsdata.data
-        if not (self.fitsdata.naxis in [2, 3]):
+        if self.fitsdata.naxis not in [2, 3]:
             print('ERROR\tpvfit_vcut: n_axis must be 2 or 3.')
             return
         if self.fitsdata.naxis == 3:
@@ -608,7 +608,6 @@ class PVAnalysis():
         """
         # modules
         import math
-        from scipy import optimize
         from scipy.signal import find_peaks
         from scipy.interpolate import interp1d
         from mpl_toolkits.axes_grid1 import ImageGrid
@@ -619,7 +618,7 @@ class PVAnalysis():
 
         # data
         data = self.fitsdata.data
-        if not (self.fitsdata.naxis in [2, 3]):
+        if self.fitsdata.naxis not in [2, 3]:
             print('Error\tpvfit_vcut: n_axis must be 2 or 3.')
             return
         elif self.fitsdata.naxis == 3:
