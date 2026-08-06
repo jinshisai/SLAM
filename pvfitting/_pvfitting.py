@@ -257,8 +257,8 @@ class PVFitting(ReadFits):
             print('Parameter values (opt, low, mid, high):')
             for i, (k, d, u, f) in enumerate(zip(paramkeys, digits, ulist, flist)):
                 p = [self.popt[i], self.plow[i], self.pmid[i], self.phigh[i]]
-                print(f'{k} = {p[0]:.{d:d}{f}}, {p[1]:.{d:d}{f}},'
-                      + f' {p[2]:.{d:d}{f}}, {p[3]:.{d:d}{f}} {u}')
+                print(f'{k} = {p[0]:.{d}{f}}, {p[1]:.{d}{f}},'
+                      + f' {p[2]:.{d}{f}}, {p[3]:.{d}{f}} {u}')
         if runfit and save_result:
             plist = [self.popt, self.plow, self.pmid, self.phigh]
             with open(filename+'.popt.txt', 'w') as f:
