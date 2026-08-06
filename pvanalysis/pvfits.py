@@ -130,10 +130,9 @@ class Impvfits:
         # need to confirm what's rotation, as well as Yusuke's coding.
         # rotation of pixel coordinates
         if 'PC1_1' in header:
-            pc_ij = np.array([
-                [header[f'PC{i:d}_{j:d}']
-                 if f'PC{i:d}_{j:d}' in header else 0.
-                 for j in rng] for i in rng])
+            pc_ij = np.array([[header[f'PC{i:d}_{j:d}']
+                               if f'PC{i:d}_{j:d}' in header else 0.
+                               for j in rng] for i in rng])
             pc_ij = pc_ij * np.array([del_i[i - 1] for i in rng])
         elif 'CD1_1' in header:
             pc_ij = np.array([[
