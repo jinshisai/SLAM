@@ -66,9 +66,9 @@ class Nested3DGrid(object):
             self.ylim.insert(0, [ye[0], ye[-1]])
             self.zlim.insert(0, [ze[0], ze[-1]])
         else:
-            self.xlim = [xe[0], xe[-1]]
-            self.ylim = [ye[0], ye[-1]]
-            self.zlim = [ze[0], ze[-1]]
+            self.xlim = [[xe[0], xe[-1]]]
+            self.ylim = [[ye[0], ye[-1]]]
+            self.zlim = [[ze[0], ze[-1]]]
 
     def get_nestinglim(self, reslim=5):
         xlim = []

@@ -817,6 +817,8 @@ class PVAnalysis():
                       outname: str = 'pvanalysis',
                       rangelevel: float = 0.8,
                       show_corner: bool = False,
+                      return_chain: bool = False,
+                      return_lnp: bool = False,
                       calc_evidence: bool = False) -> dict:
         """Fit the derived edge/ridge positions/velocities with a double power law function by using emcee.
 
@@ -850,6 +852,10 @@ class PVAnalysis():
             show_corner : bool
                True means the corner figures are shown. These figures are also
                plotted in two png files.
+            return_chain : bool
+               True stores the MCMC chains in self.chain. Each chain is a 2D numpy array with rows for varied parameters and columns for samples.
+            return_lnp : bool
+               True stores the log probability arrays in self.lnp. The sample order matches the columns of self.chain when return_chain is True.
 
         Returns:
             result : dict
@@ -887,9 +893,12 @@ class PVAnalysis():
                    include_dp, include_vsys]
         labels = labels[include]
         popt_e, popt_r = [np.empty(5), np.empty(5)], [np.empty(5), np.empty(5)]
+        self.chain = {'edge': None, 'ridge': None} if return_chain else None
+        self.lnp = {'edge': None, 'ridge': None} if return_lnp else None
         minabs = lambda a, i, j: np.min(np.abs(np.r_[a[i], a[j]]))
         maxabs = lambda a, i, j: np.max(np.abs(np.r_[a[i], a[j]]))
-        for args, ext, res in zip([Es, Rs], ['_e', '_r'], [popt_e, popt_r]):
+        for args, ext, key, res in zip([Es, Rs], ['_e', '_r'],
+                                       ['edge', 'ridge'], [popt_e, popt_r]):
             if rb_range is None:
                 rb_range = [minabs(args, 1, 3), maxabs(args, 1, 3)]
             if vb_range is None:
@@ -909,11 +918,20 @@ class PVAnalysis():
                        + np.sum(((v1 - wpow_v_custom(x0, *p)) / dv1)**2)
                 return -0.5 * chi2
             plim = plim[:, include]
-            popt, perr = emcee_corner(plim, lnprob, args=args,
-                                      labels=labels, rangelevel=rangelevel,
-                                      figname=outname+'.corner'+ext+'.png',
-                                      show_corner=show_corner,
-                                      ndata=len(args[0]) + len(args[3]))
+            mcmc = emcee_corner(plim, lnprob, args=args,
+                                labels=labels, rangelevel=rangelevel,
+                                figname=outname+'.corner'+ext+'.png',
+                                show_corner=show_corner,
+                                ndata=len(args[0]) + len(args[3]),
+                                return_chain=return_chain,
+                                return_lnp=return_lnp)
+            popt, perr = mcmc[:2]
+            i_mcmc = 2
+            if return_chain:
+                self.chain[key] = mcmc[i_mcmc]
+                i_mcmc += 1
+            if return_lnp:
+                self.lnp[key] = mcmc[i_mcmc]
             if calc_evidence:
                 dynesty_corner(plim, lnprob, args=args,
                     figname=None, show_corner=False, return_evidence=True)
@@ -922,7 +940,7 @@ class PVAnalysis():
             (qopt := q0 * 1)[np.isnan(q0)] = popt
             (qerr := q0 * 0)[np.isnan(q0)] = perr
             res[:] = [qopt, qerr]
-            dof = len(args[0]) + len(args[3]) - len(plim[0]) - 1
+            dof = len(args[0]) + len(args[3]) - len(plim[0])
             chi2 = -2 * lnprob(popt, *args)
             if ext == '_e':
                 self.chi2r_e = chi2 / dof

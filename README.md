@@ -18,16 +18,17 @@ For basic usages, please see `example_xxx.py` in this library, where xxx is the 
  
 ## Requirement
 
-* numpy
-* scipy
-* copy
-* math
-* matplotlib
-* mpl_toolkits
-* astropy
-* emcee
+* python>=3.12
+* astropy>=7.2
 * corner
 * dynesty
+* emcee
+* matplotlib
+* multiprocess
+* numba
+* numpy>=2.0
+* scipy
+* tqdm
  
 ## Installation
  

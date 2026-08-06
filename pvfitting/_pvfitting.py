@@ -79,7 +79,11 @@ class PVFitting(ReadFits):
                     vmask: list[float, float] = [0, 0],
                     zmax: float | None = None,
                     filename: str = 'PVfitting',
-                    show: bool = False, progressbar: bool = True,
+                    show: bool = False,
+                    save_result: bool = True,
+                    save_corner: bool = True,
+                    print_result: bool = True,
+                    progressbar: bool = True,
                     kwargs_emcee_corner: dict = {},
                     signmajor: int | None = None, signminor: int | None = None,
                     pa_major: float = 0., pa_minor: float = 90.,
@@ -88,7 +92,8 @@ class PVFitting(ReadFits):
                     n_nest: list[float] = [2, 2, 2, 2, 2, 2],
                     reslim: float = 10,
                     title: str | None = None,
-                    log: bool = False):
+                    log: bool = False,
+                    num_threads: int | str | None = None):
         # Observed PV diagrams
         majobs = self.dpvmajor.copy()
         minobs = self.dpvminor.copy()
@@ -118,7 +123,8 @@ class PVFitting(ReadFits):
                        nsubgrid=nsubgrid, nnest=n_nest,
                        beam=self.beam, reslim=reslim,
                        signmajor=majquad, signminor=minquad,
-                       pa_major=pa_major, pa_minor=pa_minor)
+                       pa_major=pa_major, pa_minor=pa_minor,
+                       num_threads=num_threads)
         rout = np.max(z)
 
         def makemodel(Mstar, Rc, alphainfall, taumax, frho):
@@ -138,10 +144,29 @@ class PVFitting(ReadFits):
         p_fixed = {k: fixed_params[k] if k in fixed_params else None for k in paramkeys}
         free = {k: p_fixed[k] is None for k in paramkeys}
         p_fixed = np.array([p_fixed[k] for k in paramkeys])
+        self.chain = None
+        self.lnp = None
+        notfixed = p_fixed == None
+
+        def chi2(q):
+            q = np.asarray(q, dtype=float)
+            majsig2 = (1. + q[-1]**2) * majsig**2
+            minsig2 = (1. + q[-1]**2) * minsig**2
+            majmod, minmod = self.makemodel(*q[:-1])
+            chi2maj = np.nansum((majobs - majmod)**2 / majsig2)
+            chi2min = np.nansum((minobs - minmod)**2 / minsig2)
+            return (chi2maj + chi2min) / np.sqrt(Rarea)
+
+        def reduced_chi2(q):
+            n_data = np.count_nonzero(np.isfinite(majobs)) \
+                     + np.count_nonzero(np.isfinite(minobs))
+            n_data = n_data / np.sqrt(Rarea)
+            n_free = np.count_nonzero(notfixed) + 1  # +1 is due to fflux
+            dof = n_data - n_free
+            return chi2(q) / dof if dof > 0 else np.nan
 
         runfit = None in p_fixed
         if runfit:
-            notfixed = [x is None for x in p_fixed]
             ilog = np.array([0, 1, 2, 3, 4], dtype=int)
             i = ilog[[p_fixed[i] is not None for i in ilog]]
             p_fixed[i] = np.log10(p_fixed[i].astype('float'))
@@ -154,7 +179,8 @@ class PVFitting(ReadFits):
                        'figname': filename+'.corner.png', 'show_corner': show,
                        'plot_chain': True, 'show_chain': show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
-
+            if not save_corner:
+                kw['figname'] = None
             # progress bar
             if progressbar:
                 total = kw['nwalkers_per_ndim'] * len(p_fixed[notfixed])
@@ -192,7 +218,17 @@ class PVFitting(ReadFits):
 
             # run mcmc fitting
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
-
+            i_mcmc = 4
+            if kw.get('return_chain', False):
+                chain_free = mcmc[i_mcmc]
+                i_mcmc += 1
+                chain = np.empty((len(p_fixed), chain_free.shape[1]), dtype=float)
+                chain[notfixed] = chain_free
+                chain[~notfixed] = p_fixed[~notfixed].astype(float)[:, None]
+                chain[ilog] = 10**chain[ilog]
+                self.chain = chain
+            if kw.get('return_lnp', False):
+                self.lnp = mcmc[i_mcmc]
             # best parameters & errors
             def get_p(i: int):
                 p = p_fixed.copy()
@@ -220,11 +256,11 @@ class PVFitting(ReadFits):
             # The number of paramter is assumed to be 6 but won't change dof much.
             dof = dof / np.sqrt(Rarea) - 6 - 1
             self.chi2r = chi2() / dof
-
             popt = p_fixed
             plow = p_fixed
             pmid = p_fixed
             phigh = p_fixed
+        self.chi2r = reduced_chi2(popt)
         self.popt = popt
         self.plow = plow
         self.pmid = pmid
@@ -232,10 +268,13 @@ class PVFitting(ReadFits):
         ulist = ['Msun', 'au', '', '', '', 'sig_obs']
         digits = [2, 0, 2, 2, 2, 2]
         flist = ['f', 'f', 'f', 'e', 'e', 'f']
-        for i, (k, d, u, f) in enumerate(zip(paramkeys, digits, ulist, flist)):
-            p = [self.plow[i], self.popt[i], self.phigh[i]]
-            print(f'{k} = {p[0]: .{d:d}{f}}, {p[1]: .{d:d}{f}}, {p[2]: .{d:d}{f}} {u}')
-        if runfit:
+        if print_result:
+            print('Parameter values (opt, low, mid, high):')
+            for i, (k, d, u, f) in enumerate(zip(paramkeys, digits, ulist, flist)):
+                p = [self.popt[i], self.plow[i], self.pmid[i], self.phigh[i]]
+                print(f'{k} = {p[0]:.{d:d}{f}}, {p[1]:.{d:d}{f}},'
+                      + f' {p[2]:.{d:d}{f}}, {p[3]:.{d:d}{f}} {u}')
+        if runfit and save_result:
             plist = [self.popt, self.plow, self.pmid, self.phigh]
             with open(filename+'.popt.txt', 'w') as f:
                 f.write('#Rows:' + ','.join(paramkeys) + '\n')
