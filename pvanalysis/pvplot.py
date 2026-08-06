@@ -37,7 +37,7 @@ def nice_labels(ticks):
 
 class PVPlot():
     """make a Position-Velocity diagram in color and/or contour maps.
-    
+
     """
     def __init__(self, fig=None, ax=None, fitsimage: str = None,
                  restfrq: float = None, beam: list = None,
@@ -133,13 +133,13 @@ class PVPlot():
             x, v, d = self.x, self.v, self.d
         if Tb:
             Omega = bmaj * bmin / 3600.**2 * np.radians(1)**2 \
-                    * np.pi / 4. / np.log(2.)
+                * np.pi / 4. / np.log(2.)
             if type(Omega) == np.ndarray:
                 j0, j1 = self.jrange
                 Omega = np.tile(Omega[j0:j1], (len(x), 1)).T
             lam = constants.c.to('m/s').value / restfrq
             Jy2K = units.Jy.to('J*s**(-1)*m**(-2)*Hz**(-1)') \
-                   * lam**2 / 2. / constants.k_B.to('J/K').value / Omega
+                * lam**2 / 2. / constants.k_B.to('J/K').value / Omega
             d = d * Jy2K
         if log:
             vmin = kwargs['vmin'] if 'vmin' in kwargs else np.nanstd(d)
@@ -201,7 +201,7 @@ class PVPlot():
                 Omega = np.tile(Omega[j0:j1], (len(x), 1)).T
             lam = constants.c.to('m/s').value / restfrq
             Jy2K = units.Jy.to('J*s**(-1)*m**(-2)*Hz**(-1)') \
-                   * lam**2 / 2. / constants.k_B.to('J/K').value / Omega
+                * lam**2 / 2. / constants.k_B.to('J/K').value / Omega
             d *= Jy2K
         if rms is None:
             rms = (np.std(d[:5, :]) + np.std(d[-5:, :])

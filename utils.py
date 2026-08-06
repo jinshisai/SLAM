@@ -127,13 +127,13 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
 
 
 def dynesty_corner(bounds,
-    log_prob_fn, args: list = [],
-    labels: list = None,
-    figname: str = None,
-    show_corner: bool = False,
-    return_evidence: bool = False,
-    simpleoutput: bool = True,
-    wt_kwargs=None):
+                   log_prob_fn, args: list = [],
+                   labels: list = None,
+                   figname: str = None,
+                   show_corner: bool = False,
+                   return_evidence: bool = False,
+                   simpleoutput: bool = True,
+                   wt_kwargs=None):
     # dimensions
     ndim = len(bounds[0])
     plim = np.array(bounds)
@@ -162,7 +162,7 @@ def dynesty_corner(bounds,
     # Compute 16%--84% quantiles
     weights = results.importance_weights()
     quantiles = [dyfunc.quantile(samps, [0.16, 0.5, 0.84], weights=weights)
-    for samps in results.samples.T]
+                 for samps in results.samples.T]
 
     # Evidence?
     if return_evidence:

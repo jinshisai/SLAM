@@ -88,10 +88,10 @@ class VelGrad(ReadFits):
                 if method == 'mean':
                     xval = np.sum(d * X) / np.sum(d)
                     xerr = corrected_sigma \
-                           * np.sqrt(np.sum((X - xval)**2)) / np.sum(d)
+                        * np.sqrt(np.sum((X - xval)**2)) / np.sum(d)
                     yval = np.sum(d * Y) / np.sum(d)
                     yerr = corrected_sigma \
-                           * np.sqrt(np.sum((Y - yval)**2)) / np.sum(d)
+                        * np.sqrt(np.sum((Y - yval)**2)) / np.sum(d)
                 elif method == 'peak':
                     xval = X[np.argmax(d)]
                     xerr = self.bmaj / (np.max(d) / sigma)
@@ -103,11 +103,11 @@ class VelGrad(ReadFits):
                               [d.max() * 2, xmax, ymax, xmax, ymax, np.pi]]
                     try:
                         popt, pcov = curve_fit(gauss2d,
-                                         (X.ravel(), Y.ravel()),
-                                         d.ravel(), max_nfev=1000,
-                                         sigma=X.ravel() * 0 + corrected_sigma,
-                                         absolute_sigma=True,
-                                         bounds=bounds)
+                                               (X.ravel(), Y.ravel()),
+                                               d.ravel(), max_nfev=1000,
+                                               sigma=X.ravel() * 0 + corrected_sigma,
+                                               absolute_sigma=True,
+                                               bounds=bounds)
                         xval, yval = popt[[1, 2]]
                         xerr, yerr = np.sqrt(np.diag(pcov))[[1, 2]]
                     except RuntimeError:
@@ -388,10 +388,10 @@ class VelGrad(ReadFits):
                 'chi2r_mstar': getattr(self, 'chi2r_mstar', np.nan)}
 
     def plot_center(self, pa: float = None,
-                     filehead: str = 'channelanalysis',
-                     show_figs: bool = False,
-                     title: str = None,
-                     save: bool = True):
+                    filehead: str = 'channelanalysis',
+                    show_figs: bool = False,
+                    title: str = None,
+                    save: bool = True):
         plt.rcParams['font.size'] = 20
         plt.rcParams['axes.linewidth'] = 1.5
         plt.rcParams['xtick.direction'] = 'out'

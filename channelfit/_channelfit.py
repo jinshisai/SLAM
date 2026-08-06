@@ -39,7 +39,7 @@ def avefour(a: np.ndarray) -> np.ndarray:
 
 
 def makemom012(d: np.ndarray, v: np.ndarray, sigma: float,
-              threshold: float = 3) -> dict:
+               threshold: float = 3) -> dict:
     dmasked = np.nan_to_num(d)
     dv = np.min(v[1:] - v[:-1])
     mom0 = np.sum(dmasked, axis=0) * dv
@@ -594,7 +594,7 @@ class ChannelFit(ReadFits):
         if self.free['paoff'] or self.free['Rc'] or self.free['Rin']:
             self.update_getvlos(Rc, Rin)
         if self.free['paoff'] or self.free['h1'] or self.free['h2'] \
-            or self.free['Rc'] or self.free['Rin']:
+                or self.free['Rc'] or self.free['Rin']:
             self.update_vlos(h1, h2)
 
         Iunif = self.get_Iunif(Mstar, Rc, pI, Ienv, voff)
@@ -667,11 +667,11 @@ class ChannelFit(ReadFits):
         def chi2(q):
             model = self.cubemodel(*q)
             return np.nansum((self.data_valid - model)**2) \
-                   / self.sigma**2 / self.pixperbeam
+                / self.sigma**2 / self.pixperbeam
 
         def reduced_chi2(q):
             n_data = np.count_nonzero(np.isfinite(self.data_valid)) \
-                     / self.pixperbeam
+                / self.pixperbeam
             n_free = np.count_nonzero(notfixed)
             if 'mom0' not in self.scaling:
                 n_free += 1

@@ -85,7 +85,7 @@ def gaussfit(xdata, ydata, yerr):
     if param_cov is not None:
         param_err = np.array([
             np.abs(param_cov[j][j])**0.5 for j in range(len(pinp))
-            ])
+        ])
     else:
         param_err = np.full(3, np.nan)
         param_out = np.full(3, np.nan) if (param_out == pinp).all else param_out
@@ -150,14 +150,14 @@ def dplaw(radii, params):
     '''
     vb, rb, pin, pout = params
 
-    vout = np.array([
-        vb*(r/rb)**(-pin) if r < rb else vb*(r/rb)**(-pout)
-        for r in radii
-        ])
-    dydx = np.array([
-        (vb/rb)*(-pin)*(r/rb)**(-pin-1) if r < rb else (vb/rb)*(-pout)*(r/rb)**(-pout-1)
-        for r in radii
-        ])
+    vout = np.array([vb * (r / rb)**(-pin)
+                     if r < rb else
+                     vb * (r / rb)**(-pout)
+                     for r in radii])
+    dydx = np.array([(vb / rb) * (-pin) * (r/rb)**(-pin - 1)
+                     if r < rb else
+                     (vb / rb) * (-pout) * (r / rb)**(-pout - 1)
+                     for r in radii])
 
     return vout, dydx
 
@@ -196,12 +196,8 @@ def estimate_perror(params, func, x, y, xerr, yerr, niter=3000):
         perrors = np.vstack((perrors, result[0]))
         # print param_esterr[:,0]
 
-    sigmas = np.array([
-        np.std(perrors[:, i]) for i in range(nparams)
-        ])
-    medians = np.array([
-        np.median(perrors[:, i]) for i in range(nparams)
-        ])
+    sigmas = np.array([np.std(perrors[:, i]) for i in range(nparams)])
+    medians = np.array([np.median(perrors[:, i]) for i in range(nparams)])
 
     with np.printoptions(precision=4, suppress=True):
         print('Estimated errors (standard deviation):')

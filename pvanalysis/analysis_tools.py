@@ -86,7 +86,7 @@ def doublepower_r_error(v, r_break, v_break, p_in, dp, vsys,
     p = p_inout(p_in, dp, v_break, v_a)
     perr = p_inout(dp_in, dp_out - dp_in, v_break, v_a)
     err2 = (dr_break / r_break)**2 + (dv_break / v_break / p)**2 \
-           + (np.log(v_break / v_a) * perr / p**2)**2 + (dvsys / v_a / p)**2
+        + (np.log(v_break / v_a) * perr / p**2)**2 + (dvsys / v_a / p)**2
     return np.sqrt(err2) * r0
 
 

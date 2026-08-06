@@ -223,26 +223,26 @@ class Nested3DGrid(object):
         d_avg = np.array([
             data[k::nbin, j::nbin, i::nbin]
             for k in range(nbin) for j in range(nbin) for i in range(nbin)
-            ])
+        ])
         return np.nanmean(d_avg, axis=0)
 
     def binning_onsubgrid_layered(self, data, nbin):
         dshape = len(data.shape)
         if dshape == 3:
-            d_avg = np.array([
-                data[k::nbin, j::nbin, i::nbin]
-                for k in range(nbin) for j in range(nbin) for i in range(nbin)
-                ])
+            d_avg = np.array([data[k::nbin, j::nbin, i::nbin]
+                              for k in range(nbin)
+                              for j in range(nbin)
+                              for i in range(nbin)])
         elif dshape == 4:
-            d_avg = np.array([
-                data[:, k::nbin, j::nbin, i::nbin]
-                for k in range(nbin) for j in range(nbin) for i in range(nbin)
-                ])
+            d_avg = np.array([data[:, k::nbin, j::nbin, i::nbin]
+                              for k in range(nbin)
+                              for j in range(nbin)
+                              for i in range(nbin)])
         elif dshape == 5:
-            d_avg = np.array([
-                data[:, :, k::nbin, j::nbin, i::nbin]
-                for k in range(nbin) for j in range(nbin) for i in range(nbin)
-                ])
+            d_avg = np.array([data[:, :, k::nbin, j::nbin, i::nbin]
+                              for k in range(nbin)
+                              for j in range(nbin)
+                              for i in range(nbin)])
         else:
             print('ERROR\tbinning_onsubgrid_layered: only Nd of data of 3-5 is now supported.')
             return 0

@@ -132,8 +132,8 @@ class Impvfits:
         if 'PC1_1' in header:
             pc_ij = np.array([
                 [header[f'PC{i:d}_{j:d}']
-                if f'PC{i:d}_{j:d}' in header else 0.
-                for j in rng] for i in rng])
+                 if f'PC{i:d}_{j:d}' in header else 0.
+                 for j in rng] for i in rng])
             pc_ij = pc_ij * np.array([del_i[i - 1] for i in rng])
         elif 'CD1_1' in header:
             pc_ij = np.array([[
@@ -204,10 +204,10 @@ class Impvfits:
 
     # Draw pv diagram
     def draw_pvdiagram(self, outname, data=None, header=None, ax=None, outformat='pdf', color=True, cmap='Greys',
-        vmin=None, vmax=None, vsys=None, contour=True, clevels=None, ccolor='k',
-        vrel=False, logscale=False, x_offset=False, ratio=1.2, prop_vkep=None, fontsize=14,
-        lw=1, clip=None, plot_res=True, inmode='fits', xranges=[], yranges=[],
-        ln_hor=True, ln_var=True, alpha=None):
+                       vmin=None, vmax=None, vsys=None, contour=True, clevels=None, ccolor='k',
+                       vrel=False, logscale=False, x_offset=False, ratio=1.2, prop_vkep=None, fontsize=14,
+                       lw=1, clip=None, plot_res=True, inmode='fits', xranges=[], yranges=[],
+                       ln_hor=True, ln_var=True, alpha=None):
         '''
         Draw a PV diagram.
 
@@ -335,11 +335,11 @@ class Impvfits:
         # plot images
         if color:
             imcolor = ax.imshow(data_color, cmap=cmap, origin='lower',
-                extent=extent, norm=norm, alpha=alpha)
+                                extent=extent, norm=norm, alpha=alpha)
 
         if contour:
             imcont = ax.contour(data, colors=ccolor, origin='lower',
-                extent=extent, levels=clevels, linewidths=lw, alpha=alpha)
+                                extent=extent, levels=clevels, linewidths=lw, alpha=alpha)
 
         # axis labels
         ax.set_xlabel(xlabel)
@@ -353,7 +353,7 @@ class Impvfits:
             ax.set_xlim(xmin, xmax)
         else:
             print('WARRING: Input xranges is wrong.'
-                   + 'Must be [xmin, xmax].')
+                  + 'Must be [xmin, xmax].')
             ax.set_xlim(extent[0], extent[1])
 
         if len(yranges) == 0:
@@ -363,7 +363,7 @@ class Impvfits:
             ax.set_ylim(ymin, ymax)
         else:
             print('WARRING: Input yranges is wrong.'
-                   + 'Must be [ymin, ymax].')
+                  + 'Must be [ymin, ymax].')
             ax.set_ylim(extent[2], extent[3])
 
         # lines showing offset 0 and relative velocity 0
@@ -383,7 +383,7 @@ class Impvfits:
             # print(res_x, res_y)
             res_x_plt, res_y_plt \
                 = ax.transLimits.transform((res_x*0.5, res_y*0.5)) \
-                    - ax.transLimits.transform((0, 0))  # data --> Axes coordinate
+                - ax.transLimits.transform((0, 0))  # data --> Axes coordinate
             ax.errorbar(0.1, 0.1, xerr=res_x_plt, yerr=res_y_plt,
                         color=ccolor, capsize=3, capthick=1.,
                         elinewidth=1., transform=ax.transAxes)

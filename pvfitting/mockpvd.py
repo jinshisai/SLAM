@@ -332,8 +332,7 @@ class MockPVD(object):
 
 # binning
 def binning(data, nbin):
-    d_avg = np.array([
-        data[:, i::nbin, i::nbin]
-        for j in range(nbin) for i in range(nbin)
-        ])
+    d_avg = np.array([data[:, i::nbin, i::nbin]
+                      for j in range(nbin)
+                      for i in range(nbin)])
     return np.nanmean(d_avg, axis=0)

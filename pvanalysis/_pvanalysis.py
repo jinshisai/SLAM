@@ -74,13 +74,13 @@ class PVAnalysis():
         self.__sorted = False
 
     def get_edgeridge(self, outname, thr=5.,
-        incl=None, quadrant=None, ridgemode='mean',
-        pixrng_vcut=None, pixrng_xcut=None,
-        Mlim=[0, 1e10], xlim=[-1e10, 0, 0, 1e10], vlim=[-1e10, 0, 0, 1e10],
-        use_velocity=True, use_position=True,
-        interp_ridge=False, minrelerr=0.01, minabserr=0.1,
-        nanbeforemax: bool = True, nanopposite: bool = True,
-        nanbeforecross: bool = True):
+                      incl=None, quadrant=None, ridgemode='mean',
+                      pixrng_vcut=None, pixrng_xcut=None,
+                      Mlim=[0, 1e10], xlim=[-1e10, 0, 0, 1e10], vlim=[-1e10, 0, 0, 1e10],
+                      use_velocity=True, use_position=True,
+                      interp_ridge=False, minrelerr=0.01, minabserr=0.1,
+                      nanbeforemax: bool = True, nanopposite: bool = True,
+                      nanbeforecross: bool = True):
         """Get the edge/ridge at positions/velocities.
 
         Args:
@@ -165,14 +165,14 @@ class PVAnalysis():
         # Get rigde/edge
         if use_position:
             self.get_edgeridge_xcut(outname, thr=thr, incl=incl,
-                            xlim=xlim, vlim=vlim, Mlim=Mlim,
-                            ridgemode=ridgemode, pixrng=pixrng_xcut,
-                            interp_ridge=interp_ridge)
+                                    xlim=xlim, vlim=vlim, Mlim=Mlim,
+                                    ridgemode=ridgemode, pixrng=pixrng_xcut,
+                                    interp_ridge=interp_ridge)
         if use_velocity:
             self.get_edgeridge_vcut(outname, thr=thr, incl=incl,
-                            xlim=xlim, vlim=vlim, Mlim=Mlim,
-                            ridgemode=ridgemode, pixrng=pixrng_vcut,
-                            interp_ridge=interp_ridge)
+                                    xlim=xlim, vlim=vlim, Mlim=Mlim,
+                                    ridgemode=ridgemode, pixrng=pixrng_vcut,
+                                    interp_ridge=interp_ridge)
 
         # sort results
         self.sort_fitresults(minrelerr=minrelerr, minabserr=minabserr,
@@ -259,7 +259,7 @@ class PVAnalysis():
                 store[xv]['blue'] = res_blue
             # remove low-velocity positions and inner velocities when using both positions and velocities
             if ((self.results[re]['xcut'] is not None)
-                & (self.results[re]['vcut'] is not None)):
+                    & (self.results[re]['vcut'] is not None)):
                 for rb in ['red', 'blue']:
                     if not nanbeforecross: break
                     x1, v0, _, _ = store['xcut'][rb]
@@ -275,12 +275,12 @@ class PVAnalysis():
                         v1[:iv] = np.nan
             # combine xcut and vcut
             res_f = {'xcut': {'red': np.array([[], [], [], []]),
-                             'blue': np.array([[], [], [], []])},
+                              'blue': np.array([[], [], [], []])},
                      'vcut': {'red': np.array([[], [], [], []]),
-                             'blue': np.array([[], [], [], []])}}
+                              'blue': np.array([[], [], [], []])}}
             for rb in ['red', 'blue']:
                 if ((self.results[re]['xcut'] is not None)
-                    & (self.results[re]['vcut'] is not None)):
+                        & (self.results[re]['vcut'] is not None)):
                     # remove nan
                     for xv, ival in zip(['xcut', 'vcut'], [0, 1]):
                         ref = store[xv][rb]
@@ -320,9 +320,9 @@ class PVAnalysis():
             self.results_filtered[re] = res_f
 
     def get_edgeridge_vcut(self, outname, thr=5., incl=90., xlim=[-1e10, 0, 0, 1e10],
-                   vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='gauss',
-                   pixrng=None, multipeaks=False, i_peak=0, prominence=1.5,
-                   inverse=False, interp_ridge=False):
+                           vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='gauss',
+                           pixrng=None, multipeaks=False, i_peak=0, prominence=1.5,
+                           inverse=False, interp_ridge=False):
         """Get edge/ridge along the velocity axis, i.e., determine
            representative velocity at each offset.
 
@@ -436,7 +436,7 @@ class PVAnalysis():
         # figure for check result
         fig = plt.figure(figsize=(11.69, 8.27))
         grid = ImageGrid(fig, rect=111, nrows_ncols=(nrow, ncol),
-            axes_pad=0, share_all=True, aspect=False, label_mode='L')
+                         axes_pad=0, share_all=True, aspect=False, label_mode='L')
         dlim = [np.nanmin(data_fit), np.nanmax(data_fit)]
         # x & y label
         grid[(nrow*ncol - ncol)].set_xlabel(r'Velocity (km s$^{-1}$)')
@@ -460,7 +460,7 @@ class PVAnalysis():
             # interpolate
             if interp_ridge:
                 vi_interp = np.linspace(v_i[0], v_i[-1],
-                (len(v_i) - 1) * 10 + 1)  # 1/10 sampling rate
+                                        (len(v_i) - 1) * 10 + 1)  # 1/10 sampling rate
                 d_i = interp1d(v_i, d_i, kind='cubic')(vi_interp)
                 v_i = vi_interp
             # get ridge value
@@ -486,7 +486,7 @@ class PVAnalysis():
                     # get peak index
                     pidx = peaks[i_peak] if multipeaks else np.argmax(d_i)
                     if ((pidx < pixrng)
-                        or (pidx > len(d_i) - pixrng - 1)):
+                            or (pidx > len(d_i) - pixrng - 1)):
                         # peak position is too close to edge
                         mv, mv_err = np.nan, np.nan
                     else:
@@ -526,7 +526,7 @@ class PVAnalysis():
             # interpolation
             # resample with a 10 times finer sampling rate
             vi_interp = np.linspace(v_i[0], v_i[-1],
-                                     (len(v_i)-1)*10 + 1)
+                                    (len(v_i)-1)*10 + 1)
             di_interp = interp1d(v_i, d_i, kind='cubic')(vi_interp)
             # flag by mass
             mass_est = kepler_mass(x_i, vi_interp-self.vsys, self.__unit)
@@ -544,13 +544,13 @@ class PVAnalysis():
             # observed data
             if interp_ridge:
                 ax.step(vi_interp, di_interp, linewidth=1.,
-                    color='k', where='mid')
+                        color='k', where='mid')
             else:
                 ax.step(vaxis_fit, data_fit[:, i], linewidth=1.,
-                    color='k', where='mid')
+                        color='k', where='mid')
             # offset label
             ax.text(0.9, 0.9, f'{x_i:03.2f}', horizontalalignment='right',
-                verticalalignment='top', transform=ax.transAxes)
+                    verticalalignment='top', transform=ax.transAxes)
             ax.tick_params(which='both', direction='in', bottom=True,
                            top=True, left=True, right=True, pad=9)
         # Store the result array in the shape of (4, len(x)).
@@ -561,9 +561,9 @@ class PVAnalysis():
         plt.close()
 
     def get_edgeridge_xcut(self, outname, thr=5., incl=90., xlim=[-1e10, 0, 0, 1e10],
-                   vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='mean',
-                   pixrng=None, multipeaks=False, i_peak=0,
-                   prominence=1.5, interp_ridge=False):
+                           vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='mean',
+                           pixrng=None, multipeaks=False, i_peak=0,
+                           prominence=1.5, interp_ridge=False):
         """Get edge/ridge along x-axis, i.e., determine representative
            position at each velocity.
 
@@ -629,7 +629,7 @@ class PVAnalysis():
         self.res_off = res_off
         self.delv = self.fitsdata.delv
         beamlength = res_off / self.fitsdata.delx \
-                     * np.sqrt(np.pi / 4 / np.log(2))  # pixel/beam
+            * np.sqrt(np.pi / 4 / np.log(2))  # pixel/beam
         corrected_rms = rms * np.sqrt(beamlength)
         # harf of beamsize [pix]
         hob = int(np.round((res_off*0.5/self.fitsdata.delx)))
@@ -672,7 +672,7 @@ class PVAnalysis():
         # figure for check result
         fig = plt.figure(figsize=(11.69, 8.27))
         grid = ImageGrid(fig, rect=111, nrows_ncols=(nrow, ncol),
-            axes_pad=0, share_all=True, aspect=False, label_mode='L')
+                         axes_pad=0, share_all=True, aspect=False, label_mode='L')
         # gridi = 0
         # x & y label
         grid[(nrow*ncol-ncol)].set_xlabel('Offset (arcsec)')
@@ -721,7 +721,7 @@ class PVAnalysis():
                     # get peak index
                     pidx = peaks[i_peak] if multipeaks else np.argmax(d_i)
                     if ((pidx < pixrng)
-                        or (pidx > len(d_i) - pixrng - 1)):
+                            or (pidx > len(d_i) - pixrng - 1)):
                         # peak position is too edge
                         mx, mx_err = np.nan, np.nan
                     else:
@@ -763,7 +763,7 @@ class PVAnalysis():
             # interpolation
             # resample with a 10 times finer sampling rate
             xi_interp = np.linspace(x_i[0], x_i[-1],
-                                     (len(x_i)-1)*10 + 1)
+                                    (len(x_i)-1)*10 + 1)
             di_interp = interp1d(x_i, d_i, kind='cubic')(xi_interp)
             # flag by mass
             mass_est = kepler_mass(xi_interp, v_i - self.vsys, self.__unit)
@@ -781,13 +781,13 @@ class PVAnalysis():
             # observed data
             if interp_ridge:
                 ax.step(xi_interp, di_interp, linewidth=1.,
-                    color='k', where='mid')
+                        color='k', where='mid')
             else:
                 ax.step(xaxis_fit, data_fit[i, :], linewidth=1.,
-                    color='k', where='mid')
+                        color='k', where='mid')
             # offset label
             ax.text(0.9, 0.9, f'{v_i:03.2f}', horizontalalignment='right',
-                verticalalignment='top', transform=ax.transAxes)
+                    verticalalignment='top', transform=ax.transAxes)
             ax.tick_params(which='both', direction='in', bottom=True,
                            top=True, left=True, right=True, pad=9)
         # Store the result array in the shape of (4, len(v))
@@ -875,7 +875,7 @@ class PVAnalysis():
         self.__Rs = Rs
         self.model = doublepower_v
         if (len(Es[0]) == 0 and len(Es[3]) == 0) \
-            or (len(Rs[0]) == 0 and len(Rs[3]) == 0):
+                or (len(Rs[0]) == 0 and len(Rs[3]) == 0):
             if len(Es[0]) == 0 and len(Es[3]) == 0:
                 print('No edge point was found.')
             if len(Rs[0]) == 0 and len(Es[3]) == 0:
@@ -915,7 +915,7 @@ class PVAnalysis():
 
             def lnprob(p, v0, x1, dx1, x0, v1, dv1):
                 chi2 = np.sum(((x1 - wpow_r_custom(v0, *p)) / dx1)**2) \
-                       + np.sum(((v1 - wpow_v_custom(x0, *p)) / dv1)**2)
+                    + np.sum(((v1 - wpow_v_custom(x0, *p)) / dv1)**2)
                 return -0.5 * chi2
             plim = plim[:, include]
             mcmc = emcee_corner(plim, lnprob, args=args,
@@ -934,7 +934,7 @@ class PVAnalysis():
                 self.lnp[key] = mcmc[i_mcmc]
             if calc_evidence:
                 dynesty_corner(plim, lnprob, args=args,
-                    figname=None, show_corner=False, return_evidence=True)
+                               figname=None, show_corner=False, return_evidence=True)
                 e = 'edge' if ext == '_e' else 'ridge'
                 print(f'\033[1A\033[33C[{e}]')
             (qopt := q0 * 1)[np.isnan(q0)] = popt
@@ -989,7 +989,7 @@ class PVAnalysis():
         self.__Rs = Rs
         self.model = lambda x, c0, c1: c0 + c1 * x
         if (len(Es[0]) == 0 and len(Es[3]) == 0) \
-            or (len(Rs[0]) == 0 and len(Rs[3]) == 0):
+                or (len(Rs[0]) == 0 and len(Rs[3]) == 0):
             if len(Es[0]) == 0 and len(Es[3]) == 0:
                 print('No edge point was found.')
             if len(Rs[0]) == 0 and len(Es[3]) == 0:
@@ -1043,7 +1043,7 @@ class PVAnalysis():
         print(f'v    = {vlim[0]:.3f} --- {vlim[1]:.3f} km/s')
         self.rvlim = {'edge': [[1e-10, 1e-10], [1e-10, 1e-10]],
                       'ridge': [[0.01, np.max(np.abs(xlim))],
-                               [0.01, np.max(np.abs(vlim))]]}
+                                [0.01, np.max(np.abs(vlim))]]}
         self.popt = {'edge': [[np.nan, np.nan], [np.nan, np.nan]],
                      'ridge': [c, dc]}
         result = {'edge': {'popt': [np.nan, np.nan], 'perr': [np.nan, np.nan]},
@@ -1295,11 +1295,11 @@ class PVAnalysis():
 
     # Plot results
     def plotresults_pvdiagram(self, outname=None, marker='o', colors=['r'], alpha=1.,
-        ax=None, outformat='pdf', pvcolor=True, cmap='Greys',
-        vmin=None, vmax=None, contour=True, clevels=None, pvccolor='k',
-        vrel=False, logscale=False, x_offset=False, ratio=1.2, prop_vkep=None, fontsize=14,
-        lw=1, clip=None, plot_res=True, inmode='fits', xranges=[], yranges=[],
-        ln_hor=True, ln_var=True, pvalpha=None):
+                              ax=None, outformat='pdf', pvcolor=True, cmap='Greys',
+                              vmin=None, vmax=None, contour=True, clevels=None, pvccolor='k',
+                              vrel=False, logscale=False, x_offset=False, ratio=1.2, prop_vkep=None, fontsize=14,
+                              lw=1, clip=None, plot_res=True, inmode='fits', xranges=[], yranges=[],
+                              ln_hor=True, ln_var=True, pvalpha=None):
         """Plot fitting results on a PV diagram for quick check.
 
 
@@ -1340,20 +1340,20 @@ class PVAnalysis():
         def plotpoints(ax, x, v, xerr, verr, color, x_offset=False):
             if x_offset:
                 ax.errorbar(x, v, xerr=xerr, yerr=verr, color=color,
-                    capsize=2., capthick=2., ls='', marker='o')
+                            capsize=2., capthick=2., ls='', marker='o')
             else:
                 ax.errorbar(v, x, xerr=verr, yerr=xerr, color=color,
-                    capsize=2., capthick=2., ls='', marker='o')
+                            capsize=2., capthick=2., ls='', marker='o')
             return ax
 
         # draw pv diagram
         ax = self.fitsdata.draw_pvdiagram(outname, data=None, header=None, ax=ax,
-            outformat=outformat, color=pvcolor, cmap=cmap,
-            vmin=vmin, vmax=vmax, vsys=self.vsys, contour=contour, clevels=clevels,
-            ccolor=pvccolor, vrel=vrel, logscale=logscale, x_offset=x_offset,
-            ratio=ratio, prop_vkep=prop_vkep, fontsize=fontsize, lw=lw, clip=clip,
-            plot_res=plot_res, inmode=inmode, xranges=xranges, yranges=yranges,
-            ln_hor=ln_hor, ln_var=ln_var, alpha=pvalpha)
+                                          outformat=outformat, color=pvcolor, cmap=cmap,
+                                          vmin=vmin, vmax=vmax, vsys=self.vsys, contour=contour, clevels=clevels,
+                                          ccolor=pvccolor, vrel=vrel, logscale=logscale, x_offset=x_offset,
+                                          ratio=ratio, prop_vkep=prop_vkep, fontsize=fontsize, lw=lw, clip=clip,
+                                          plot_res=plot_res, inmode=inmode, xranges=xranges, yranges=yranges,
+                                          ln_hor=ln_hor, ln_var=ln_var, alpha=pvalpha)
 
         # plot fitting results
         if self.__sorted:
@@ -1370,7 +1370,7 @@ class PVAnalysis():
                 results[i]['blue'][1] = self.vsys - results[i]['blue'][1]
 
                 colors = {'ridge': {'red': 'red', 'blue': 'blue'},
-                'edge': {'red': 'pink', 'blue': 'skyblue'}}
+                          'edge': {'red': 'pink', 'blue': 'skyblue'}}
 
                 for j in results[i]:
                     ax = plotpoints(ax, *results[i][j], colors[i][j], x_offset)
@@ -1391,8 +1391,8 @@ class PVAnalysis():
         return ax
 
     def plotresults_rvplane(self, outname=None, outformat='pdf', ax=None,
-        xlog=True, ylog=True, au=False, marker='o',
-        capsize=2, capthick=2., colors=None, xlim=[], ylim=[], fontsize=14):
+                            xlog=True, ylog=True, au=False, marker='o',
+                            capsize=2, capthick=2., colors=None, xlim=[], ylim=[], fontsize=14):
         """Plot edge/ridge in a r-v plane for quick check.
 
         Args:
@@ -1430,7 +1430,7 @@ class PVAnalysis():
             pass
         else:
             colors = {'ridge': {'red': 'red', 'blue': 'blue'},
-            'edge': {'red': 'pink', 'blue': 'skyblue'}}
+                      'edge': {'red': 'pink', 'blue': 'skyblue'}}
 
         # plot fitting results
         if self.__sorted == False:
@@ -1441,11 +1441,11 @@ class PVAnalysis():
             for j in self.results_sorted[i]:
                 # print (self.results_sorted[i][j])
                 ax.errorbar(*self.results_sorted[i][j][0:2], xerr=self.results_sorted[i][j][2],
-                    yerr=self.results_sorted[i][j][3], color=colors[i][j],
-                    marker=marker, capsize=capsize, capthick=capthick, ls='')
+                            yerr=self.results_sorted[i][j][3], color=colors[i][j],
+                            marker=marker, capsize=capsize, capthick=capthick, ls='')
 
         ax.tick_params(which='both', direction='in', bottom=True, top=True,
-         left=True, right=True, pad=9)
+                       left=True, right=True, pad=9)
 
         if xlog:
             ax.set_xscale('log')
