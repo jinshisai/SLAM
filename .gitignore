@@ -22,3 +22,17 @@ pvsilhouette/__pycache__/ulrichenvelope.cpython-310.pyc
 __pycache__/utils.cpython-314.pyc
 channelfit/__pycache__/_channelfit.cpython-314.pyc
 channelfit/__pycache__/__init__.cpython-314.pyc
+pvanalysis/__pycache__/__init__.cpython-314.pyc
+pvanalysis/__pycache__/_pvanalysis.cpython-314.pyc
+pvanalysis/__pycache__/analysis_tools.cpython-314.pyc
+pvanalysis/__pycache__/fitfuncs.cpython-314.pyc
+pvanalysis/__pycache__/pvfits.cpython-314.pyc
+pvanalysis/__pycache__/pvplot.cpython-314.pyc
+pvfitting/__pycache__/__init__.cpython-314.pyc
+__pycache__/test_SLAM.cpython-314.pyc
+pvfitting/__pycache__/_pvfitting.cpython-314.pyc
+pvfitting/__pycache__/grid.cpython-314.pyc
+pvfitting/__pycache__/mockpvd.cpython-314.pyc
+pvfitting/__pycache__/precalculation.cpython-314.pyc
+velgrad/__pycache__/__init__.cpython-314.pyc
+velgrad/__pycache__/_velgrad.cpython-314.pyc

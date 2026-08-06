@@ -5,7 +5,7 @@ from scipy.signal import convolve
 from pvfitting.grid import Nested3DGrid
 from pvfitting.precalculation import XYZ2rtp
 from pvfitting import precalculation
-from pvfitting.precalculation import rho2tau
+from pvfitting.precalculation import resolve_num_threads, rho2tau
 from utils import rot
 
 au = units.au.to('m')
@@ -32,7 +32,8 @@ class MockPVD(object):
                  xlim: list | None = None, ylim: list | None = None, zlim: list | None = None,
                  beam: list | None = None, reslim: float = 10,
                  signmajor: int = 1, signminor: int = 1,
-                 pa_major: float = 0, pa_minor: float = 90):
+                 pa_major: float = 0, pa_minor: float = 90,
+                 num_threads: int | str | None = None):
         '''
         Initialize MockPVD with a given grid. z is the line of sight axis.
 
@@ -61,6 +62,7 @@ class MockPVD(object):
          along the minor axis; otherwise -1.
         pa_major: PA of the positive offset of the PV diagram along the major axis.
         pa_minor: PA of the positive offset of the PV diagram along the minor axis.
+        num_threads: Number of Numba threads used for line-of-sight integration. None uses a conservative automatic budget, while "all" uses every thread available to Numba.
         '''
         super(MockPVD, self).__init__()
 
@@ -80,6 +82,7 @@ class MockPVD(object):
         self.nnest = nnest
         # beam
         self.beam = beam
+        self.num_threads = resolve_num_threads(num_threads)
         self.pa_major = pa_major
         self.pa_minor = pa_minor
         pa_major_red = pa_major + (0. if signmajor > 0 else 180.)
@@ -272,7 +275,7 @@ class MockPVD(object):
         rho_l = rho_col[-1].reshape(_nx, _ny, _nz)
         vlos_l = vlos_col[-1].reshape(_nx, _ny, _nz)
         dz = self.grid.zaxes[-1][1] - self.grid.zaxes[-1][0]
-        tau_v = rho2tau(vlos_l, rho_l) * dz
+        tau_v = rho2tau(vlos_l, rho_l, num_threads=self.num_threads) * dz
         # if nested grid
         if self.grid.nlevels >= 2:
             for l in range(self.grid.nlevels-2, -1, -1):
@@ -288,7 +291,8 @@ class MockPVD(object):
                     zimin, zimax = self.grid.zinest[l+1]
                     rho_l[ximin:ximax+1, yimin:yimax+1, zimin:zimax+1] = 0.
 
-                tau_vl = rho2tau(vlos_l, rho_l) * dz
+                tau_vl = rho2tau(vlos_l, rho_l,
+                                 num_threads=self.num_threads) * dz
                 # add values from the inner grid
                 _tau_v = binning(tau_v, self.grid.nsub[l])
                 tau_vl[:, yimin:yimax+1, ximin:ximax+1] += _tau_v
