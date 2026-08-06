@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
-#----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Created By  : Yusuke Aso
 # Created Date: 2022 Jan 27
 # Updated Date: 2023 Nov 21 by J.Sai
 # version = alpha
 # ---------------------------------------------------------------------------
 """
-This script makes position-velocity diagrams along the major anc minor axes and reproduces their silhouette by the UCM envelope.
-The main class PVSilhouette can be imported to do each steps separately.
+This script makes position-velocity diagrams along the major and minor axes,
+ and reproduces their silhouette by the UCM envelope.
+The main class PVFitting can be imported to do each steps separately.
 
-Note. FITS files with multiple beams are not supported. The dynamic range for xlim_plot and vlim_plot should be >10 for nice tick labels.
+Note. FITS files with multiple beams are not supported.
+The dynamic range for xlim_plot and vlim_plot should be >10 for nice tick labels.
 """
 
 import numpy as np
@@ -26,8 +28,6 @@ warnings.simplefilter('ignore', RuntimeWarning)
 
 class PVFitting(ReadFits):
 
-#    def __init__(self):
-    
     def put_PV(self, pvmajorfits: str, pvminorfits: str,
                dist: float, vsys: float,
                rmax: float | None,
@@ -40,47 +40,29 @@ class PVFitting(ReadFits):
             self.read_pvfits(pvfits=pvfits, dist=dist, vsys=vsys,
                              xmin=-rmax, xmax=rmax, xskip=xskip, sigma=sigma)
             if type(skipto) is int:
-                    iskip = int(self.bmin / (np.abs(self.dx) / xskip) / skipto)
-                    if iskip == 0:
-                        print('WARNING: \'skipto\' is ignored because the beam minor axis is smaller than \'skipto\' pixels.')
-                        iskip = 1
-                    else:
-                        print(f'Adopt xskip={iskip:d}.')
-                        ibmaj = self.bmaj / (np.abs(self.dx) * iskip)
-                        ibmin = self.bmin / (np.abs(self.dx) * iskip)
-                        print(f'Beam major/minor axis is {ibmaj:.1f}/{ibmin:.1f} pixels.')
+                iskip = int(self.bmin / (np.abs(self.dx) / xskip) / skipto)
+                if iskip == 0:
+                    print('WARNING: \'skipto\' is ignored because the beam minor axis is smaller than \'skipto\' pixels.')
+                    iskip = 1
+                else:
+                    print(f'Adopt xskip={iskip:d}.')
+                    ibmaj = self.bmaj / (np.abs(self.dx) * iskip)
+                    ibmin = self.bmin / (np.abs(self.dx) * iskip)
+                    print(f'Beam major/minor axis is {ibmaj:.1f}/{ibmin:.1f} pixels.')
             else:
                 iskip = xskip
             self.vorg = self.v
             self.read_pvfits(pvfits=pvfits, dist=dist, vsys=vsys,
                              xmin=-rmax, xmax=rmax, xskip=iskip, sigma=sigma,
                              vmin=vmin, vmax=vmax)
-            #if dNsampling is not None:
-            #    self.sampling(dNsampling)
             d.append(self.data)
         self.dpvmajor, self.dpvminor = d
-    '''
-    def sampling(self, steps):
-        x_smpl, y_smpl = steps
-        x_smpl = int(self.bmin / x_smpl / self.dx )
-        y_smpl = int(1. / y_smpl)
-        if x_smpl == 0: x_smpl = 1
-        if y_smpl == 0: y_smpl = 1
-        self.data = self.data[y_smpl//2::y_smpl, x_smpl//2::x_smpl]
-        self.v = self.v[y_smpl//2::y_smpl]
-        self.x = self.x[x_smpl//2::x_smpl]
-        self.dx = self.x[1] - self.x[0]
-        self.dv = self.v[1] - self.v[0]
-        ibmaj = self.bmaj / self.dx
-        ibmin = self.bmin / self.dx
-        print(f'Adopt xskip={x_smpl:d} and vskip={y_smpl:d}.')
-        print(f'Beam major/minor axis is {ibmaj:.1f}/{ibmin:.1f} pixels.')
-    '''
+
     def check_modelgrid(self, nsubgrid: float = 1,
                         n_nest: list | None = None, reslim: float = 5):
         # model grid
-        mpvd = MockPVD(self.x, self.x, self.v, 
-                       nsubgrid=nsubgrid, nnest=n_nest, 
+        mpvd = MockPVD(self.x, self.x, self.v,
+                       nsubgrid=nsubgrid, nnest=n_nest,
                        beam=self.beam, reslim=reslim)
         mpvd.grid.gridinfo()
 
@@ -91,9 +73,9 @@ class PVFitting(ReadFits):
                     taumax_range: list[float, float] = [0.1, 1e3],
                     frho_range: list[float, float] = [1., 1e4],
                     sig_mdl_range: list[float, float] = [0., 10.],
-                    fixed_params: dict = {'Mstar':None, 'Rc':None,
-                                          'alphainfall':None, 'taumax':None,
-                                          'frho':None, 'sig_mdl':None},
+                    fixed_params: dict = {'Mstar': None, 'Rc': None,
+                                          'alphainfall': None, 'taumax': None,
+                                          'frho': None, 'sig_mdl': None},
                     vmask: list[float, float] = [0, 0],
                     zmax: float | None = None,
                     filename: str = 'PVfitting',
@@ -116,9 +98,8 @@ class PVFitting(ReadFits):
         majobs = self.dpvmajor.copy()
         minobs = self.dpvminor.copy()
         # correction factor for over sampling
-        beam_area = np.pi/(4.*np.log(2.)) * self.bmaj * self.bmin # beam area
-        Rarea = beam_area / np.abs(self.dx * self.dy) # area ratio
-
+        beam_area = np.pi/(4.*np.log(2.)) * self.bmaj * self.bmin  # beam area
+        Rarea = beam_area / self.dx / self.dx  # area ratio
 
         # grid & mask
         x, v = np.meshgrid(self.x, self.v)
@@ -145,6 +126,7 @@ class PVFitting(ReadFits):
                        pa_major=pa_major, pa_minor=pa_minor,
                        num_threads=num_threads)
         rout = np.max(z)
+
         def makemodel(Mstar, Rc, alphainfall, taumax, frho):
             major, minor = mpvd.generate_mockpvd(Mstar=Mstar, Rc=Rc,
                                                  alphainfall=alphainfall,
@@ -153,13 +135,14 @@ class PVFitting(ReadFits):
                                                  rout=rout, axis='both')
             # quadrant
             fflux = (np.nansum(majobs * major) + np.nansum(minobs * minor)) \
-                    / (np.nansum(major * major) + np.nansum(minor * minor))
+                / (np.nansum(major * major) + np.nansum(minor * minor))
             return fflux * major, fflux * minor
         self.makemodel = makemodel
+
         # Fitting
         paramkeys = ['Mstar', 'Rc', 'alphainfall', 'taumax', 'frho', 'sig_mdl']
-        p_fixed = {k:fixed_params[k] if k in fixed_params else None for k in paramkeys}
-        free = {k:p_fixed[k] is None for k in paramkeys}
+        p_fixed = {k: fixed_params[k] if k in fixed_params else None for k in paramkeys}
+        free = {k: p_fixed[k] is None for k in paramkeys}
         p_fixed = np.array([p_fixed[k] for k in paramkeys])
         self.chain = None
         self.lnp = None
@@ -185,16 +168,16 @@ class PVFitting(ReadFits):
         runfit = None in p_fixed
         if runfit:
             ilog = np.array([0, 1, 2, 3, 4], dtype=int)
-            i = ilog[p_fixed[ilog] != None]
+            i = ilog[[p_fixed[i] is not None for i in ilog]]
             p_fixed[i] = np.log10(p_fixed[i].astype('float'))
             labels = np.array(['Mstar', 'Rc', r'$\alpha$', r'$\tau_\mathrm{max}$',
                                r'$f_\rho$', r'$\sigma_\mathrm{model}$'])
-            labels[ilog] = ['log'+labels[i] for i in ilog]
+            labels[ilog] = ['log' + labels[i] for i in ilog]
             labels = labels[notfixed]
-            kwargs0 = {'nwalkers_per_ndim':4, 'nburnin':500, 'nsteps':500,
-                       'rangelevel':None, 'range_corner':None, 'labels':labels,
-                       'figname':filename+'.corner.png', 'show_corner':show,
-                       'plot_chain':True, 'show_chain':show}
+            kwargs0 = {'nwalkers_per_ndim': 4, 'nburnin': 500, 'nsteps': 500,
+                       'rangelevel': None, 'range_corner': None, 'labels': labels,
+                       'figname': filename+'.corner.png', 'show_corner': show,
+                       'plot_chain': True, 'show_chain': show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
             if not save_corner:
                 kw['figname'] = None
@@ -204,13 +187,14 @@ class PVFitting(ReadFits):
                 total *= kw['nburnin'] + kw['nsteps']
                 bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
+
             # Modified log likelihood
             def lnprob(p):
                 if progressbar:
                     bar.update(1)
                 # parameter
                 q = p_fixed.copy()
-                q[notfixed] = p # in linear scale
+                q[notfixed] = p  # in linear scale
                 q[ilog] = 10**q[ilog]
                 # updated sigma
                 majsig2 = (1. + q[-1]**2) * majsig**2
@@ -218,7 +202,7 @@ class PVFitting(ReadFits):
                 # make model
                 majmod, minmod = self.makemodel(*q[:-1])
                 chi2maj = np.nansum((majobs - majmod)**2 / majsig2 + np.log(majsig2))
-                chi2min = np.nansum((minobs - minmod)**2 / minsig2 + np.log(minsig2)) 
+                chi2min = np.nansum((minobs - minmod)**2 / minsig2 + np.log(minsig2))
                 return -0.5 * (chi2maj + chi2min) / np.sqrt(Rarea)
             # prior
             plim = np.array([Mstar_range, Rc_range, alphainfall_range,
@@ -286,7 +270,7 @@ class PVFitting(ReadFits):
         self.phigh = dict(zip(paramkeys, self.phigh))
 
         # plot
-        self.plot_pvds(filename=filename, color='model', contour='obs', 
+        self.plot_pvds(filename=filename, color='model', contour='obs',
                        vmask=vmask, title=title, show=show, log=log)
 
     def read_fitres(self, f: str):
@@ -299,12 +283,14 @@ class PVFitting(ReadFits):
         '''
         self.popt, self.plow, self.pmid, self.phigh = np.loadtxt(f).T
 
-    def plot_pvds(self, filename: str = 'PVfitting', 
+    def plot_pvds(self, filename: str = 'PVfitting',
                   color: str = 'model', contour: str = 'obs',
                   vmask: list[float, float] = [0., 0.],
-                  cmap: str = 'viridis', cmap_residual: str = 'bwr', ext: str = '.png',
+                  cmap: str = 'viridis',
+                  cmap_residual: str = 'bwr', ext: str = '.png',
                   title: str | None = None, show: bool = False,
-                  shadecolor: str = 'white', clevels: list[float] | None = None,
+                  shadecolor: str = 'white',
+                  clevels: list[float] | None = None,
                   log: bool = False):
         '''
         Plot observed and model PV diagrams.
@@ -314,7 +300,7 @@ class PVFitting(ReadFits):
         majobs, minobs = self.dpvmajor.copy(), self.dpvminor.copy()
         # grid/data/mask/sigma
         x, v = np.meshgrid(self.x, self.v)
-        mask = (vmask[0] < v) * (v < vmask[1]) # velocity mask
+        mask = (vmask[0] < v) * (v < vmask[1])  # velocity mask
         majsig, minsig = self.sigma, self.sigma
 
         if 'model' in [color, contour]:
@@ -336,9 +322,9 @@ class PVFitting(ReadFits):
             plot_residual = False
             outlabel = '.obs'
 
-
         if clevels is None:
             clevels = (2**np.arange(0, 10) if log else np.arange(1, 11)) * 3 * self.sigma
+
         def makeplots(data_color, data_contour, cmap,
                       vmin=None, vmax=None, vmask=None,
                       alpha=1., mode='model'):
@@ -368,11 +354,11 @@ class PVFitting(ReadFits):
             d_plot = data_color[0] * 1
             if log and mode == 'model':
                 d_plot = np.log10(d_plot.clip(vmin, None))
-            im = ax1.pcolormesh(self.x, self.v, d_plot, 
+            im = ax1.pcolormesh(self.x, self.v, d_plot,
                                 cmap=cmap, vmin=vmin_plot, vmax=vmax_plot,
                                 alpha=alpha, rasterized=True)
             ax1.contour(self.x, self.v, data_contour[0],
-                       levels = clevels, colors='k')
+                        levels=clevels, colors='k')
             ax1.set_xlabel('Major offset (au)')
             ax1.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
 
@@ -384,8 +370,8 @@ class PVFitting(ReadFits):
                                 cmap=cmap, vmin=vmin_plot, vmax=vmax_plot,
                                 alpha=alpha, rasterized=True)
             ax2.contour(self.x, self.v, data_contour[1],
-                       levels = clevels, colors='k')
-            cax2 = ax2.inset_axes([1.02, 0., 0.05, 1.]) # x0, y0, dx, dy
+                        levels=clevels, colors='k')
+            cax2 = ax2.inset_axes([1.02, 0., 0.05, 1.])  # x0, y0, dx, dy
             cb = plt.colorbar(im, cax=cax2, label=cblabel)
             if log and mode == 'model':
                 cbticks = np.outer([1, 2, 5], 10**np.arange(-6, 3, 1.0))
@@ -402,22 +388,20 @@ class PVFitting(ReadFits):
                 ax.set_ylim(np.min(self.v), np.max(self.v))
 
             if vmask is not None:
-                _v = self.v[ (self.v > vmask[0]) * (self.v < vmask[1])] # masked velocity ranges
+                _v = self.v[(self.v > vmask[0]) * (self.v < vmask[1])]  # masked velocity ranges
                 for ax in axes:
                     ax.fill_between(self.x,
-                                    np.full(len(self.x), np.min(_v) - 0.5 * self.dv), 
+                                    np.full(len(self.x), np.min(_v) - 0.5 * self.dv),
                                     np.full(len(self.x), np.max(_v) + 0.5 * self.dv),
                                     color=shadecolor, alpha=0.6, edgecolor=None)
             if title is not None:
                 fig.suptitle(title, y=0.92)
-            
-            return fig
 
+            return fig
 
         # color images and model images
         d_col = [majmod, minmod] if color == 'model' else [majobs, minobs]
         d_con = [majmod, minmod] if contour == 'model' else [majobs, minobs]
-
 
         figs = []
         # main plot
@@ -430,7 +414,8 @@ class PVFitting(ReadFits):
         fig.subplots_adjust(wspace=0.1)
         fig.savefig(filename + outlabel + ext, dpi=300)
         figs.append(fig)
-        if show: plt.show()
+        if show:
+            plt.show()
 
         # residual plot
         if plot_residual:
@@ -444,7 +429,8 @@ class PVFitting(ReadFits):
             fig2.subplots_adjust(wspace=0.1)
             fig2.savefig(filename + '.residual' + ext, dpi=300)
             figs.append(fig2)
-            if show: plt.show()
+            if show:
+                plt.show()
 
         return figs
 
@@ -454,7 +440,7 @@ class PVFitting(ReadFits):
         h['NAXIS1'] = len(self.x)
         h['CRPIX1'] = h['CRPIX1'] - self.offpix[0]
         nx = h['NAXIS1']
-        p = self.popt if kwargs == {} else kwargs 
+        p = self.popt if kwargs == {} else kwargs
         if 'sig_mdl' in p.keys():
             del p['sig_mdl']
         majmod, minmod = self.makemodel(**p)
@@ -468,16 +454,16 @@ class PVFitting(ReadFits):
         minmod = np.concatenate((nanblue, minmod, nanred), axis=0)
         majres = np.concatenate((nanblue, majres, nanred), axis=0)
         minres = np.concatenate((nanblue, minres, nanred), axis=0)
-        
+
         def tofits(d: np.ndarray, ext: str):
             header = w.to_header()
             hdu = fits.PrimaryHDU(d, header=header)
             for k in h.keys():
                 if not ('COMMENT' in k or 'HISTORY' in k):
-                    hdu.header[k]=h[k]
+                    hdu.header[k] = h[k]
             hdu = fits.HDUList([hdu])
             hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
-            
+
         tofits(majmod, 'model.major')
         tofits(minmod, 'model.minor')
         tofits(majres, 'residual.major')
