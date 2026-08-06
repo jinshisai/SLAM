@@ -7,7 +7,6 @@ from scipy.interpolate import RectBivariateSpline as RBS
 from pvanalysis.pvfits import Impvfits
 
 
-
 def set_rcparams():
     plt.rcParams['font.size'] = 16
     plt.rcParams['axes.linewidth'] = 1.5
@@ -107,7 +106,6 @@ class PVPlot():
         xi, vi, d = xi[i0:], vi[j0:], d[j0:, i0:]
         self.xl, self.vl, self.dl = xi, vi, d
 
-
     def add_color(self, restfrq: float = None, bmaj: float = None,
                   bmin: float = None, bpa: float = None,
                   Tb: bool = False, log: bool = False,
@@ -115,14 +113,14 @@ class PVPlot():
                   cblabel: str = None, cbformat: float = '%.1e',
                   cbticks: list = None, cbticklabels: list = None,
                   **kwargs) -> None:
-        kwargs0 = {'cmap':'viridis', 'zorder':1, 'shading':'nearest'}
+        kwargs0 = {'cmap': 'viridis', 'zorder': 1, 'shading': 'nearest'}
         if restfrq is None:
             restfrq = self.restfrq
         if bmaj is None or bmin is None or bpa is None:
             if self.multibeam:
                 bmaj = self.beam['BMAJ']
                 bmin = self.beam['BMIN']
-                bpa  = self.beam['BPA']
+                bpa = self.beam['BPA']
                 if self.loglog:
                     ichan = np.nanargmax(bmaj * bmin)
                     bmaj, bmin, bpa = bmaj[ichan], bmin[ichan], bpa[ichan]
@@ -138,7 +136,7 @@ class PVPlot():
                     * np.pi / 4. / np.log(2.)
             if type(Omega) == np.ndarray:
                 j0, j1 = self.jrange
-                Omega = np.tile(Omega[j0:j1], (len(x),1)).T
+                Omega = np.tile(Omega[j0:j1], (len(x), 1)).T
             lam = constants.c.to('m/s').value / restfrq
             Jy2K = units.Jy.to('J*s**(-1)*m**(-2)*Hz**(-1)') \
                    * lam**2 / 2. / constants.k_B.to('J/K').value / Omega
@@ -173,7 +171,6 @@ class PVPlot():
                 cb.set_ticks(t)
                 cb.set_ticklabels([f'{lt:.1e}' for lt in 10**t])
 
-
     def add_contour(self, restfrq: float = None, bmaj: float = None,
                     bmin: float = None, bpa: float = None,
                     Tb: bool = False, rms: float = None,
@@ -186,7 +183,7 @@ class PVPlot():
             if self.multibeam:
                 bmaj = self.beam['BMAJ']
                 bmin = self.beam['BMIN']
-                bpa  = self.beam['BPA']
+                bpa = self.beam['BPA']
                 if self.loglog:
                     ichan = np.nanargmax(bmaj * bmin)
                     bmaj, bmin, bpa = bmaj[ichan], bmin[ichan], bpa[ichan]
@@ -201,7 +198,7 @@ class PVPlot():
             Omega = bmaj * bmin / 3600.**2 * np.pi / 4. / np.log(2.)
             if type(Omega) == np.ndarray:
                 j0, j1 = self.jrange
-                Omega = np.tile(Omega[j0:j1], (len(x),1)).T
+                Omega = np.tile(Omega[j0:j1], (len(x), 1)).T
             lam = constants.c.to('m/s').value / restfrq
             Jy2K = units.Jy.to('J*s**(-1)*m**(-2)*Hz**(-1)') \
                    * lam**2 / 2. / constants.k_B.to('J/K').value / Omega
@@ -217,7 +214,6 @@ class PVPlot():
         if self.loglog:
             ax.set_xscale('log')
             ax.set_yscale('log')
-
 
     def set_axis(self, xticks: list = None, yticks: list = None,
                  xticklabels: list = None, yticklabels: list = None,
@@ -244,7 +240,6 @@ class PVPlot():
         if xticklabels: ax.set_xticklabels(xticklabels)
         if yticklabels: ax.set_yticklabels(yticklabels)
         self.fig.tight_layout()
-
 
     def savefig(self, figname: str = None, show: bool = False,
                 **kwargs) -> None:

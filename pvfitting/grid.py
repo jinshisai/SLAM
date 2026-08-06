@@ -238,7 +238,7 @@ class Nested3DGrid(object):
                 data[:, k::nbin, j::nbin, i::nbin]
                 for k in range(nbin) for j in range(nbin) for i in range(nbin)
                 ])
-        elif dshape ==5:
+        elif dshape == 5:
             d_avg = np.array([
                 data[:, :, k::nbin, j::nbin, i::nbin]
                 for k in range(nbin) for j in range(nbin) for i in range(nbin)
@@ -250,17 +250,18 @@ class Nested3DGrid(object):
 
     def gridinfo(self, units=['au', 'au', 'au']):
         ux, uy, uz = units
-        print('Nesting level: %i'%self.nlevels)
+        print('Nesting level: %i' % self.nlevels)
         print('Resolutions:')
         for l in range(self.nlevels):
             dx = self.xaxes[l][1] - self.xaxes[l][0]
             dy = self.yaxes[l][1] - self.yaxes[l][0]
             dz = self.zaxes[l][1] - self.zaxes[l][0]
-            print('   l=%i: (dx, dy, dz) = (%.2e %s, %.2e %s, %.2e %s)'%(l, dx, ux, dy, uy, dz, uz))
-            print('      : (xlim, ylim, zlim) = (%.2e to %.2e %s, %.2e to %.2e %s, %.2e to %.2e %s, )'%(
+            print('   l=%i: (dx, dy, dz) = (%.2e %s, %.2e %s, %.2e %s)' % (l, dx, ux, dy, uy, dz, uz))
+            print('      : (xlim, ylim, zlim) = (%.2e to %.2e %s, %.2e to %.2e %s, %.2e to %.2e %s, )' % (
                 self.xlim[l][0], self.xlim[l][1], ux,
                 self.ylim[l][0], self.ylim[l][1], uy,
                 self.zlim[l][0], self.zlim[l][1], uz))
+
 
 def index_between(t, tlim, mode='all'):
     if not (len(tlim) == 2):
@@ -283,6 +284,7 @@ def index_between(t, tlim, mode='all'):
         else:
             print('index_between: mode parameter is not right.')
             return (tlim[0] <= t) * (t <= tlim[1])
+
 
 def nestgrid_3D(x, y, z, xlim, ylim, zlim, nsub):
     # error check

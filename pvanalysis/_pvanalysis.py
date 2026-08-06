@@ -27,11 +27,10 @@ from utils import emcee_corner, dynesty_corner
 
 
 # Constants (in cgs)
-Ggrav  = constants.G.cgs.value     # Gravitational constant
-Msun   = constants.M_sun.cgs.value # Solar mass (g)
-au     = units.au.to('cm')         # au (cm)
+Ggrav = constants.G.cgs.value     # Gravitational constant
+Msun = constants.M_sun.cgs.value  # Solar mass (g)
+au = units.au.to('cm')         # au (cm)
 clight = constants.c.cgs.value     # light speed (cm s^-1)
-
 
 
 class PVAnalysis():
@@ -64,7 +63,7 @@ class PVAnalysis():
         # read fits file
         self.fitsdata = Impvfits(infile, pa=pa, multibeam=multibeam)
         # parameters required for analysis
-        self.rms  = rms
+        self.rms = rms
         self.vsys = vsys
         self.dist = dist
         self.incl = incl
@@ -125,13 +124,13 @@ class PVAnalysis():
         self.outname = outname
         # data
         data = self.fitsdata.data
-        nxh  = self.fitsdata.nx // 2
-        nvh  = self.fitsdata.nv // 2
+        nxh = self.fitsdata.nx // 2
+        nvh = self.fitsdata.nv // 2
         if self.fitsdata.naxis not in [2, 3]:
             print('ERROR\tget_edgeridge: n_axis must be 2 or 3.')
             return
         elif self.fitsdata.naxis == 3:
-            data = np.squeeze(data) # Remove stokes I
+            data = np.squeeze(data)  # Remove stokes I
         # check quadrant
         quadcheck = lambda a: (np.sum(a[:nvh, :nxh])
                                + np.sum(a[nvh:, nxh:])
@@ -157,8 +156,8 @@ class PVAnalysis():
         self.vlim = vlim
         self.Mlim = Mlim
         if incl is not None:
-            self.incl = incl # update incl
-            self.sini = np.sin(np.radians(incl)) # update sini
+            self.incl = incl  # update incl
+            self.sini = np.sin(np.radians(incl))  # update sini
         self.__unit = 1e10 * self.dist * au / Ggrav / Msun / self.sini**2
         self.__use_position = use_position
         self.__use_velocity = use_velocity
@@ -181,8 +180,8 @@ class PVAnalysis():
                              nanopposite=nanopposite,
                              nanbeforecross=nanbeforecross)
         # plot
-        #self.plotresults_pvdiagram()
-        #self.plotresults_rvplane()
+        # self.plotresults_pvdiagram()
+        # self.plotresults_rvplane()
 
     def sort_fitresults(self, minrelerr=0.01, minabserr=0.1,
                         nanbeforemax: bool = True,
@@ -209,7 +208,7 @@ class PVAnalysis():
 
         # error clip
         def clipped_error(err, val, mode):
-            res    = self.res_off if mode == 'x' else self.delv
+            res = self.res_off if mode == 'x' else self.delv
             minabs = [minabserr * res] * len(err)
             return np.max([err, minrelerr * np.abs(val), minabs], axis=0)
 
@@ -222,7 +221,7 @@ class PVAnalysis():
                 if self.results[re][xv] is None:
                     continue
                 # x, v, err_x, err_v
-                results     = copy.deepcopy(self.results[re][xv])
+                results = copy.deepcopy(self.results[re][xv])
                 results[1] -= self.vsys
                 # clip too small error
                 if xv == 'xcut':
@@ -236,7 +235,7 @@ class PVAnalysis():
                 # separate red/blue components
                 rel = vrel if xv == 'xcut' else xrel * self.xsign
                 redsign = int(self.xsign) if xv == 'vcut' else 1
-                res_red  = [k[rel > 0][::redsign] for k in results]
+                res_red = [k[rel > 0][::redsign] for k in results]
                 res_blue = [k[rel < 0][::-redsign] for k in results]
                 ival = 0 if xv == 'xcut' else 1
                 # nan before turn over
@@ -256,7 +255,7 @@ class PVAnalysis():
                     for a in [res_red, res_blue]:
                         mass_est = kepler_mass(a[0], a[1], self.__unit)
                         a[ival][~between(mass_est, self.Mlim)] = np.nan
-                store[xv]['red']  = res_red
+                store[xv]['red'] = res_red
                 store[xv]['blue'] = res_blue
             # remove low-velocity positions and inner velocities when using both positions and velocities
             if ((self.results[re]['xcut'] is not None)
@@ -275,10 +274,10 @@ class PVAnalysis():
                         x1[:ix] = np.nan
                         v1[:iv] = np.nan
             # combine xcut and vcut
-            res_f = {'xcut':{'red':np.array([[], [], [], []]),
-                             'blue':np.array([[], [], [], []])},
-                     'vcut':{'red':np.array([[], [], [], []]),
-                             'blue':np.array([[], [], [], []])}}
+            res_f = {'xcut': {'red': np.array([[], [], [], []]),
+                             'blue': np.array([[], [], [], []])},
+                     'vcut': {'red': np.array([[], [], [], []]),
+                             'blue': np.array([[], [], [], []])}}
             for rb in ['red', 'blue']:
                 if ((self.results[re]['xcut'] is not None)
                     & (self.results[re]['vcut'] is not None)):
@@ -313,8 +312,8 @@ class PVAnalysis():
                 for xv in ['xcut', 'vcut']:
                     res_f[xv][rb][0] = res_f[xv][rb][0]*self.dist
                     res_f[xv][rb][2] = res_f[xv][rb][2]*self.dist
-                ## sort by x
-                i_order  = np.argsort(np.abs(res_comb[0]))
+                # sort by x
+                i_order = np.argsort(np.abs(res_comb[0]))
                 res_comb = np.array([np.abs(k[i_order]) for k in res_comb])
                 # save
                 self.results_sorted[re][rb] = res_comb
@@ -379,7 +378,7 @@ class PVAnalysis():
             print('ERROR\tpvfit_vcut: n_axis must be 2 or 3.')
             return
         if self.fitsdata.naxis == 3:
-            data = np.squeeze(data) # Select stokes I
+            data = np.squeeze(data)  # Select stokes I
         # axes
         xaxis = self.fitsdata.xaxis
         vaxis = self.fitsdata.vaxis
@@ -390,13 +389,13 @@ class PVAnalysis():
         # harf of beamsize [pix]
         hob = int(np.round((res_off*0.5/self.fitsdata.delx)))
 
-        ### calculate intensity-weighted mean positions
+        # calculate intensity-weighted mean positions
         # cutting at an velocity and determining the position
 
         # x & v ranges used for calculation for fitting
         xaxis_fit = xaxis.copy()
         vaxis_fit = vaxis.copy()
-        data_fit  = data.copy()
+        data_fit = data.copy()
         if len(xlim) != 4:
             print('Warning\tpvfit_vcut: '
                   + 'Size of xlim is not correct. '
@@ -407,7 +406,7 @@ class PVAnalysis():
         else:
             b = between(xaxis, (xlim[0], xlim[3]))
             xaxis_fit = xaxis[b]
-            data_fit  = np.array([d[b] for d in data])
+            data_fit = np.array([d[b] for d in data])
             xmin, xmax = np.min(xaxis_fit), np.max(xaxis_fit)
             print(f'x range: {xmin:.2f} -- {xmax:.2f} arcsec')
         vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
@@ -421,30 +420,30 @@ class PVAnalysis():
         else:
             b = between(vaxis, (vlim[0], vlim[3]))
             vaxis_fit = vaxis[b]
-            data_fit  = np.array([d[b] for d in data_fit.T]).T
+            data_fit = np.array([d[b] for d in data_fit.T]).T
             vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
             print(f'v range: {vmin:.2f} -- {vmax:.2f} km/s')
         # to achieve the same sampling on two sides
         if inverse:
             xaxis_fit = xaxis_fit[::-1]
-            data_fit  = data_fit[:, ::-1]
+            data_fit = data_fit[:, ::-1]
         # Nyquist sampling
         xaxis_fit = xaxis_fit[::hob]
-        data_fit  = data_fit[:, ::hob]
-        nloop     = len(xaxis_fit)
+        data_fit = data_fit[:, ::hob]
+        nloop = len(xaxis_fit)
         ncol = int(math.ceil(np.sqrt(nloop)))
         nrow = int(math.ceil(nloop / ncol))
         # figure for check result
-        fig  = plt.figure(figsize=(11.69, 8.27))
+        fig = plt.figure(figsize=(11.69, 8.27))
         grid = ImageGrid(fig, rect=111, nrows_ncols=(nrow, ncol),
-            axes_pad=0,share_all=True, aspect=False, label_mode='L')
+            axes_pad=0, share_all=True, aspect=False, label_mode='L')
         dlim = [np.nanmin(data_fit), np.nanmax(data_fit)]
         # x & y label
         grid[(nrow*ncol - ncol)].set_xlabel(r'Velocity (km s$^{-1}$)')
         grid[(nrow*ncol - ncol)].set_ylabel('Intensity')
         # list to save final results
         res_ridge = np.empty((nloop, 4))
-        res_edge  = np.empty((nloop, 4))
+        res_edge = np.empty((nloop, 4))
 
         # loop for x
         for i in range(nloop):
@@ -457,11 +456,11 @@ class PVAnalysis():
                 res_edge[i, :] = [x_i, np.nan, 0, np.nan]
                 continue
             # plot results
-            ax  = grid[i]
+            ax = grid[i]
             # interpolate
             if interp_ridge:
                 vi_interp = np.linspace(v_i[0], v_i[-1],
-                (len(v_i) - 1) * 10 + 1) # 1/10 sampling rate
+                (len(v_i) - 1) * 10 + 1)  # 1/10 sampling rate
                 d_i = interp1d(v_i, d_i, kind='cubic')(vi_interp)
                 v_i = vi_interp
             # get ridge value
@@ -492,9 +491,9 @@ class PVAnalysis():
                         mv, mv_err = np.nan, np.nan
                     else:
                         # use pixels only around intensity peak
-                        v0, v1   = pidx - pixrng, pidx + pixrng + 1
+                        v0, v1 = pidx - pixrng, pidx + pixrng + 1
                         d_i, v_i = d_i[v0:v1], v_i[v0:v1]
-                        #nd_i = len(d_i)
+                        # nd_i = len(d_i)
 
                 if np.nanmax(d_i) >= thr * rms:
                     popt, perr = gaussfit(v_i, d_i, rms)
@@ -503,7 +502,7 @@ class PVAnalysis():
                 mv, mv_err = popt[1], perr[1]
                 # Plot result
                 if ~np.isnan(mv):
-                    v_model = np.linspace(vmin, vmax, 256) # offset axis for plot
+                    v_model = np.linspace(vmin, vmax, 256)  # offset axis for plot
                     g_model = gauss1d(v_model, *popt)
                     ax.step(v_i, d_i, linewidth=1.5, color='r',
                             where='mid')
@@ -523,12 +522,12 @@ class PVAnalysis():
             # get edge values
             # fitting axis
             v_i = vaxis_fit.copy()
-            d_i = data_fit[:,i].copy()
+            d_i = data_fit[:, i].copy()
             # interpolation
             # resample with a 10 times finer sampling rate
-            vi_interp  = np.linspace(v_i[0], v_i[-1],
+            vi_interp = np.linspace(v_i[0], v_i[-1],
                                      (len(v_i)-1)*10 + 1)
-            di_interp  = interp1d(v_i, d_i, kind='cubic')(vi_interp)
+            di_interp = interp1d(v_i, d_i, kind='cubic')(vi_interp)
             # flag by mass
             mass_est = kepler_mass(x_i, vi_interp-self.vsys, self.__unit)
             goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
@@ -547,20 +546,19 @@ class PVAnalysis():
                 ax.step(vi_interp, di_interp, linewidth=1.,
                     color='k', where='mid')
             else:
-                ax.step(vaxis_fit, data_fit[:,i], linewidth=1.,
+                ax.step(vaxis_fit, data_fit[:, i], linewidth=1.,
                     color='k', where='mid')
             # offset label
             ax.text(0.9, 0.9, f'{x_i:03.2f}', horizontalalignment='right',
-                verticalalignment='top',transform=ax.transAxes)
-            ax.tick_params(which='both', direction='in',bottom=True,
+                verticalalignment='top', transform=ax.transAxes)
+            ax.tick_params(which='both', direction='in', bottom=True,
                            top=True, left=True, right=True, pad=9)
         # Store the result array in the shape of (4, len(x)).
         self.results['ridge']['vcut'] = res_ridge.T
-        self.results['edge']['vcut']  = res_edge.T
-        #plt.show()
+        self.results['edge']['vcut'] = res_edge.T
+        # plt.show()
         fig.savefig(outname + ".pvfit.vcut.png")
         plt.close()
-
 
     def get_edgeridge_xcut(self, outname, thr=5., incl=90., xlim=[-1e10, 0, 0, 1e10],
                    vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='mean',
@@ -622,7 +620,7 @@ class PVAnalysis():
             print('Error\tpvfit_vcut: n_axis must be 2 or 3.')
             return
         elif self.fitsdata.naxis == 3:
-            data = np.squeeze(data) # Remove stokes I
+            data = np.squeeze(data)  # Remove stokes I
         # axes
         xaxis = self.fitsdata.xaxis
         vaxis = self.fitsdata.vaxis
@@ -634,11 +632,11 @@ class PVAnalysis():
                      * np.sqrt(np.pi / 4 / np.log(2))  # pixel/beam
         corrected_rms = rms * np.sqrt(beamlength)
         # harf of beamsize [pix]
-        hob  = int(np.round((res_off*0.5/self.fitsdata.delx)))
+        hob = int(np.round((res_off*0.5/self.fitsdata.delx)))
         # x & v ranges used for calculation for fitting
         xaxis_fit = xaxis
         vaxis_fit = vaxis
-        data_fit  = data
+        data_fit = data
         xmin, xmax = np.min(xaxis_fit), np.max(xaxis_fit)
         if len(xlim) != 4:
             print('Warning\tpvfit_vcut: '
@@ -650,7 +648,7 @@ class PVAnalysis():
         else:  # between can treat tlim=[] now.
             b = between(xaxis, (xlim[0], xlim[3]))
             xaxis_fit = xaxis[b]
-            data_fit  = np.array([d[b] for d in data])
+            data_fit = np.array([d[b] for d in data])
             xmin, xmax = np.min(xaxis_fit), np.max(xaxis_fit)
             print(f'x range: {xmin:.2f} -- {xmax:.2f} arcsec')
 
@@ -664,7 +662,7 @@ class PVAnalysis():
         else:
             b = between(vaxis, (vlim[0], vlim[3]))
             vaxis_fit = vaxis[b]
-            data_fit  = np.array([d[b] for d in data_fit.T]).T
+            data_fit = np.array([d[b] for d in data_fit.T]).T
             vmin, vmax = np.min(vaxis_fit), np.max(vaxis_fit)
             print(f'v range: {vmin:.2f} -- {vmax:.2f} km/s')
         # for loop
@@ -672,24 +670,24 @@ class PVAnalysis():
         ncol = int(math.ceil(np.sqrt(nloop)))
         nrow = int(math.ceil(nloop / ncol))
         # figure for check result
-        fig  = plt.figure(figsize=(11.69, 8.27))
-        grid = ImageGrid(fig, rect=111, nrows_ncols=(nrow,ncol),
-            axes_pad=0,share_all=True, aspect=False, label_mode='L')
-        #gridi = 0
+        fig = plt.figure(figsize=(11.69, 8.27))
+        grid = ImageGrid(fig, rect=111, nrows_ncols=(nrow, ncol),
+            axes_pad=0, share_all=True, aspect=False, label_mode='L')
+        # gridi = 0
         # x & y label
         grid[(nrow*ncol-ncol)].set_xlabel('Offset (arcsec)')
         grid[(nrow*ncol-ncol)].set_ylabel('Intensity')
         dlim = [np.nanmin(data_fit), np.nanmax(data_fit)]
         # list to save final results
         res_ridge = np.empty((nloop, 4))
-        res_edge  = np.empty((nloop, 4))
+        res_edge = np.empty((nloop, 4))
 
         # loop for v
         for i in range(nloop):
             # ith data
-            v_i  = vaxis_fit[i]
-            x_i  = xaxis_fit.copy()
-            d_i  = data_fit[i, :].copy()
+            v_i = vaxis_fit[i]
+            x_i = xaxis_fit.copy()
+            d_i = data_fit[i, :].copy()
             if np.all(np.isnan(d_i)) or (vlim[1] < v_i < vlim[2]):
                 res_ridge[i, :] = [np.nan, v_i, np.nan, 0]
                 res_edge[i, :] = [np.nan, v_i, np.nan, 0]
@@ -729,8 +727,8 @@ class PVAnalysis():
                     else:
                         # use pixels only around intensity peak
                         x0, x1 = pidx - pixrng, pidx + pixrng + 1
-                        d_i, x_i  = d_i[x0:x1], xaxis_fit[x0:x1]
-                        #nd_i = len(d_i)
+                        d_i, x_i = d_i[x0:x1], xaxis_fit[x0:x1]
+                        # nd_i = len(d_i)
                 else:
                     x_i = xaxis_fit.copy()
                 if np.nanmax(d_i) >= thr * rms:
@@ -740,7 +738,7 @@ class PVAnalysis():
                 mx, mx_err = popt[1], perr[1]
                 # Plot result
                 if ~np.isnan(mx):
-                    x_model = np.linspace(xmin, xmax, 256) # offset axis for plot
+                    x_model = np.linspace(xmin, xmax, 256)  # offset axis for plot
                     g_model = gauss1d(x_model, *popt)
                     ax.step(x_i, d_i, linewidth=1.5, color='r',
                             where='mid')
@@ -753,7 +751,7 @@ class PVAnalysis():
                 return
             if not (xlim[0] < mx < xlim[1] or xlim[2] < mx < xlim[3]):
                 mx, mx_err = np.nan, np.nan
-            mx_err *= np.sqrt(hob) # correction of sampling rate
+            mx_err *= np.sqrt(hob)  # correction of sampling rate
             if interp_ridge: mx_err *= np.sqrt(10.)
             # output ridge results
             res_ridge[i, :] = [mx, v_i, mx_err, 0.]
@@ -764,9 +762,9 @@ class PVAnalysis():
             d_i = data_fit[i, :].copy()
             # interpolation
             # resample with a 10 times finer sampling rate
-            xi_interp  = np.linspace(x_i[0], x_i[-1],
+            xi_interp = np.linspace(x_i[0], x_i[-1],
                                      (len(x_i)-1)*10 + 1)
-            di_interp  = interp1d(x_i, d_i, kind='cubic')(xi_interp)
+            di_interp = interp1d(x_i, d_i, kind='cubic')(xi_interp)
             # flag by mass
             mass_est = kepler_mass(xi_interp, v_i - self.vsys, self.__unit)
             goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
@@ -785,23 +783,23 @@ class PVAnalysis():
                 ax.step(xi_interp, di_interp, linewidth=1.,
                     color='k', where='mid')
             else:
-                ax.step(xaxis_fit, data_fit[i,:], linewidth=1.,
+                ax.step(xaxis_fit, data_fit[i, :], linewidth=1.,
                     color='k', where='mid')
             # offset label
             ax.text(0.9, 0.9, f'{v_i:03.2f}', horizontalalignment='right',
-                verticalalignment='top',transform=ax.transAxes)
+                verticalalignment='top', transform=ax.transAxes)
             ax.tick_params(which='both', direction='in', bottom=True,
                            top=True, left=True, right=True, pad=9)
         # Store the result array in the shape of (4, len(v))
         self.results['ridge']['xcut'] = res_ridge.T
-        self.results['edge']['xcut']  = res_edge.T
-        #plt.show()
+        self.results['edge']['xcut'] = res_edge.T
+        # plt.show()
         fig.savefig(outname+".pvfit.xcut.png")
         plt.close()
         # output results as .txt file
-        #res_hd  = 'offset[arcsec]\tvelocity[km/s]\toff_err[arcesc]\tvel_err[km/s]'
-        #res_all = np.c_[res_x, res_v, err_x, err_v]
-        #np.savetxt(outname+'_chi2_pv_xfit.txt', res_all,fmt = '%4.4f', delimiter ='\t', header = res_hd)
+        # res_hd  = 'offset[arcsec]\tvelocity[km/s]\toff_err[arcesc]\tvel_err[km/s]'
+        # res_all = np.c_[res_x, res_v, err_x, err_v]
+        # np.savetxt(outname+'_chi2_pv_xfit.txt', res_all,fmt = '%4.4f', delimiter ='\t', header = res_hd)
 
     def fit_edgeridge(self, include_vsys: bool = False,
                       include_dp: bool = True,
@@ -865,10 +863,10 @@ class PVAnalysis():
         res_org = self.results_filtered
         Ds = [None, None]
         for i, er in enumerate(['edge', 'ridge']):
-            xrb  = [res_org[er]['xcut'][rb] for rb in ['red', 'blue']]
+            xrb = [res_org[er]['xcut'][rb] for rb in ['red', 'blue']]
             xcut = np.concatenate(xrb, axis=1)
             v0, x1, dx1 = xcut[1], self.xsign * xcut[0], xcut[2]
-            vrb  = [res_org[er]['vcut'][rb] for rb in ['red', 'blue']]
+            vrb = [res_org[er]['vcut'][rb] for rb in ['red', 'blue']]
             vcut = np.concatenate(vrb, axis=1)
             x0, v1, dv1 = self.xsign * vcut[0], vcut[1], vcut[3]
             Ds[i] = [v0, x1, dx1, x0, v1, dv1]
@@ -883,8 +881,8 @@ class PVAnalysis():
             if len(Rs[0]) == 0 and len(Es[3]) == 0:
                 print('No ridge point was found.')
             print('Skip the fitting to edge/ridge points.')
-            self.popt = {'edge':[[np.nan] * 5, [np.nan] * 5],
-                         'ridge':[[np.nan] * 5, [np.nan] * 5]}
+            self.popt = {'edge': [[np.nan] * 5, [np.nan] * 5],
+                         'ridge': [[np.nan] * 5, [np.nan] * 5]}
             return -1
 
         labels = np.array(['Rb', 'Vb', 'p_in', 'dp', 'dVsys'])
@@ -906,12 +904,15 @@ class PVAnalysis():
             q0 = np.array([0, np.sqrt(plim[0][1] * plim[1][1]),
                            fixed_pin, fixed_dp, 0])
             q0 = np.where(include, np.nan, q0)
+
             def wpow_r_custom(v, *p):
                 (q := q0 * 1)[np.isnan(q0)] = p
                 return doublepower_r(v, *q)
+
             def wpow_v_custom(r, *p):
                 (q := q0 * 1)[np.isnan(q0)] = p
                 return doublepower_v(r, *q)
+
             def lnprob(p, v0, x1, dx1, x0, v1, dv1):
                 chi2 = np.sum(((x1 - wpow_r_custom(v0, *p)) / dx1)**2) \
                        + np.sum(((v1 - wpow_v_custom(x0, *p)) / dv1)**2)
@@ -948,9 +949,9 @@ class PVAnalysis():
 
         print(f'Corner plots in {outname}.corner_e.png '
               + f'and {outname}.corner_r.png')
-        self.popt = {'edge':popt_e, 'ridge':popt_r}
-        result = {'edge':{'popt':popt_e[0], 'perr':popt_e[1]},
-                  'ridge':{'popt':popt_r[0], 'perr':popt_r[1]}}
+        self.popt = {'edge': popt_e, 'ridge': popt_r}
+        result = {'edge': {'popt': popt_e[0], 'perr': popt_e[1]},
+                  'ridge': {'popt': popt_r[0], 'perr': popt_r[1]}}
         return result
 
     def fit_linear(self, include_intercept: bool = True) -> dict:
@@ -976,10 +977,10 @@ class PVAnalysis():
         res_org = self.results_filtered
         Ds = [None, None]
         for i, er in enumerate(['edge', 'ridge']):
-            xrb  = [res_org[er]['xcut'][rb] for rb in ['red', 'blue']]
+            xrb = [res_org[er]['xcut'][rb] for rb in ['red', 'blue']]
             xcut = np.concatenate(xrb, axis=1)
             v0, x1, dx1 = xcut[1], self.xsign * xcut[0], xcut[2]
-            vrb  = [res_org[er]['vcut'][rb] for rb in ['red', 'blue']]
+            vrb = [res_org[er]['vcut'][rb] for rb in ['red', 'blue']]
             vcut = np.concatenate(vrb, axis=1)
             x0, v1, dv1 = self.xsign * vcut[0], vcut[1], vcut[3]
             Ds[i] = [v0, x1, dx1, x0, v1, dv1]
@@ -1003,6 +1004,7 @@ class PVAnalysis():
             c = np.dot(Ainv := np.linalg.inv(A), b)
             dc = np.sqrt([Ainv[0, 0], Ainv[1, 1]])
             return c, dc
+
         def grafit(x, y, dy):
             wsum = lambda a: np.sum(a / dy**2)
             c = np.array([0, wsum(x * y) / wsum(x**2)])
@@ -1020,6 +1022,7 @@ class PVAnalysis():
             dci = [dc[0], dc[1] * self.sini]
             vlim = np.array([np.min(Rs[0]), np.max(Rs[0])])
             xlim = np.sort(c[0] + c[1] * vlim)
+
             def gradinv(c, dc):
                 err = [dc[0]**2 / c[1]**2 + dc[1]**2 * c[0]**2 / c[1]**4,
                        dc[1]**2 / c[1]**4]
@@ -1038,13 +1041,13 @@ class PVAnalysis():
         print(f'grad = {ci[1]:+.4f} +/- {dci[1]:.4f} km/s/au')
         print(f'x    = {xlim[0]:.2f} --- {xlim[1]:.2f} au')
         print(f'v    = {vlim[0]:.3f} --- {vlim[1]:.3f} km/s')
-        self.rvlim = {'edge':[[1e-10, 1e-10], [1e-10, 1e-10]],
-                      'ridge':[[0.01, np.max(np.abs(xlim))],
+        self.rvlim = {'edge': [[1e-10, 1e-10], [1e-10, 1e-10]],
+                      'ridge': [[0.01, np.max(np.abs(xlim))],
                                [0.01, np.max(np.abs(vlim))]]}
-        self.popt = {'edge':[[np.nan, np.nan], [np.nan, np.nan]],
-                     'ridge':[c, dc]}
-        result = {'edge':{'popt':[np.nan, np.nan], 'perr':[np.nan, np.nan]},
-                  'ridge':{'popt':c, 'perr':dc}}
+        self.popt = {'edge': [[np.nan, np.nan], [np.nan, np.nan]],
+                     'ridge': [c, dc]}
+        result = {'edge': {'popt': [np.nan, np.nan], 'perr': [np.nan, np.nan]},
+                  'ridge': {'popt': c, 'perr': dc}}
         return result
 
     def write_edgeridge(self, outname='pvanalysis'):
@@ -1071,7 +1074,6 @@ class PVAnalysis():
         print('Derived points in'
               + f' {outname}.edge.dat and {outname}.ridge.dat.')
 
-
     def get_range(self):
         """Calculate the ranges of the edge/ridge positions (radii) and velocities.
 
@@ -1091,9 +1093,9 @@ class PVAnalysis():
             vin, vout = np.nan, np.nan
             if len(vall) > 0: vin, vout = np.max(vall), np.min(vall)
             if self.__use_position:
-                rin  = doublepower_r(vin, *popt)
+                rin = doublepower_r(vin, *popt)
             else:
-                vin  = doublepower_v(rin, *popt)
+                vin = doublepower_v(rin, *popt)
             if self.__use_velocity:
                 vout = doublepower_v(rout, *popt)
             else:
@@ -1101,11 +1103,10 @@ class PVAnalysis():
             return [[rin, rout], [vin, vout]]
         lims_e = inout(*self.__Es, self.popt['edge'][0])
         lims_r = inout(*self.__Rs, self.popt['ridge'][0])
-        self.rvlim = {'edge':lims_e, 'ridge':lims_r}
-        result = {'edge':{'rlim':lims_e[0], 'vlim':lims_e[1]},
-                  'ridge':{'rlim':lims_r[0], 'vlim':lims_r[1]}}
+        self.rvlim = {'edge': lims_e, 'ridge': lims_r}
+        result = {'edge': {'rlim': lims_e[0], 'vlim': lims_e[1]},
+                  'ridge': {'rlim': lims_r[0], 'vlim': lims_r[1]}}
         return result
-
 
     def output_fitresult(self):
         """Output the fitting result in the terminal.
@@ -1142,7 +1143,7 @@ class PVAnalysis():
             print(f'r     = {rin:.2f} --- {rout:.2f} au')
             print(f'v     = {vout:.3f} --- {vin:.3f} km/s')
             M_in = kepler_mass(rin, vin - vsys, self.__unit/self.dist)
-            M_b  = kepler_mass(rb, vb, self.__unit/self.dist)
+            M_b = kepler_mass(rb, vb, self.__unit/self.dist)
             M_out = kepler_mass(rout, vout - vsys, self.__unit/self.dist)
             if self.__use_position:
                 drin = doublepower_r_error(vin, *params)
@@ -1168,14 +1169,14 @@ class PVAnalysis():
                        logcolor: bool = False,
                        Tbcolor: bool = False,
                        show: bool = True,
-                       kwargs_pcolormesh: dict = {'cmap':'viridis'},
-                       kwargs_contour: dict = {'colors':'lime'},
+                       kwargs_pcolormesh: dict = {'cmap': 'viridis'},
+                       kwargs_contour: dict = {'colors': 'lime'},
                        plotedgepoint: bool = True,
                        plotridgepoint: bool = True,
                        plotedgemodel: bool = True,
                        plotridgemodel: bool = True,
-                       fmt: dict = {'edge':'v', 'ridge':'o'},
-                       linestyle: dict = {'edge':'--', 'ridge':'-'},
+                       fmt: dict = {'edge': 'v', 'ridge': 'o'},
+                       linestyle: dict = {'edge': '--', 'ridge': '-'},
                        flipaxis: bool = False) -> None:
         """Make linear and loglog PV diagrams
            with the derived points and model lines.
@@ -1248,7 +1249,6 @@ class PVAnalysis():
             pp.set_axis()
             pp.savefig(figname=outname + '.' + ext + '.png', show=show)
 
-
     def plot_point(self, ax=None, loglog: bool = False,
                    method: str = 'ridge', fmt: str = 'o',
                    flipaxis: bool = False) -> None:
@@ -1269,14 +1269,14 @@ class PVAnalysis():
                             color=color[xv][rb], ms=5)
 
     def plot_model(self, ax=None, loglog: bool = False,
-                   model = None, popt: list = [],
+                   model=None, popt: list = [],
                    method: str = 'ridge', ls: str = '-',
                    flipaxis: bool = False) -> None:
         if ax is None:
             print('Please input ax.')
             return -1
         if model is None: model = self.model
-        if popt  == []:
+        if popt == []:
             popt = self.popt[method][0].copy()
             if len(popt) == 5:
                 popt[4] -= self.avevsys
@@ -1293,13 +1293,12 @@ class PVAnalysis():
         if flipaxis: x, y = y, x
         ax.plot(x, y, ls=ls, lw=2, color='gray', zorder=3)
 
-
     # Plot results
     def plotresults_pvdiagram(self, outname=None, marker='o', colors=['r'], alpha=1.,
-        ax=None,outformat='pdf',pvcolor=True,cmap='Greys',
-        vmin=None,vmax=None, contour=True,clevels=None,pvccolor='k',
-        vrel=False,logscale=False,x_offset=False,ratio=1.2, prop_vkep=None,fontsize=14,
-        lw=1,clip=None,plot_res=True,inmode='fits',xranges=[], yranges=[],
+        ax=None, outformat='pdf', pvcolor=True, cmap='Greys',
+        vmin=None, vmax=None, contour=True, clevels=None, pvccolor='k',
+        vrel=False, logscale=False, x_offset=False, ratio=1.2, prop_vkep=None, fontsize=14,
+        lw=1, clip=None, plot_res=True, inmode='fits', xranges=[], yranges=[],
         ln_hor=True, ln_var=True, pvalpha=None):
         """Plot fitting results on a PV diagram for quick check.
 
@@ -1356,22 +1355,21 @@ class PVAnalysis():
             plot_res=plot_res, inmode=inmode, xranges=xranges, yranges=yranges,
             ln_hor=ln_hor, ln_var=ln_var, alpha=pvalpha)
 
-
         # plot fitting results
         if self.__sorted:
             results = copy.deepcopy(self.results_sorted)
 
             # get them back into arcsec and LSR velocity
             for i in results:
-                results[i]['red'][0]  *= self.xsign/self.dist
+                results[i]['red'][0] *= self.xsign/self.dist
                 results[i]['blue'][0] *= -self.xsign/self.dist
-                results[i]['red'][2]  *= self.xsign/self.dist
+                results[i]['red'][2] *= self.xsign/self.dist
                 results[i]['blue'][2] *= -self.xsign/self.dist
 
-                results[i]['red'][1]  = self.vsys + results[i]['red'][1]
+                results[i]['red'][1] = self.vsys + results[i]['red'][1]
                 results[i]['blue'][1] = self.vsys - results[i]['blue'][1]
 
-                colors = {'ridge': {'red': 'red', 'blue':'blue'},
+                colors = {'ridge': {'red': 'red', 'blue': 'blue'},
                 'edge': {'red': 'pink', 'blue': 'skyblue'}}
 
                 for j in results[i]:
@@ -1379,9 +1377,9 @@ class PVAnalysis():
         else:
             results = self.results
 
-            colors = {'ridge':'r', 'edge':'b'}
+            colors = {'ridge': 'r', 'edge': 'b'}
             for i in results:
-                #color = colors[i]
+                # color = colors[i]
                 if self.results[i]['vcut'] is not None:
                     ax = plotpoints(ax, *self.results[i]['vcut'], colors[i], x_offset)
 
@@ -1391,7 +1389,6 @@ class PVAnalysis():
         plt.savefig(outname+'.'+outformat, transparent=True)
         plt.close()
         return ax
-
 
     def plotresults_rvplane(self, outname=None, outformat='pdf', ax=None,
         xlog=True, ylog=True, au=False, marker='o',
@@ -1411,10 +1408,10 @@ class PVAnalysis():
         """
 
         # plot setting
-        plt.rcParams['font.family']     = 'Arial'  # font (Times New Roman, Helvetica, Arial)
+        plt.rcParams['font.family'] = 'Arial'  # font (Times New Roman, Helvetica, Arial)
         plt.rcParams['xtick.direction'] = 'in'     # directions of x ticks ('in'), ('out') or ('inout')
         plt.rcParams['ytick.direction'] = 'in'     # directions of y ticks ('in'), ('out') or ('inout')
-        plt.rcParams['font.size']       = fontsize # fontsize
+        plt.rcParams['font.size'] = fontsize  # fontsize
 
         # output name
         if outname:
@@ -1427,12 +1424,12 @@ class PVAnalysis():
             pass
         else:
             fig = plt.figure(figsize=(11.69, 8.27))
-            ax  = fig.add_subplot(111)
+            ax = fig.add_subplot(111)
 
         if colors:
             pass
         else:
-            colors = {'ridge': {'red': 'red', 'blue':'blue'},
+            colors = {'ridge': {'red': 'red', 'blue': 'blue'},
             'edge': {'red': 'pink', 'blue': 'skyblue'}}
 
         # plot fitting results
@@ -1442,7 +1439,7 @@ class PVAnalysis():
         # plot
         for i in self.results_sorted:
             for j in self.results_sorted[i]:
-                #print (self.results_sorted[i][j])
+                # print (self.results_sorted[i][j])
                 ax.errorbar(*self.results_sorted[i][j][0:2], xerr=self.results_sorted[i][j][2],
                     yerr=self.results_sorted[i][j][3], color=colors[i][j],
                     marker=marker, capsize=capsize, capthick=capthick, ls='')
@@ -1470,13 +1467,14 @@ class PVAnalysis():
         return ax
 
 
-
-### functions
+# functions
 def kepler_mass(r, v, unit):
     return v**2 * np.abs(r) * unit
 
+
 def kepler_mass_error(r, v, dr, dv, unit):
     return kepler_mass(r, v, unit) * np.sqrt((2*dv/v)**2 + (dr/r)**2)
+
 
 def between(t, tlim):
     if not (len(tlim) == 2):

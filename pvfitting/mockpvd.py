@@ -13,6 +13,7 @@ GG = constants.G.si.value
 M_sun = constants.M_sun.si.value
 deg = units.deg.to('radian')
 
+
 class MockPVD(object):
     """
     MockPVD is a class to generate mock position-velocity (PV) diagrams of a protostellar
@@ -301,7 +302,7 @@ class MockPVD(object):
         # convolution along the spectral direction
         if linewidth is not None:
             if precalculation.gauss_v is None:
-                gaussbeam = np.exp(- (v - v[nv//2 - 1 + nv%2])**2. / linewidth**2.)
+                gaussbeam = np.exp(- (v - v[nv//2 - 1 + nv % 2])**2. / linewidth**2.)
                 gaussbeam /= np.sum(gaussbeam)
                 precalculation.gauss_v = gaussbeam[:, np.newaxis, np.newaxis]
             g = precalculation.gauss_v
@@ -327,6 +328,7 @@ class MockPVD(object):
             I_pv = np.nanmean(np.array([I_pv[:, i::self.nsubgrid]
                                         for i in range(self.nsubgrid)]), axis=0)
         return I_pv
+
 
 # binning
 def binning(data, nbin):

@@ -26,7 +26,7 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
                  ncore: int = 1, simpleoutput: bool = True,
                  return_chain: bool = False,
                  return_lnp: bool = False,
-                 moves = emcee.moves.StretchMove()):
+                 moves=emcee.moves.StretchMove()):
     ndim = len(bounds[0])
     nwalkers = ndim * nwalkers_per_ndim
     plim = np.array(bounds)
@@ -59,7 +59,7 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
             sampler = emcee.EnsembleSampler(nwalkers, ndim, lnL,
                                             args=args, moves=moves)
             sampler.run_mcmc(p0, n)
-        #samples = sampler.get_chain()  # emcee 3.1.1
+        # samples = sampler.get_chain()  # emcee 3.1.1
         samples = sampler.chain  # emcee 2.2.1
         if gr_check:
             GR = gelman_rubin(samples)
@@ -69,7 +69,7 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
     if not converge:
         print('\nWARNING: emcee did not converge (Gelman-Rubin =',
               np.round(GR, 2), '> 1.25).\n')
-    #lnp = sampler.get_log_prob()  # emcee 3.1.1
+    # lnp = sampler.get_log_prob()  # emcee 3.1.1
     lnp = sampler.lnprobability  # emcee 2.2.1
     popt = samples[np.unravel_index(np.argmax(lnp), lnp.shape)]
     _samples = samples.copy()
@@ -96,7 +96,7 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
         xplot = np.arange(0, nsteps, 1)
         for i, ax in enumerate(axes):
             for iwalk in range(nwalkers):
-                ax.plot(xplot, _samples[iwalk,:,i].T, 'k')
+                ax.plot(xplot, _samples[iwalk, :, i].T, 'k')
             ax.set_ylabel(labels[i])
             ax.tick_params(which='both', direction='in',
                            bottom=True, top=True,
@@ -133,7 +133,7 @@ def dynesty_corner(bounds,
     show_corner: bool = False,
     return_evidence: bool = False,
     simpleoutput: bool = True,
-    wt_kwargs = None):
+    wt_kwargs=None):
     # dimensions
     ndim = len(bounds[0])
     plim = np.array(bounds)
@@ -143,15 +143,15 @@ def dynesty_corner(bounds,
     ptform = lambda u: plim[0] + (plim[1] - plim[0]) * u
 
     # Static nested sampling
-    #sampler = NS(lnlike, ptform, ndim)
-    #sampler.run_nested(print_progress=False)
-    #sresults = sampler.results
+    # sampler = NS(lnlike, ptform, ndim)
+    # sampler.run_nested(print_progress=False)
+    # sresults = sampler.results
     # Dynamic nested sampling.
     dsampler = DNS(lnlike, ptform, ndim)
     dsampler.run_nested(print_progress=False, wt_kwargs=wt_kwargs)
-    #dresults = dsampler.results
+    # dresults = dsampler.results
     results = dsampler.results
-    #results = dyfunc.merge_runs([sresults, dresults])
+    # results = dyfunc.merge_runs([sresults, dresults])
     if (figname is not None) & (show_corner == True):
         cfig, caxes = dyplot.cornerplot(results, labels=labels, quantiles=[0.16, 0.5, 0.84])
         if figname is not None: cfig.savefig(figname)
@@ -176,7 +176,7 @@ def dynesty_corner(bounds,
         perr = np.array([(q[2] - q[0]) * 0.5 for q in quantiles])
         return [pmid, perr]
     else:
-        popt = results.samples[np.argmax(results.logl), :] # highest probability
+        popt = results.samples[np.argmax(results.logl), :]  # highest probability
         plow, pmid, phigh = np.array(quantiles).T
         return [popt, plow, pmid, phigh]
 
@@ -262,7 +262,7 @@ class ReadFits():
         k0 = 0 if vmin is None else np.argmin(np.abs(v - vmin))
         k1 = len(v) - 1 if vmax is None else np.argmin(np.abs(v - vmax))
         v = v[k0:k1 + 1]
-        d =  d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
+        d = d[k0:k1 + 1, j0:j1 + 1, i0:i1 + 1]
         self.offpix = (i0, j0, k0)
         dx = x[1] - x[0]
         dy = y[1] - y[0]
@@ -281,7 +281,7 @@ class ReadFits():
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.beam = np.array([bmaj, bmin, bpa])
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
-        return {'x':x, 'y':y, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
+        return {'x': x, 'y': y, 'v': v, 'data': d, 'header': h, 'sigma': sigma}
 
     def read_pvfits(self, pvfits: str,
                     dist: float = 1, vsys: float = 0,
@@ -356,7 +356,8 @@ class ReadFits():
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.beam = np.array([bmaj, bmin, bpa])
         self.pvfits, self.dist, self.vsys = pvfits, dist, vsys
-        return {'x':x, 'v':v, 'data':d, 'header':h, 'sigma':sigma}
+        return {'x': x, 'v': v, 'data': d, 'header': h, 'sigma': sigma}
+
 
 def rot(x, y, pa):
     s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis

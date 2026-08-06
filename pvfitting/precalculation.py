@@ -194,11 +194,13 @@ def _rho2tau_parallel(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
         tau[i] = np.sum(mask * rho, axis=2).T
     return tau
 
+
 def rho2tau(vlos: np.ndarray, rho: np.ndarray,
             num_threads: int | str | None = None) -> np.ndarray:
     """Integrate density by velocity channel with bounded parallelism."""
     with numba_thread_limit(num_threads):
         return _rho2tau_parallel(vlos, rho)
+
 
 Nr = 1600
 lnr = np.linspace(np.log(1e-4), np.log(1e4), Nr)  # dr/r ~ dtheta ~ 0.01

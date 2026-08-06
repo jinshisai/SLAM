@@ -230,6 +230,7 @@ class PVFitting(ReadFits):
             if kw.get('return_lnp', False):
                 self.lnp = mcmc[i_mcmc]
             # best parameters & errors
+
             def get_p(i: int):
                 p = p_fixed.copy()
                 p[notfixed] = mcmc[i]
