@@ -49,6 +49,7 @@ def numba_thread_limit(num_threads: int | str | None = None):
 
 
 class diskenvelope():
+
     def __init__(self, radius: np.ndarray = None,
                  theta: np.ndarray = None,
                  phi: np.ndarray = None, incl: float = 0,
@@ -98,7 +99,7 @@ class diskenvelope():
         q = mu * r / 2.
         D = q**2 + p**3
         mu0 = np.full_like(r, np.nan)
-        ### three cases for computational stability
+        # three cases for computational stability
         # r >= 1 (then p >= 0 and sqrt(D) >= q >= 0)
         c = (r >= 1)
         qD = q[c] * (D[c])**(-1/2)
@@ -111,9 +112,8 @@ class diskenvelope():
         minus_p = -p[c]
         sqrt_minus_p = np.sqrt(minus_p.clip(0, None))
         mu0[c] = 2 * sqrt_minus_p \
-                 * np.cos(np.arccos(q[c] * sqrt_minus_p**(-3)) / 3.)
+            * np.cos(np.arccos(q[c] * sqrt_minus_p**(-3)) / 3.)
         return mu0.clip(0, 1)
-        
 
     def envelope(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         mu0 = self.get_mu0(self.mu)
@@ -122,13 +122,13 @@ class diskenvelope():
         mm = 1 - sin_theta0**2 / r  # mu / mu0
         vr = -np.sqrt(1 + mm) / np.sqrt(r)
         vt = self.sign_mu * np.sqrt(1 + mm) \
-             * (mu0 - self.mu) / self.sin_theta / np.sqrt(r)
+            * (mu0 - self.mu) / self.sin_theta / np.sqrt(r)
         vp = np.sqrt(1 - mm) * sin_theta0 / self.sin_theta / np.sqrt(r)
         clipped_mu = self.mu.clip(0.17, 1.0)  # theta < 80 deg
         clipped_mu0 = self.get_mu0(clipped_mu)
         clipped_mm = clipped_mu0 / clipped_mu
         rho = (np.sqrt((1 + clipped_mm) / 2) * (2 * clipped_mu0**2 / r + clipped_mm))**(-1) \
-              / np.sqrt(r)**3
+            / np.sqrt(r)**3
         c = self.where_disk
         vr[c] = 0
         vt[c] = 0
@@ -140,21 +140,24 @@ class diskenvelope():
         r = self.radius
         vp = self.sin_theta / np.sqrt(r)
         rho = r**(-self.pls) * self.H0 / self.H \
-              * np.exp(-0.5 * (self.z / self.H)**2)
+            * np.exp(-0.5 * (self.z / self.H)**2)
         c = self.where_disk
         vp[~c] = 0
         rho[~c] = 0
         return vp, rho
 
+
 def rotbase(t: np.ndarray, p: np.ndarray
             ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """t is an inclination angle from +z to (x, y)=(sin p, -cos p).
-       p is an azimuthal angle from -y to +x.
+    """
+    t is an inclination angle from +z to (x, y)=(sin p, -cos p).
+    p is an azimuthal angle from -y to +x.
     """
     er = np.array([np.sin(t) * np.sin(p), -np.sin(t) * np.cos(p), np.cos(t)])
     et = np.array([np.cos(t) * np.sin(p), -np.cos(t) * np.cos(p), -np.sin(t)])
     ep = np.array([np.cos(p), np.sin(p), np.zeros_like(p)])
     return er, et, ep
+
 
 def XYZ2rtp(incl: float, phi: float,
             X: np.ndarray, Y: np.ndarray, Z: np.ndarray
@@ -165,8 +168,8 @@ def XYZ2rtp(incl: float, phi: float,
     shape = np.shape(X)
     er, et, ep = rotbase(incl, phi)
     x, y, z = np.outer(ep, X.ravel()) \
-              + np.outer(-et, Y.ravel()) \
-              + np.outer(er, Z.ravel())
+        + np.outer(-et, Y.ravel()) \
+        + np.outer(er, Z.ravel())
     r = np.linalg.norm([x, y, z], axis=0).clip(1e-10, None)
     t = np.arccos(z / r)
     p = np.arctan2(x, -y)
@@ -175,9 +178,12 @@ def XYZ2rtp(incl: float, phi: float,
     p = np.reshape(p, shape)
     return r, t, p
 
+
 gauss_xy = None
 gauss_v = None
 vedge = None
+
+
 @jit(parallel=True)
 def _rho2tau_parallel(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
     nv = len(vedge) - 1
@@ -210,13 +216,15 @@ vp_disk, rho_disk = m.disk()
 vp_all = vp_env + vp_disk
 
 lmax = 10
-elos_r = {'major' : [None] * lmax, 'minor' : [None] * lmax}
-elos_t = {'major' : [None] * lmax, 'minor' : [None] * lmax}
-elos_p = {'major' : [None] * lmax, 'minor' : [None] * lmax}
-t = {'major' : [None] * lmax, 'minor' : [None] * lmax}
-idx_t = {'major' : [None] * lmax, 'minor' : [None] * lmax}
-r_org = {'major' : [None] * lmax, 'minor' : [None] * lmax}
-j_org = {'major' : [None] * lmax, 'minor' : [None] * lmax}
+elos_r = {'major': [None] * lmax, 'minor': [None] * lmax}
+elos_t = {'major': [None] * lmax, 'minor': [None] * lmax}
+elos_p = {'major': [None] * lmax, 'minor': [None] * lmax}
+t = {'major': [None] * lmax, 'minor': [None] * lmax}
+idx_t = {'major': [None] * lmax, 'minor': [None] * lmax}
+r_org = {'major': [None] * lmax, 'minor': [None] * lmax}
+j_org = {'major': [None] * lmax, 'minor': [None] * lmax}
+
+
 def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: float,
            axis: str, l: int) -> None:
     m = diskenvelope(theta=theta, phi=phi, incl=incl)
@@ -229,11 +237,12 @@ def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: flo
     r_org[axis][l] = radius_org
     j_org[axis][l] = (np.log(radius_org) - lnr0) / dlnr + 0.5
 
+
 def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
                  axis: str, l: int) -> tuple[np.ndarray, np.ndarray]:
     i = idx_t[axis][l]
     j = j_org[axis][l] - np.log(Rc) / dlnr
-    j = np.clip(j, 0, Nr - 1) 
+    j = np.clip(j, 0, Nr - 1)
     j = j.astype(int)
     rho = rho_env[i, j] + rho_disk[i, j] * rho_jump
     vr = vr_env[i, j] * alphainfall
