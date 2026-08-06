@@ -96,7 +96,7 @@ class PVFitting(ReadFits):
                                           'frho':None, 'sig_mdl':None},
                     vmask: list[float, float] = [0, 0],
                     zmax: float | None = None,
-                    filename: str = 'PVsilhouette',
+                    filename: str = 'PVfitting',
                     show: bool = False,
                     save_result: bool = True,
                     save_corner: bool = True,
