@@ -261,7 +261,8 @@ class PVAnalysis():
             if ((self.results[re]['xcut'] is not None)
                     & (self.results[re]['vcut'] is not None)):
                 for rb in ['red', 'blue']:
-                    if not nanbeforecross: break
+                    if not nanbeforecross:
+                        break
                     x1, v0, _, _ = store['xcut'][rb]
                     x0, v1, _, _ = store['vcut'][rb]
                     X1, X0 = np.meshgrid(x1, x0)
@@ -515,7 +516,8 @@ class PVAnalysis():
                 return
             if not (vlim[0] < mv < vlim[1] or vlim[2] < mv < vlim[3]):
                 mv, mv_err = np.nan, np.nan
-            if interp_ridge: mv_err *= np.sqrt(10.)
+            if interp_ridge:
+                mv_err *= np.sqrt(10.)
             # output ridge results
             res_ridge[i, :] = [x_i, mv, 0, mv_err]
 
@@ -752,7 +754,8 @@ class PVAnalysis():
             if not (xlim[0] < mx < xlim[1] or xlim[2] < mx < xlim[3]):
                 mx, mx_err = np.nan, np.nan
             mx_err *= np.sqrt(hob)  # correction of sampling rate
-            if interp_ridge: mx_err *= np.sqrt(10.)
+            if interp_ridge:
+                mx_err *= np.sqrt(10.)
             # output ridge results
             res_ridge[i, :] = [mx, v_i, mx_err, 0.]
 
@@ -1089,9 +1092,11 @@ class PVAnalysis():
         def inout(v0, x1, dx1, x0, v1, dv1, popt):
             xall, vall = np.abs(np.r_[x0, x1]), np.abs(np.r_[v0, v1])
             rin, rout = np.nan, np.nan
-            if len(xall) > 0: rin, rout = np.min(xall), np.max(xall)
+            if len(xall) > 0:
+                rin, rout = np.min(xall), np.max(xall)
             vin, vout = np.nan, np.nan
-            if len(vall) > 0: vin, vout = np.max(vall), np.min(vall)
+            if len(vall) > 0:
+                vin, vout = np.max(vall), np.min(vall)
             if self.__use_position:
                 rin = doublepower_r(vin, *popt)
             else:
@@ -1117,7 +1122,8 @@ class PVAnalysis():
         Returns:
             No return.
         """
-        if not hasattr(self, 'rvlim'): self.get_range()
+        if not hasattr(self, 'rvlim'):
+            self.get_range()
         for i in ['edge', 'ridge']:
             if i == 'edge' and len(self.__Es[0]) == 0 and len(self.__Es[3]) == 0:
                 print('--- No edge result. ---')
@@ -1229,7 +1235,8 @@ class PVAnalysis():
                         loglog=loglog, vlim=vlim, xlim=xlim,
                         multibeam=self.fitsdata.multibeam)
             cblabel = self.fitsdata.header['BUNIT']
-            if Tbcolor: cblabel = r'T$_{\rm b}$ (K)'
+            if Tbcolor:
+                cblabel = r'T$_{\rm b}$ (K)'
             pp.add_color(log=logcolor, Tb=Tbcolor, cblabel=cblabel,
                          **kwargs_pcolormesh)
             pp.add_contour(rms=self.rms, levels=clevels,
@@ -1261,10 +1268,14 @@ class PVAnalysis():
             for rb in ['red', 'blue']:
                 x, v, dx, dv = self.results_filtered[method][xv][rb]
                 v = v - self.avevsys
-                if xv == 'xcut': dv = 0
-                if xv == 'vcut': dx = 0
-                if loglog: x, v = np.abs(x), np.abs(v)
-                if flipaxis: x, v, dx, dv = v, x, dv, dx
+                if xv == 'xcut':
+                    dv = 0
+                if xv == 'vcut':
+                    dx = 0
+                if loglog:
+                    x, v = np.abs(x), np.abs(v)
+                if flipaxis:
+                    x, v, dx, dv = v, x, dv, dx
                 ax.errorbar(x, v, xerr=dx, yerr=dv, fmt=fmt,
                             color=color[xv][rb], ms=5)
 
@@ -1275,13 +1286,15 @@ class PVAnalysis():
         if ax is None:
             print('Please input ax.')
             return -1
-        if model is None: model = self.model
+        if model is None:
+            model = self.model
         if popt == []:
             popt = self.popt[method][0].copy()
             if len(popt) == 5:
                 popt[4] -= self.avevsys
         fx_model = lambda x: model(x, *popt)
-        if not hasattr(self, 'rvlim'): self.get_range()
+        if not hasattr(self, 'rvlim'):
+            self.get_range()
         xmin, xmax = self.rvlim[method][0]
         if loglog:
             x = np.geomspace(xmin, xmax, 100)
@@ -1290,7 +1303,8 @@ class PVAnalysis():
             x = np.linspace(-xmax, xmax, 101)
             x[(-xmin < x) * (x < xmin)] = None
             y = fx_model(self.xsign * x)
-        if flipaxis: x, y = y, x
+        if flipaxis:
+            x, y = y, x
         ax.plot(x, y, ls=ls, lw=2, color='gray', zorder=3)
 
     # Plot results

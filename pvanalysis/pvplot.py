@@ -146,10 +146,12 @@ class PVPlot():
             kwargs['vmin'] = np.log10(vmin)
             vmax = kwargs['vmax'] if 'vmax' in kwargs else np.nanmax(d)
             kwargs['vmax'] = np.log10(vmax)
-        if log: d = np.log10(d.clip(np.min(d[d > 0]), None))
+        if log:
+            d = np.log10(d.clip(np.min(d[d > 0]), None))
         kwargs0 = dict(kwargs0, **kwargs)
         ax = self.ax
-        if self.flipaxis: x, v, d = v, x, d.T
+        if self.flipaxis:
+            x, v, d = v, x, d.T
         p = ax.pcolormesh(x, v, d, **kwargs0)
         if self.loglog:
             ax.set_xscale('log')
@@ -209,7 +211,8 @@ class PVPlot():
             print(f'rms = {rms:.2e}')
         kwargs0 = dict(kwargs0, **kwargs)
         ax = self.ax
-        if self.flipaxis: x, v, d = v, x, d.T
+        if self.flipaxis:
+            x, v, d = v, x, d.T
         ax.contour(x, v, d, np.array(levels) * rms, **kwargs0)
         if self.loglog:
             ax.set_xscale('log')
@@ -237,8 +240,10 @@ class PVPlot():
             ax.set_ylim(-vmax, vmax)
         ax.set_xlabel(rlabel if xlabel is None else xlabel)
         ax.set_ylabel(vlabel if ylabel is None else ylabel)
-        if xticklabels: ax.set_xticklabels(xticklabels)
-        if yticklabels: ax.set_yticklabels(yticklabels)
+        if xticklabels:
+            ax.set_xticklabels(xticklabels)
+        if yticklabels:
+            ax.set_yticklabels(yticklabels)
         self.fig.tight_layout()
 
     def savefig(self, figname: str = None, show: bool = False,
@@ -246,5 +251,6 @@ class PVPlot():
         kwargs0 = {'bbox_inches': 'tight', 'transparent': True}
         if figname is not None:
             self.fig.savefig(figname, **dict(kwargs0, **kwargs))
-        if show: plt.show()
+        if show:
+            plt.show()
         plt.close()

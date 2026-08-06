@@ -98,7 +98,8 @@ class VelGrad(ReadFits):
                     yval = Y[np.argmax(d)]
                     yerr = self.bmaj / (np.max(d) / sigma)
                 elif method == 'gauss':
-                    if len(d) < 7: continue
+                    if len(d) < 7:
+                        continue
                     bounds = [[0, -xmax, -ymax, dx, dy, 0],
                               [d.max() * 2, xmax, ymax, xmax, ymax, np.pi]]
                     try:

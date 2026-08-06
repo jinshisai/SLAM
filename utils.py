@@ -88,7 +88,8 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
                       range=r_c, labels=labels),
         if figname is not None:
             plt.savefig(figname)
-        if show_corner: plt.show()
+        if show_corner:
+            plt.show()
         plt.close()
 
     if plot_chain:
@@ -154,7 +155,8 @@ def dynesty_corner(bounds,
     # results = dyfunc.merge_runs([sresults, dresults])
     if (figname is not None) & (show_corner == True):
         cfig, caxes = dyplot.cornerplot(results, labels=labels, quantiles=[0.16, 0.5, 0.84])
-        if figname is not None: cfig.savefig(figname)
+        if figname is not None:
+            cfig.savefig(figname)
         if show_corner:
             plt.show()
         else:
