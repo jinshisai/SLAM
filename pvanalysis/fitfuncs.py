@@ -53,8 +53,8 @@ def ridge_gauss(xdata, ydata, yerr):
 
 def gaussfit(xdata, ydata, yerr):
     '''
-	Gaussian fit through chi-square fit.
-	'''
+    Gaussian fit through chi-square fit.
+    '''
 
     # Get estimate of the initial parameters
     indx_pini = ydata >= 3.*yerr
@@ -111,13 +111,13 @@ def ridge_mean(xdata, ydata, yerr):
 # functions
 def splaw(r, params, r0=100.):
     '''
-	Single power-law function.
+    Single power-law function.
 
-	Args:
-	 - r: radius (au or any)
-	 - params: [vsys, v0, p]
-	 - r0: 100 (au)
-	'''
+    Args:
+     - r: radius (au or any)
+     - params: [vsys, v0, p]
+     - r0: 100 (au)
+    '''
     vsys, v0, p = params
     vout = v0*(r/r0)**(-p)
     dydx = (v0/r0)*(-p)*(r/r0)**(-p-1)
@@ -126,8 +126,8 @@ def splaw(r, params, r0=100.):
 
 def chi_splaw(params, xdata, ydata, xsig, ysig):
     '''
-	Calculate chi for chi-square for the single power-law function.
-	'''
+    Calculate chi for chi-square for the single power-law function.
+    '''
     vsys = params[0]
     vout, dydx = splaw(xdata, params)
     # sig       = np.sqrt((xsig*dydx)*(xsig*dydx) + ysig*ysig)
@@ -138,16 +138,16 @@ def chi_splaw(params, xdata, ydata, xsig, ysig):
 
 def dplaw(radii, params):
     '''
-	Double power-law function.
+    Double power-law function.
 
-	Args:
-	 - r: radius (au or any)
-	 - params: [vb, rb, pin, pout]
-	  - vb: rotational velocity at rb [km/s]
-	  - rb: break point raidus at which powers change [au]
-	  - pin: power at r < rb
-	  - pout: power at r >= rb
-	'''
+    Args:
+     - r: radius (au or any)
+     - params: [vb, rb, pin, pout]
+     - vb: rotational velocity at rb [km/s]
+     - rb: break point raidus at which powers change [au]
+     - pin: power at r < rb
+     - pout: power at r >= rb
+    '''
     vb, rb, pin, pout = params
 
     vout = np.array([
@@ -164,16 +164,16 @@ def dplaw(radii, params):
 
 def chi_dplaw(params, xdata, ydata, xsig, ysig):
     '''
-	Chi for chi square for the double power-law function.
+    Chi for chi square for the double power-law function.
 
-	Args:
-	 - func: a function.
-	 - params: input parameters for the function.
-	 - xdata: x of data
-	 - ydata: y of data
-	 - xsig: sigma for x
-	 - ysig: sigma for y
-	'''
+    Args:
+     - func: a function.
+     - params: input parameters for the function.
+     - xdata: x of data
+     - ydata: y of data
+     - xsig: sigma for x
+     - ysig: sigma for y
+    '''
     vout, dydx = dplaw(xdata, params)
     # sig       = np.sqrt((xsig*dydx)*(xsig*dydx) + ysig*ysig)
     sig = ysig
@@ -183,9 +183,9 @@ def chi_dplaw(params, xdata, ydata, xsig, ysig):
 
 def estimate_perror(params, func, x, y, xerr, yerr, niter=3000):
     '''
-	Estimate fitting-parameter errors by Monte-Carlo method.
+    Estimate fitting-parameter errors by Monte-Carlo method.
 
-	'''
+    '''
     nparams = len(params)
     perrors = np.zeros((0, nparams), float)
 
