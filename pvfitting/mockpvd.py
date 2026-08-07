@@ -203,7 +203,21 @@ class MockPVD(object):
             return self.generate_pvd(rho=rho, vlos=vlos, taumax=taumax,
                                      beam=self.beam, linewidth=linewidth, pa=pa)
 
-    def subgrid(self, axes: list, nsubgrid: int):
+    def subgrid(self, axes: list[np.ndarray],
+                nsubgrid: int) -> list[np.ndarray]:
+        """Uniformly refine one-dimensional cell-center coordinate axes.
+
+        Args:
+            axes (list): Coordinate arrays to refine. Each array must be
+                uniformly spaced and contain at least two cell centers.
+            nsubgrid (int): Number of refined cells placed across each
+                original cell.
+
+        Returns:
+            list: Refined cell-center arrays in the same order as ``axes``.
+                Each output axis contains ``nsubgrid`` times as many cells as
+                its input axis while preserving the original outer edges.
+        """
         axes_out = []
         for x in axes:
             nx = len(x)
@@ -213,8 +227,33 @@ class MockPVD(object):
             axes_out.append(x)
         return axes_out
 
-    def makegrid(self, xlim: list | None = None, ylim: list | None = None,
-                 zlim: list | None = None, reslim: float = 10):
+    def makegrid(self, xlim: list[list[float]] | None = None,
+                 ylim: list[list[float]] | None = None,
+                 zlim: list[list[float]] | None = None,
+                 reslim: float = 10) -> None:
+        """Construct the three-dimensional model grid.
+
+        Args:
+            xlim (list or None, optional): Per-level x-coordinate ranges for
+                nested refinement. None derives them from ``reslim``. Defaults
+                to None.
+            ylim (list or None, optional): Per-level y-coordinate ranges for
+                nested refinement. None derives them from ``reslim``. Defaults
+                to None.
+            zlim (list or None, optional): Per-level z-coordinate ranges for
+                nested refinement. None derives them from ``reslim``. Defaults
+                to None.
+            reslim (float, optional): Half-width of an automatically selected
+                refinement region, in cells of its parent level. Defaults to
+                10.
+
+        Notes:
+            The x and z axes are those supplied at initialization, optionally
+            refined by ``nsubgrid``. When a beam is available, the y axis
+            covers approximately three Gaussian standard deviations on either
+            side of zero; otherwise it contains three cells centered on zero.
+            The resulting :class:`Nested3DGrid` is stored as ``self.grid``.
+        """
         # parental grid
         # x and z
         x = self.x
@@ -238,14 +277,54 @@ class MockPVD(object):
             grid = Nested3DGrid(x, y, z, None, None, None, [1], nlevels=0)
         self.grid = grid
 
-    def gridinfo(self):
+    def gridinfo(self) -> None:
+        """Print the model-grid resolutions and limits in au."""
         self.grid.gridinfo(units=['au', 'au', 'au'])
 
     def build(self, Mstar: float, Rc: float, incl: float,
               alphainfall: float = 1., frho: float = 1.,
               rin: float = 1.0, rout: float | None = None,
               collapse: bool = False, normalize: bool = True,
-              axis: str = 'major'):
+              axis: str = 'major'
+              ) -> (tuple[list[np.ndarray], list[np.ndarray]]
+                    | tuple[np.ndarray, np.ndarray]):
+        """Build density and line-of-sight velocity fields on the model grid.
+
+        Args:
+            Mstar (float): Stellar mass in solar masses.
+            Rc (float): Centrifugal radius in au.
+            incl (float): Inclination angle in degrees. An inclination of 90
+                degrees corresponds to an edge-on configuration.
+            alphainfall (float, optional): Scaling applied to the radial
+                infall velocity. A value of one means no suppression. Defaults
+                to 1.
+            frho (float, optional): Density jump at the centrifugal radius.
+                Higher values give a higher density on the disk side. Defaults
+                to 1.
+            rin (float, optional): Inner cut-off radius in au. Density at and
+                inside this radius is set to zero. Defaults to 1.
+            rout (float or None, optional): Outer cut-off radius in au. None
+                applies no outer cut-off. Defaults to None.
+            collapse (bool, optional): Whether to average all nested levels
+                back onto the original three-dimensional grid. Defaults to
+                False.
+            normalize (bool, optional): Whether to divide density at every
+                level by the maximum density across all levels. Defaults to
+                True.
+            axis (str, optional): PV-cut axis, ``'major'`` or ``'minor'``.
+                Defaults to ``'major'``.
+
+        Returns:
+            tuple: Density fields and line-of-sight velocity fields, with the
+                latter in km/s. When ``collapse`` is False, each item is a
+                list of flattened arrays ordered from the original to the
+                innermost grid level. When True, each item is an array with
+                shape ``(nx, ny, nz)`` on the original grid.
+
+        Notes:
+            Geometry terms that depend only on the grid, inclination, and cut
+            axis are cached in :mod:`pvfitting.precalculation` for reuse.
+        """
         # parameters/units
         irad = np.abs(np.arcsin(np.sin(np.radians(incl)))) + self.iradshift
         vunit = np.sqrt(GG * Mstar * M_sun / Rc / au) * 1e-3
@@ -295,9 +374,41 @@ class MockPVD(object):
 
         return d_rho, d_vlos
 
-    def generate_pvd(self, rho: np.ndarray | list, vlos: np.ndarray | list,
-                     taumax: float = 1., beam: list | None = None,
-                     linewidth: float | None = None, pa: float = 0.):
+    def generate_pvd(self, rho: np.ndarray | list[np.ndarray],
+                     vlos: np.ndarray | list[np.ndarray],
+                     taumax: float = 1.,
+                     beam: list[float] | np.ndarray | None = None,
+                     linewidth: float | None = None,
+                     pa: float = 0.) -> np.ndarray:
+        """Convert density and velocity fields into a mock PV diagram.
+
+        Args:
+            rho (np.ndarray or list): Density field, either on one grid or as
+                flattened arrays for all nested levels.
+            vlos (np.ndarray or list): Line-of-sight velocity field in km/s,
+                with the same organization and shapes as ``rho``.
+            taumax (float, optional): Maximum scaled optical depth. Defaults to
+                1.
+            beam (list, np.ndarray, or None, optional): Beam major axis, minor
+                axis, and position angle ``[major, minor, pa]`` in au, au, and
+                degrees. None disables spatial convolution. Defaults to None.
+            linewidth (float or None, optional): Intrinsic line width in km/s
+                used for convolution along the velocity axis. None disables
+                spectral convolution. Defaults to None.
+            pa (float, optional): Position angle of the PV cut in degrees,
+                used to rotate the beam onto the model grid. Defaults to 0.
+
+        Returns:
+            np.ndarray: Normalized intensity of the mock PV diagram, with
+                shape ``(nv, nx)`` on the original velocity and position axes.
+
+        Notes:
+            Optical depth is integrated along z from the innermost nested
+            level outward. The normalized intensity is calculated as
+            ``I_v = 1 - exp(-tau_v)`` after scaling the peak optical depth to
+            ``taumax``. Spectral and beam kernels are cached in
+            :mod:`pvfitting.precalculation`.
+        """
         ny = self.grid.ny
         # integrate along Z axis
         v = self.v.copy()
@@ -375,7 +486,22 @@ class MockPVD(object):
 
 
 # binning
-def binning(data, nbin):
+def binning(data: np.ndarray, nbin: int) -> np.ndarray:
+    """Downsample the two spatial axes of an optical-depth cube.
+
+    Args:
+        data (np.ndarray): Optical-depth cube with shape ``(nv, ny, nx)``.
+        nbin (int): Spatial refinement factor.
+
+    Returns:
+        np.ndarray: NaN-aware mean of the strided spatial samples, with shape
+            ``(nv, ny / nbin, nx / nbin)`` when both spatial dimensions are
+            divisible by ``nbin``.
+
+    Notes:
+        The current implementation pairs identical stride offsets on the y
+        and x axes; it does not combine all ``nbin**2`` offset pairs.
+    """
     d_avg = np.array([data[:, i::nbin, i::nbin]
                       for j in range(nbin)
                       for i in range(nbin)])
