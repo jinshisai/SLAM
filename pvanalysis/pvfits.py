@@ -256,11 +256,11 @@ class Impvfits:
                 print('inmode ="data" is selected.'
                       + 'data must be provided.')
                 return
-            naxis = len(data.shape)
+            # naxis = len(data.shape)
         else:
             data = self.data
-            header = self.header
-            naxis = self.naxis
+            # header = self.header
+            # naxis = self.naxis
 
         # figures
         if ax:
@@ -334,12 +334,12 @@ class Impvfits:
 
         # plot images
         if color:
-            imcolor = ax.imshow(data_color, cmap=cmap, origin='lower',
-                                extent=extent, norm=norm, alpha=alpha)
+            ax.imshow(data_color, cmap=cmap, origin='lower',
+                      extent=extent, norm=norm, alpha=alpha)
 
         if contour:
-            imcont = ax.contour(data, colors=ccolor, origin='lower',
-                                extent=extent, levels=clevels, linewidths=lw, alpha=alpha)
+            ax.contour(data, colors=ccolor, origin='lower',
+                       extent=extent, levels=clevels, linewidths=lw, alpha=alpha)
 
         # axis labels
         ax.set_xlabel(xlabel)
