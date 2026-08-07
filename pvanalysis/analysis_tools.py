@@ -60,7 +60,7 @@ def doublepower_v(r, r_break, v_break, p_in, dp, vsys):
 
 def doublepower_v_error(r, r_break, v_break, p_in, dp, vsys,
                         dr_break, dv_break, dp_in, ddp, dvsys):
-    p_out = p_in + dp
+    # p_out = p_in + dp
     dp_out = np.sqrt(dp_in**2 + ddp**2)
     r_a = np.abs(r)
     v0 = doublepower_v(r, r_break, v_break, p_in, dp, vsys=0)
@@ -79,7 +79,7 @@ def doublepower_r(v, r_break, v_break, p_in, dp, vsys):
 
 def doublepower_r_error(v, r_break, v_break, p_in, dp, vsys,
                         dr_break, dv_break, dp_in, ddp, dvsys):
-    p_out = p_in + dp
+    # p_out = p_in + dp
     dp_out = np.sqrt(dp_in**2 + ddp**2)
     v_a = np.abs(v - vsys)
     r0 = doublepower_r(v, r_break, v_break, p_in, dp, vsys)
