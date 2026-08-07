@@ -237,7 +237,8 @@ class Impvfits:
                 ratio: float or int
                     relative x axis width compared to y axis width.
             '''
-            aspect = (1/ratio) *(ax.get_xlim()[1] - ax.get_xlim()[0]) / (ax.get_ylim()[1] - ax.get_ylim()[0])
+            aspect = ((1 / ratio) * (ax.get_xlim()[1] - ax.get_xlim()[0])
+                      / (ax.get_ylim()[1] - ax.get_ylim()[0]))
             aspect = np.abs(aspect)
             aspect = float(aspect)
             ax.set_aspect(aspect)

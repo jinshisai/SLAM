@@ -15,7 +15,9 @@ vlim = [-3.6, -2.0, 2.0, 3.6]  # km/s; Relative to vsys.
 
 '-------- HOW TO DO EACH STEP --------'
 filehead = 'test.channelfit'
-# scaling can be 'uniform', 'mom0ft', or 'mom0clean'. mom0ft and mom0clean scales the model intensity by the deconvolved moment 0 map obtained by Fourier transform and clean, respectively.
+# Scaling can be 'uniform', 'mom0ft', or 'mom0clean'. The latter two scale the
+# model intensity using the deconvolved moment 0 map obtained by Fourier
+# transform and CLEAN, respectively.
 chan = ChannelFit(scaling='uniform', progressbar=True)
 chan.makegrid(cubefits=cubefits, center=center, pa=pa, incl=incl,
               vsys=vsys, dist=dist, sigma=sigma, rmax=rmax, vlim=vlim)

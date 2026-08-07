@@ -855,9 +855,13 @@ class PVAnalysis():
                True means the corner figures are shown. These figures are also
                plotted in two png files.
             return_chain : bool
-               True stores the MCMC chains in self.chain. Each chain is a 2D numpy array with rows for varied parameters and columns for samples.
+               True stores the MCMC chains in self.chain. Each chain is a 2D
+               numpy array with rows for varied parameters and columns for
+               samples.
             return_lnp : bool
-               True stores the log probability arrays in self.lnp. The sample order matches the columns of self.chain when return_chain is True.
+               True stores the log probability arrays in self.lnp. The sample
+               order matches the columns of self.chain when return_chain is
+               True.
 
         Returns:
             result : dict
@@ -1208,7 +1212,7 @@ class PVAnalysis():
                 Defaults to True.
             kwargs_pcolormesh (dict, optional):
                 Defaults to {'cmap':'viridis'}.
-            kwargs_contour (dict, optional): 
+            kwargs_contour (dict, optional):
                 Defaults to {'colors':'lime'}.
             plotedgepoint (bool, optional): Defaults to True.
             plotridgepoint (bool, optional): Defaults to True.

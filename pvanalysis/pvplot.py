@@ -32,7 +32,7 @@ def nice_ticks(ticks, tlim):
 
 def nice_labels(ticks):
     digits = np.floor(np.log10(ticks)).astype('int').clip(None, 0)
-    return [f'{t:.{d:d}f}' for t, d in zip(ticks, -digits)]
+    return [f'{t:.{d}f}' for t, d in zip(ticks, -digits)]
 
 
 class PVPlot():

@@ -5,10 +5,16 @@
 # version = alpha
 # ---------------------------------------------------------------------------
 """
-This script derives the 2D central position at each velocity channel from a channel map, in the FITS form (AXIS1=deg, AXIS2=deg, AXIS3=Hz) and fits the major-offset vs. velocity with a power-law function. The outputs are the central points on the R.A.-Dec., major-minor, and major-velocity planes.
-The main class ChannelAnalysis can be imported to do each steps separately: get the central points, write them, fit them, output the fit result, and plot the central points.
+This script derives the 2D central position at each velocity channel from a
+channel map in FITS form (AXIS1=deg, AXIS2=deg, AXIS3=Hz), and fits the
+major-offset vs. velocity with a power-law function. The outputs are the
+central points on the R.A.-Dec., major-minor, and major-velocity planes.
+The main class ChannelAnalysis can be imported to perform each step separately:
+get the central points, write them, fit them, output the fit result, and plot
+the central points.
 
-Note. FITS files with multiple beams are not supported. The dynamic range for xlim_plot and vlim_plot should be >10 for nice tick labels.
+Note. FITS files with multiple beams are not supported. The dynamic range for
+xlim_plot and vlim_plot should be >10 for nice tick labels.
 """
 
 
@@ -538,7 +544,7 @@ class VelGrad(ReadFits):
 
         def nice_labels(ticks):
             digits = np.floor(np.log10(ticks)).astype('int').clip(None, 0)
-            return [f'{t:.{d:d}f}' for t, d in zip(ticks, -digits)]
+            return [f'{t:.{d}f}' for t, d in zip(ticks, -digits)]
         ax.set_xticklabels(nice_labels(xticks))
         ax.set_yticklabels(nice_labels(yticks))
         ax.set_xlim(xmin * 0.99, xmax * 1.01)  # au

@@ -63,7 +63,9 @@ class MockPVD(object):
          along the minor axis; otherwise -1.
         pa_major: PA of the positive offset of the PV diagram along the major axis.
         pa_minor: PA of the positive offset of the PV diagram along the minor axis.
-        num_threads: Number of Numba threads used for line-of-sight integration. None uses a conservative automatic budget, while "all" uses every thread available to Numba.
+        num_threads: Number of Numba threads used for line-of-sight integration.
+         None uses a conservative automatic budget, while "all" uses every
+         thread available to Numba.
         '''
         super(MockPVD, self).__init__()
 
@@ -180,7 +182,7 @@ class MockPVD(object):
         if self.beam is not None:
             bmaj, bmin, bpa = self.beam
             y = np.arange(
-                - int(bmaj / dx * 3. / 2.35) -1,
+                - int(bmaj / dx * 3. / 2.35) - 1,
                 int(bmaj / dx * 3. / 2.35) + 2,
                 1) * dx  # +/- 3 sigma
             self.y = y

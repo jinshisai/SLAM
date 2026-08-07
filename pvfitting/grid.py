@@ -211,10 +211,11 @@ class Nested3DGrid(object):
                     (ximax + 1 - ximin, yimax + 1 - yimin, zimin))
             # Region 6
             i0 = i1
-            i1 = i0 + (ximax + 1 - ximin) * (yimax + 1 - yimin) * (nz - zimax -1)
+            i1 = i0 + (ximax + 1 - ximin) * (yimax + 1 - yimin) * (nz - zimax - 1)
             d_col[ximin:ximax+1, yimin:yimax+1, zimax+1:] = \
-                d[l-1][i0:].reshape(
-                    (ximax + 1 - ximin, yimax + 1 - yimin, nz - zimax -1))
+                d[l-1][i0:].reshape((ximax + 1 - ximin,
+                                     yimax + 1 - yimin,
+                                     nz - zimax - 1))
 
         return d_col
 
