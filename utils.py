@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import emcee
 import corner
+from collections.abc import Callable
 from multiprocessing import Pool
 from dynesty import DynamicNestedSampler as DNS
 from dynesty import utils as dyfunc
@@ -11,33 +12,108 @@ from astropy import constants, units
 from astropy.coordinates import SkyCoord
 
 
-def gauss1d(x, amp, mean, fwhm):
+def gauss1d(x: float | np.ndarray, amp: float, mean: float,
+            fwhm: float) -> float | np.ndarray:
+    """Evaluate a one-dimensional Gaussian parameterized by its FWHM.
+
+    Args:
+        x (float or np.ndarray): Coordinates at which to evaluate the model.
+        amp (float): Gaussian peak amplitude.
+        mean (float): Gaussian center in the same unit as ``x``.
+        fwhm (float): Full width at half maximum in the same unit as ``x``.
+
+    Returns:
+        float or np.ndarray: Gaussian evaluated at ``x``.
+    """
     return amp * np.exp2(-4. * ((x - mean) / fwhm)**2)
 
 
-def emcee_corner(bounds, log_prob_fn, args: list = [],
+def emcee_corner(bounds: list[list[float]] | np.ndarray,
+                 log_prob_fn: Callable[..., float],
+                 args: list[object] = [],
                  nwalkers_per_ndim: int = 16,
                  nburnin: int = 2000, nsteps: int = 2000,
                  gr_check: bool = False, ndata: int = 1000,
-                 labels: list = None, rangelevel: float = 0.8,
-                 range_corner: list | None = None,
-                 figname: str = None, show_corner: bool = False,
+                 labels: list[str] | None = None,
+                 rangelevel: float | None = 0.8,
+                 range_corner: list[float | tuple[float, float]] | None = None,
+                 figname: str | None = None, show_corner: bool = False,
                  plot_chain: bool = False, show_chain: bool = False,
                  ncore: int = 1, simpleoutput: bool = True,
                  return_chain: bool = False,
                  return_lnp: bool = False,
-                 moves=emcee.moves.StretchMove()):
+                 moves: emcee.moves.Move = emcee.moves.StretchMove()
+                 ) -> list[np.ndarray]:
+    """Sample a bounded posterior with emcee and optionally plot the result.
+
+    Args:
+        bounds (list or np.ndarray): Lower and upper parameter bounds, with
+            shape ``(2, ndim)``.
+        log_prob_fn (callable): Function returning the log probability for a
+            parameter vector followed by the values in ``args``.
+        args (list, optional): Additional positional arguments passed to
+            ``log_prob_fn``. Defaults to an empty list.
+        nwalkers_per_ndim (int, optional): Number of walkers per fitted
+            dimension. Defaults to 16.
+        nburnin (int, optional): Number of burn-in steps. Defaults to 2000.
+        nsteps (int, optional): Number of production steps. Defaults to 2000.
+        gr_check (bool, optional): Whether to evaluate the Gelman--Rubin
+            convergence statistic. Defaults to False.
+        ndata (int, optional): Number of data points used in the convergence
+            correction. Defaults to 1000.
+        labels (list or None, optional): Parameter labels for the corner and
+            chain plots. Defaults to None.
+        rangelevel (float or None, optional): Fraction of samples shown for
+            every parameter in the corner plot. None uses ``bounds``.
+            Defaults to 0.8.
+        range_corner (list or None, optional): Per-parameter corner-plot
+            ranges. Each entry is either a sample fraction or an explicit
+            ``(minimum, maximum)`` pair. Defaults to None.
+        figname (str or None, optional): Corner-plot output filename. When
+            chain plotting is enabled, it is also used to derive the chain
+            filename. Defaults to None.
+        show_corner (bool, optional): Whether to display the corner plot.
+            Defaults to False.
+        plot_chain (bool, optional): Whether to create a walker-chain plot.
+            Defaults to False.
+        show_chain (bool, optional): Whether to display the chain plot.
+            Defaults to False.
+        ncore (int, optional): Number of worker processes. Values greater than
+            one enable multiprocessing. Defaults to 1.
+        simpleoutput (bool, optional): Return median values and symmetric
+            uncertainties instead of maximum-probability values and three
+            percentiles. Defaults to True.
+        return_chain (bool, optional): Append the flattened parameter chains
+            to the output. Defaults to False.
+        return_lnp (bool, optional): Append flattened log probabilities to
+            the output. Defaults to False.
+        moves (emcee.moves.Move, optional): emcee proposal move. Defaults to
+            :class:`emcee.moves.StretchMove`.
+
+    Returns:
+        list: Fit summaries as NumPy arrays. The first two entries are
+            ``[median, uncertainty]`` when ``simpleoutput`` is True; otherwise
+            they begin ``[maximum_probability, percentile_16, median,
+            percentile_84]``. Requested chains and log probabilities follow.
+
+    Notes:
+        Parameter bounds are enforced by the local log-probability wrapper in
+        serial execution. The underlying emcee sampler determines the precise
+        chain layout.
+    """
     ndim = len(bounds[0])
     nwalkers = ndim * nwalkers_per_ndim
     plim = np.array(bounds)
 
-    def lnL(p, *args):
+    def lnL(p: np.ndarray, *args: object) -> float:
+        """Evaluate the log probability inside the parameter bounds."""
         if np.all((plim[0] < p) * (p < plim[1])):
             return log_prob_fn(p, *args)
         else:
             return -np.inf
 
-    def gelman_rubin(samples):
+    def gelman_rubin(samples: np.ndarray) -> np.ndarray:
+        """Estimate the corrected Gelman--Rubin statistic by parameter."""
         nsteps = len(samples[0])
         B = np.std(np.mean(samples, axis=1), axis=0)
         W = np.mean(np.std(samples, axis=1), axis=0)
@@ -127,23 +203,58 @@ def emcee_corner(bounds, log_prob_fn, args: list = [],
     return output
 
 
-def dynesty_corner(bounds,
-                   log_prob_fn, args: list = [],
-                   labels: list = None,
-                   figname: str = None,
+def dynesty_corner(bounds: list[list[float]] | np.ndarray,
+                   log_prob_fn: Callable[..., float],
+                   args: list[object] = [],
+                   labels: list[str] | None = None,
+                   figname: str | None = None,
                    show_corner: bool = False,
                    return_evidence: bool = False,
                    simpleoutput: bool = True,
-                   wt_kwargs=None):
+                   wt_kwargs: dict[str, object] | None = None
+                   ) -> list[np.ndarray]:
+    """Sample a bounded likelihood with dynamic nested sampling.
+
+    Args:
+        bounds (list or np.ndarray): Lower and upper parameter bounds, with
+            shape ``(2, ndim)``.
+        log_prob_fn (callable): Log-likelihood function accepting a parameter
+            vector followed by the values in ``args``.
+        args (list, optional): Additional positional arguments passed to
+            ``log_prob_fn``. Defaults to an empty list.
+        labels (list or None, optional): Parameter labels for the corner plot.
+            Defaults to None.
+        figname (str or None, optional): Corner-plot output filename. Defaults
+            to None.
+        show_corner (bool, optional): Whether to display the corner plot. A
+            corner plot is created only when ``figname`` is also supplied.
+            Defaults to False.
+        return_evidence (bool, optional): Whether to calculate and print the
+            Bayesian evidence and its uncertainty. Defaults to False.
+        simpleoutput (bool, optional): Return median values and symmetric
+            uncertainties instead of the maximum-likelihood values and three
+            percentiles. Defaults to True.
+        wt_kwargs (dict or None, optional): Weight-function options forwarded
+            to :meth:`dynesty.DynamicNestedSampler.run_nested`. Defaults to
+            None.
+
+    Returns:
+        list: ``[median, uncertainty]`` when ``simpleoutput`` is True;
+            otherwise ``[maximum_likelihood, percentile_16, median,
+            percentile_84]``. Every entry is a NumPy array with one value per
+            fitted parameter.
+    """
     # dimensions
     ndim = len(bounds[0])
     plim = np.array(bounds)
 
     # likelihood/prior
-    def lnlike(p):
+    def lnlike(p: np.ndarray) -> float:
+        """Evaluate the supplied log likelihood."""
         return log_prob_fn(p, *args)
 
-    def ptform(u):
+    def ptform(u: np.ndarray) -> np.ndarray:
+        """Transform a unit-cube sample to the bounded parameter space."""
         return plim[0] + (plim[1] - plim[0]) * u
 
     # Static nested sampling
@@ -186,14 +297,17 @@ def dynesty_corner(bounds,
         return [popt, plow, pmid, phigh]
 
 
-class ReadFits():
+class ReadFits:
+    """Provide FITS-reading methods and store the resulting data as attributes."""
+
     def read_cubefits(self, cubefits: str, center: str | None = None,
                       dist: float = 1, vsys: float = 0,
                       xmin: float | None = None, xmax: float | None = None,
                       ymin: float | None = None, ymax: float | None = None,
                       vmin: float | None = None, vmax: float | None = None,
                       xskip: int = 1, yskip: int = 1,
-                      sigma: float | None = None) -> dict:
+                      sigma: float | None = None
+                      ) -> dict[str, np.ndarray | fits.Header | float]:
         """Read channel maps in the FITS format.
 
         Args:
@@ -215,16 +329,26 @@ class ReadFits():
                 ``vsys`` in km/s. Defaults to None.
             vmax (float or None, optional): Maximum velocity relative to
                 ``vsys`` in km/s. Defaults to None.
-            xskip (int, optional): Pixel stride along the x axis. Defaults to
-                1.
-            yskip (int, optional): Pixel stride along the y axis. Defaults to
-                1.
+            xskip (int, optional): Positive pixel stride along the x axis.
+                The returned header is updated to describe the subsampled
+                axis. Defaults to 1.
+            yskip (int, optional): Positive pixel stride along the y axis.
+                The returned header is updated to describe the subsampled
+                axis. Defaults to 1.
             sigma (float or None, optional): RMS noise of the FITS data. None
                 means automatic estimation. Defaults to None.
 
         Returns:
-            dict: Coordinates ``x``, ``y``, and ``v``; the data cube; FITS
-                header; and RMS noise ``sigma``.
+            dict: Coordinates ``x`` and ``y`` in au, velocity ``v`` relative
+                to ``vsys`` in km/s, the ``(v, y, x)`` data cube, the updated
+                FITS ``header``, and RMS noise ``sigma``.
+
+        Notes:
+            The selected coordinates, sampling intervals, data, beam, header,
+            noise, source distance, systemic velocity, and crop offsets are
+            also stored as attributes of this instance. Right ascension axes
+            commonly have a negative FITS pixel increment; the x limits are
+            applied in the corresponding array order.
         """
         cc = constants.c.si.value
         f = fits.open(cubefits)[0]
@@ -305,22 +429,38 @@ class ReadFits():
                     xmin: float | None = None, xmax: float | None = None,
                     vmin: float | None = None, vmax: float | None = None,
                     xskip: int = 1,
-                    sigma: float | None = None) -> dict:
+                    sigma: float | None = None
+                    ) -> dict[str, np.ndarray | fits.Header | float]:
         """Read a position-velocity diagram in the FITS format.
 
         Args:
-            pvfits (str): Name of the input FITS file including the extension.
-            dist (float, optional): Distance of the target in the unit of pc, used to convert arcsec to au. Defaults to 1.
-            vsys (float, optional): Systemic velocity of the target in the unit of km/s. Defaults to 0.
-            xmin (float | None, optional): The positional axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
-            xmax (float | None, optional): The positional axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
-            vmin (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
-            vmax (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
-            xskip (int, optional): Skip xskip pixels in the x axis. Defaults to 1.
-            sigma (float | None, optional): Standard deviation of the FITS data. None means automatic. Defaults to None.
+            pvfits (str): Input position-velocity FITS file.
+            dist (float, optional): Source distance in pc, used to convert the
+                position axis from arcseconds to au. Defaults to 1.
+            vsys (float, optional): Systemic velocity in km/s. Defaults to 0.
+            xmin (float or None, optional): Minimum position in au. Defaults
+                to None.
+            xmax (float or None, optional): Maximum position in au. Defaults
+                to None.
+            vmin (float or None, optional): Minimum velocity relative to
+                ``vsys`` in km/s. Defaults to None.
+            vmax (float or None, optional): Maximum velocity relative to
+                ``vsys`` in km/s. Defaults to None.
+            xskip (int, optional): Positive pixel stride along the position
+                axis. The returned header is updated to describe the
+                subsampled axis. Defaults to 1.
+            sigma (float or None, optional): RMS noise of the FITS data. None
+                means automatic estimation from its edges. Defaults to None.
 
         Returns:
-            dict: The keys are x (1D array), v (1D array), data (2D array), header, and sigma.
+            dict: Position ``x`` in au, velocity ``v`` relative to ``vsys`` in
+                km/s, the ``(v, x)`` data array, the updated FITS ``header``,
+                and RMS noise ``sigma``.
+
+        Notes:
+            The selected coordinates, sampling intervals, data, beam, header,
+            noise, source distance, systemic velocity, and crop offsets are
+            also stored as attributes of this instance.
         """
         cc = constants.c.si.value
         f = fits.open(pvfits)[0]
@@ -376,7 +516,20 @@ class ReadFits():
         return {'x': x, 'v': v, 'data': d, 'header': h, 'sigma': sigma}
 
 
-def rot(x, y, pa):
+def rot(x: float | np.ndarray, y: float | np.ndarray,
+        pa: float) -> np.ndarray:
+    """Rotate Cartesian coordinates onto minor and major axes.
+
+    Args:
+        x (float or np.ndarray): First Cartesian coordinate.
+        y (float or np.ndarray): Second Cartesian coordinate, broadcastable
+            with ``x``.
+        pa (float): Counterclockwise rotation angle in radians.
+
+    Returns:
+        np.ndarray: Rotated minor- and major-axis coordinates ``[s, t]``. Its
+            leading dimension has length two.
+    """
     s = x * np.cos(pa) - y * np.sin(pa)  # along minor axis
     t = x * np.sin(pa) + y * np.cos(pa)  # along major axis
     return np.array([s, t])
