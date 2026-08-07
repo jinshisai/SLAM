@@ -1,4 +1,5 @@
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 import numpy as np
@@ -9,11 +10,24 @@ DEFAULT_NUMBA_THREAD_CAP = 4
 
 
 def resolve_num_threads(num_threads: int | str | None = None) -> int:
-    """Return the Numba thread budget to use for PV integration.
+    """Resolve the Numba thread budget used for PV integration.
 
-    An existing NUMBA_NUM_THREADS setting or a runtime thread mask is respected
-    when no explicit value is supplied. Otherwise, the automatic budget uses
-    half of Numba's available threads, capped at DEFAULT_NUMBA_THREAD_CAP.
+    Args:
+        num_threads (int, str, or None, optional): Positive thread count,
+            ``'all'`` to use every Numba thread, or None for an automatic
+            budget. Defaults to None.
+
+    Returns:
+        int: Number of Numba threads to use.
+
+    Raises:
+        TypeError: If ``num_threads`` is not an integer, ``'all'``, or None.
+        ValueError: If an integer is outside Numba's available thread range.
+
+    Notes:
+        With None, an existing ``NUMBA_NUM_THREADS`` setting or runtime thread
+        mask is respected. Otherwise, half the available threads are used, up
+        to ``DEFAULT_NUMBA_THREAD_CAP``.
     """
     maximum = config.NUMBA_NUM_THREADS
 
@@ -35,8 +49,20 @@ def resolve_num_threads(num_threads: int | str | None = None) -> int:
 
 
 @contextmanager
-def numba_thread_limit(num_threads: int | str | None = None):
-    """Temporarily apply a Numba thread budget and restore the prior value."""
+def numba_thread_limit(num_threads: int | str | None = None) -> Iterator[int]:
+    """Temporarily apply a Numba thread budget.
+
+    Args:
+        num_threads (int, str, or None, optional): Thread budget accepted by
+            :func:`resolve_num_threads`. Defaults to None.
+
+    Yields:
+        int: Resolved thread count active inside the context.
+
+    Notes:
+        The previously active Numba thread count is restored when the context
+        exits, including when an exception is raised.
+    """
     previous = get_num_threads()
     requested = resolve_num_threads(num_threads)
     if requested != previous:
@@ -49,14 +75,32 @@ def numba_thread_limit(num_threads: int | str | None = None):
 
 
 class diskenvelope():
+    """Precalculate geometry and dimensionless disk-envelope quantities.
 
-    def __init__(self, radius: np.ndarray = None,
-                 theta: np.ndarray = None,
-                 phi: np.ndarray = None, incl: float = 0,
-                 H0: float = 0.2, plh: float = 0.25, pls: float = 1.0):
-        """theta is a polar angle from +z to (x, y)=(sin phi, -cos phi).
-           phi is an azimuthal angle from -y to +x.
-        """
+    Args:
+        radius (np.ndarray or None, optional): Spherical radius normalized by
+            the centrifugal radius. Defaults to None.
+        theta (np.ndarray or None, optional): Polar angle in radians, measured
+            from +z toward ``(x, y) = (sin(phi), -cos(phi))``. Defaults to
+            None.
+        phi (np.ndarray or None, optional): Azimuth in radians, measured from
+            -y toward +x. Defaults to None.
+        incl (float, optional): Inclination in radians used to project velocity
+            onto the line of sight. Defaults to 0.
+        H0 (float, optional): Disk scale height at cylindrical radius 1.
+            Defaults to 0.2.
+        plh (float, optional): Flaring exponent in
+            ``H = H0 * R ** (1 + plh)``. Defaults to 0.25.
+        pls (float, optional): Radial density exponent of the disk. Defaults to
+            1.
+    """
+
+    def __init__(self, radius: np.ndarray | None = None,
+                 theta: np.ndarray | None = None,
+                 phi: np.ndarray | None = None, incl: float = 0,
+                 H0: float = 0.2, plh: float = 0.25,
+                 pls: float = 1.0) -> None:
+        """Initialize disk-envelope coordinates and projection factors."""
         self.H0 = H0
         self.plh = plh
         self.pls = pls
@@ -93,7 +137,19 @@ class diskenvelope():
                 self.elos_t = np.reshape(elos_t, shape)
                 self.elos_p = np.reshape(elos_p, shape)
 
-    def get_mu0(self, mu: np.ndarray):
+    def get_mu0(self, mu: np.ndarray) -> np.ndarray:
+        """Calculate the initial polar-angle cosine of an infalling streamline.
+
+        Args:
+            mu (np.ndarray): Absolute cosine of the current polar angle.
+
+        Returns:
+            np.ndarray: Streamline initial cosine ``mu0``, clipped to [0, 1].
+
+        Notes:
+            The cubic streamline equation is evaluated in three regimes to
+            improve numerical stability around changes in its discriminant.
+        """
         r = self.radius
         p = (r - 1) / 3.
         q = mu * r / 2.
@@ -116,6 +172,13 @@ class diskenvelope():
         return mu0.clip(0, 1)
 
     def envelope(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Calculate dimensionless UCM-envelope velocity and density.
+
+        Returns:
+            tuple: Radial, polar, and azimuthal velocity components followed
+                by density. Values inside the region assigned to the disk are
+                set to zero.
+        """
         mu0 = self.get_mu0(self.mu)
         sin_theta0 = np.sqrt(1 - mu0**2)
         r = self.radius
@@ -136,7 +199,13 @@ class diskenvelope():
         rho[c] = 0
         return vr, vt, vp, rho
 
-    def disk(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def disk(self) -> tuple[np.ndarray, np.ndarray]:
+        """Calculate dimensionless Keplerian disk velocity and density.
+
+        Returns:
+            tuple: Azimuthal velocity and density. Values outside the region
+                assigned to the disk are set to zero.
+        """
         r = self.radius
         vp = self.sin_theta / np.sqrt(r)
         rho = r**(-self.pls) * self.H0 / self.H \
@@ -147,11 +216,18 @@ class diskenvelope():
         return vp, rho
 
 
-def rotbase(t: np.ndarray, p: np.ndarray
+def rotbase(t: float | np.ndarray, p: float | np.ndarray
             ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    t is an inclination angle from +z to (x, y)=(sin p, -cos p).
-    p is an azimuthal angle from -y to +x.
+    """Calculate spherical-coordinate basis vectors.
+
+    Args:
+        t (float or np.ndarray): Polar angle in radians, measured from +z
+            toward ``(x, y) = (sin(p), -cos(p))``.
+        p (float or np.ndarray): Azimuth in radians, measured from -y toward
+            +x.
+
+    Returns:
+        tuple: Radial, polar, and azimuthal basis vectors ``(er, et, ep)``.
     """
     er = np.array([np.sin(t) * np.sin(p), -np.sin(t) * np.cos(p), np.cos(t)])
     et = np.array([np.cos(t) * np.sin(p), -np.cos(t) * np.cos(p), -np.sin(t)])
@@ -162,8 +238,24 @@ def rotbase(t: np.ndarray, p: np.ndarray
 def XYZ2rtp(incl: float, phi: float,
             X: np.ndarray, Y: np.ndarray, Z: np.ndarray
             ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """The observer coordinate (X,Y,Z) and the envelope coordinate (x,y,z)
-       are linked as X * ep + Y * (-et) + Z * er = x, y, z.
+    """Convert observer Cartesian coordinates to envelope spherical ones.
+
+    Args:
+        incl (float): Polar viewing angle in radians.
+        phi (float): Azimuthal viewing angle in radians.
+        X (np.ndarray): Observer-frame X coordinates.
+        Y (np.ndarray): Observer-frame Y coordinates with the same shape as
+            ``X``.
+        Z (np.ndarray): Observer-frame line-of-sight coordinates with the same
+            shape as ``X``.
+
+    Returns:
+        tuple: Spherical radius, polar angle, and azimuth arrays with the same
+            shape as ``X``.
+
+    Notes:
+        Observer and envelope coordinates are related by
+        ``X * ep + Y * (-et) + Z * er = (x, y, z)``.
     """
     shape = np.shape(X)
     er, et, ep = rotbase(incl, phi)
@@ -186,6 +278,21 @@ vedge = None
 
 @jit(parallel=True)
 def _rho2tau_parallel(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
+    """Integrate density into global velocity bins in parallel.
+
+    Args:
+        vlos (np.ndarray): Line-of-sight velocity cube with shape
+            ``(nx, ny, nz)``.
+        rho (np.ndarray): Density cube with the same shape as ``vlos``.
+
+    Returns:
+        np.ndarray: Density summed along z for every velocity channel, with
+            shape ``(nv, ny, nx)``.
+
+    Notes:
+        The module-level ``vedge`` array must contain ``nv + 1`` velocity-bin
+        edges before this internal JIT-compiled function is called.
+    """
     nv = len(vedge) - 1
     nx, ny, _ = np.shape(vlos)
     tau = np.zeros((nv, ny, nx))
@@ -197,7 +304,23 @@ def _rho2tau_parallel(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
 
 def rho2tau(vlos: np.ndarray, rho: np.ndarray,
             num_threads: int | str | None = None) -> np.ndarray:
-    """Integrate density by velocity channel with bounded parallelism."""
+    """Integrate density by velocity channel with bounded parallelism.
+
+    Args:
+        vlos (np.ndarray): Line-of-sight velocity cube with shape
+            ``(nx, ny, nz)``.
+        rho (np.ndarray): Density cube with the same shape as ``vlos``.
+        num_threads (int, str, or None, optional): Numba thread budget accepted
+            by :func:`resolve_num_threads`. Defaults to None.
+
+    Returns:
+        np.ndarray: Density summed along z for every velocity channel, with
+            shape ``(nv, ny, nx)``.
+
+    Notes:
+        Set the module-level ``vedge`` array to the velocity-bin edges before
+        calling this function.
+    """
     with numba_thread_limit(num_threads):
         return _rho2tau_parallel(vlos, rho)
 
@@ -229,6 +352,16 @@ j_org = {'major': [None] * lmax, 'minor': [None] * lmax}
 
 def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: float,
            axis: str, l: int) -> None:
+    """Cache geometry and lookup indices for one nested model-grid level.
+
+    Args:
+        radius_org (np.ndarray): Physical spherical radii of grid samples.
+        theta (np.ndarray): Polar angles in radians.
+        phi (np.ndarray): Azimuthal angles in radians.
+        incl (float): Inclination in radians used for line-of-sight projection.
+        axis (str): PV-cut axis, normally ``'major'`` or ``'minor'``.
+        l (int): Nested-grid level stored in the module-level caches.
+    """
     m = diskenvelope(theta=theta, phi=phi, incl=incl)
     elos_r[axis][l] = m.elos_r
     elos_t[axis][l] = m.elos_t
@@ -242,6 +375,20 @@ def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: flo
 
 def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
                  axis: str, l: int) -> tuple[np.ndarray, np.ndarray]:
+    """Interpolate cached disk-envelope density and line-of-sight velocity.
+
+    Args:
+        Rc (float): Centrifugal radius in the same unit as the radii cached by
+            :func:`update`.
+        rho_jump (float): Disk-to-envelope density scaling.
+        alphainfall (float): Scaling applied to radial infall velocity.
+        axis (str): PV-cut axis used in :func:`update`.
+        l (int): Nested-grid level used in :func:`update`.
+
+    Returns:
+        tuple: Dimensionless density and line-of-sight velocity arrays for the
+            requested grid level.
+    """
     i = idx_t[axis][l]
     j = j_org[axis][l] - np.log(Rc) / dlnr
     j = np.clip(j, 0, Nr - 1)

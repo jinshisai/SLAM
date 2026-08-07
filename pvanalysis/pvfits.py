@@ -189,6 +189,7 @@ class Impvfits:
         self.delx = xaxis[1] - xaxis[0]
         self.delv = vaxis[1] - vaxis[0]
 
+    '''
     # Read multibeam table
     def read_multibeamtable(self):
         # multibeam table
@@ -200,6 +201,7 @@ class Impvfits:
         # rng = range(1, nbmaxis + 1)
         # ttype_i = np.array([header['TTYPE'+str(i)] for i in rng])
         # tunit_i = np.array([int(header['TUNIT'+str(i)]) for i in rng])
+    '''
 
     # Draw pv diagram
     def draw_pvdiagram(self, outname, data=None, header=None, ax=None, outformat='pdf', color=True, cmap='Greys',
