@@ -291,12 +291,33 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
 
 
 class ChannelFit(ReadFits):
+    """Fit a Keplerian disk or infalling envelope model directly to channel maps.
+
+    Args:
+        disk (bool, optional): Whether to include the disk component. Defaults
+            to True.
+        envelope (bool, optional): Whether to include the envelope component.
+            Defaults to False.
+        scaling (str, optional): Method used to set the model intensity.
+            ``'uniform'`` does not use the observed moment-0 map as a spatial
+            template: the intensity follows the ``pI`` and ``Ienv`` model,
+            and one global scale factor is fitted to the cube. Each method
+            whose name begins with ``'mom0'`` instead normalizes the
+            velocity-integrated model at every sky position to a deconvolved
+            observed moment-0 map. ``'mom0clean'`` obtains that map with
+            CLEAN, ``'mom0model'`` uses a nonnegative model-grid
+            deconvolution, and ``'mom0ft'`` uses zero-order Tikhonov
+            regularization in Fourier space. Defaults to ``'uniform'``.
+        progressbar (bool, optional): Whether to display progress bars during
+            deconvolution and fitting. Defaults to True.
+    """
 
     def __init__(self,
                  disk: bool = True,
                  envelope: bool = False,
                  scaling: str = 'uniform',
-                 progressbar: bool = True):
+                 progressbar: bool = True) -> None:
+        """Initialize channel-map fitting options."""
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2',
                           'pI', 'Rin', 'Ienv',
                           'xoff', 'yoff', 'voff', 'incloff', 'paoff']
@@ -311,13 +332,64 @@ class ChannelFit(ReadFits):
                  rmax: float = 1e4,
                  vlim: tuple[float, float, float, float] = (-100, 0, 0, 100),
                  sigma: float | None = None, nlayer: int = 3,
-                 xskip: int = 1, yskip: int = 1, skipto: int | None = False,
+                 xskip: int = 1, yskip: int = 1,
+                 skipto: int | bool | None = False,
                  gaussmargin: float = 1.6,
                  tikhonov_threshold: float = 6.25e-2,
                  savedeconvolved: str | None = None,
                  loaddeconvolved: str | None = None,
                  signmajor: int | None = None,
-                 signminor: int | None = None):
+                 signminor: int | None = None) -> None:
+        """Read a cube and prepare the observational and nested model grids.
+
+        Args:
+            cubefits (str or None, optional): Input channel-map FITS file.
+                Defaults to None.
+            pa (float, optional): Position angle of the disk major axis in
+                degrees. Defaults to 0.
+            incl (float, optional): Disk inclination in degrees. Defaults to
+                90.
+            dist (float, optional): Source distance in pc. Defaults to 1.
+            center (str or None, optional): Sky coordinates of the model
+                center. Defaults to None.
+            vsys (float, optional): Systemic velocity in km/s. Defaults to 0.
+            rmax (float, optional): Half-width of the fitted area in au.
+                Defaults to 1e4.
+            vlim (tuple, optional): Boundaries of the fitted blue and red
+                velocity ranges, relative to ``vsys``, in km/s. Defaults to
+                (-100, 0, 0, 100).
+            sigma (float or None, optional): RMS noise of the cube. None means
+                automatic estimation. Defaults to None.
+            nlayer (int, optional): Number of nested model-grid layers.
+                Defaults to 3.
+            xskip (int, optional): Pixel stride along the x axis. Defaults to
+                1.
+            yskip (int, optional): Pixel stride along the y axis. Defaults to
+                1.
+            skipto (int, bool, or None, optional): Approximate number of
+                pixels per beam minor axis after resampling. False or None
+                disables automatic resampling. Defaults to False.
+            gaussmargin (float, optional): Beam-kernel margin in units of the
+                beam major axis. Defaults to 1.6.
+            tikhonov_threshold (float, optional): Regularization threshold for
+                Fourier deconvolution. Defaults to 6.25e-2.
+            savedeconvolved (str or None, optional): File in which to save the
+                deconvolved moment-0 map. Defaults to None.
+            loaddeconvolved (str or None, optional): File from which to load a
+                previously deconvolved moment-0 map. Defaults to None.
+            signmajor (int or None, optional): Sign of the rotational
+                line-of-sight velocity. +1 makes the positive major-axis side (i.e., pa)
+                redshifted and -1 makes it blueshifted. Zero suppresses the
+                rotational contribution. None determines the sign from the
+                observed moment-1 map. Defaults to None.
+            signminor (int or None, optional): Sign of the radial-infall
+                line-of-sight velocity. For inward motion, +1 makes the
+                positive minor-axis side blueshifted (i.e., pa+90) and -1 makes it
+                redshifted. Zero suppresses the radial contribution. This
+                option affects only a model with radial motion, such as when
+                ``envelope=True``. None determines the sign from the observed
+                moment-1 map. Defaults to None.
+        """
         if cubefits is not None:
             self.read_cubefits(cubefits, center, dist, vsys,
                                -rmax, rmax, -rmax, rmax, None, None,
@@ -640,7 +712,61 @@ class ChannelFit(ReadFits):
                 save_result: bool = True,
                 save_corner: bool = True,
                 print_result: bool = True,
-                kwargs_emcee_corner: dict = {}):
+                kwargs_emcee_corner: dict = {}) -> dict:
+        """Fit the channel-map model parameters with MCMC.
+
+        Args:
+            Mstar_range (list, optional): Prior range of stellar mass in solar
+                masses. Defaults to [0.01, 10].
+            Rc_range (list, optional): Prior range of disk radius in au.
+                Defaults to [1, 1000].
+            cs_range (list, optional): Prior range of line width in km/s.
+                Defaults to [0.01, 1].
+            h1_range (list, optional): Prior range of the first disk scale
+                height divided by radius. Defaults to [0.01, 1].
+            h2_range (list, optional): Prior range of the second disk scale
+                height divided by radius. Always h1 < h2, regardless of h1_range and h2_range. Defaults to [0.01, 1].
+            pI_range (list, optional): Prior range of the radial intensity
+                power-law index. Defaults to [-2, 2].
+            Rin_range (list, optional): Prior range of inner radius in au.
+                Defaults to [0, 1000].
+            Ienv_range (list, optional): Prior range of ``Ienv``, the
+                intrinsic intensity immediately outside ``Rc`` divided by
+                that immediately inside ``Rc``, before final intensity
+                scaling. ``Ienv=0`` gives no envelope emission, ``Ienv=1``
+                gives equal intensity across ``Rc``, values between 0 and 1
+                make the envelope fainter than the disk, and values greater
+                than 1 make it brighter. This parameter matters only when the
+                envelope component is enabled. Defaults to [0.01, 100].
+            xoff_range (list, optional): Prior range of x offsets in au.
+                Defaults to [-100, 100].
+            yoff_range (list, optional): Prior range of y offsets in au.
+                Defaults to [-100, 100].
+            voff_range (list, optional): Prior range of velocity offsets (i.e., the offset of systemic velocity) in
+                km/s. Defaults to [-0.2, 0.2].
+            incl_range (list, optional): Prior range of inclination offsets in
+                degrees, from ``incl`` givne in ``makegrid``. Defaults to [-45, 45].
+            pa_range (list, optional): Prior range of position-angle offsets
+                in degrees, from ``pa`` given in ``makegrid``. Defaults to [-45, 45].
+            fixed_params (dict, optional): Values of parameters to hold fixed.
+                Unspecified parameters remain free. Defaults to {}.
+            filename (str, optional): Prefix for fitting products. Defaults to
+                ``'channelfit'``.
+            show (bool, optional): Whether to show the corner plot. Defaults to
+                False.
+            save_result (bool, optional): Whether to save fitted parameter
+                values. Defaults to True.
+            save_corner (bool, optional): Whether to save the corner plot.
+                Defaults to True.
+            print_result (bool, optional): Whether to print fitted values.
+                Defaults to True.
+            kwargs_emcee_corner (dict, optional): Additional arguments passed
+                to ``emcee_corner``. Defaults to {}.
+
+        Returns:
+            dict: Best-fit, lower, median, and upper parameter dictionaries,
+            together with the reduced chi-square value.
+        """
 
         p_fixed = {k: fixed_params[k] if k in fixed_params else None for k in self.paramkeys}
         self.free = {k: p_fixed[k] is None for k in self.paramkeys}
@@ -828,7 +954,15 @@ class ChannelFit(ReadFits):
                 'beforeconvolving': concat(m0),
                 'header': h}
 
-    def modeltofits(self, filehead: str = 'best', **kwargs):
+    def modeltofits(self, filehead: str = 'best', **kwargs) -> None:
+        """Write the best-fit model and residual cubes to FITS files.
+
+        Args:
+            filehead (str, optional): Prefix of the output FITS files.
+                Defaults to ``'best'``.
+            **kwargs: Model parameters. The stored best-fit parameters are
+                used when no values are supplied.
+        """
         w = wcs.WCS(naxis=3)
         products = self.make_model_products(**kwargs)
 
@@ -852,7 +986,21 @@ class ChannelFit(ReadFits):
         tofits(products['beforeconvolving'], 'beforeconvolving')
 
     def plotmom(self, mode: str, filename: str = 'mom01.png',
-                save: bool = True, show: bool = False, **kwargs):
+                save: bool = True, show: bool = False,
+                **kwargs: float) -> None:
+        """Plot moment-0 contours over a moment-1 image.
+
+        Args:
+            mode (str): Data product to plot: ``'obs'``, ``'model'``, or
+                ``'residual'``.
+            filename (str, optional): Output figure name. Defaults to
+                ``'mom01.png'``.
+            save (bool, optional): Whether to save the figure. Defaults to
+                True.
+            show (bool, optional): Whether to show the figure. Defaults to
+                False.
+            **kwargs: Model parameters used for model or residual plots.
+        """
         if 'mod' in mode or 'res' in mode or 'clean' in mode:
             if kwargs != {}:
                 self.popt = kwargs

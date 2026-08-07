@@ -70,10 +70,25 @@ def r_kep_out(v, M_p, v_break, p_low, vsys):
 
 
 class VelGrad(ReadFits):
+    """Measure emission centers, a velocity gradient, and dynamical mass."""
 
     def get_2Dcenter(self, cutoff: float = 5, vmask: list = [0, 0],
                      minrelerr: float = 0.01, minabserr: float = 0.1,
-                     method: str = 'mean'):
+                     method: str = 'mean') -> None:
+        """Measure the two-dimensional emission center in each channel.
+
+        Args:
+            cutoff (float, optional): Intensity threshold in units of the RMS
+                noise. Defaults to 5.
+            vmask (list, optional): Velocity interval to exclude in km/s.
+                Defaults to [0, 0].
+            minrelerr (float, optional): Minimum relative center uncertainty.
+                Defaults to 0.01.
+            minabserr (float, optional): Minimum absolute center uncertainty in
+                units of the beam major axis. Defaults to 0.1.
+            method (str, optional): Center estimator: ``'mean'``, ``'peak'``,
+                or ``'gauss'``. Defaults to ``'mean'``.
+        """
         dx, dy = self.dx, self.dy
         xmax, ymax = np.max(self.x), np.max(self.y)
         sigma, data = self.sigma, self.data
@@ -134,7 +149,34 @@ class VelGrad(ReadFits):
                   save_points: bool = True,
                   print_result: bool = True,
                   return_chain: bool = False,
-                  return_lnp: bool = False):
+                  return_lnp: bool = False) -> dict:
+        """Fit a velocity-gradient axis and filter inconsistent channels.
+
+        Args:
+            pa0 (float, optional): Initial position angle in degrees. Defaults
+                to 0.
+            fixcenter (bool, optional): Whether to fix the gradient center at
+                the image origin. Defaults to True.
+            axisfilter (bool, optional): Whether to reject centers inconsistent
+                with the fitted gradient axis. Defaults to False.
+            lowvelfilter (bool, optional): Whether to reject low-velocity
+                centers inside the maximum projected radius. Defaults to
+                False.
+            filename (str, optional): Prefix for the output point table.
+                Defaults to ``'velgrad'``.
+            save_points (bool, optional): Whether to write the retained channel
+                centers. Defaults to True.
+            print_result (bool, optional): Whether to print fit information in terminal.
+                Defaults to True.
+            return_chain (bool, optional): Whether to store the MCMC chain in
+                ``self.chain_grad``. Defaults to False.
+            return_lnp (bool, optional): Whether to store log probabilities in
+                ``self.lnp_grad``. Defaults to False.
+
+        Returns:
+            dict: Best-fit center and position angle, their uncertainties, the
+                reduced chi-square, and retained channel centers.
+        """
         xc = self.center['xc'] * 1
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
@@ -305,7 +347,32 @@ class VelGrad(ReadFits):
                    minabserr: float = 0.1, minrelerr: float = 0.01,
                    print_result: bool = True,
                    return_chain: bool = False,
-                   return_lnp: bool = False):
+                   return_lnp: bool = False) -> dict:
+        """Fit a rotation profile and estimate the central stellar mass.
+
+        Args:
+            incl (float, optional): Inclination angle in degrees. Defaults to
+                90.
+            voff_range (list, optional): Prior range of the systemic-velocity
+                offset in km/s. Defaults to [-0.5, 0.5].
+            voff_fixed (float or None, optional): Fixed velocity offset in
+                km/s. None fits the offset. Defaults to 0.
+            minabserr (float, optional): Minimum absolute radial uncertainty in
+                units of the beam major axis. Defaults to 0.1.
+            minrelerr (float, optional): Minimum relative radial uncertainty.
+                Defaults to 0.01.
+            print_result (bool, optional): Whether to print fitted values in terminal.
+                Defaults to True.
+            return_chain (bool, optional): Whether to store the MCMC chain in
+                ``self.chain_mstar``. Defaults to False.
+            return_lnp (bool, optional): Whether to store log probabilities in
+                ``self.lnp_mstar``. Defaults to False.
+
+        Returns:
+            dict: Stellar mass and uncertainty, characteristic radius and
+                velocity, fit parameters and uncertainties, and reduced
+                chi-square.
+        """
         self.incl = incl
         sini2 = np.sin(np.radians(incl))**2
         xc = self.kepler['xc'] * 1
@@ -394,11 +461,24 @@ class VelGrad(ReadFits):
                 'popt': self.popt, 'perr': getattr(self, 'perr', None),
                 'chi2r_mstar': getattr(self, 'chi2r_mstar', np.nan)}
 
-    def plot_center(self, pa: float = None,
-                    filehead: str = 'channelanalysis',
+    def plot_center(self, pa: float | None = None,
+                    filehead: str = 'velgrad',
                     show_figs: bool = False,
-                    title: str = None,
-                    save: bool = True):
+                    title: str | None = None,
+                    save: bool = True) -> None:
+        """Plot channel centers on the sky and in position-velocity space.
+
+        Args:
+            pa (float or None, optional): Reference position angle in degrees.
+                Defaults to None.
+            filehead (str, optional): Prefix for the ``.radec.png`` and
+                ``.majvel.png`` figures. Defaults to ``'velgrad'``.
+            show_figs (bool, optional): Whether to show the figures. Defaults
+                to False.
+            title (str or None, optional): Figure title. Defaults to None.
+            save (bool, optional): Whether to save the figures. Defaults to
+                True.
+        """
         plt.rcParams['font.size'] = 20
         plt.rcParams['axes.linewidth'] = 1.5
         plt.rcParams['xtick.direction'] = 'out'

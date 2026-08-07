@@ -27,14 +27,33 @@ warnings.simplefilter('ignore', RuntimeWarning)
 
 
 class PVFitting(ReadFits):
+    """Fit a Keplerian disk and infalling envelope model to major/minor PV diagrams."""
 
     def put_PV(self, pvmajorfits: str, pvminorfits: str,
                dist: float, vsys: float,
                rmax: float | None,
                vmin: float | None, vmax: float | None,
                sigma: float | None,
-               xskip: int = 1, skipto: int | None = None,
-               dNsampling: list | None = [5, 1]):
+               xskip: int = 1, skipto: int | None = None) -> None:
+        """Read and prepare observed major- and minor-axis PV diagrams.
+
+        Args:
+            pvmajorfits (str): FITS file containing the major-axis PV diagram.
+            pvminorfits (str): FITS file containing the minor-axis PV diagram.
+            dist (float): Source distance in pc.
+            vsys (float): Systemic velocity in km/s.
+            rmax (float or None): Maximum absolute position in au.
+            vmin (float or None): Minimum velocity relative to ``vsys`` in
+                km/s.
+            vmax (float or None): Maximum velocity relative to ``vsys`` in
+                km/s.
+            sigma (float or None): RMS noise of the PV diagrams. None means
+                automatic estimation.
+            xskip (int, optional): Pixel stride along the position axis.
+                Defaults to 1.
+            skipto (int or None, optional): Approximate number of pixels per
+                beam minor axis after resampling. Defaults to None.
+        """
         d = []
         for pvfits in [pvmajorfits, pvminorfits]:
             self.read_pvfits(pvfits=pvfits, dist=dist, vsys=vsys,
@@ -67,16 +86,16 @@ class PVFitting(ReadFits):
         mpvd.grid.gridinfo()
 
     def fit_mockpvd(self, incl: float = 89.,
-                    Mstar_range: list[float, float] = [0.01, 10],
-                    Rc_range: list[float, float] = [1., 1000.],
-                    alphainfall_range: list[float, float] = [0.0, 1],
-                    taumax_range: list[float, float] = [0.1, 1e3],
-                    frho_range: list[float, float] = [1., 1e4],
-                    sig_mdl_range: list[float, float] = [0., 10.],
+                    Mstar_range: list[float] = [0.01, 10],
+                    Rc_range: list[float] = [1., 1000.],
+                    alphainfall_range: list[float] = [0.0, 1],
+                    taumax_range: list[float] = [0.1, 1e3],
+                    frho_range: list[float] = [1., 1e4],
+                    sig_mdl_range: list[float] = [0., 10.],
                     fixed_params: dict = {'Mstar': None, 'Rc': None,
                                           'alphainfall': None, 'taumax': None,
                                           'frho': None, 'sig_mdl': None},
-                    vmask: list[float, float] = [0, 0],
+                    vmask: list[float] = [0, 0],
                     zmax: float | None = None,
                     filename: str = 'PVfitting',
                     show: bool = False,
@@ -89,11 +108,77 @@ class PVFitting(ReadFits):
                     pa_major: float = 0., pa_minor: float = 90.,
                     linewidth: float | None = None,
                     nsubgrid: int = 1,
-                    n_nest: list[float] = [2, 2, 2, 2, 2, 2],
+                    n_nest: list[int] = [2, 2, 2, 2, 2, 2],
                     reslim: float = 10,
                     title: str | None = None,
                     log: bool = False,
-                    num_threads: int | str | None = None):
+                    num_threads: int | str | None = None) -> None:
+        """Fit mock major- and minor-axis PV diagrams with MCMC.
+
+        Args:
+            incl (float, optional): Inclination angle in degrees. Defaults to
+                89.
+            Mstar_range (list, optional): Prior range of stellar mass in solar
+                masses. Defaults to [0.01, 10].
+            Rc_range (list, optional): Prior range of centrifugal radius in
+                au. Defaults to [1, 1000].
+            alphainfall_range (list, optional): Prior range of the radial
+                infall-velocity scaling. One means no suppression for the radial infall-velocity. Defaults to [0, 1].
+            taumax_range (list, optional): Prior range of maximum optical
+                depth. Defaults to [0.1, 1e3].
+            frho_range (list, optional): Prior range of the density jump at the
+                centrifugal radius. Higher values mean a higher denisty on the disk side. Defaults to [1, 1e4].
+            sig_mdl_range (list, optional): Prior range of fractional model
+                uncertainty in units of observational noise. Defaults to
+                [0, 10].
+            fixed_params (dict, optional): Values of parameters to hold fixed.
+                A value of None leaves a parameter free.
+            vmask (list, optional): Excluded velocity interval in km/s.
+                Defaults to [0, 0].
+            zmax (float or None, optional): Maximum line-of-sight extent in au.
+                None uses the position grid. Defaults to None.
+            filename (str, optional): Prefix for fitting products. Defaults to
+                ``'PVfitting'``.
+            show (bool, optional): Whether to show generated figures. Defaults
+                to False.
+            save_result (bool, optional): Whether to save fitted parameter
+                values. Defaults to True.
+            save_corner (bool, optional): Whether to save the corner plot.
+                Defaults to True.
+            print_result (bool, optional): Whether to print fitted values in terminal.
+                Defaults to True.
+            progressbar (bool, optional): Whether to display fitting progress.
+                Defaults to True.
+            kwargs_emcee_corner (dict, optional): Additional arguments passed
+                to ``emcee_corner``. Defaults to {}.
+            signmajor (int or None, optional): Sign of the rotational
+                line-of-sight velocity. +1 makes the positive major-axis side
+                redshifted and -1 makes it blueshifted. None determines the
+                sign from the observed major-axis PV diagram. Defaults to
+                None.
+            signminor (int or None, optional): Sign of the radial-infall
+                line-of-sight velocity. +1 makes the positive minor-axis side
+                blueshifted and -1 makes it redshifted. None determines the
+                sign from the observed minor-axis PV diagram. Defaults to
+                None.
+            pa_major (float, optional): Position angle of the major-axis cut in
+                degrees. Defaults to 0.
+            pa_minor (float, optional): Position angle of the minor-axis cut in
+                degrees. Defaults to 90.
+            linewidth (float or None, optional): Intrinsic line width in km/s.
+                Defaults to None.
+            nsubgrid (int, optional): Initial model subgrid refinement factor.
+                Defaults to 1.
+            n_nest (list, optional): Refinement factors for nested model-grid
+                levels. Defaults to [2, 2, 2, 2, 2, 2].
+            reslim (float, optional): Threshold defining the next nested-grid
+                extent. Defaults to 10.
+            title (str or None, optional): Figure title. Defaults to None.
+            log (bool, optional): Whether to use logarithmic color scaling.
+                Defaults to False.
+            num_threads (int, str, or None, optional): Number of threads for Numba;
+                ``'all'`` uses all available CPUs. Defaults to None.
+        """
         # Observed PV diagrams
         majobs = self.dpvmajor.copy()
         minobs = self.dpvminor.copy()
@@ -435,7 +520,15 @@ class PVFitting(ReadFits):
 
         return figs
 
-    def modeltofits(self, filehead: str = 'best', **kwargs):
+    def modeltofits(self, filehead: str = 'best', **kwargs) -> None:
+        """Write model and residual major/minor PV diagrams to FITS files.
+
+        Args:
+            filehead (str, optional): Prefix of the output FITS files.
+                Defaults to ``'best'``.
+            **kwargs: Model parameters. The stored best-fit parameters are
+                used when no values are supplied.
+        """
         w = wcs.WCS(naxis=2)
         h = self.header
         h['NAXIS1'] = len(self.x)

@@ -34,32 +34,25 @@ clight = constants.c.cgs.value     # light speed (cm s^-1)
 
 
 class PVAnalysis():
-    """Perform fitting to a rotational profile using a PV diagram.
+    """Perform fitting to a radial profile of the rotational velocity using a PV diagram.
 
     Args:
-        infile (str): Input fits file.
-        rms (float): RMS noise level of the pv diagram.
-        vsys (float): Systemic velocity of the object (km s^-1).
-        dist (float): Distance to the object (pc).
-        incl (float, optional): Inclination angle of the object.
-               Defaults to 90, which means no correction for estimate
-               of the protostellar mass.
+        infile (str): Input FITS file containing the PV diagram.
+        rms (float): RMS noise of the PV diagram.
+        vsys (float): Systemic velocity in km/s.
+        dist (float): Source distance in pc.
+        incl (float, optional): Inclination angle in degrees. Defaults to 90,
+            corresponding to no inclination correction of the estimated mass.
+        pa (float or None, optional): Position angle of the PV cut in degrees.
+            None uses the beam major axis as the spatial resolution. Defaults
+            to None.
+        multibeam (bool, optional): Whether the FITS file contains a CASA
+            per-channel beam table. Defaults to False.
     """
-    def __init__(self, infile, rms, vsys, dist, incl=90., pa=None, multibeam=False):
-        """Initialize.
-
-        Args:
-            infile (str): An input fits file.
-            rms (float): rms noise level of the pv diagram.
-            vsys (float): Systemic velocity of the object (km s^-1).
-            dist (float): Distance to the object (pc).
-            incl (float, optional): Inclination angle of the object.
-               Defaults to 90, which means no correction for estimate
-               of the protostellar mass.
-            pa (float, optional): Position angle of the pv cut.
-               Will be used to calculate the spatial resolution along the pv
-               cut if it is given. Defaults to None.
-        """
+    def __init__(self, infile: str, rms: float, vsys: float, dist: float,
+                 incl: float = 90., pa: float | None = None,
+                 multibeam: bool = False) -> None:
+        """Initialize a PV-diagram analysis."""
         # read fits file
         self.fitsdata = Impvfits(infile, pa=pa, multibeam=multibeam)
         # parameters required for analysis
@@ -73,52 +66,63 @@ class PVAnalysis():
                         'edge': {'vcut': None, 'xcut': None}}
         self.__sorted = False
 
-    def get_edgeridge(self, outname, thr=5.,
-                      incl=None, quadrant=None, ridgemode='mean',
-                      pixrng_vcut=None, pixrng_xcut=None,
-                      Mlim=[0, 1e10], xlim=[-1e10, 0, 0, 1e10], vlim=[-1e10, 0, 0, 1e10],
-                      use_velocity=True, use_position=True,
-                      interp_ridge=False, minrelerr=0.01, minabserr=0.1,
+    def get_edgeridge(self, outname: str, thr: float = 5.,
+                      incl: float | None = None,
+                      quadrant: str | None = None,
+                      ridgemode: str = 'mean',
+                      pixrng_vcut: int | None = None,
+                      pixrng_xcut: int | None = None,
+                      Mlim: list[float] = [0, 1e10],
+                      xlim: list[float] = [-1e10, 0, 0, 1e10],
+                      vlim: list[float] = [-1e10, 0, 0, 1e10],
+                      use_velocity: bool = True,
+                      use_position: bool = True,
+                      interp_ridge: bool = False,
+                      minrelerr: float = 0.01, minabserr: float = 0.1,
                       nanbeforemax: bool = True, nanopposite: bool = True,
-                      nanbeforecross: bool = True):
-        """Get the edge/ridge at positions/velocities.
+                      nanbeforecross: bool = True) -> None:
+        """Derive edge and ridge points along the position and velocity axes.
 
         Args:
-            outname (str): Output file name.
-            thr (float, optional): Edge level and intensity threshold for
-               ridge in the unit of 'rms' Defaults to 5.
-            incl (float, optional): Inclination angle of the object.
-               Defaults to 90, which means no correction for estimate
-               of the protostellar mass.
-            quadrant (str, optional): Quadrant of the PV diagram where you
-               want to get edge/ridge. Defaults to None.
-            ridgemode (str, optional): Method to derive ridge.
-               Must be 'mean' or 'gauss'. Defaults to 'mean'.
-            pixrng_vcut (int, optional): Pixel range within which gaussian
-               fit is performed around the peak intensity along the v-axis.
-               Only used when ridgemode='gauss'. Defaults to None.
-            pixrng_xcut (int, optional): Pixel range within which gaussian
-               fit is performed around the peak intensity along the x-axis.
-               Only used when ridgemode='gauss'. Defaults to None.
-            Mlim (list, optional): Reliable mass range. Data points that do
-               not come within this range is removed. Defaults to [0, 1e10].
-            xlim (list, optional): Range of offset where edge/ridge is
-               derived. Defaults to [-1e10, 0, 0, 1e10].
-            vlim (list, optional): Range of velocity where edge/ridge is
-               derived. Defaults to [-1e10, 0, 0, 1e10].
-            use_velocity (bool, optional): Derive representative velocities
-               as a function of position. Defaults to True.
-            use_position (bool, optional): Derive representatieve positions
-               as a function of velocity. Defaults to True.
-            interp_ridge (bool, optional): _description_. Defaults to False.
-            minrelerr, minabserr (float): Parameters to clip too small errors.
-                Defaults to 0.01 and 0.1 respectively.
-            nanbeforemax (bool, optional): Whether poins before turn over
-                are removed. Defaults to True.
-            nanopposite (bool, optional): Whether points in the opposite
-                quadrant are removed. Defaults to True.
-            nanbeforecross (bool, optional): Whether points before cross
-                of xcut and vcut are removed. Defaults to True.
+            outname (str): Prefix for diagnostic figures.
+            thr (float, optional): Edge and ridge intensity threshold in units
+                of the RMS noise. Defaults to 5.
+            incl (float or None, optional): Inclination angle in degrees. None
+                uses the value given at initialization. Defaults to None.
+            quadrant (str or None, optional): PV quadrants to analyze,
+                ``'13'`` or ``'24'``. None determines them from the data.
+                Defaults to None.
+            ridgemode (str, optional): Ridge estimator, ``'mean'`` or
+                ``'gauss'``. Defaults to ``'mean'``.
+            pixrng_vcut (int or None, optional): Pixel range fitted around a
+                peak along the velocity axis in Gaussian mode. Defaults to
+                None.
+            pixrng_xcut (int or None, optional): Pixel range fitted around a
+                peak along the position axis in Gaussian mode. Defaults to
+                None.
+            Mlim (list, optional): Accepted dynamical-mass range in solar
+                masses. Defaults to [0, 1e10].
+            xlim (list, optional): Position ranges in au.
+                Defaults to [-1e10, 0, 0, 1e10].
+            vlim (list, optional): Velocity ranges in km/s.
+                Defaults to [-1e10, 0, 0, 1e10].
+            use_velocity (bool, optional): Whether to derive the edge/ridge velocity as a
+                function of position. Defaults to True.
+            use_position (bool, optional): Whether to derive the edge/ridge position as a
+                function of velocity. Defaults to True.
+            interp_ridge (bool, optional): Whether to spline-interpolate an
+                axis when deriving ridge points. Defaults to False.
+            minrelerr (float, optional): Minimum relative point uncertainty.
+                Defaults to 0.01.
+            minabserr (float, optional): Minimum absolute uncertainty in units
+                of the spatial or velocity resolution. Defaults to 0.1.
+            nanbeforemax (bool, optional): Whether to remove points before the
+                rotation-curve turnover. Defaults to True.
+            nanopposite (bool, optional): Whether to remove points in the
+                opposite PV quadrants. Defaults to True.
+            nanbeforecross (bool, optional): Whether to remove points before
+                the position-cut and velocity-cut curves cross. Defaults to
+                True.
         """
         # remember output name
         self.outname = outname
@@ -824,53 +828,48 @@ class PVAnalysis():
                       show_corner: bool = False,
                       return_chain: bool = False,
                       return_lnp: bool = False,
-                      calc_evidence: bool = False) -> dict:
-        """Fit the derived edge/ridge positions/velocities with a double power law function by using emcee.
-
+                      calc_evidence: bool = False) -> dict | int:
+        """Fit the edge and ridge points with a double power law using MCMC.
 
         Args:
-            include_vsys : bool
-               False means vsys is fixed at 0.
-            include_dp : bool
-               False means dp is fixed at fixed_dp.
-            include_pin : bool
-               False means pin is fixed at fixed_pin.
-            fixed_pin : float
-               pin = fixed_pin if include_pix is False. pin = 0.5 means the Keplerian law.
-            fixed_dp : float
-               dp = fixed_dp if include_dp is False. dp = 0 means a single-power fitting.
-            rb_range : list
-                The prior range. None means the r range the obtained edge/ridge points.
-            vb_range : list
-                The prior range. None means the v range the obtained edge/ridge points.
-            pin_range : list
-                The prior range. Defaults to [0.01, 10].
-            dp_range : list
-                The prior range. Defaults to [0, 10].
-            vsys_range : list
-                The prior range. Defaults to [-1, 1].
-            outname : str
-               The output corner figures have names of "outname".corner_e.png
-               and "outname".corner_r.png.
-            rangelevel : float
-               Fraction of points included in the corner plot. Defaults to 0.8.
-            show_corner : bool
-               True means the corner figures are shown. These figures are also
-               plotted in two png files.
-            return_chain : bool
-               True stores the MCMC chains in self.chain. Each chain is a 2D
-               numpy array with rows for varied parameters and columns for
-               samples.
-            return_lnp : bool
-               True stores the log probability arrays in self.lnp. The sample
-               order matches the columns of self.chain when return_chain is
-               True.
+            include_vsys (bool, optional): Whether to fit the systemic-velocity
+                offset. False fixes it at zero. Defaults to False.
+            include_dp (bool, optional): Whether to fit the change in power-law
+                index. Defaults to True.
+            include_pin (bool, optional): Whether to fit the inner power-law
+                index. Defaults to False.
+            fixed_pin (float, optional): Inner index used when ``include_pin``
+                is False. A value of 0.5 means Keplerian. Defaults to 0.5.
+            fixed_dp (float, optional): Index change used when ``include_dp``
+                is False. Zero means a single power law. Defaults to 0.
+            rb_range (list or None, optional): Prior range of break radius in
+                au. None uses the range of measured points. Defaults to None.
+            vb_range (list or None, optional): Prior range of break velocity
+                in km/s. None uses the range of measured points. Defaults to
+                None.
+            pin_range (list, optional): Prior range of the inner index.
+                Defaults to [0.01, 10].
+            dp_range (list, optional): Prior range of the index change.
+                Defaults to [0, 10].
+            vsys_range (list, optional): Prior range of the systemic-velocity
+                offset in km/s. Defaults to [-1, 1].
+            outname (str, optional): Prefix for edge and ridge corner plots.
+                Defaults to ``'pvanalysis'``.
+            rangelevel (float, optional): Fraction of samples displayed in the
+                corner plots. Defaults to 0.8.
+            show_corner (bool, optional): Whether to show the corner plots.
+                Defaults to False.
+            return_chain (bool, optional): Whether to store edge and ridge MCMC
+                chains in ``self.chain``. Defaults to False.
+            return_lnp (bool, optional): Whether to store log probabilities in
+                ``self.lnp``. Defaults to False.
+            calc_evidence (bool, optional): Whether to calculate and print the
+                Bayesian evidence using dynesty.DynamicNestedSampler. Defaults to False.
 
         Returns:
-            result : dict
-                {'edge':{'popt':[...], 'perr':[...]}, 'ridge':{...}}
-                'popt' is a list of [r_break, v_break, p_in, dp, vsys].
-                'perr' is the uncertainties for popt.
+            dict or int: Edge and ridge best-fit parameters and uncertainties.
+            Each parameter vector is ``[r_break, v_break, p_in, dp, vsys]``.
+            Returns -1 when no edge or ridge points are available.
         """
         res_org = self.results_filtered
         Ds = [None, None]
@@ -971,25 +970,19 @@ class PVAnalysis():
                   'ridge': {'popt': popt_r[0], 'perr': popt_r[1]}}
         return result
 
-    def fit_linear(self, include_intercept: bool = True) -> dict:
-        """Fit the derived edge/ridge positions/velocities with a linear function analytically.
-
+    def fit_linear(self, include_intercept: bool = True) -> dict | int:
+        """Fit the ridge points analytically with a linear function.
 
         Args:
-            include_intercept : bool
-               False means that the model line passes (0, 0).
-            outname : str
-               The output corner figures have names of "outname".corner_e.png
-               and "outname".corner_r.png.
-            show_corner : bool
-               True means the corner figures are shown. These figures are also
-               plotted in two png files.
+            include_intercept (bool, optional): Whether to fit an intercept.
+                False constrains the line to pass through the origin. Defaults
+                to True.
 
         Returns:
-            result : dict
-                {'edge':{'popt':[...], 'perr':[...]}, 'ridge':{...}}
-                'popt' is a list of [r_break, v_break, p_in, dp, vsys].
-                'perr' is the uncertainties for popt.
+            dict or int: Edge and ridge results containing ``popt`` and
+            ``perr``. The ridge arrays contain the intercept and gradient;
+            the edge arrays contain NaNs. Returns -1 when no points are
+            available.
         """
         res_org = self.results_filtered
         Ds = [None, None]
@@ -1071,14 +1064,14 @@ class PVAnalysis():
                   'ridge': {'popt': c, 'perr': dc}}
         return result
 
-    def write_edgeridge(self, outname='pvanalysis'):
+    def write_edgeridge(self, outname: str = 'pvanalysis') -> None:
         """Write the edge/ridge positions/velocities to a text file.
 
         Args:
-            outname (str): The output text file has a name of
-               "outname".edge.dat. and "outname".ridge.dat The file
-               consists of four columns of x (au), dx (au), v (km/s),
-               and dv (km/s).
+            outname (str, optional): Prefix for ``.edge.dat`` and
+                ``.ridge.dat`` files. Each file contains x, dx, v, and dv in
+                au, au, km/s, and km/s, respectively. Defaults to
+                ``'pvanalysis'``.
         """
         res_org = self.results_filtered
         for i, er in enumerate(['edge', 'ridge']):
@@ -1131,14 +1124,8 @@ class PVAnalysis():
                   'ridge': {'rlim': lims_r[0], 'vlim': lims_r[1]}}
         return result
 
-    def output_fitresult(self):
+    def output_fitresult(self) -> None:
         """Output the fitting result in the terminal.
-
-        Args:
-            No parameter.
-
-        Returns:
-            No return.
         """
         if not hasattr(self, 'rvlim'):
             self.get_range()
@@ -1202,40 +1189,41 @@ class PVAnalysis():
                        fmt: dict = {'edge': 'v', 'ridge': 'o'},
                        linestyle: dict = {'edge': '--', 'ridge': '-'},
                        flipaxis: bool = False) -> None:
-        """Make linear and loglog PV diagrams
-           with the derived points and model lines.
+        """Make linear and log-log PV diagrams with points and model lines.
 
         Args:
-            vlim (list, optional): In the unit of km/s, from Vsys.
-                The used range is [-vlim[1], -vlim[0], vlim[0], vlim[1]].
-                Defaults to [0, 1e10].
-            xlim (list, optional): In the unit of au.
-                The used range is [-xlim[1], -xlim[0], xlim[0], xlim[1]].
-                Defaults to [0, 1e10].
+            vlim (list, optional): Absolute velocity range relative to the
+                systemic velocity in km/s. Defaults to [0, 1e10].
+            xlim (list, optional): Absolute position range in au. Defaults to
+                [0, 1e10].
             clevels (list, optional): Contour levels in the unit of sigma.
                 Defaults to [3, 6].
-            outname (str, optional): outname.linear.png and outname.log.png
-                will be made. Defaults to 'pvanalysis'.
-            logcolor (bool, optional): True means the color map in log scale.
-                Defaults to False.
-            Tbcolor (bool, optional): True means the color map shows
-                brightness temperature. Defaults to False.
-            show (bool, optional): True means showing the figures made.
+            outname (str, optional): Prefix for ``.linear.png`` and
+                ``.log.png``. Defaults to ``'pvanalysis'``.
+            logcolor (bool, optional): Whether to use logarithmic color
+                scaling. Defaults to False.
+            Tbcolor (bool, optional): Whether to display brightness
+                temperature by the color map. Defaults to False.
+            show (bool, optional): Whether to show the figures. Defaults to
+                True.
+            kwargs_pcolormesh (dict, optional): Arguments passed to the color
+                plot. Defaults to {'cmap': 'viridis'}.
+            kwargs_contour (dict, optional): Arguments passed to the contour
+                plot. Defaults to {'colors': 'lime'}.
+            plotedgepoint (bool, optional): Whether to plot edge points.
                 Defaults to True.
-            kwargs_pcolormesh (dict, optional):
-                Defaults to {'cmap':'viridis'}.
-            kwargs_contour (dict, optional):
-                Defaults to {'colors':'lime'}.
-            plotedgepoint (bool, optional): Defaults to True.
-            plotridgepoint (bool, optional): Defaults to True.
-            plotedgemodel (bool, optional): Defaults to True.
-            plotridgemodel (bool, optional): Defaults to True.
+            plotridgepoint (bool, optional): Whether to plot ridge points.
+                Defaults to True.
+            plotedgemodel (bool, optional): Whether to plot the edge model.
+                Defaults to True.
+            plotridgemodel (bool, optional): Whether to plot the ridge model.
+                Defaults to True.
             fmt (dict, optional): Format for plotting data points.
-                Defaults to {'edge':'v', 'ridge':'o'}.
+                Defaults to {'edge': 'v', 'ridge': 'o'}.
             linestyle (dict, optional): Linestyle for plotting model lines.
-                Defaults to {'edge':'--', 'ridge':'-'}.
-            flipaxis (bool, optional): True means x-axis is velocity and
-                y-axis is position. Defaults to False.
+                Defaults to {'edge': '--', 'ridge': '-'}.
+            flipaxis (bool, optional): Whether velocity is the horizontal axis
+                and position is the vertical axis. Defaults to False.
         """
         if len(self.popt['ridge'][0]) == 5:
             self.avevsys = (self.popt['edge'][0][4]

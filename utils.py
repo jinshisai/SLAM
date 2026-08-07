@@ -197,22 +197,34 @@ class ReadFits():
         """Read channel maps in the FITS format.
 
         Args:
-            cubefits (str): Name of the input FITS file including the extension.
-            center (str | None, optional): Coordinates of the target: e.g., "01h23m45.6s 01d23m45.6s". Defaults to None.
-            dist (float, optional): Distance of the target in the unit of pc, used to convert arcsec to au. Defaults to 1.
-            vsys (float, optional): Systemic velocity of the target in the unit of km/s. Defaults to 0.
-            xmin (float | None, optional): The x-axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
-            xmax (float | None, optional): The x-axis is limited to (xmin, xmax) in the unit of au. Defaults to None.
-            ymin (float | None, optional): The y-axis is limited to (ymin, ymax) in the unit of au. Defaults to None.
-            ymax (float | None, optional): The y-axis is limited to (ymin, ymax) in the unit of au. Defaults to None.
-            vmin (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
-            vmax (float | None, optional): The velocity axis is limited to (vmin, vmax) in the unit of km/s. Defaults to None.
-            xskip (int, optional): Skip xskip pixels in the x axis. Defaults to 1.
-            yskip (int, optional): Skip yskip pixels in the y axis. Defaults to 1.
-            sigma (float | None, optional): Standard deviation of the FITS data. None means automatic. Defaults to None.
+            cubefits (str): Input channel-map FITS file.
+            center (str or None, optional): Sky coordinates of the target, for
+                example, ``"01h23m45.6s 01d23m45.6s"``. Defaults to None.
+            dist (float, optional): Source distance in pc, used to convert
+                arcseconds to au. Defaults to 1.
+            vsys (float, optional): Systemic velocity in km/s. Defaults to 0.
+            xmin (float or None, optional): Minimum x coordinate in au.
+                Defaults to None.
+            xmax (float or None, optional): Maximum x coordinate in au.
+                Defaults to None.
+            ymin (float or None, optional): Minimum y coordinate in au.
+                Defaults to None.
+            ymax (float or None, optional): Maximum y coordinate in au.
+                Defaults to None.
+            vmin (float or None, optional): Minimum velocity relative to
+                ``vsys`` in km/s. Defaults to None.
+            vmax (float or None, optional): Maximum velocity relative to
+                ``vsys`` in km/s. Defaults to None.
+            xskip (int, optional): Pixel stride along the x axis. Defaults to
+                1.
+            yskip (int, optional): Pixel stride along the y axis. Defaults to
+                1.
+            sigma (float or None, optional): RMS noise of the FITS data. None
+                means automatic estimation. Defaults to None.
 
         Returns:
-            dict: x (1D array), y (1D array), v (1D array), data (2D array), header, and sigma.
+            dict: Coordinates ``x``, ``y``, and ``v``; the data cube; FITS
+                header; and RMS noise ``sigma``.
         """
         cc = constants.c.si.value
         f = fits.open(cubefits)[0]
