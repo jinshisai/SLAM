@@ -3,10 +3,38 @@ import numpy as np
 
 
 class Nested3DGrid(object):
-    """docstring for NestedGrid"""
-    def __init__(self, x, y, z,
-                 xlim, ylim, zlim, nsub,
-                 nlevels=1, reslim=5,):
+    """Construct and manipulate a Cartesian grid with nested refinements.
+
+    Args:
+        x (np.ndarray): Cell-center coordinates along the x axis.
+        y (np.ndarray): Cell-center coordinates along the y axis.
+        z (np.ndarray): Cell-center coordinates along the z axis.
+        xlim (list or None): Per-level x-coordinate limits of the regions to
+            refine. None derives the limits from ``reslim``.
+        ylim (list or None): Per-level y-coordinate limits of the regions to
+            refine. None derives the limits from ``reslim``.
+        zlim (list or None): Per-level z-coordinate limits of the regions to
+            refine. None derives the limits from ``reslim``.
+        nsub (list): Refinement factor for each nested level.
+        nlevels (int, optional): Number of nested levels in addition to the
+            original grid. Defaults to 1.
+        reslim (float, optional): Half-width of an automatically selected
+            refinement region, in cells of its parent level. Defaults to 5.
+
+    Notes:
+        Coordinate arrays must be one-dimensional, uniformly spaced, and
+        contain at least two values. Level zero is the original grid, so the
+        instance stores ``nlevels + 1`` total levels. Coordinates covered by a
+        child level are removed from the flattened parent-level arrays.
+    """
+
+    def __init__(self, x: np.ndarray, y: np.ndarray, z: np.ndarray,
+                 xlim: list[list[float]] | None,
+                 ylim: list[list[float]] | None,
+                 zlim: list[list[float]] | None,
+                 nsub: list[int], nlevels: int = 1,
+                 reslim: float = 5) -> None:
+        """Initialize the original grid and its requested nested levels."""
         super(Nested3DGrid, self).__init__()
         # save axes of the mother grid
         self.x = x
@@ -70,7 +98,20 @@ class Nested3DGrid(object):
             self.ylim = [[ye[0], ye[-1]]]
             self.zlim = [[ze[0], ze[-1]]]
 
-    def get_nestinglim(self, reslim=5):
+    def get_nestinglim(self, reslim: float = 5
+                       ) -> tuple[list[list[float]],
+                                  list[list[float]],
+                                  list[list[float]]]:
+        """Calculate symmetric refinement limits for every nested level.
+
+        Args:
+            reslim (float, optional): Half-width of each refinement region in
+                cells of its parent level. Defaults to 5.
+
+        Returns:
+            tuple: Lists of ``[minimum, maximum]`` limits along x, y, and z.
+                Each list contains one entry per nested level.
+        """
         xlim = []
         ylim = []
         zlim = []
@@ -83,10 +124,21 @@ class Nested3DGrid(object):
 
         return xlim, ylim, zlim
 
-    def get_grid(self, l):
-        '''
-        Get grid on the l layer.
-        '''
+    def get_grid(self, l: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Return Cartesian coordinate meshes for one grid level.
+
+        Args:
+            l (int): Grid level, where zero denotes the original grid.
+
+        Returns:
+            tuple: Three arrays containing the x, y, and z coordinates. Their
+                common shape is ``(nx, ny, nz)`` for the selected level.
+
+        Notes:
+            If the flattened level has had its child region removed, the full
+            coordinate mesh is reconstructed from the saved one-dimensional
+            axes.
+        """
         _nx, _ny, _nz = self.ngrids[l]
         # if it is not collapsed
         if self.xnest[l].size == _nx * _ny * _nz:
@@ -99,10 +151,23 @@ class Nested3DGrid(object):
             xx, yy, zz = np.meshgrid(x, y, z, indexing='ij')
         return xx, yy, zz
 
-    def nest(self, l, xlim, ylim, zlim, nsub):
-        '''
-        l - 1 is the mother grid layer. l is the child grid layer.
-        '''
+    def nest(self, l: int, xlim: list[float], ylim: list[float],
+             zlim: list[float], nsub: int) -> None:
+        """Create a child grid inside a region of its parent level.
+
+        Args:
+            l (int): Child-level index. Its parent is level ``l - 1``.
+            xlim (list): Minimum and maximum x coordinates to refine.
+            ylim (list): Minimum and maximum y coordinates to refine.
+            zlim (list): Minimum and maximum z coordinates to refine.
+            nsub (int): Number of child cells placed across each parent cell
+                along every axis.
+
+        Notes:
+            Parent cells covered by the child region are removed from the
+            flattened parent arrays. The full parent axes remain available for
+            reconstruction by :meth:`get_grid` and :meth:`collapse`.
+        """
         x, y, z = self.xaxes[l-1], self.yaxes[l-1], self.zaxes[l-1]
         ximin, ximax, yimin, yimax, zimin, zimax, x_sub, y_sub, z_sub = \
             nestgrid_3D(x, y, z, xlim, ylim, zlim, nsub)
@@ -155,14 +220,26 @@ class Nested3DGrid(object):
         self.znest[l] = zz_sub.ravel()
         self.ngrids[l] = (len(x_sub), len(y_sub), len(z_sub))
 
-    def collapse(self, d, upto=None):
-        '''
-        Collapse given data to the mother grid.
+    def collapse(self, d: list[np.ndarray],
+                 upto: int | None = None) -> np.ndarray:
+        """Average nested data back onto a selected parent grid.
 
-        Parameters
-        ----------
-        d (list): List of data on the nested grid
-        '''
+        Args:
+            d (list): Flattened data arrays for all grid levels, ordered from
+                the original grid to the innermost grid.
+            upto (int or None, optional): Level onto which the data are
+                collapsed. None collapses through level zero. Defaults to
+                None.
+
+        Returns:
+            np.ndarray: Data on the selected level with shape
+                ``(nx, ny, nz)``.
+
+        Notes:
+            Values outside each refined region are restored from the
+            corresponding parent-level array. Values inside it are the
+            NaN-aware mean of the child cells.
+        """
         d_col = d[-1]  # starting from the inner most grid
         lmax = 0 if upto is None else upto
         for l in range(self.nlevels-1, lmax, -1):
@@ -219,7 +296,22 @@ class Nested3DGrid(object):
 
         return d_col
 
-    def binning_onsubgrid(self, data):
+    def binning_onsubgrid(self, data: np.ndarray) -> np.ndarray:
+        """Average a three-dimensional subgrid over its refinement cells.
+
+        Args:
+            data (np.ndarray): Three-dimensional data sampled on a refined
+                grid.
+
+        Returns:
+            np.ndarray: NaN-aware block averages along all three axes.
+
+        Notes:
+            This legacy helper uses ``self.nsub`` directly as one integer
+            binning factor. A standard :class:`Nested3DGrid` stores one factor
+            per level; :meth:`binning_onsubgrid_layered` is used internally
+            with an explicit level-specific factor.
+        """
         nbin = self.nsub
         d_avg = np.array([
             data[k::nbin, j::nbin, i::nbin]
@@ -227,7 +319,21 @@ class Nested3DGrid(object):
         ])
         return np.nanmean(d_avg, axis=0)
 
-    def binning_onsubgrid_layered(self, data, nbin):
+    def binning_onsubgrid_layered(
+            self, data: np.ndarray, nbin: int
+            ) -> np.ndarray | int:
+        """Average refined spatial cells while preserving leading axes.
+
+        Args:
+            data (np.ndarray): Data with three spatial dimensions and zero,
+                one, or two leading dimensions.
+            nbin (int): Number of refined cells per parent cell along each
+                spatial axis.
+
+        Returns:
+            np.ndarray or int: NaN-aware block averages. Integer ``0`` is
+                returned when ``data`` does not have three to five dimensions.
+        """
         dshape = len(data.shape)
         if dshape == 3:
             d_avg = np.array([data[k::nbin, j::nbin, i::nbin]
@@ -249,7 +355,13 @@ class Nested3DGrid(object):
             return 0
         return np.nanmean(d_avg, axis=0)
 
-    def gridinfo(self, units=['au', 'au', 'au']):
+    def gridinfo(self, units: list[str] = ['au', 'au', 'au']) -> None:
+        """Print the resolution and coordinate limits of every grid level.
+
+        Args:
+            units (list, optional): Labels for the x, y, and z coordinate
+                units. Defaults to ``['au', 'au', 'au']``.
+        """
         ux, uy, uz = units
         print('Nesting level: %i' % self.nlevels)
         print('Resolutions:')
@@ -264,7 +376,28 @@ class Nested3DGrid(object):
                 self.zlim[l][0], self.zlim[l][1], uz))
 
 
-def index_between(t, tlim, mode='all'):
+def index_between(
+        t: np.ndarray, tlim: list[float] | tuple[float, float],
+        mode: str = 'all'
+        ) -> np.ndarray | tuple[list[int], ...]:
+    """Select values or index extents inside an inclusive interval.
+
+    Args:
+        t (np.ndarray): Coordinate array to examine.
+        tlim (list or tuple): Inclusive lower and upper limits. A sequence
+            whose length is not two indicates that no interval is applied.
+        mode (str, optional): ``'all'`` returns a Boolean mask; ``'edge'``
+            returns ``[minimum, maximum]`` index pairs for each dimension.
+            Other values print a warning and fall back to the ``'all'``
+            result. Defaults to ``'all'``.
+
+    Returns:
+        np.ndarray or tuple: Boolean selection mask in ``'all'`` mode, or one
+            index pair per dimension in ``'edge'`` mode.
+
+    Raises:
+        ValueError: If ``mode='edge'`` and no element lies inside ``tlim``.
+    """
     if not (len(tlim) == 2):
         if mode == 'all':
             return np.full(np.shape(t), True)
@@ -287,7 +420,30 @@ def index_between(t, tlim, mode='all'):
             return (tlim[0] <= t) * (t <= tlim[1])
 
 
-def nestgrid_3D(x, y, z, xlim, ylim, zlim, nsub):
+def nestgrid_3D(
+        x: np.ndarray, y: np.ndarray, z: np.ndarray,
+        xlim: list[float], ylim: list[float], zlim: list[float], nsub: int
+        ) -> tuple[int, int, int, int, int, int,
+                   np.ndarray, np.ndarray, np.ndarray] | int:
+    """Refine a rectangular region of a three-dimensional Cartesian grid.
+
+    Args:
+        x (np.ndarray): One-dimensional parent-grid x coordinates.
+        y (np.ndarray): One-dimensional parent-grid y coordinates.
+        z (np.ndarray): One-dimensional parent-grid z coordinates.
+        xlim (list): Inclusive minimum and maximum x coordinates to refine.
+        ylim (list): Inclusive minimum and maximum y coordinates to refine.
+        zlim (list): Inclusive minimum and maximum z coordinates to refine.
+        nsub (int): Number of child cells placed across each selected parent
+            cell along every axis.
+
+    Returns:
+        tuple or int: Inclusive parent-grid index limits ``ximin``, ``ximax``,
+            ``yimin``, ``yimax``, ``zimin``, and ``zimax``, followed by the
+            child-grid x, y, and z cell centers. Integer ``0`` is returned if
+            any coordinate-limit sequence does not contain exactly two
+            values.
+    """
     # error check
     if (len(xlim) != 2) | (len(ylim) != 2) | (len(zlim) != 2):
         print('ERROR\tnest: Input xlim/ylim/zlim must be list as [min, max].')
