@@ -140,8 +140,11 @@ def dynesty_corner(bounds,
     plim = np.array(bounds)
 
     # likelihood/prior
-    lnlike = lambda p: log_prob_fn(p, *args)
-    ptform = lambda u: plim[0] + (plim[1] - plim[0]) * u
+    def lnlike(p):
+        return log_prob_fn(p, *args)
+
+    def ptform(u):
+        return plim[0] + (plim[1] - plim[0]) * u
 
     # Static nested sampling
     # sampler = NS(lnlike, ptform, ndim)

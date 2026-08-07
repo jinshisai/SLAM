@@ -132,10 +132,13 @@ class PVAnalysis():
         elif self.fitsdata.naxis == 3:
             data = np.squeeze(data)  # Remove stokes I
         # check quadrant
-        quadcheck = lambda a: (np.sum(a[:nvh, :nxh])
-                               + np.sum(a[nvh:, nxh:])
-                               - np.sum(a[:nvh, nxh:])
-                               - np.sum(a[nvh:, :nxh]))
+
+        def quadcheck(a):
+            return (np.sum(a[:nvh, :nxh])
+                    + np.sum(a[nvh:, nxh:])
+                    - np.sum(a[:nvh, nxh:])
+                    - np.sum(a[nvh:, :nxh]))
+
         q = np.sign(quadcheck(data))
         if quadrant is None:
             self.quadrant = '13' if q > 0 else '24'
@@ -901,8 +904,13 @@ class PVAnalysis():
         popt_e, popt_r = [np.empty(5), np.empty(5)], [np.empty(5), np.empty(5)]
         self.chain = {'edge': None, 'ridge': None} if return_chain else None
         self.lnp = {'edge': None, 'ridge': None} if return_lnp else None
-        minabs = lambda a, i, j: np.min(np.abs(np.r_[a[i], a[j]]))
-        maxabs = lambda a, i, j: np.max(np.abs(np.r_[a[i], a[j]]))
+
+        def minabs(a, i, j):
+            return np.min(np.abs(np.r_[a[i], a[j]]))
+
+        def maxabs(a, i, j):
+            return np.max(np.abs(np.r_[a[i], a[j]]))
+
         for args, ext, key, res in zip([Es, Rs], ['_e', '_r'],
                                        ['edge', 'ridge'], [popt_e, popt_r]):
             if rb_range is None:
@@ -1006,7 +1014,9 @@ class PVAnalysis():
             return -1
 
         def linfit(x, y, dy):
-            wsum = lambda a: np.sum(a / dy**2)
+            def wsum(a):
+                return np.sum(a / dy**2)
+
             b = np.array([wsum(y), wsum(y * x)])
             A = np.array([[wsum(1), wsum(x)],
                           [wsum(x), wsum(x**2)]])
@@ -1015,7 +1025,9 @@ class PVAnalysis():
             return c, dc
 
         def grafit(x, y, dy):
-            wsum = lambda a: np.sum(a / dy**2)
+            def wsum(a):
+                return np.sum(a / dy**2)
+
             c = np.array([0, wsum(x * y) / wsum(x**2)])
             dc = np.array([0, 1. / np.sqrt(wsum(x**2))])
             return c, dc
@@ -1298,7 +1310,10 @@ class PVAnalysis():
             popt = self.popt[method][0].copy()
             if len(popt) == 5:
                 popt[4] -= self.avevsys
-        fx_model = lambda x: model(x, *popt)
+
+        def fx_model(x):
+            return model(x, *popt)
+
         if not hasattr(self, 'rvlim'):
             self.get_range()
         xmin, xmax = self.rvlim[method][0]
