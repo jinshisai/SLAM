@@ -156,7 +156,7 @@ def dynesty_corner(bounds,
     # dresults = dsampler.results
     results = dsampler.results
     # results = dyfunc.merge_runs([sresults, dresults])
-    if (figname is not None) & (show_corner == True):
+    if (figname is not None) & show_corner:
         cfig, caxes = dyplot.cornerplot(results, labels=labels, quantiles=[0.16, 0.5, 0.84])
         if figname is not None:
             cfig.savefig(figname)

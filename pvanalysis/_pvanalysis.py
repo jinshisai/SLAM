@@ -1468,7 +1468,7 @@ class PVAnalysis():
                       'edge': {'red': 'pink', 'blue': 'skyblue'}}
 
         # plot fitting results
-        if self.__sorted == False:
+        if not self.__sorted:
             self.sort_fitresults()
 
         # plot
