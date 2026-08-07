@@ -268,7 +268,7 @@ def chi_dplaw(params: np.ndarray | list[float], xdata: np.ndarray,
     chi_out = (np.abs(ydata - vout))/sig
     return chi_out
 '''
-'''
+r'''
 def estimate_perror(params: np.ndarray | list[float],
                     func: Callable[..., np.ndarray],
                     x: np.ndarray, y: np.ndarray,
