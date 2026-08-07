@@ -120,22 +120,46 @@ class MockPVD(object):
 
     def generate_mockpvd(self, Mstar: float, Rc: float, alphainfall: float = 1.,
                          taumax: float = 1., frho: float = 1.,
-                         incl: float = 89., pa: float | list = 0.,
+                         incl: float = 89., pa: float = 0.,
                          linewidth: float | None = None, rin: float = 1.,
-                         rout: float | None = None, axis: str = 'both'):
-        '''
-        Generate a mock PV diagram.
+                         rout: float | None = None,
+                         axis: str = 'both'
+                         ) -> np.ndarray | list[np.ndarray] | int:
+        """Generate a mock PV diagram.
 
-        Parameters
-        ----------
-        Mstar (float): Stellar mass (Msun)
-        Rc (float): Centrifugal radius (au)
-        alphainfall (float): Decelerating factor
-        taumax (float): Factor to scale mock optical depth
-        frho (float): Factor to scale density contrast between disk and envelope
-        incl (float): Inclination angle (deg). Incl=90 deg corresponds to edge-on configuration.
-        axis (str): Axis of the pv cut. Must be major, minor or both.
-        '''
+        Args:
+            Mstar (float): Stellar mass in solar masses.
+            Rc (float): Centrifugal radius in au.
+            alphainfall (float, optional): Decelerating factor that scales the
+                radial infall velocity. A value of one means no suppression.
+                Defaults to 1.
+            taumax (float, optional): Factor used to scale the maximum mock
+                optical depth. Defaults to 1.
+            frho (float, optional): Factor used to scale the density contrast
+                between the disk and envelope. Higher values give a higher
+                density on the disk side. Defaults to 1.
+            incl (float, optional): Inclination angle in degrees. An
+                inclination of 90 degrees corresponds to an edge-on
+                configuration. Defaults to 89.
+            pa (float, optional): Position angle of a single requested PV cut
+                in degrees. When ``axis='both'``, the major- and minor-axis
+                position angles supplied at initialization are used instead.
+                Defaults to 0.
+            linewidth (float or None, optional): Intrinsic line width in km/s
+                used for convolution along the velocity axis. None disables
+                spectral convolution. Defaults to None.
+            rin (float, optional): Inner cut-off radius in au. Density at and
+                inside this radius is set to zero. Defaults to 1.
+            rout (float or None, optional): Outer cut-off radius in au. None
+                applies no outer cut-off. Defaults to None.
+            axis (str, optional): Axis of the PV cut: ``'major'``, ``'minor'``,
+                or ``'both'``. Defaults to ``'both'``.
+
+        Returns:
+            np.ndarray, list, or int: Mock PV diagram for a single requested
+            axis, or ``[major, minor]`` diagrams when ``axis='both'``. Integer
+            ``0`` is returned after an error message if ``axis`` is invalid.
+        """
 
         # check
         if axis not in ['major', 'minor', 'both']:
