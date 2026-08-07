@@ -28,16 +28,16 @@ Also, setting the path in .bashrc (or .zshrc etc.) will be useful.
 Versions
 ==================
 
-The latest, stable version is v2.0.0.
+The latest stable version is |release|.
 
 To use the stable version, go to the SLAM directory and type
 
 
-.. code-block:: bash
+.. parsed-literal::
 
    git tag -l # list tags (versions)
 
-   git checkout tags/v2.0.0 # choose v2.0.0
+   git checkout tags/|release| # choose |release|
 
 
 Contents

@@ -2,7 +2,6 @@
 # ----------------------------------------------------------------------------
 # Created By  : Yusuke Aso
 # Created Date: 2022 Jan 27
-# version = alpha
 # ---------------------------------------------------------------------------
 """
 This script derives the 2D central position at each velocity channel from a

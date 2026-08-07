@@ -2,7 +2,6 @@
 # ----------------------------------------------------------------------------
 # Created By  : Yusuke Aso
 # Created Date: 2022 Jan 27
-# version = alpha
 # ---------------------------------------------------------------------------
 """
 This script makes model channel maps from the observed mom0 by assuming 2D velocity pattern.

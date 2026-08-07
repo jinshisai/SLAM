@@ -8,6 +8,7 @@
 
 import os
 import sys
+from pathlib import Path
 
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -16,7 +17,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 project = 'SLAM'
 copyright = '2023, Y.Aso & J.Sai'
 author = 'Y.Aso & J.Sai'
-release = 'v2.0.0'
+project_version = (
+    Path(__file__).resolve().parents[1] / 'VERSION'
+).read_text().strip()
+release = f'v{project_version}'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
