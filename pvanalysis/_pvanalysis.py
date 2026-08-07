@@ -480,7 +480,8 @@ class PVAnalysis():
                 # determining used data range
                 if pixrng:
                     # error check
-                    if type(pixrng) != int:
+                    if (isinstance(pixrng, bool)
+                            or not isinstance(pixrng, (int, np.integer))):
                         print('ERROR\tpvfit_vcut: '
                               + 'pixrng must be integer.')
                         return
@@ -717,7 +718,8 @@ class PVAnalysis():
                 # determining used data range
                 if pixrng:
                     # error check
-                    if type(pixrng) != int:
+                    if (isinstance(pixrng, bool)
+                            or not isinstance(pixrng, (int, np.integer))):
                         print('ERROR\tpvfit_xcut: pixrng must be integer.')
                         return
                     # get peak index

@@ -134,7 +134,7 @@ class PVPlot():
         if Tb:
             Omega = bmaj * bmin / 3600.**2 * np.radians(1)**2 \
                 * np.pi / 4. / np.log(2.)
-            if type(Omega) == np.ndarray:
+            if isinstance(Omega, np.ndarray):
                 j0, j1 = self.jrange
                 Omega = np.tile(Omega[j0:j1], (len(x), 1)).T
             lam = constants.c.to('m/s').value / restfrq
@@ -198,7 +198,7 @@ class PVPlot():
             x, v, d = self.x, self.v, self.d
         if Tb:
             Omega = bmaj * bmin / 3600.**2 * np.pi / 4. / np.log(2.)
-            if type(Omega) == np.ndarray:
+            if isinstance(Omega, np.ndarray):
                 j0, j1 = self.jrange
                 Omega = np.tile(Omega[j0:j1], (len(x), 1)).T
             lam = constants.c.to('m/s').value / restfrq
