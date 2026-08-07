@@ -15,58 +15,76 @@ deg = units.deg.to('radian')
 
 
 class MockPVD(object):
-    """
-    MockPVD is a class to generate mock position-velocity (PV) diagrams of a protostellar
-    disk-envelope system assuming a cut-off disk and the UCM envelope model.
+    """Generate mock PV diagrams of a protostellar disk-envelope system.
 
-    The mock PV diagram is calculated with the scaled optical depth, computed by summing up
-    the gas density along the line-of-sight and rescaling the integrated value, and the
-    radiative transfer equation of Iv = (1 - exp(-tau_v)) for normalized intensity.
+    The model assumes a cut-off disk and the UCM envelope model. A mock
+    position-velocity (PV) diagram is calculated from the scaled optical
+    depth, obtained by summing the gas density along the line of sight and
+    rescaling the integrated value. The normalized intensity follows the
+    radiative-transfer equation ``I_v = 1 - exp(-tau_v)``.
 
-    Physical assumptions behind the intensity calculation is the isothermal disk and envelope,
-    and a constant molecular abundance. To match the mock PV diagram with observational data,
-    it must be rescaled by the observed flux.
+    Args:
+        x (np.ndarray): One-dimensional spatial coordinates of the PV cut in
+            au.
+        z (np.ndarray): One-dimensional line-of-sight coordinates in au.
+        v (np.ndarray): One-dimensional velocity coordinates in km/s.
+        nnest (list or None, optional): Refinement factor for each nested-grid
+            level. For example, ``[4, 2]`` creates three total levels—the
+            original grid and two nested levels—with successive refinement
+            factors of four and two. None disables nested refinement. Defaults
+            to None.
+        nsubgrid (int, optional): Refinement factor applied to the entire
+            original spatial grid before nesting. Defaults to 1.
+        xlim (list or None, optional): Per-level x-coordinate ranges for the
+            nested grid, formatted as ``[[xmin0, xmax0], ...]``. None derives
+            them from ``reslim``. Defaults to None.
+        ylim (list or None, optional): Per-level y-coordinate ranges for the
+            nested grid, formatted as ``[[ymin0, ymax0], ...]``. None derives
+            them from ``reslim``. Defaults to None.
+        zlim (list or None, optional): Per-level z-coordinate ranges for the
+            nested grid, formatted as ``[[zmin0, zmax0], ...]``. None derives
+            them from ``reslim``. Defaults to None.
+        beam (list, np.ndarray, or None, optional): Beam major axis, minor
+            axis, and position angle ``[major, minor, pa]`` in au, au, and
+            degrees, respectively. None disables beam convolution. Defaults
+            to None.
+        reslim (float, optional): Resolution threshold used instead of exact
+            nesting ranges. If nesting is requested and any range is None,
+            each such range extends to plus and minus ``reslim`` times the
+            parent-level resolution. Defaults to 10.
+        signmajor (int, optional): Sign of the rotational line-of-sight
+            velocity. +1 makes the positive major-axis side redshifted and -1
+            makes it blueshifted. Defaults to 1.
+        signminor (int, optional): Sign of the radial-infall line-of-sight
+            velocity. +1 makes the positive minor-axis side blueshifted and -1
+            makes it redshifted. Defaults to 1.
+        pa_major (float, optional): Position angle of the positive major-axis
+            offset in degrees. Defaults to 0.
+        pa_minor (float, optional): Position angle of the positive minor-axis
+            offset in degrees. Defaults to 90.
+        num_threads (int, str, or None, optional): Number of Numba threads for
+            line-of-sight integration. None uses a conservative automatic
+            budget; ``'all'`` uses every thread available to Numba. Defaults
+            to None.
+
+    Notes:
+        The intensity calculation assumes an isothermal disk and envelope and
+        a constant molecular abundance. To compare a normalized mock PV
+        diagram with observational data, it is rescaled by the observed
+        flux.
     """
 
     def __init__(self, x: np.ndarray, z: np.ndarray, v: np.ndarray,
-                 nnest: list | None = None, nsubgrid: int = 1,
-                 xlim: list | None = None, ylim: list | None = None, zlim: list | None = None,
-                 beam: list | None = None, reslim: float = 10,
+                 nnest: list[int] | None = None, nsubgrid: int = 1,
+                 xlim: list[list[float]] | None = None,
+                 ylim: list[list[float]] | None = None,
+                 zlim: list[list[float]] | None = None,
+                 beam: list[float] | np.ndarray | None = None,
+                 reslim: float = 10,
                  signmajor: int = 1, signminor: int = 1,
                  pa_major: float = 0, pa_minor: float = 90,
-                 num_threads: int | str | None = None):
-        '''
-        Initialize MockPVD with a given grid. z is the line of sight axis.
-
-        Parameters
-        ----------
-        x, z, v (array): 1D arrays for x, z and v axes.
-        nsubgrid (int): A refinement factor for the subgrid, in which the pixel resolution
-         of the entire original grid is refined by the refining factor.
-        nnest (list): A list of refinement factors for each nesting level of the nested
-         grid; pixel resolution increases by the given factor at each nesting level.
-         For example, if nnest=[4, 2], the grid is nested to three levels (original,
-         first nesting level, and second nesting level), and the pixel resolution increases
-         by a factor of 4 and 2 at the first- and second nesting levels, respectively.
-        xlim, zlim (list): x and z ranges for the nested grid.
-         Must be given as [[xmin0, xmax0], [xmin1, xmax1]] and [[zmin0, zmax0], [zmin1, zmax1]].
-        beam (list): Beam info, which must be give [major, minor, pa].
-        reslim (float or int): Resolution threshold that triggers nesting. It is used as an
-         alternative way to set xlim and zlim for the nested grid instead of givin exact
-         x and z ranges. When nnest is given but either xlim or zlim is not provided,
-         the grid is nested when the spatial scale hits the resolution threshold.
-         For example, if reslim=10, xlim will be set to [-10 x upper-level resolution,
-         upper-level resolution]. Same for zlim.
-        signmajor: 1 for the case where the positive offset is on the redshifted side in the PV diagram
-         along the major axis; otherwise -1.
-        signminor: 1 for the case where the negative offset is on the redshifted side in the PV diagram
-         along the minor axis; otherwise -1.
-        pa_major: PA of the positive offset of the PV diagram along the major axis.
-        pa_minor: PA of the positive offset of the PV diagram along the minor axis.
-        num_threads: Number of Numba threads used for line-of-sight integration.
-         None uses a conservative automatic budget, while "all" uses every
-         thread available to Numba.
-        '''
+                 num_threads: int | str | None = None) -> None:
+        """Initialize the model coordinates, orientation, beam, and grid."""
         super(MockPVD, self).__init__()
 
         # save input
