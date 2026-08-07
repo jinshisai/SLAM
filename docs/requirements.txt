@@ -1,5 +1,15 @@
-sphinx>=1.7.0
+astropy>=7.2
+corner
+dynesty
+emcee
 jupyter
+matplotlib
+multiprocess
 nbsphinx
 myst_parser
+numba
+numpy>=2.0
+scipy
+sphinx>=1.7.0
 sphinx_rtd_theme
+tqdm

@@ -6,6 +6,13 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+import os
+import sys
+
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+
 project = 'SLAM'
 copyright = '2023, Y.Aso & J.Sai'
 author = 'Y.Aso & J.Sai'
@@ -15,9 +22,14 @@ release = 'v2.0.0'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
+    'sphinx.ext.autodoc',  # Generate API documentation from docstrings
+    'sphinx.ext.napoleon',  # Support Google-style docstrings
+    'sphinx.ext.viewcode',  # Add links to highlighted source code
     'nbsphinx',  # Support for Jupyter notebook
     'myst_parser',  # Support for Markdown
 ]
+
+autodoc_member_order = 'bysource'
 
 # -- Source file extentions --------------------------------------------------
 source_suffix = {

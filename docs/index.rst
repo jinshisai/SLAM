@@ -41,7 +41,15 @@ To use the stable version, go to the SLAM directory and type
 
 
 Contents
-=================
+========
+
+API reference
+-------------
+
+.. toctree::
+   :maxdepth: 2
+
+   slam
 
 PV Analysis
 ------------
@@ -53,8 +61,9 @@ PV Analysis
    tutorials/notes_pvanalysis.md
 
 
-More documents are coming soon
-----------
+Indices and tables
+==================
 
-.. toctree::
-   :maxdepth: 2
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
