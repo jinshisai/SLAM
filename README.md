@@ -24,7 +24,6 @@ For basic usages, please see `example_xxx.py` in this library, where xxx is the 
 * dynesty
 * emcee
 * matplotlib
-* multiprocess
 * numba
 * numpy>=2.0
 * scipy
@@ -32,7 +31,7 @@ For basic usages, please see `example_xxx.py` in this library, where xxx is the 
  
 ## Installation
  
-You can install SLMA with `git clone`.
+You can install SLAM with `git clone`.
 
 ```bash 
 git clone https://github.com/jinshisai/SLAM

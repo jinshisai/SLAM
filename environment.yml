@@ -8,7 +8,6 @@ dependencies:
   - dynesty
   - emcee
   - matplotlib
-  - multiprocess
   - numba
   - numpy>=2.0
   - scipy
