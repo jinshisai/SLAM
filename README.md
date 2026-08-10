@@ -22,7 +22,7 @@ For basic usages, please see `example_xxx.py` in this library, where xxx is the 
 * astropy>=7.2
 * corner
 * dynesty
-* emcee
+* emcee>=3.1
 * matplotlib
 * numba
 * numpy>=2.0

@@ -135,8 +135,9 @@ def emcee_corner(bounds: list[list[float]] | np.ndarray,
             sampler = emcee.EnsembleSampler(nwalkers, ndim, lnL,
                                             args=args, moves=moves)
             sampler.run_mcmc(p0, n)
-        # samples = sampler.get_chain()  # emcee 3.1.1
-        samples = sampler.chain  # emcee 2.2.1
+        # emcee 3 stores samples as (step, walker, parameter).  Keep the
+        # established (walker, step, parameter) layout below and in outputs.
+        samples = sampler.get_chain().transpose(1, 0, 2)
         if gr_check:
             GR = gelman_rubin(samples)
             if np.max(GR) > 1.25:
@@ -145,8 +146,7 @@ def emcee_corner(bounds: list[list[float]] | np.ndarray,
     if not converge:
         print('\nWARNING: emcee did not converge (Gelman-Rubin =',
               np.round(GR, 2), '> 1.25).\n')
-    # lnp = sampler.get_log_prob()  # emcee 3.1.1
-    lnp = sampler.lnprobability  # emcee 2.2.1
+    lnp = sampler.get_log_prob().T
     popt = samples[np.unravel_index(np.argmax(lnp), lnp.shape)]
     _samples = samples.copy()
     samples = samples.reshape((-1, ndim))
