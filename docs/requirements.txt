@@ -10,6 +10,6 @@ myst_parser
 numba
 numpy>=2.0
 scipy
-sphinx>=1.7.0
+sphinx>=8
 sphinx_rtd_theme
 tqdm
