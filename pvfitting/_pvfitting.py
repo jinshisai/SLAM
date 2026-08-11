@@ -1,17 +1,8 @@
 # -*- coding: utf-8 -*-
-# ---------------------------------------------------------------------------
-# Created By  : Yusuke Aso
-# Created Date: 2022 Jan 27
-# Updated Date: 2023 Nov 21 by J.Sai
-# version = alpha
-# ---------------------------------------------------------------------------
 """
 This script makes position-velocity diagrams along the major and minor axes,
  and reproduces their silhouette by the UCM envelope.
 The main class PVFitting can be imported to do each steps separately.
-
-Note. FITS files with multiple beams are not supported.
-The dynamic range for xlim_plot and vlim_plot should be >10 for nice tick labels.
 """
 
 import numpy as np

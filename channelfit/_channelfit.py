@@ -1,14 +1,7 @@
 # -*- coding: utf-8 -*-
-# ----------------------------------------------------------------------------
-# Created By  : Yusuke Aso
-# Created Date: 2022 Jan 27
-# ---------------------------------------------------------------------------
 """
 This script makes model channel maps from the observed mom0 by assuming 2D velocity pattern.
 The main class ChannelFit can be imported to do each steps separately.
-
-Note. FITS files with multiple beams are not supported. The dynamic range for
-xlim_plot and vlim_plot should be >10 for nice tick labels.
 """
 
 import numpy as np

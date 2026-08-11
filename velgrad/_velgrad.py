@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-# ----------------------------------------------------------------------------
-# Created By  : Yusuke Aso
-# Created Date: 2022 Jan 27
-# ---------------------------------------------------------------------------
 """
 This script derives the 2D central position at each velocity channel from a
 channel map in FITS form (AXIS1=deg, AXIS2=deg, AXIS3=Hz), and fits the
@@ -11,9 +7,6 @@ central points on the R.A.-Dec., major-minor, and major-velocity planes.
 The main class ChannelAnalysis can be imported to perform each step separately:
 get the central points, write them, fit them, output the fit result, and plot
 the central points.
-
-Note. FITS files with multiple beams are not supported. The dynamic range for
-xlim_plot and vlim_plot should be >10 for nice tick labels.
 """
 
 

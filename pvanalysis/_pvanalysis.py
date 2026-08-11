@@ -1,13 +1,9 @@
 # -*- coding: utf-8 -*-
 
-'''
+"""
 Program to perform Gaussian fitting to a PV diagram.
 Made and developed by Yusuke ASO & Jinshi Sai.
-
-E-mail: jn.insa.sai@gmail.com
-
-Latest update: 3/2/2022
-'''
+"""
 
 
 # modules
