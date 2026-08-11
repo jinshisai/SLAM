@@ -6,7 +6,7 @@ dependencies:
   - astropy>=7.2
   - corner
   - dynesty
-  - emcee>=3.1
+  - emcee>=3.0.2
   - matplotlib
   - numba
   - numpy>=2.0

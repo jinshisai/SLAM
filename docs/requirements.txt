@@ -2,7 +2,7 @@ python>=3.12
 astropy>=7.2
 corner
 dynesty
-emcee>=3.1
+emcee>=3.0.2
 jupyter
 matplotlib
 nbsphinx
