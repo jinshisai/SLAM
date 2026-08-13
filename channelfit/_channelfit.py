@@ -629,10 +629,10 @@ class ChannelFit(ReadFits):
         Iout = np.array(Iout)
         return Iout
 
-    def get_scale(self, Iout) -> np.ndarray:
+    def get_scale(self, Iout) -> float:
         fg = np.sum(Iout * self.data_valid)
         ff = np.sum(Iout * Iout)
-        scale = fg / ff
+        scale = 0.0 if ff == 0 else fg / ff
         return scale
 
     def peaktounity(self, I_in: np.ndarray) -> np.ndarray:
@@ -785,6 +785,8 @@ class ChannelFit(ReadFits):
 
         def chi2(q):
             model = self.cubemodel(*q)
+            if not np.all(np.isfinite(model)):
+                return np.inf
             return np.nansum((self.data_valid - model)**2) \
                 / self.sigma**2 / self.pixperbeam
 
