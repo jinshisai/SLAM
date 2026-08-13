@@ -210,8 +210,11 @@ class PVFitting(ReadFits):
                                                  incl=incl, linewidth=linewidth,
                                                  rout=rout, axis='both')
             # quadrant
+            model_power = np.sum(major * major) + np.sum(minor * minor)
+            if model_power == 0:
+                return np.zeros_like(major), np.zeros_like(minor)
             fflux = (np.nansum(majobs * major) + np.nansum(minobs * minor)) \
-                / (np.nansum(major * major) + np.nansum(minor * minor))
+                / model_power
             return fflux * major, fflux * minor
         self.makemodel = makemodel
 
@@ -229,6 +232,9 @@ class PVFitting(ReadFits):
             majsig2 = (1. + q[-1]**2) * majsig**2
             minsig2 = (1. + q[-1]**2) * minsig**2
             majmod, minmod = self.makemodel(*q[:-1])
+            if not (np.all(np.isfinite(majmod))
+                    and np.all(np.isfinite(minmod))):
+                return np.inf
             chi2maj = np.nansum((majobs - majmod)**2 / majsig2)
             chi2min = np.nansum((minobs - minmod)**2 / minsig2)
             return (chi2maj + chi2min) / np.sqrt(Rarea)
@@ -277,6 +283,9 @@ class PVFitting(ReadFits):
                 minsig2 = (1. + q[-1]**2) * minsig**2
                 # make model
                 majmod, minmod = self.makemodel(*q[:-1])
+                if not (np.all(np.isfinite(majmod))
+                        and np.all(np.isfinite(minmod))):
+                    return -np.inf
                 chi2maj = np.nansum((majobs - majmod)**2 / majsig2 + np.log(majsig2))
                 chi2min = np.nansum((minobs - minmod)**2 / minsig2 + np.log(minsig2))
                 return -0.5 * (chi2maj + chi2min) / np.sqrt(Rarea)

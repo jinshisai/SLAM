@@ -182,7 +182,8 @@ class MockPVD(object):
                 vlos.append(_vlos)
             # density normalization
             rho_max = np.nanmax([np.nanmax([np.nanmax(i) for i in _rho]) for _rho in rho])
-            rho = [[i / rho_max for i in _rho] for _rho in rho]  # normalized rho
+            if rho_max != 0:
+                rho = [[i / rho_max for i in _rho] for _rho in rho]
             # get PV diagrams
             palist = [self.pa_major, self.pa_minor]
             signlist = [self.signmajor, self.signminor]
@@ -359,7 +360,8 @@ class MockPVD(object):
         # normalize
         if normalize:
             rho_max = np.nanmax([np.nanmax(i) for i in d_rho])
-            d_rho = [i / rho_max for i in d_rho]
+            if rho_max != 0:
+                d_rho = [i / rho_max for i in d_rho]
 
         # collapse
         if collapse:
@@ -463,7 +465,11 @@ class MockPVD(object):
             g = precalculation.gauss_v
             tau_v = convolve(tau_v, g, mode='same')  # conserve integrated value
 
-        I_cube = 1. - np.exp(-tau_v / np.nanmax(tau_v) * taumax)
+        tau_max = np.nanmax(tau_v)
+        if tau_max == 0:
+            I_cube = np.zeros_like(tau_v)
+        else:
+            I_cube = 1. - np.exp(-tau_v / tau_max * taumax)
 
         # beam convolution
         if beam is not None:
