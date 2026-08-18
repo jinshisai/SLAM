@@ -84,8 +84,23 @@ class MockPVD(object):
                  signmajor: int = 1, signminor: int = 1,
                  pa_major: float = 0, pa_minor: float = 90,
                  num_threads: int | str | None = None) -> None:
-        """Initialize the model coordinates, orientation, beam, and grid."""
+        """Initialize the model coordinates, orientation, beam, and grid.
+        """
         super(MockPVD, self).__init__()
+
+        # orientation validation
+        for name, value in (("signmajor", signmajor),
+                            ("signminor", signminor)):
+            if isinstance(value, (bool, np.bool_)) \
+                    or not isinstance(value, (int, np.integer)):
+                raise TypeError(f"{name} must be an integer equal to +1 or -1")
+            if value not in (-1, 1):
+                raise ValueError(f"{name} must be +1 or -1")
+        axis_separation = (pa_minor - pa_major) % 180.
+        if not np.isclose(axis_separation, 90., rtol=0., atol=1e-8):
+            raise ValueError(
+                "pa_major and pa_minor must be perpendicular modulo 180 degrees"
+            )
 
         # save input
         self._x, self._z = x, z
