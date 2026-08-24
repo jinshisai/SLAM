@@ -1,0 +1,574 @@
+# -*- coding: utf-8 -*-
+"""
+This script makes position-velocity diagrams along the major and minor axes,
+ and reproduces their silhouette by the UCM envelope.
+The main class PVFitting can be imported to do each steps separately.
+"""
+
+import numpy as np
+import matplotlib.pyplot as plt
+from astropy.io import fits
+from astropy import wcs
+import warnings
+from tqdm import tqdm
+from utils import emcee_corner, ReadFits
+from pvfitting.mockpvd import MockPVD
+
+warnings.simplefilter('ignore', RuntimeWarning)
+
+
+class PVFitting(ReadFits):
+    """Fit a Keplerian disk and infalling envelope model to major/minor PV diagrams."""
+
+    def put_PV(self, pvmajorfits: str, pvminorfits: str,
+               dist: float, vsys: float,
+               rmax: float | None,
+               vmin: float | None, vmax: float | None,
+               sigma: float | None,
+               xskip: int = 1, skipto: int | None = None) -> None:
+        """Read and prepare observed major- and minor-axis PV diagrams.
+
+        Args:
+            pvmajorfits (str): FITS file containing the major-axis PV diagram.
+            pvminorfits (str): FITS file containing the minor-axis PV diagram.
+            dist (float): Source distance in pc.
+            vsys (float): Systemic velocity in km/s.
+            rmax (float or None): Maximum absolute position in au.
+            vmin (float or None): Minimum velocity relative to ``vsys`` in
+                km/s.
+            vmax (float or None): Maximum velocity relative to ``vsys`` in
+                km/s.
+            sigma (float or None): RMS noise of the PV diagrams. None means
+                automatic estimation.
+            xskip (int, optional): Pixel stride along the position axis.
+                Defaults to 1.
+            skipto (int or None, optional): Approximate number of pixels per
+                beam minor axis after resampling. Defaults to None.
+        """
+        d = []
+        for pvfits in [pvmajorfits, pvminorfits]:
+            self.read_pvfits(pvfits=pvfits, dist=dist, vsys=vsys,
+                             xmin=-rmax, xmax=rmax, xskip=xskip, sigma=sigma)
+            if type(skipto) is int:
+                iskip = int(self.bmin / (np.abs(self.dx) / xskip) / skipto)
+                if iskip == 0:
+                    print('WARNING: \'skipto\' is ignored because the beam minor axis is smaller than \'skipto\' pixels.')
+                    iskip = 1
+                else:
+                    print(f'Adopt xskip={iskip:d}.')
+                    ibmaj = self.bmaj / (np.abs(self.dx) * iskip)
+                    ibmin = self.bmin / (np.abs(self.dx) * iskip)
+                    print(f'Beam major/minor axis is {ibmaj:.1f}/{ibmin:.1f} pixels.')
+            else:
+                iskip = xskip
+            self.vorg = self.v
+            self.read_pvfits(pvfits=pvfits, dist=dist, vsys=vsys,
+                             xmin=-rmax, xmax=rmax, xskip=iskip, sigma=sigma,
+                             vmin=vmin, vmax=vmax)
+            d.append(self.data)
+        self.dpvmajor, self.dpvminor = d
+
+    def check_modelgrid(self, nsubgrid: float = 1,
+                        n_nest: list | None = None, reslim: float = 5):
+        # model grid
+        mpvd = MockPVD(self.x, self.x, self.v,
+                       nsubgrid=nsubgrid, nnest=n_nest,
+                       beam=self.beam, reslim=reslim)
+        mpvd.grid.gridinfo()
+
+    def fit_mockpvd(self, incl: float = 89.,
+                    Mstar_range: list[float] = [0.01, 10],
+                    Rc_range: list[float] = [1., 1000.],
+                    alphainfall_range: list[float] = [0.0, 1],
+                    taumax_range: list[float] = [0.1, 1e3],
+                    frho_range: list[float] = [1., 1e4],
+                    sig_mdl_range: list[float] = [0., 10.],
+                    fixed_params: dict = {'Mstar': None, 'Rc': None,
+                                          'alphainfall': None, 'taumax': None,
+                                          'frho': None, 'sig_mdl': None},
+                    vmask: list[float] = [0, 0],
+                    zmax: float | None = None,
+                    filename: str = 'PVfitting',
+                    show: bool = False,
+                    save_result: bool = True,
+                    save_corner: bool = True,
+                    print_result: bool = True,
+                    progressbar: bool = True,
+                    kwargs_emcee_corner: dict = {},
+                    signmajor: int | None = None, signminor: int | None = None,
+                    pa_major: float = 0., pa_minor: float = 90.,
+                    linewidth: float | None = None,
+                    nsubgrid: int = 1,
+                    n_nest: list[int] = [2, 2, 2, 2, 2, 2],
+                    reslim: float = 10,
+                    title: str | None = None,
+                    log: bool = False,
+                    num_threads: int | str | None = None) -> None:
+        """Fit mock major- and minor-axis PV diagrams with MCMC.
+
+        Args:
+            incl (float, optional): Inclination angle in degrees. Defaults to
+                89.
+            Mstar_range (list, optional): Prior range of stellar mass in solar
+                masses. Defaults to [0.01, 10].
+            Rc_range (list, optional): Prior range of centrifugal radius in
+                au. Defaults to [1, 1000].
+            alphainfall_range (list, optional): Prior range of the radial
+                infall-velocity scaling. One means no suppression for the radial infall-velocity. Defaults to [0, 1].
+            taumax_range (list, optional): Prior range of maximum optical
+                depth. Defaults to [0.1, 1e3].
+            frho_range (list, optional): Prior range of the density jump at the
+                centrifugal radius. Higher values mean a higher denisty on the disk side. Defaults to [1, 1e4].
+            sig_mdl_range (list, optional): Prior range of fractional model
+                uncertainty in units of observational noise. Defaults to
+                [0, 10].
+            fixed_params (dict, optional): Values of parameters to hold fixed.
+                A value of None leaves a parameter free.
+            vmask (list, optional): Excluded velocity interval in km/s.
+                Defaults to [0, 0].
+            zmax (float or None, optional): Maximum line-of-sight extent in au.
+                None uses the position grid. Defaults to None.
+            filename (str, optional): Prefix for fitting products. Defaults to
+                ``'PVfitting'``.
+            show (bool, optional): Whether to show generated figures. Defaults
+                to False.
+            save_result (bool, optional): Whether to save fitted parameter
+                values. Defaults to True.
+            save_corner (bool, optional): Whether to save the corner plot.
+                Defaults to True.
+            print_result (bool, optional): Whether to print fitted values in terminal.
+                Defaults to True.
+            progressbar (bool, optional): Whether to display fitting progress.
+                Defaults to True.
+            kwargs_emcee_corner (dict, optional): Additional arguments passed
+                to ``emcee_corner``. Defaults to {}.
+            signmajor (int or None, optional): Sign of the rotational
+                line-of-sight velocity. +1 makes the positive major-axis side
+                redshifted and -1 makes it blueshifted. None determines the
+                sign from the observed major-axis PV diagram. Defaults to
+                None.
+            signminor (int or None, optional): Sign of the radial-infall
+                line-of-sight velocity. +1 makes the positive minor-axis side
+                blueshifted and -1 makes it redshifted. None determines the
+                sign from the observed minor-axis PV diagram. Defaults to
+                None.
+            pa_major (float, optional): Position angle of the major-axis cut in
+                degrees. Defaults to 0.
+            pa_minor (float, optional): Position angle of the minor-axis cut in
+                degrees. Defaults to 90.
+            linewidth (float or None, optional): Intrinsic line width in km/s.
+                Defaults to None.
+            nsubgrid (int, optional): Initial model subgrid refinement factor.
+                Defaults to 1.
+            n_nest (list, optional): Refinement factors for nested model-grid
+                levels. Defaults to [2, 2, 2, 2, 2, 2].
+            reslim (float, optional): Threshold defining the next nested-grid
+                extent. Defaults to 10.
+            title (str or None, optional): Figure title. Defaults to None.
+            log (bool, optional): Whether to use logarithmic color scaling.
+                Defaults to False.
+            num_threads (int, str, or None, optional): Number of threads for Numba;
+                ``'all'`` uses all available CPUs. Defaults to None.
+        """
+        # Observed PV diagrams
+        majobs = self.dpvmajor.copy()
+        minobs = self.dpvminor.copy()
+        # correction factor for over sampling
+        beam_area = np.pi/(4.*np.log(2.)) * self.bmaj * self.bmin  # beam area
+        Rarea = beam_area / self.dx / self.dx  # area ratio
+
+        # grid & mask
+        x, v = np.meshgrid(self.x, self.v)
+        mask = (vmask[0] < v) * (v < vmask[1])
+        majobs = np.where(mask, np.nan, majobs)
+        minobs = np.where(mask, np.nan, minobs)
+        majsig, minsig = self.sigma, self.sigma
+
+        # get quadrant
+        majquad = getquad(self.dpvmajor) if signmajor is None else signmajor
+        minquad = getquad(self.dpvminor) * (-1) if signminor is None else signminor
+
+        # model
+        if zmax is None:
+            z = self.x
+        else:
+            dx = self.x[1] - self.x[0]
+            nz = int(zmax / dx + 0.5)
+            z = (np.arange(2 * nz + 1) - nz) * dx
+        mpvd = MockPVD(self.x, z, self.v,
+                       nsubgrid=nsubgrid, nnest=n_nest,
+                       beam=self.beam, reslim=reslim,
+                       signmajor=majquad, signminor=minquad,
+                       pa_major=pa_major, pa_minor=pa_minor,
+                       num_threads=num_threads)
+        rout = np.max(z)
+
+        def makemodel(Mstar, Rc, alphainfall, taumax, frho):
+            major, minor = mpvd.generate_mockpvd(Mstar=Mstar, Rc=Rc,
+                                                 alphainfall=alphainfall,
+                                                 taumax=taumax, frho=frho,
+                                                 incl=incl, linewidth=linewidth,
+                                                 rout=rout, axis='both')
+            # quadrant
+            model_power = np.sum(major * major) + np.sum(minor * minor)
+            if model_power == 0:
+                return np.zeros_like(major), np.zeros_like(minor)
+            fflux = (np.nansum(majobs * major) + np.nansum(minobs * minor)) \
+                / model_power
+            return fflux * major, fflux * minor
+        self.makemodel = makemodel
+
+        # Fitting
+        paramkeys = ['Mstar', 'Rc', 'alphainfall', 'taumax', 'frho', 'sig_mdl']
+        p_fixed = {k: fixed_params[k] if k in fixed_params else None for k in paramkeys}
+        free = {k: p_fixed[k] is None for k in paramkeys}
+        p_fixed = np.array([p_fixed[k] for k in paramkeys])
+        self.chain = None
+        self.lnp = None
+        notfixed = np.equal(p_fixed, None)
+
+        def chi2(q):
+            q = np.asarray(q, dtype=float)
+            majsig2 = (1. + q[-1]**2) * majsig**2
+            minsig2 = (1. + q[-1]**2) * minsig**2
+            majmod, minmod = self.makemodel(*q[:-1])
+            if not (np.all(np.isfinite(majmod))
+                    and np.all(np.isfinite(minmod))):
+                return np.inf
+            chi2maj = np.nansum((majobs - majmod)**2 / majsig2)
+            chi2min = np.nansum((minobs - minmod)**2 / minsig2)
+            return (chi2maj + chi2min) / np.sqrt(Rarea)
+
+        def reduced_chi2(q):
+            n_data = np.count_nonzero(np.isfinite(majobs)) \
+                + np.count_nonzero(np.isfinite(minobs))
+            n_data = n_data / np.sqrt(Rarea)
+            n_free = np.count_nonzero(notfixed) + 1  # +1 is due to fflux
+            dof = n_data - n_free
+            return chi2(q) / dof if dof > 0 else np.nan
+
+        runfit = None in p_fixed
+        if runfit:
+            ilog = np.array([0, 1, 2, 3, 4], dtype=int)
+            i = ilog[[p_fixed[i] is not None for i in ilog]]
+            p_fixed[i] = np.log10(p_fixed[i].astype('float'))
+            labels = np.array(['Mstar', 'Rc', r'$\alpha$', r'$\tau_\mathrm{max}$',
+                               r'$f_\rho$', r'$\sigma_\mathrm{model}$'])
+            labels[ilog] = ['log' + labels[i] for i in ilog]
+            labels = labels[notfixed]
+            kwargs0 = {'nwalkers_per_ndim': 4, 'nburnin': 500, 'nsteps': 500,
+                       'rangelevel': None, 'range_corner': None, 'labels': labels,
+                       'figname': filename+'.corner.png', 'show_corner': show,
+                       'plot_chain': True, 'show_chain': show}
+            kw = dict(kwargs0, **kwargs_emcee_corner)
+            if not save_corner:
+                kw['figname'] = None
+            # progress bar
+            if progressbar:
+                total = kw['nwalkers_per_ndim'] * len(p_fixed[notfixed])
+                total *= kw['nburnin'] + kw['nsteps']
+                bar = tqdm(total=total)
+                bar.set_description('Within the ranges')
+
+            # Modified log likelihood
+            def lnprob(p):
+                if progressbar:
+                    bar.update(1)
+                # parameter
+                q = p_fixed.copy()
+                q[notfixed] = p  # in linear scale
+                q[ilog] = 10**q[ilog]
+                # updated sigma
+                majsig2 = (1. + q[-1]**2) * majsig**2
+                minsig2 = (1. + q[-1]**2) * minsig**2
+                # make model
+                majmod, minmod = self.makemodel(*q[:-1])
+                if not (np.all(np.isfinite(majmod))
+                        and np.all(np.isfinite(minmod))):
+                    return -np.inf
+                chi2maj = np.nansum((majobs - majmod)**2 / majsig2 + np.log(majsig2))
+                chi2min = np.nansum((minobs - minmod)**2 / minsig2 + np.log(minsig2))
+                return -0.5 * (chi2maj + chi2min) / np.sqrt(Rarea)
+            # prior
+            plim = np.array([Mstar_range, Rc_range, alphainfall_range,
+                             taumax_range, frho_range, sig_mdl_range])
+            plim[ilog] = np.log10(plim[ilog])
+            plim = plim[notfixed].T
+            if type(r_c := kw['range_corner']) is dict:
+                r_c = [r_c[k] if k in r_c else 0.8 for k in paramkeys]
+                for i in ilog:
+                    r_c[i] = r_c[i] if type(r_c[i]) is float else np.log10(r_c[i])
+                r_c = [a for a, k in zip(r_c, paramkeys) if free[k]]
+                kw['range_corner'] = r_c
+
+            # run mcmc fitting
+            mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
+            i_mcmc = 4
+            if kw.get('return_chain', False):
+                chain_free = mcmc[i_mcmc]
+                i_mcmc += 1
+                chain = np.empty((len(p_fixed), chain_free.shape[1]), dtype=float)
+                chain[notfixed] = chain_free
+                chain[~notfixed] = p_fixed[~notfixed].astype(float)[:, None]
+                chain[ilog] = 10**chain[ilog]
+                self.chain = chain
+            if kw.get('return_lnp', False):
+                self.lnp = mcmc[i_mcmc]
+            # best parameters & errors
+
+            def get_p(i: int):
+                p = p_fixed.copy()
+                p[notfixed] = mcmc[i]
+                p[ilog] = 10**p[ilog]
+                return p
+            popt = get_p(0)
+            plow = get_p(1)
+            pmid = get_p(2)
+            phigh = get_p(3)
+        else:
+            popt = p_fixed
+            plow = p_fixed
+            pmid = p_fixed
+            phigh = p_fixed
+        self.chi2r = reduced_chi2(popt)
+        self.popt = popt
+        self.plow = plow
+        self.pmid = pmid
+        self.phigh = phigh
+        ulist = ['Msun', 'au', '', '', '', 'sig_obs']
+        digits = [2, 0, 2, 2, 2, 2]
+        flist = ['f', 'f', 'f', 'e', 'e', 'f']
+        if print_result:
+            print('Parameter values (opt, low, mid, high):')
+            for i, (k, d, u, f) in enumerate(zip(paramkeys, digits, ulist, flist)):
+                p = [self.popt[i], self.plow[i], self.pmid[i], self.phigh[i]]
+                print(f'{k} = {p[0]:.{d}{f}}, {p[1]:.{d}{f}},'
+                      + f' {p[2]:.{d}{f}}, {p[3]:.{d}{f}} {u}')
+        if runfit and save_result:
+            plist = [self.popt, self.plow, self.pmid, self.phigh]
+            with open(filename+'.popt.txt', 'w') as f:
+                f.write('#Rows:' + ','.join(paramkeys) + '\n')
+                f.write('#Columns:' + ','.join(['popt', 'plow', 'pmid', 'phigh']) + '\n')
+                np.savetxt(f, np.transpose(plist))
+        self.popt = dict(zip(paramkeys, self.popt))
+        self.plow = dict(zip(paramkeys, self.plow))
+        self.pmid = dict(zip(paramkeys, self.pmid))
+        self.phigh = dict(zip(paramkeys, self.phigh))
+
+        # plot
+        self.plot_pvds(filename=filename, color='model', contour='obs',
+                       vmask=vmask, title=title, show=show, log=log)
+
+    def read_fitres(self, f: str):
+        '''
+        Read fitting result.
+
+        Parameter
+        ---------
+        f (str): Path to a file containing the fitting result.
+        '''
+        self.popt, self.plow, self.pmid, self.phigh = np.loadtxt(f).T
+
+    def plot_pvds(self, filename: str = 'PVfitting',
+                  color: str = 'model', contour: str = 'obs',
+                  vmask: list[float, float] = [0., 0.],
+                  cmap: str = 'viridis',
+                  cmap_residual: str = 'bwr', ext: str = '.png',
+                  title: str | None = None, show: bool = False,
+                  shadecolor: str = 'white',
+                  clevels: list[float] | None = None,
+                  log: bool = False):
+        '''
+        Plot observed and model PV diagrams.
+        '''
+
+        # data
+        majobs, minobs = self.dpvmajor.copy(), self.dpvminor.copy()
+        # grid/data/mask/sigma
+        x, v = np.meshgrid(self.x, self.v)
+        mask = (vmask[0] < v) * (v < vmask[1])  # velocity mask
+        majsig, minsig = self.sigma, self.sigma
+
+        if 'model' in [color, contour]:
+            # check if fitting result exists
+            if hasattr(self, 'popt'):
+                popt = np.array(list(self.popt.values()))
+            else:
+                print('ERROR\twriteout_fitres: No optimized parameters are found.')
+                print('ERROR\twriteout_fitres: Run fitting or read fitting result first.')
+                return 0
+            # model pv diagrams
+            majmod, minmod = self.makemodel(*popt[:-1])
+            # residual
+            majres = np.where(mask, -(mask.astype('int')), (majobs - majmod) / majsig)
+            minres = np.where(mask, -(mask.astype('int')), (minobs - minmod) / minsig)
+            plot_residual = True
+            outlabel = '.model'
+        else:
+            plot_residual = False
+            outlabel = '.obs'
+
+        if clevels is None:
+            clevels = (2**np.arange(0, 10) if log else np.arange(1, 11)) * 3 * self.sigma
+
+        def makeplots(data_color, data_contour, cmap,
+                      vmin=None, vmax=None, vmask=None,
+                      alpha=1., mode='model'):
+            # set figure
+            fig, axes = plt.subplots(1, 2,)
+            fig.set_figheight(3.2)
+            fig.set_figwidth(5)
+            ax1, ax2 = axes
+            ax1.tick_params("x", rotation=30)
+            ax2.tick_params("x", rotation=30)
+            cblabel = r'Jy beam$^{-1}$' if mode == 'model' else r'Noise level ($\sigma$)'
+            # major
+            if log and mode == 'model':
+                vmin_plot = np.log10(2 * self.sigma) if vmin is None else np.log10(vmin)
+                vmax_plot = None if vmax is None else np.log10(vmax)
+            elif mode == 'residual':
+                vabsmax = None
+                if vmin is not None:
+                    vabsmax = np.abs(vmin)
+                if vmax is not None:
+                    vabsmax = max(np.abs(vmax), vabsmax)
+                vmin_plot = -vabsmax
+                vmax_plot = vabsmax
+            else:
+                vmin_plot = vmin
+                vmax_plot = vmax
+            d_plot = data_color[0] * 1
+            if log and mode == 'model':
+                d_plot = np.log10(d_plot.clip(vmin, None))
+            im = ax1.pcolormesh(self.x, self.v, d_plot,
+                                cmap=cmap, vmin=vmin_plot, vmax=vmax_plot,
+                                alpha=alpha, rasterized=True)
+            ax1.contour(self.x, self.v, data_contour[0],
+                        levels=clevels, colors='k')
+            ax1.set_xlabel('Major offset (au)')
+            ax1.set_ylabel(r'$V-V_{\rm sys}$ (km s$^{-1}$)')
+
+            # minor
+            d_plot = data_color[1] * 1
+            if log and mode == 'model':
+                d_plot = np.log10(d_plot.clip(vmin, None))
+            im = ax2.pcolormesh(self.x, self.v, d_plot,
+                                cmap=cmap, vmin=vmin_plot, vmax=vmax_plot,
+                                alpha=alpha, rasterized=True)
+            ax2.contour(self.x, self.v, data_contour[1],
+                        levels=clevels, colors='k')
+            cax2 = ax2.inset_axes([1.02, 0., 0.05, 1.])  # x0, y0, dx, dy
+            cb = plt.colorbar(im, cax=cax2, label=cblabel)
+            if log and mode == 'model':
+                cbticks = np.outer([1, 2, 5], 10**np.arange(-6, 3, 1.0))
+                cbticks = np.log10(np.sort(np.ravel(cbticks)))
+                cbticks = cbticks[(vmin_plot < cbticks) * (cbticks < vmax_plot)]
+                cb.set_ticks(cbticks)
+                cb.set_ticklabels([f'{i:.1e}' for i in 10**cbticks])
+
+            ax2.set_yticklabels('')
+            ax2.set_xlabel('Minor offset (au)')
+
+            for ax in axes:
+                ax.set_xlim(np.min(self.x), np.max(self.x))
+                ax.set_ylim(np.min(self.v), np.max(self.v))
+
+            if vmask is not None:
+                _v = self.v[(self.v > vmask[0]) * (self.v < vmask[1])]  # masked velocity ranges
+                for ax in axes:
+                    ax.fill_between(self.x,
+                                    np.full(len(self.x), np.min(_v) - 0.5 * self.dv),
+                                    np.full(len(self.x), np.max(_v) + 0.5 * self.dv),
+                                    color=shadecolor, alpha=0.6, edgecolor=None)
+            if title is not None:
+                fig.suptitle(title, y=0.92)
+
+            return fig
+
+        # color images and model images
+        d_col = [majmod, minmod] if color == 'model' else [majobs, minobs]
+        d_con = [majmod, minmod] if contour == 'model' else [majobs, minobs]
+
+        figs = []
+        # main plot
+        vmin = 2 * self.sigma if log else np.nanmin(np.array(d_col))
+        vmax = np.nanmax(np.array(d_col))
+        vmask = vmask if vmask[1] > vmask[0] else None
+        fig = makeplots(d_col, d_con, cmap, vmin=vmin, vmax=vmax,
+                        vmask=vmask, alpha=0.8)
+        fig.tight_layout()
+        fig.subplots_adjust(wspace=0.1)
+        fig.savefig(filename + outlabel + ext, dpi=300)
+        figs.append(fig)
+        if show:
+            plt.show()
+
+        # residual plot
+        if plot_residual:
+            d_col = [majres, minres] if color == 'model' else [majobs, minobs]
+            d_con = [majres, minres] if contour == 'model' else [majobs, minobs]
+            vmin, vmax = np.nanmin(np.array(d_col)), np.nanmax(np.array(d_col))
+            # plot
+            fig2 = makeplots(d_col, d_con, cmap_residual, vmin=vmin, vmax=vmax,
+                             vmask=None, alpha=0.5, mode='residual')
+            fig2.tight_layout()
+            fig2.subplots_adjust(wspace=0.1)
+            fig2.savefig(filename + '.residual' + ext, dpi=300)
+            figs.append(fig2)
+            if show:
+                plt.show()
+
+        return figs
+
+    def modeltofits(self, filehead: str = 'best', **kwargs) -> None:
+        """Write model and residual major/minor PV diagrams to FITS files.
+
+        Args:
+            filehead (str, optional): Prefix of the output FITS files.
+                Defaults to ``'best'``.
+            **kwargs: Model parameters. The stored best-fit parameters are
+                used when no values are supplied.
+        """
+        w = wcs.WCS(naxis=2)
+        h = self.header
+        h['NAXIS1'] = len(self.x)
+        h['CRPIX1'] = h['CRPIX1'] - self.offpix[0]
+        nx = h['NAXIS1']
+        p = self.popt if kwargs == {} else kwargs
+        if 'sig_mdl' in p.keys():
+            del p['sig_mdl']
+        majmod, minmod = self.makemodel(**p)
+        majres = self.dpvmajor - majmod
+        minres = self.dpvminor - minmod
+        v_nanblue = self.vorg[self.vorg < np.min(self.v)]
+        v_nanred = self.vorg[np.max(self.v) < self.vorg]
+        nanblue = np.full((len(v_nanblue), nx), np.nan)
+        nanred = np.full((len(v_nanred), nx), np.nan)
+        majmod = np.concatenate((nanblue, majmod, nanred), axis=0)
+        minmod = np.concatenate((nanblue, minmod, nanred), axis=0)
+        majres = np.concatenate((nanblue, majres, nanred), axis=0)
+        minres = np.concatenate((nanblue, minres, nanred), axis=0)
+
+        def tofits(d: np.ndarray, ext: str):
+            header = w.to_header()
+            hdu = fits.PrimaryHDU(d, header=header)
+            for k in h.keys():
+                if not ('COMMENT' in k or 'HISTORY' in k):
+                    hdu.header[k] = h[k]
+            hdu = fits.HDUList([hdu])
+            hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
+
+        tofits(majmod, 'model.major')
+        tofits(minmod, 'model.minor')
+        tofits(majres, 'residual.major')
+        tofits(minres, 'residual.minor')
+
+
+def getquad(m):
+    '''
+    Get quadrant
+    '''
+    nv, nx = np.shape(m)
+    q = np.sum(m[:nv//2, :nx//2]) + np.sum(m[nv//2:, nx//2:]) \
+        - np.sum(m[nv//2:, :nx//2]) - np.sum(m[:nv//2, nx//2:])
+    return int(np.sign(q))
