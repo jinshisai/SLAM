@@ -11,7 +11,7 @@ from astropy.io import fits
 from astropy import constants, units
 from astropy.coordinates import SkyCoord
 
-'''
+
 def gauss1d(x: float | np.ndarray, amp: float, mean: float,
             fwhm: float) -> float | np.ndarray:
     """Evaluate a one-dimensional Gaussian parameterized by its FWHM.
@@ -26,7 +26,7 @@ def gauss1d(x: float | np.ndarray, amp: float, mean: float,
         float or np.ndarray: Gaussian evaluated at ``x``.
     """
     return amp * np.exp2(-4. * ((x - mean) / fwhm)**2)
-'''
+
 
 def emcee_corner(bounds: list[list[float]] | np.ndarray,
                  log_prob_fn: Callable[..., float],

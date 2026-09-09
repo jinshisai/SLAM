@@ -635,6 +635,13 @@ class ChannelFit(ReadFits):
         scale = 0.0 if ff == 0 else fg / ff
         return scale
 
+    def peaktounity(self, I_in: np.ndarray) -> np.ndarray:
+        xypeak = np.max(I_in, axis=(1, 2))
+        scale = 1 / xypeak
+        scale[xypeak == 0] = 0
+        Iout = I_in * np.moveaxis([[scale]], 2, 0)
+        return Iout
+
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   h1: float = 0, h2: float = -1, pI: float = 0,
                   Rin: float = 0, Ienv: float = 0,

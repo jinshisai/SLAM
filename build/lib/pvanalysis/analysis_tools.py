@@ -3,14 +3,14 @@ Analysis tools for PVfit
 
 '''
 
-#import sys
+import sys
 import numpy as np
 # import scipy.optimize
-# from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit
 # import matplotlib.pyplot as plt
 
-#sys.path.append('../')
-#from utils import gauss1d
+sys.path.append('../')
+from utils import gauss1d
 
 '''
 def edge(xdata: np.ndarray, ydata: np.ndarray, yerr: float,

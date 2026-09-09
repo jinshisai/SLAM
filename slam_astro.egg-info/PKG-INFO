@@ -1,11 +1,41 @@
+Metadata-Version: 2.4
+Name: slam-astro
+Version: 2.0.1
+Summary: Spectral Line Analysis/Modeling for (sub)millimeter astronomy
+Home-page: https://github.com/jinshisai/SLAM
+Author: Jinshi Sai, Yusuke Aso
+Author-email: jinshi.sai@sci.kagoshima-u.ac.jp, yaso@kasi.re.kr
+License: GPL-3.0-only
+Project-URL: Documentation, https://slam-astro.readthedocs.io/
+Project-URL: Source, https://github.com/jinshisai/SLAM
+Project-URL: Issues, https://github.com/jinshisai/SLAM/issues
+Classifier: Intended Audience :: Science/Research
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Topic :: Scientific/Engineering :: Astronomy
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: astropy>=7.2
+Requires-Dist: corner
+Requires-Dist: dynesty
+Requires-Dist: emcee>=3.1.5
+Requires-Dist: matplotlib
+Requires-Dist: numba
+Requires-Dist: numpy>=2.0
+Requires-Dist: scipy
+Requires-Dist: tqdm
+Dynamic: license-file
+
 [![Documentation Status](https://readthedocs.org/projects/slam-astro/badge/?version=latest)](https://slam-astro.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7944158.svg)](https://doi.org/10.5281/zenodo.7944158)
 
 
 # SLAM: Spectral Line Analysis/Modeling
 **SLAM (Spectral Line Analysis/Modeling)** is a Python library for analyzing and modeling spectral line data at (sub)millimeter wavelengths, with a particular focus on rotational motions around (proto)stellar objects. The current release (v2) includes several packages for deriving rotation curves and estimating the dynamical mass of the central object. Details of the methods are presented [Aso & Sai (2024)](https://ui.adsabs.harvard.edu/abs/2024PKAS...39...27A/abstract) and Aso, Sai et al. (2026) in prep.
-
-Documentation is available on [Read the Docs](https://slam-astro.readthedocs.io/en/latest/).
 
 
 ## Features

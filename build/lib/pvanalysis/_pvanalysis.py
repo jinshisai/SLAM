@@ -1175,7 +1175,6 @@ class PVAnalysis():
                        outname: str = 'pvanalysis',
                        logcolor: bool = False,
                        Tbcolor: bool = False,
-                       cblabel: str | None = None,
                        show: bool = True,
                        kwargs_pcolormesh: dict = {'cmap': 'viridis'},
                        kwargs_contour: dict = {'colors': 'lime'},
@@ -1201,9 +1200,6 @@ class PVAnalysis():
                 scaling. Defaults to False.
             Tbcolor (bool, optional): Whether to display brightness
                 temperature by the color map. Defaults to False.
-            cblabel (str or None, optional): Color-bar label. None uses
-                ``'T_b (K)'`` when ``Tbcolor`` is True and the FITS brightness
-                unit otherwise. Defaults to None.
             show (bool, optional): Whether to show the figures. Defaults to
                 True.
             kwargs_pcolormesh (dict, optional): Arguments passed to the color
@@ -1232,11 +1228,6 @@ class PVAnalysis():
         else:
             self.vsys_opt = self.vsys
             self.avevsys = 0
-        if cblabel is None:
-            cblabel_plot = (r'T$_{\rm b}$ (K)' if Tbcolor
-                            else self.fitsdata.header.get('BUNIT'))
-        else:
-            cblabel_plot = cblabel
         for loglog, ext in zip([False, True], ['linear', 'log']):
             pp = PVPlot(restfrq=self.fitsdata.restfreq,
                         beam=self.fitsdata.beam, pa=self.fitsdata.pa,
@@ -1245,7 +1236,10 @@ class PVAnalysis():
                         v=self.fitsdata.vaxis, x=self.fitsdata.xaxis,
                         loglog=loglog, vlim=vlim, xlim=xlim,
                         multibeam=self.fitsdata.multibeam)
-            pp.add_color(log=logcolor, Tb=Tbcolor, cblabel=cblabel_plot,
+            cblabel = self.fitsdata.header['BUNIT']
+            if Tbcolor:
+                cblabel = r'T$_{\rm b}$ (K)'
+            pp.add_color(log=logcolor, Tb=Tbcolor, cblabel=cblabel,
                          **kwargs_pcolormesh)
             pp.add_contour(rms=self.rms, levels=clevels,
                            **kwargs_contour)
