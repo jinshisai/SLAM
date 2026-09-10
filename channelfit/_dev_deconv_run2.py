@@ -20,7 +20,7 @@ def main():
     rmax = 200  # au; The fitted area is [-rmax, ramx] x [-rmax, rmax].
     vlim = [-3.6, -2.0, 2.0, 3.]
     outname = 'testfits'
-    scale_length = 2.
+    scale_length = 2.0
 
     # image 2
     cubefits = '/Users/jinshi/Works/Myproject/V883Ori/Linecentroid/fitsimages/CH3OH/V883Ori_spw39_CH3OH_stacked_contsub_selfcal_rb05_cl.pbcor.subim.fits'
@@ -116,9 +116,8 @@ def main():
               vsys=vsys, dist=dist, sigma=sigma, rmax=rmax, vlim=vlim)
     chan.diagnose_gpdeconvolution(outname)
     deconv_gp = chan.mom0decon
-    plt.show()
+    #plt.show()
 
-    '''
     # For comparison
     chan = ChannelFit(scaling='mom0ft', progressbar=True)
     chan.makegrid(cubefits=cubefits, center=center, pa=pa, incl=incl,
@@ -166,7 +165,6 @@ def main():
     plt.tight_layout()
     fig.savefig(outname + '_deconv_comp.pdf', transparent = True)
     plt.show()
-    '''
 
 if __name__ == '__main__':
     main()
