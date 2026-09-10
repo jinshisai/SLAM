@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 
 sys.path.append('.')
 sys.path.append('/Users/jinshi/Works/Git/jinshisai/SLAM/')
-from dev_deconv import *
+#from dev_deconv import *
 from channelfit import ChannelFit
+from channelfit._channelfit import *
 
 def main():
     # -------- INPUTS --------
@@ -19,6 +20,7 @@ def main():
     rmax = 200  # au; The fitted area is [-rmax, ramx] x [-rmax, rmax].
     vlim = [-3.6, -2.0, 2.0, 3.]
     outname = 'testfits'
+    scale_length = 2.
 
     # image 2
     cubefits = '/Users/jinshi/Works/Myproject/V883Ori/Linecentroid/fitsimages/CH3OH/V883Ori_spw39_CH3OH_stacked_contsub_selfcal_rb05_cl.pbcor.subim.fits'
@@ -31,36 +33,41 @@ def main():
     rmax = 230  # au; The fitted area is [-rmax, ramx] x [-rmax, rmax].
     vlim = [-4.3, 0, 0, 4.3]  # km/s; Relative to vsys.
     outname = 'V883Ori'
+    scale_length = 1.5
     # ------------------------
-
-    chan = ChannelFit(scaling='uniform', progressbar=True)
-    chan.makegrid(cubefits=cubefits, center=center, pa=pa, incl=incl,
-              vsys=vsys, dist=dist, sigma=sigma, rmax=rmax, vlim=vlim)
 
     # --------------------------------------------------
     # GP deconvolution
     # --------------------------------------------------
+    '''By myself
+    chan = ChannelFit(scaling='uniform', progressbar=True)
+    chan.makegrid(cubefits=cubefits, center=center, pa=pa, incl=incl,
+              vsys=vsys, dist=dist, sigma=sigma, rmax=rmax, vlim=vlim)
+
     mom0 = chan.mom0.copy()
     mom0_masked = chan.mom0.copy()
     mom0_masked[chan.mom0 < 3.*chan.sigma_mom0] = 0.
-    one_third_beam = int(np.sqrt(chan.pixperbeam) // 1.)
-    #print(one_third_beam)
-    result = gp_deconvolve_2d(
+    result = gpdeconvolve(
         image=mom0,
-        psf=chan.gaussbeam[:, ::-1],
-        noise_std=sigma,
-        kernel="matern32", # kernel doesn't change results much
-        sigma_f=np.std(chan.mom0),
-        length_scale_pix=one_third_beam,
+        psf=chan.gaussbeam,
+        noise_std=chan.sigma_mom0,
+        bmaj = chan.bmaj,
+        bmin = chan.bmin,
+        dx = np.abs(chan.dx),
+        dy = chan.dy,
+        kernel="rbf",    # kernel doesn't change results much
+        sigma_f=None,
+        scale_length=scale_length,
         pad_factor=2,
         clip_positive=False,
-        noise_clip_threshold = 3., #one_third_beam,
+        noise_clip_threshold = 3.,
     )
 
     deconv = result["deconvolved"]
     reconv = result["reconvolved"]
     resid = result["residual"]
 
+    diagnose_gpdeconvolution(result, chan.mom0)
 
     # --------------------------------------------------
     # Plot
@@ -74,7 +81,7 @@ def main():
 
     im1 = axs[1].imshow(deconv, origin="lower")
     axs[1].set_title("Model (deconvolved)")
-    #axs[1].contour(deconv, origin="lower", 
+    #axs[1].contour(deconv, origin="lower",
     #    levels = np.array([-6,-3,3,6,9])*chan.sigma_mom0, colors = 'white')
     axs[1].set_title("Model (deconvolved)")
     plt.colorbar(im1, ax=axs[1], fraction=0.046)
@@ -94,9 +101,25 @@ def main():
     plt.tight_layout()
     fig.savefig(outname + '_GPdeconv.pdf', transparent = True)
     plt.show()
+    '''
 
 
-    # comparison 2
+    # GP deconvolution within ChannelFit
+    chan = ChannelFit(scaling='mom0gp', progressbar=True,
+        scaling_gp_args = {
+        'scale_length': scale_length,
+        'kernel': 'rbf',
+        'sigma_f': None,
+        'pad_factor': 2,
+        'noise_clip_threshold': -1})
+    chan.makegrid(cubefits=cubefits, center=center, pa=pa, incl=incl,
+              vsys=vsys, dist=dist, sigma=sigma, rmax=rmax, vlim=vlim)
+    chan.diagnose_gpdeconvolution(outname)
+    deconv_gp = chan.mom0decon
+    plt.show()
+
+    '''
+    # For comparison
     chan = ChannelFit(scaling='mom0ft', progressbar=True)
     chan.makegrid(cubefits=cubefits, center=center, pa=pa, incl=incl,
               vsys=vsys, dist=dist, sigma=sigma, rmax=rmax, vlim=vlim)
@@ -110,7 +133,7 @@ def main():
               vsys=vsys, dist=dist, sigma=sigma, rmax=rmax, vlim=vlim)
     deconv_md = chan.mom0decon
 
-
+    # plot
     fig, axes = plt.subplots(2, 3, figsize=(12, 6))
     axs = axes.ravel()
 
@@ -130,7 +153,7 @@ def main():
     axs[3].set_title("Deconvolved (Model)")
     plt.colorbar(im3, ax=axs[3], fraction=0.046)
 
-    im3 = axs[4].imshow(deconv, origin="lower")
+    im3 = axs[4].imshow(deconv_gp, origin="lower")
     axs[4].set_title("Deconvolved (GP)")
     plt.colorbar(im3, ax=axs[4], fraction=0.046)
 
@@ -143,7 +166,7 @@ def main():
     plt.tight_layout()
     fig.savefig(outname + '_deconv_comp.pdf', transparent = True)
     plt.show()
-
+    '''
 
 if __name__ == '__main__':
     main()

@@ -371,20 +371,13 @@ def _crop_center(arr, shape):
 
 
 def gpdeconvolve(
-    image,
-    psf,
-    noise_std,
-    bmaj,
-    bmin,
-    dx,
-    dy,
-    kernel="rbf",
-    sigma_f=None,
-    scale_length=2.0,
-    pad_factor=2,
-    clip_positive=False,
-    eps=1e-12,
-    noise_clip_threshold = 3.,
+    image: np.ndarray, psf: np.ndarray, noise_std: float,
+    bmaj: float, bmin: float, dx: float, dy: float,
+    kernel: str = "rbf",
+    sigma_f: float | None = None,
+    scale_length: float = 2.0,
+    pad_factor: int = 2,
+    noise_clip_threshold: float = -1,
 ):
     """
     Gaussian prior deconvolution of a 2D image using Fourier-domain posterior mean
@@ -393,10 +386,13 @@ def gpdeconvolve(
     Model
     -----
     y = H f + n,
-    where f is the true image to guess, H is the beam convolution function,
-    n is the intrinsic thermal noise, and y is the observed image.
-    f ~ GP(0, K)
-    n ~ N(0, noise_std^2 I)
+     where y is the vectorized, observed image, H is the beam convolution matrix,
+     f is the true image to guess, n is the intrinsic thermal noise.
+
+    Assumptions
+    -----------
+    f ~ N(0, K); K is the covariance matrix
+    n ~ N(0, noise_std^2 I); I is the identity matrix
 
     Parameters
     ----------
@@ -406,7 +402,7 @@ def gpdeconvolve(
         2D beam/PSF image. Should be centered in the middle of the array
         and normalized so that psf.sum() = 1.
     noise_std : float
-        Standard deviation of the image noise in the same intensity units
+        Standard deviation of the image noise in the same intensity unit
         as the image.
     bmaj : float
         Beam major FWHM. Unit can be arbitral
@@ -421,29 +417,32 @@ def gpdeconvolve(
         pixel size along y axis. Unit can be arbitral
         but must be the same as that of the beam size.
     kernel : {"rbf", "matern32", "matern52"}
-        GP kernel. Default is RBF.
+        Kernel that determines the covariance of the prior. Default is RBF.
     sigma_f : float or None
         Prior standard deviation of the latent image.
-        If None, estimated from the image standard deviation.
-    length_scale_pix : float
-        GP correlation length in pixels.
+        If None, estimated from the image flux density.
+    scale_length : float
+        GP correlation length in a unit of the inverse of the beam size.
+        E.g., scale_length = 2 means the correlation length is a half of the beam size.
     pad_factor : int
         Zero-padding factor to reduce FFT wrap-around artifacts.
         1 means no extra padding. 2 is a good default.
-    clip_positive : bool
-        If True, clip negative values in the deconvolved image to zero.
-    eps : float
-        Small floor to avoid division by zero.
+    noise_clip_threshold : float
+        Threshold to clip noise in the deconvolved model image.
+        If negative values are given, no noise clipping will be performed.
 
     Returns
     -------
     result : dict
         Dictionary containing:
-        - "deconvolved": posterior mean latent image
+        - "deconvolved": posterior mean latent image in Jy/pixel
         - "reconvolved": posterior mean convolved back with the PSF
         - "residual": image - reconvolved
-        - "posterior_filter": Fourier-space Wiener/GP filter
-        - "prior_power": GP prior power spectrum
+        - "FT_image": Fourier transform of the input image in Jy.
+        - "FT_beam": Fourier transform of the beam.
+        - "posterior_filter": GP Filter function in the Fourier space.
+        - "yfreq": Frequency in the Fourier space, corresponding to the y axis in the image domain.
+        - "xfreq": Frequency in the Fourier space, corresponding to the x axis in the image domain.
     """
     image = np.asarray(image, dtype=float)
     psf = np.asarray(psf, dtype=float)
@@ -471,8 +470,6 @@ def gpdeconvolve(
     #sig_int *= np.sqrt(nx * ny)    # Jy/pixel to Jy in Fourier space
     omega_source = image[image >= 3 * noise_std].size
     sig_int *= np.sqrt(omega_source)    # Jy/pixel to Jy over the source in Fourier space
-    #print('Input noise: %.2e Jy/beam'%noise_std)
-    #print('Deconvolved noise: %.2e Jy/beam'%(sig_int * beam_area / pix_area))
 
     # Normalize PSF if needed.
     psf_sum = psf_pad.sum()
@@ -500,27 +497,21 @@ def gpdeconvolve(
         kernel=kernel,
         sigma_f=sigma_f,
         length_scale_pix=length_scale_pix,
-    )     #/ (px * py)**0.5    # to Jy/pixel in the image domain
+    )
 
     # Prior power for each Fourier mode.
     # Numerical round-off can make tiny negative values; clip them.
     Shat = np.real(np.fft.fft2(kimg))
     Shat = np.maximum(Shat, 0.0)
-    #print('Source flux: %.2e Jy'%sigma_f)
-    #print('Deconvolved visibility noise: %.2e Jy'%(sig_int))
 
     # Posterior mean in Fourier space:
     # F_post = Shat / (Shat + sig_int^2) / Hhat * Y
     denom = Shat + sig_int**2
-    denom = np.maximum(denom, eps)
     Ghat  = Shat / denom
     Fhat_post = Ghat / Hhat * Yhat
 
     # Back to image space.
     f_post_pad = np.real(np.fft.ifft2(Fhat_post))
-
-    if clip_positive:
-        f_post_pad = np.maximum(f_post_pad, 0.0)
 
     if noise_clip_threshold > 0.:
         noise_dec = estimate_noise(f_post_pad)
@@ -610,7 +601,7 @@ def _diagnose_gpdeconvolution(result, data, outname = None):
         ax.set_xlabel('Frequency')
     fig.tight_layout()
     fig.savefig(outname_prof, dpi = 300)
-    #plt.show()
+    plt.close()
 
     # 2D plot
     fig, axes = plt.subplots(2, 2, figsize=(12, 12))
@@ -637,9 +628,9 @@ def _diagnose_gpdeconvolution(result, data, outname = None):
         ax.set_xticks([])
         ax.set_yticks([])
 
-    plt.tight_layout()
+    fig.tight_layout()
     fig.savefig(outname_maps, dpi = 300)
-    #plt.show()
+    plt.close()
 
 
 def estimate_noise(_d, nitr=1000, thr=2.):
@@ -722,7 +713,7 @@ class ChannelFit(ReadFits):
                  'kernel': 'rbf',
                  'sigma_f': None,
                  'pad_factor': 2,
-                 'noise_clip_threshold': 3.}) -> None:
+                 'noise_clip_threshold': -1}) -> None:
         """Initialize channel-map fitting options."""
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2',
                           'pI', 'Rin', 'Ienv',
