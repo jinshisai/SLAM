@@ -371,8 +371,9 @@ def _crop_center(arr, shape):
 
 
 def gpdeconvolve(
-    image: np.ndarray, psf: np.ndarray, noise_std: float,
-    bmaj: float, bmin: float, dx: float, dy: float,
+    image: np.ndarray, noise_std: float,
+    bmaj: float, bmin: float, bpa: float,
+    dx: float, dy: float,
     kernel: str = "rbf",
     sigma_f: float | None = None,
     scale_length: float = 2.0,
@@ -398,9 +399,6 @@ def gpdeconvolve(
     ----------
     image : ndarray
         Observed 2D image (ny, nx).
-    psf : ndarray
-        2D beam/PSF image. Should be centered in the middle of the array
-        and normalized so that psf.sum() = 1.
     noise_std : float
         Standard deviation of the image noise in the same intensity unit
         as the image.
@@ -410,6 +408,8 @@ def gpdeconvolve(
     bmin : float
         Beam minor FWHM. Unit can be arbitral
         but must be the same as that of the pixel length.
+    bpa : float
+        Position angle of the beam (deg).
     dx : float
         pixel size along x axis. Unit can be arbitral
         but must be the same as that of the beam size.
@@ -445,27 +445,34 @@ def gpdeconvolve(
         - "xfreq": Frequency in the Fourier space, corresponding to the x axis in the image domain.
     """
     image = np.asarray(image, dtype=float)
-    psf = np.asarray(psf, dtype=float)
 
-    if image.ndim != 2 or psf.ndim != 2:
+    if image.ndim != 2:
         raise ValueError("image and psf must both be 2D arrays")
     if noise_std <= 0:
         raise ValueError("noise_std must be > 0")
-    if pad_factor < 1:
-        raise ValueError("pad_factor must be >= 1")
 
+    # Padded shape; always odd size for simplicity in FFT
     ny, nx = image.shape
     py = int(pad_factor * ny)
     px = int(pad_factor * nx)
+    py = py + 1 if py%2 == 0 else py
+    px = px + 1 if px%2 == 0 else px
     padded_shape = (py, px)
 
-    # Pad image and PSF to a larger grid to reduce periodic wrap-around.
+    # Pad image to a larger grid to reduce periodic wrap-around.
     image_pad, _ = _pad_to_shape(image, padded_shape)
-    psf_pad, _ = _pad_to_shape(psf, padded_shape)
+
+    # Generate PSF
+    pyh, pxh = (py - 1) // 2, (px - 1) // 2
+    xg = np.linspace(-pxh * dx, pxh * dx, px)
+    yg = np.linspace(-pyh * dy, pyh * dy, py)
+    s, t = rot(*np.meshgrid(xg, yg), np.radians(bpa))
+    psf_pad = np.exp2(-4 * ((t / bmaj)**2 + (s / bmin)**2))
+    psf_pad[psf_pad <= 1e-6] = 0.    # Set a floor at five sigma to prevent numeric errors in division
 
     # intrinsic noise
     beam_area = bmaj * bmin * np.pi / (4.*np.log(2.))    # in au^2 for default
-    pix_area  = dx * dy                                  # in au for default
+    pix_area  = np.abs(dx * dy)                          # in au for default
     sig_int = noise_std * np.sqrt(2. * pix_area / beam_area)    # deconvolved noise in Jy/pixel
     #sig_int *= np.sqrt(nx * ny)    # Jy/pixel to Jy in Fourier space
     omega_source = image[image >= 3 * noise_std].size
@@ -627,6 +634,9 @@ def _diagnose_gpdeconvolution(result, data, outname = None):
     for ax in axs:
         ax.set_xticks([])
         ax.set_yticks([])
+        #ny, nx = data.shape
+        #ax.set_xlim(nx//2 -10,nx//2 +10)
+        #ax.set_ylim(ny//2 -20,ny//2 + 0)
 
     fig.tight_layout()
     fig.savefig(outname_maps, dpi = 300)
@@ -916,8 +926,8 @@ class ChannelFit(ReadFits):
                                           savetxt=savedeconvolved,
                                           loadtxt=loaddeconvolved)
         elif self.scaling == 'mom0gp':
-            res = gpdeconvolve(self.mom0, self.gaussbeam, self.sigma_mom0,
-                self.bmaj, self.bmin, np.abs(self.dx), np.abs(self.dy),
+            res = gpdeconvolve(self.mom0, self.sigma_mom0,
+                self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
                 **self.scaling_gp_args)
             self.mom0decon = res["deconvolved"]
         if 'mom0' in self.scaling:
@@ -929,8 +939,8 @@ class ChannelFit(ReadFits):
                   + f'and {rmsres:.1f}sigma in Moment 0 residual.')
 
     def diagnose_gpdeconvolution(self, outname = None):
-        res = gpdeconvolve(self.mom0, self.gaussbeam, self.sigma_mom0,
-                self.bmaj, self.bmin, np.abs(self.dx), np.abs(self.dy),
+        res = gpdeconvolve(self.mom0, self.sigma_mom0,
+                self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
                 **self.scaling_gp_args)
         _diagnose_gpdeconvolution(res, self.mom0, outname = outname)
 
