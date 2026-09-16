@@ -376,7 +376,7 @@ def gpdeconvolve(
     dx: float, dy: float,
     kernel: str = "rbf",
     sigma_f: float | None = None,
-    scale_length: float = 2.0,
+    scale_length: float = 1.0,
     pad_factor: int = 2,
     noise_clip_threshold: float = -1,
 ):
@@ -422,8 +422,8 @@ def gpdeconvolve(
         Prior standard deviation of the latent image.
         If None, estimated from the image flux density.
     scale_length : float
-        GP correlation length in a unit of the inverse of the beam size.
-        E.g., scale_length = 2 means the correlation length is a half of the beam size.
+        GP correlation length in a unit of the beam size.
+        E.g., scale_length = 2 means the correlation length is twice the beam size.
     pad_factor : int
         Zero-padding factor to reduce FFT wrap-around artifacts.
         1 means no extra padding. 2 is a good default.
@@ -474,9 +474,7 @@ def gpdeconvolve(
     beam_area = bmaj * bmin * np.pi / (4.*np.log(2.))    # in au^2 for default
     pix_area  = np.abs(dx * dy)                          # in au for default
     sig_int = noise_std * np.sqrt(2. * pix_area / beam_area)    # deconvolved noise in Jy/pixel
-    #sig_int *= np.sqrt(nx * ny)    # Jy/pixel to Jy in Fourier space
-    omega_source = image[image >= 3 * noise_std].size
-    sig_int *= np.sqrt(omega_source)    # Jy/pixel to Jy over the source in Fourier space
+    sig_int *= np.sqrt(nx * ny)    # Jy/pixel to Jy in Fourier space
 
     # Normalize PSF if needed.
     psf_sum = psf_pad.sum()
@@ -498,7 +496,8 @@ def gpdeconvolve(
         sigma_f = sig_int
 
     # Build GP kernel on the padded grid.
-    length_scale_pix = 0.5 * (bmaj + bmin) / (2.0 * np.sqrt(2.0 * np.log(2.0))) / scale_length
+    length_scale_pix = (bmaj + bmin)\
+    / (np.abs(dx) + np.abs(dy)) / (2.0 * np.sqrt(2.0 * np.log(2.0))) * scale_length
     kimg = make_periodic_gp_kernel(
         padded_shape,
         kernel=kernel,
@@ -509,12 +508,12 @@ def gpdeconvolve(
     # Prior power for each Fourier mode.
     # Numerical round-off can make tiny negative values; clip them.
     Shat = np.real(np.fft.fft2(kimg))
-    Shat = np.maximum(Shat, 0.0)
 
     # Posterior mean in Fourier space:
     # F_post = Shat / (Shat + sig_int^2) / Hhat * Y
     denom = Shat + sig_int**2
     Ghat  = Shat / denom
+    Ghat[Ghat <= 1e-6] = 0.    # Set a floor corresponding 5sigma of Gaussian to prevent numeric errors
     Fhat_post = Ghat / Hhat * Yhat
 
     # Back to image space.
@@ -605,6 +604,7 @@ def _diagnose_gpdeconvolution(result, data, outname = None):
     k_plt_max = np.nanmin(k_profile[amp_profs[0] <= 4.e-5])
     for ax in axes:
         ax.set_xlim(0, k_plt_max)
+        #ax.set_ylim(-1e-4,1e-4)
         ax.set_xlabel('Frequency')
     fig.tight_layout()
     fig.savefig(outname_prof, dpi = 300)
