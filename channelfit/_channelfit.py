@@ -468,7 +468,7 @@ def gpdeconvolve(
     yg = np.linspace(-pyh * dy, pyh * dy, py)
     s, t = rot(*np.meshgrid(xg, yg), np.radians(bpa))
     psf_pad = np.exp2(-4 * ((t / bmaj)**2 + (s / bmin)**2))
-    psf_pad[psf_pad <= 1e-6] = 0.    # Set a floor at five sigma to prevent numeric errors in division
+    #psf_pad[psf_pad <= 1e-6] = 0.    # Set a floor at five sigma to prevent numeric errors in division
 
     # intrinsic noise
     beam_area = bmaj * bmin * np.pi / (4.*np.log(2.))    # in au^2 for default
@@ -490,10 +490,8 @@ def gpdeconvolve(
 
     if sigma_f is None:
         sigma_f = np.nanmax(np.abs(Yhat)) * pix_area / beam_area    # flux in Jy
-    if not np.isfinite(sigma_f) or sigma_f <= 0:
-        print('WARNING\tgpdeconvolve: Flux is infinity or negative.')
-        print('WARNING\tgpdeconvolve: Set sigma_f to sigma_int.')
-        sigma_f = sig_int
+    else:
+        sigma_f *= sig_int    # scaled by sig_int
 
     # Build GP kernel on the padded grid.
     length_scale_pix = (bmaj + bmin)\
