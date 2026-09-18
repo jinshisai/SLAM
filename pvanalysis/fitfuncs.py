@@ -173,6 +173,7 @@ def ridge_mean(xdata: np.ndarray, ydata: np.ndarray,
     err = yerr * np.sqrt(np.sum((xdata - val)**2)) / np.sum(ydata)
     return val, err
 
+
 '''
 # functions
 def splaw(r: float | np.ndarray, params: np.ndarray | list[float],
