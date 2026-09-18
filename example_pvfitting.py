@@ -32,13 +32,17 @@ pvfit.fit_mockpvd(Mstar_range=[0.1, 1.0],  # Msun; stellar mass
                   show=False, filename=filehead, vmask=vmask,
                   incl=incl, pa_major=pa_major, pa_minor=pa_minor,
                   kwargs_emcee_corner={'nwalkers_per_ndim': 4,
-                                       'nburnin': 30, # number of burn-in steps. Set a larger number for practical use.
-                                       'nsteps': 70, # number of steps used for posterior.  Set a larger number for practical use.
+                                       'nburnin': 30,  # number of burn-in steps. Set a larger number for practical use.
+                                       # Posterior steps; use more for practical applications.
+                                       'nsteps': 70,
                                        'rangelevel': 0.99},
                   signmajor=signmajor, signminor=signminor,
-                  n_nest=[2, 2, 2, 2, 2, 2], # Refinement factors for each nesting level of the nested grid; pixel resolution increases by the given factor at each level.
-                  reslim=10, # Resolution threshold that triggers nesting; defines the spatial extent of the next-level subgrid.
-                  zmax=1000  # au; length along the line of sight, from -zmax to zmax.
+                  # Refinement factors for each nested-grid level.
+                  n_nest=[2, 2, 2, 2, 2, 2],
+                  # Threshold defining the extent of the next-level subgrid.
+                  reslim=10,
+                  zmax=1000,  # au; length along the line of sight, from -zmax to zmax.
+                  num_threads=4  # Use 1 on a busy shared system or "all" on a dedicated machine.
                   )
 pvfit.modeltofits(**pvfit.popt, filehead=filehead)
 '-------------------------------------'

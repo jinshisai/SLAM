@@ -282,413 +282,6 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     return dnew
 
 
-def _periodic_distance_axis(n):
-    """
-    Periodic distance from index 0 on a length-n grid:
-    [0, 1, 2, ..., floor(n/2), ..., 2, 1]
-    """
-    idx = np.arange(n)
-    return np.minimum(idx, n - idx)
-
-
-def make_periodic_gp_kernel(
-    shape,
-    kernel="rbf",
-    sigma_f=1.0,
-    length_scale_pix=3.0,
-):
-    """
-    Create a stationary GP covariance kernel image on a periodic grid.
-
-    This kernel image is used to build the covariance eigenvalues by FFT.
-
-    Parameters
-    ----------
-    shape : tuple[int, int]
-        Shape (ny, nx).
-    kernel : {"rbf", "matern32", "matern52"}
-        Choice of GP kernel.
-    sigma_f : float
-        Prior standard deviation of the latent image.
-    length_scale_pix : float
-        Correlation length in pixels.
-
-    Returns
-    -------
-    kimg : ndarray
-        Kernel image whose FFT gives the prior power per Fourier mode.
-    """
-    ny, nx = shape
-    dy = _periodic_distance_axis(ny)
-    dx = _periodic_distance_axis(nx)
-    yy, xx = np.meshgrid(dy, dx, indexing="ij")
-    r = np.sqrt(xx**2 + yy**2)
-
-    ell = float(length_scale_pix)
-    if ell <= 0:
-        raise ValueError("length_scale_pix must be > 0")
-
-    if kernel == "rbf":
-        kimg = np.exp(-0.5 * (r / ell) ** 2)
-    elif kernel == "matern32":
-        z = np.sqrt(3.0) * r / ell
-        kimg = (1.0 + z) * np.exp(-z)
-    elif kernel == "matern52":
-        z = np.sqrt(5.0) * r / ell
-        kimg = (1.0 + z + z**2 / 3.0) * np.exp(-z)
-    else:
-        raise ValueError("kernel must be one of: 'rbf', 'matern32', 'matern52'")
-
-    # normalize
-    kimg /= kimg.sum()
-    kimg *= sigma_f**2
-
-    return kimg
-
-
-def _pad_to_shape(arr, out_shape):
-    """Zero-pad a 2D array to out_shape, centering the original array."""
-    in_y, in_x = arr.shape
-    out_y, out_x = out_shape
-    if in_y > out_y or in_x > out_x:
-        raise ValueError("Input array is larger than output shape.")
-
-    y0 = (out_y - in_y) // 2
-    x0 = (out_x - in_x) // 2
-
-    out = np.zeros(out_shape, dtype=float)
-    out[y0:y0 + in_y, x0:x0 + in_x] = arr
-    return out, (y0, x0)
-
-
-def _crop_center(arr, shape):
-    """Crop the central region of arr to shape."""
-    in_y, in_x = arr.shape
-    out_y, out_x = shape
-    y0 = (in_y - out_y) // 2
-    x0 = (in_x - out_x) // 2
-    return arr[y0:y0 + out_y, x0:x0 + out_x]
-
-
-def gpdeconvolve(
-    image: np.ndarray, noise_std: float,
-    bmaj: float, bmin: float, bpa: float,
-    dx: float, dy: float,
-    kernel: str = "rbf",
-    sigma_f: float | None = None,
-    scale_length: float = 1.0,
-    pad_factor: int = 2,
-    noise_clip_threshold: float = -1,
-):
-    """
-    Gaussian prior deconvolution of a 2D image using Fourier-domain posterior mean
-    based on Gaussian Process (GP).
-
-    Model
-    -----
-    y = H f + n,
-     where y is the vectorized, observed image, H is the beam convolution matrix,
-     f is the true image to guess, n is the intrinsic thermal noise.
-
-    Assumptions
-    -----------
-    f ~ N(0, K); K is the covariance matrix
-    n ~ N(0, noise_std^2 I); I is the identity matrix
-
-    Parameters
-    ----------
-    image : ndarray
-        Observed 2D image (ny, nx).
-    noise_std : float
-        Standard deviation of the image noise in the same intensity unit
-        as the image.
-    bmaj : float
-        Beam major FWHM. Unit can be arbitral
-        but must be the same as that of the pixel length.
-    bmin : float
-        Beam minor FWHM. Unit can be arbitral
-        but must be the same as that of the pixel length.
-    bpa : float
-        Position angle of the beam (deg).
-    dx : float
-        pixel size along x axis. Unit can be arbitral
-        but must be the same as that of the beam size.
-    dy : float
-        pixel size along y axis. Unit can be arbitral
-        but must be the same as that of the beam size.
-    kernel : {"rbf", "matern32", "matern52"}
-        Kernel that determines the covariance of the prior. Default is RBF.
-    sigma_f : float or None
-        Prior standard deviation of the latent image.
-        If None, estimated from the image flux density.
-    scale_length : float
-        GP correlation length in a unit of the beam size.
-        E.g., scale_length = 2 means the correlation length is twice the beam size.
-    pad_factor : int
-        Zero-padding factor to reduce FFT wrap-around artifacts.
-        1 means no extra padding. 2 is a good default.
-    noise_clip_threshold : float
-        Threshold to clip noise in the deconvolved model image.
-        If negative values are given, no noise clipping will be performed.
-
-    Returns
-    -------
-    result : dict
-        Dictionary containing:
-        - "deconvolved": posterior mean latent image in Jy/pixel
-        - "reconvolved": posterior mean convolved back with the PSF
-        - "residual": image - reconvolved
-        - "FT_image": Fourier transform of the input image in Jy.
-        - "FT_beam": Fourier transform of the beam.
-        - "posterior_filter": GP Filter function in the Fourier space.
-        - "yfreq": Frequency in the Fourier space, corresponding to the y axis in the image domain.
-        - "xfreq": Frequency in the Fourier space, corresponding to the x axis in the image domain.
-    """
-    image = np.asarray(image, dtype=float)
-
-    if image.ndim != 2:
-        raise ValueError("image and psf must both be 2D arrays")
-    if noise_std <= 0:
-        raise ValueError("noise_std must be > 0")
-
-    # Padded shape; always odd size for simplicity in FFT
-    ny, nx = image.shape
-    py = int(pad_factor * ny)
-    px = int(pad_factor * nx)
-    py = py + 1 if py%2 == 0 else py
-    px = px + 1 if px%2 == 0 else px
-    padded_shape = (py, px)
-
-    # Pad image to a larger grid to reduce periodic wrap-around.
-    image_pad, _ = _pad_to_shape(image, padded_shape)
-
-    # Generate PSF
-    pyh, pxh = (py - 1) // 2, (px - 1) // 2
-    xg = np.linspace(-pxh * dx, pxh * dx, px)
-    yg = np.linspace(-pyh * dy, pyh * dy, py)
-    s, t = rot(*np.meshgrid(xg, yg), np.radians(bpa))
-    psf_pad = np.exp2(-4 * ((t / bmaj)**2 + (s / bmin)**2))
-    #psf_pad[psf_pad <= 1e-6] = 0.    # Set a floor at five sigma to prevent numeric errors in division
-
-    # intrinsic noise
-    beam_area = bmaj * bmin * np.pi / (4.*np.log(2.))    # in au^2 for default
-    pix_area  = np.abs(dx * dy)                          # in au for default
-    sig_int = noise_std * np.sqrt(2. * pix_area / beam_area)    # deconvolved noise in Jy/pixel
-    sig_int *= np.sqrt(nx * ny)    # Jy/pixel to Jy in Fourier space
-
-    # Normalize PSF if needed.
-    psf_sum = psf_pad.sum()
-    if psf_sum <= 0:
-        raise ValueError("PSF sum must be positive")
-    psf_pad = psf_pad / psf_sum
-
-    # Fourier-domain quantities.
-    # PSF is assumed centered in the middle of the array.
-    # ifftshift moves its center to [0,0] for correct FFT convolution.
-    Hhat = np.fft.fft2(np.fft.ifftshift(psf_pad))
-    Yhat = np.fft.fft2(image_pad)
-
-    if sigma_f is None:
-        sigma_f = np.nanmax(np.abs(Yhat)) * pix_area / beam_area    # flux in Jy
-    else:
-        sigma_f *= sig_int    # scaled by sig_int
-
-    # Build GP kernel on the padded grid.
-    length_scale_pix = (bmaj + bmin)\
-    / (np.abs(dx) + np.abs(dy)) / (2.0 * np.sqrt(2.0 * np.log(2.0))) * scale_length
-    kimg = make_periodic_gp_kernel(
-        padded_shape,
-        kernel=kernel,
-        sigma_f=sigma_f,
-        length_scale_pix=length_scale_pix,
-    )
-
-    # Prior power for each Fourier mode.
-    # Numerical round-off can make tiny negative values; clip them.
-    Shat = np.real(np.fft.fft2(kimg))
-
-    # Posterior mean in Fourier space:
-    # F_post = Shat / (Shat + sig_int^2) / Hhat * Y
-    denom = Shat + sig_int**2
-    Ghat  = Shat / denom
-    Ghat[Ghat <= 1e-6] = 0.    # Set a floor corresponding 5sigma of Gaussian to prevent numeric errors
-    Fhat_post = Ghat / Hhat * Yhat
-
-    # Back to image space.
-    f_post_pad = np.real(np.fft.ifft2(Fhat_post))
-
-    if noise_clip_threshold > 0.:
-        noise_dec = estimate_noise(f_post_pad)
-        f_post_pad[f_post_pad < noise_clip_threshold * noise_dec] = 0.
-
-    # Reconvolution for consistency check.
-    reconv_pad = np.real(np.fft.ifft2(Hhat * np.fft.fft2(f_post_pad)))
-
-    # Crop back to original image size.
-    deconvolved = _crop_center(f_post_pad, image.shape)
-    reconvolved = _crop_center(reconv_pad, image.shape)
-    residual = image - reconvolved
-
-    # for check
-    yfreq = np.fft.fftfreq(py)    # unshifted; np.fft.fftshift if shifted
-    xfreq = np.fft.fftfreq(px)    # unshifted; np.fft.fftshift if shifted
-
-    return {
-        "deconvolved": deconvolved * pix_area / beam_area,    # in Jy/pixel
-        "reconvolved": reconvolved,
-        "residual": residual,
-        "FT_image": Yhat * pix_area / beam_area,    # in Jy
-        "FT_beam": Hhat,
-        "posterior_filter": Ghat,
-        "yfreq": yfreq,
-        "xfreq": xfreq,
-    }
-
-def _diagnose_gpdeconvolution(result, data, outname = None):
-    '''
-    Make diagnostic plots for GP deconvolution.
-    '''
-    # radial plot
-    qy, qx   = np.meshgrid(result['yfreq'], result['xfreq'], indexing="ij")
-    q_radius = np.sqrt(qx**2 + qy**2)
-    n_bins   = np.max([len(result['yfreq']), len(result['xfreq'])]) // 2
-    k_max    = np.nanmax(q_radius)
-
-    outname_prof = 'gpdeconv_diagnostic_profiles.png'
-    outname_maps = 'gpdeconv_diagnostic_maps.png'
-    if outname is not None:
-        outname_prof = outname + '_' + outname_prof
-        outname_maps = outname + '_' + outname_maps
-
-    # figure
-    fig, axes = plt.subplots(1,2, figsize = (8.27, 3.6))
-    ax1, ax2 = axes
-    cmap = plt.get_cmap('viridis')
-
-    amp_profs = []
-    for _d, label, ci in zip(
-        [result['FT_beam'], result['posterior_filter']],
-        ['Beam', 'GP filter'],
-        [0.3, 0.6]):
-        k_profile, amp_profile = radial_profile(
-            np.abs(_d),
-            q_radius,
-            n_bins=n_bins,
-            r_max=k_max,
-        )
-        ax1.plot(k_profile, amp_profile, label = label,
-            color = cmap(ci), lw = 2.)
-        amp_profs.append(amp_profile)
-    for _d, label in zip([result['FT_image']], ['FT[img]']):
-        k_profile, amp_profile = radial_profile(
-            np.abs(_d),
-            q_radius,
-            n_bins=n_bins,
-            r_max=k_max,
-        )
-        ax1.plot(k_profile, amp_profile / np.nanmax(amp_profile), label = label,
-            color = cmap(0.), lw=2)
-        amp_profs.append(amp_profile)
-    ax1.legend()
-    ax1.set_ylabel('Normalized amplitude')
-
-    ax2.set_ylabel('Amplitude')
-    ax2.plot(k_profile, amp_profs[-1],
-        color = cmap(0.), lw = 2, label = 'FT[img] (Before deconv.)')
-    ax2.plot(k_profile, amp_profs[1] / amp_profs[0] * amp_profs[-1],
-        color = cmap(0.3), lw = 2, label = 'FT[img] (Deconvolved)')
-    ax2.legend()
-
-    k_plt_max = np.nanmin(k_profile[amp_profs[0] <= 4.e-5])
-    for ax in axes:
-        ax.set_xlim(0, k_plt_max)
-        #ax.set_ylim(-1e-4,1e-4)
-        ax.set_xlabel('Frequency')
-    fig.tight_layout()
-    fig.savefig(outname_prof, dpi = 300)
-    plt.close()
-
-    # 2D plot
-    fig, axes = plt.subplots(2, 2, figsize=(12, 12))
-    axs = axes.ravel()
-
-    # data
-    im0 = axs[0].imshow(data, origin="lower")
-    axs[0].set_title("Observed data")
-    plt.colorbar(im0, ax=axs[0], fraction=0.046)
-
-    im1 = axs[1].imshow(result['deconvolved'], origin="lower")
-    axs[1].set_title("Model (deconvolved)")
-    plt.colorbar(im1, ax=axs[1], fraction=0.046)
-
-    im2 = axs[2].imshow(result['reconvolved'], origin="lower")
-    axs[2].set_title("Model (convolved)")
-    plt.colorbar(im2, ax=axs[2], fraction=0.046)
-
-    im3 = axs[3].imshow(result['residual'], origin="lower")
-    axs[3].set_title("Residual")
-    plt.colorbar(im3, ax=axs[3], fraction=0.046)
-
-    for ax in axs:
-        ax.set_xticks([])
-        ax.set_yticks([])
-        #ny, nx = data.shape
-        #ax.set_xlim(nx//2 -10,nx//2 +10)
-        #ax.set_ylim(ny//2 -20,ny//2 + 0)
-
-    fig.tight_layout()
-    fig.savefig(outname_maps, dpi = 300)
-    plt.close()
-
-
-def estimate_noise(_d, nitr=1000, thr=2.):
-    '''
-    Estimate map noise
-
-    _d (array): Data
-    nitr (int): Number of the maximum iteration
-    thr (float): Threshold of the each iteration
-    '''
-
-    d = _d.copy().ravel()
-    rms = np.sqrt(np.nanmean(d*d))
-    for i in range(nitr):
-        rms_p = rms
-        d[d >= thr*rms] = np.nan
-        rms = np.sqrt(np.nanmean(d*d))
-
-        if (rms - rms_p)*(rms - rms_p) < 1e-20:
-            return rms
-
-    print('Reach maximum number of iteration.')
-    return rms
-
-
-def radial_profile(
-    values: np.ndarray,
-    radius: np.ndarray,
-    n_bins: int,
-    r_max: float | None = None,
-    ) -> tuple[np.ndarray, np.ndarray]:
-    """Return an azimuthally averaged radial profile."""
-    valid = np.isfinite(values) & np.isfinite(radius)
-    if r_max is None:
-        r_max = float(np.nanmax(radius[valid]))
-    edges = np.linspace(0.0, r_max, n_bins + 1)
-    which = np.digitize(radius[valid], edges) - 1
-    in_range = (0 <= which) & (which < n_bins)
-    which = which[in_range]
-    vals = values[valid][in_range]
-
-    sums = np.bincount(which, weights=vals, minlength=n_bins)
-    counts = np.bincount(which, minlength=n_bins)
-    profile = np.full(n_bins, np.nan, dtype=float)
-    filled = counts > 0
-    profile[filled] = sums[filled] / counts[filled]
-    centers = 0.5 * (edges[:-1] + edges[1:])
-    return centers, profile
-
-
 class ChannelFit(ReadFits):
     """Fit a Keplerian disk or infalling envelope model directly to channel maps.
 
@@ -715,13 +308,7 @@ class ChannelFit(ReadFits):
                  disk: bool = True,
                  envelope: bool = False,
                  scaling: str = 'uniform',
-                 progressbar: bool = True,
-                 scaling_gp_args: dict = {
-                 'scale_length': 2.,
-                 'kernel': 'rbf',
-                 'sigma_f': None,
-                 'pad_factor': 2,
-                 'noise_clip_threshold': -1}) -> None:
+                 progressbar: bool = True) -> None:
         """Initialize channel-map fitting options."""
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2',
                           'pI', 'Rin', 'Ienv',
@@ -730,7 +317,6 @@ class ChannelFit(ReadFits):
         self.envelope = envelope
         self.scaling = scaling
         self.progressbar = progressbar
-        self.scaling_gp_args = scaling_gp_args
 
     def makegrid(self, cubefits: str | None = None,
                  pa: float = 0, incl: float = 90, dist: float = 1,
@@ -923,11 +509,6 @@ class ChannelFit(ReadFits):
                                           tikhonov_threshold=tikhonov_threshold,
                                           savetxt=savedeconvolved,
                                           loadtxt=loaddeconvolved)
-        elif self.scaling == 'mom0gp':
-            res = gpdeconvolve(self.mom0, self.sigma_mom0,
-                self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
-                **self.scaling_gp_args)
-            self.mom0decon = res["deconvolved"]
         if 'mom0' in self.scaling:
             c = convolve(self.mom0decon, self.gaussbeam, mode='same')
             self.resdecon = self.mom0 - c
@@ -935,12 +516,6 @@ class ChannelFit(ReadFits):
             rmsres = np.sqrt(np.mean(self.resdecon**2)) / self.sigma_mom0
             print(f'Max and rms are {maxres:.1f}sigma '
                   + f'and {rmsres:.1f}sigma in Moment 0 residual.')
-
-    def diagnose_gpdeconvolution(self, outname = None):
-        res = gpdeconvolve(self.mom0, self.sigma_mom0,
-                self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
-                **self.scaling_gp_args)
-        _diagnose_gpdeconvolution(res, self.mom0, outname = outname)
 
     def update_pa(self, pa: float):
         self.Xnest, self.Ynest = rot(self.Xnest0, self.Ynest0, np.radians(pa))
@@ -1059,6 +634,13 @@ class ChannelFit(ReadFits):
         ff = np.sum(Iout * Iout)
         scale = 0.0 if ff == 0 else fg / ff
         return scale
+
+    def peaktounity(self, I_in: np.ndarray) -> np.ndarray:
+        xypeak = np.max(I_in, axis=(1, 2))
+        scale = 1 / xypeak
+        scale[xypeak == 0] = 0
+        Iout = I_in * np.moveaxis([[scale]], 2, 0)
+        return Iout
 
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   h1: float = 0, h2: float = -1, pI: float = 0,

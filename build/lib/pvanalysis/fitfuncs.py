@@ -5,11 +5,11 @@ Fitting functions
 # modules
 import numpy as np
 # import os
-# import matplotlib.pyplot as plt
-# from matplotlib.gridspec import GridSpec
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
 from scipy import optimize
-# from scipy.stats import norm
-# from typing import Callable
+from scipy.stats import norm
+from typing import Callable
 
 
 # functions

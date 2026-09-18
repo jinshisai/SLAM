@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 SLAM: Spectral Line Analysis/Modeling
-================================
+=====================================
 
 **SLAM (Spectral Line Analysis/Modeling)** is a Python library for analyzing and modeling spectral line data at (sub)millimeter wavelengths, with a particular focus on rotational motions around (proto)stellar objects. The second release includes several packages for deriving rotation curves and estimating the dynamical mass of the central object. Details of the methods are presented `Aso & Sai (2024) <https://ui.adsabs.harvard.edu/abs/2024PKAS...39...27A/abstract>`_ and Aso, Sai et al. (2026) in prep.
 
@@ -28,20 +28,28 @@ Also, setting the path in .bashrc (or .zshrc etc.) will be useful.
 Versions
 ==================
 
-The latest, stable version is v2.0.0.
+The latest stable version is |release|.
 
 To use the stable version, go to the SLAM directory and type
 
 
-.. code-block:: bash
+.. parsed-literal::
 
    git tag -l # list tags (versions)
 
-   git checkout tags/v2.0.0 # choose v2.0.0
+   git checkout tags/|release| # choose |release|
 
 
 Contents
-=================
+========
+
+API reference
+-------------
+
+.. toctree::
+   :maxdepth: 2
+
+   slam
 
 PV Analysis
 ------------
@@ -53,8 +61,8 @@ PV Analysis
    tutorials/notes_pvanalysis.md
 
 
-More documents are coming soon
-----------
+API index and search
+====================
 
-.. toctree::
-   :maxdepth: 2
+* :ref:`API index <genindex>`
+* :ref:`Search the documentation <search>`
