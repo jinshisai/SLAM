@@ -28,6 +28,7 @@ def gauss1d(x: float | np.ndarray, amp: float, mean: float,
     return amp * np.exp2(-4. * ((x - mean) / fwhm)**2)
 '''
 
+
 def emcee_corner(bounds: list[list[float]] | np.ndarray,
                  log_prob_fn: Callable[..., float],
                  args: list[object] = [],

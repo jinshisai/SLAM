@@ -3,14 +3,14 @@ Analysis tools for PVfit
 
 '''
 
-#import sys
+# import sys
 import numpy as np
 # import scipy.optimize
 # from scipy.optimize import curve_fit
 # import matplotlib.pyplot as plt
 
-#sys.path.append('../')
-#from utils import gauss1d
+# sys.path.append('../')
+# from utils import gauss1d
 
 '''
 def edge(xdata: np.ndarray, ydata: np.ndarray, yerr: float,
@@ -89,6 +89,7 @@ def ridge_mean(xdata: np.ndarray, ydata: np.ndarray,
     err = yerr * np.abs(np.sum(xdata - val)) / np.sum(ydata)
     return [val, err]
 '''
+
 
 def p_inout(p_in: float, dp: float, t0: float | np.ndarray,
             t1: float | np.ndarray) -> float | np.ndarray:
@@ -216,6 +217,7 @@ def doublepower_r_error(v: float | np.ndarray, r_break: float,
     err2 = (dr_break / r_break)**2 + (dv_break / v_break / p)**2 \
         + (np.log(v_break / v_a) * perr / p**2)**2 + (dvsys / v_a / p)**2
     return np.sqrt(err2) * r0
+
 
 '''
 def read_pvfitres(fname: str, inner_threshold: float | None = None,

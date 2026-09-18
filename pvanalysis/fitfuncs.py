@@ -32,8 +32,8 @@ def gauss1d(x: float | np.ndarray, amp: float, mean: float,
 
 # for chi-square
 def chi_gauss1d(param: np.ndarray | list[float], xdata: np.ndarray,
-                 ydata: np.ndarray,
-                 ysig: float | np.ndarray) -> np.ndarray:
+                ydata: np.ndarray,
+                ysig: float | np.ndarray) -> np.ndarray:
     """Calculate normalized residuals for a one-dimensional Gaussian.
 
     Args:
@@ -172,6 +172,7 @@ def ridge_mean(xdata: np.ndarray, ydata: np.ndarray,
     val = np.average(xdata, weights=ydata)
     err = yerr * np.sqrt(np.sum((xdata - val)**2)) / np.sum(ydata)
     return val, err
+
 
 '''
 # functions

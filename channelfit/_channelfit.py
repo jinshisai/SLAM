@@ -455,8 +455,8 @@ def gpdeconvolve(
     ny, nx = image.shape
     py = int(pad_factor * ny)
     px = int(pad_factor * nx)
-    py = py + 1 if py%2 == 0 else py
-    px = px + 1 if px%2 == 0 else px
+    py = py + 1 if py % 2 == 0 else py
+    px = px + 1 if px % 2 == 0 else px
     padded_shape = (py, px)
 
     # Pad image to a larger grid to reduce periodic wrap-around.
@@ -468,11 +468,11 @@ def gpdeconvolve(
     yg = np.linspace(-pyh * dy, pyh * dy, py)
     s, t = rot(*np.meshgrid(xg, yg), np.radians(bpa))
     psf_pad = np.exp2(-4 * ((t / bmaj)**2 + (s / bmin)**2))
-    #psf_pad[psf_pad <= 1e-6] = 0.    # Set a floor at five sigma to prevent numeric errors in division
+    # psf_pad[psf_pad <= 1e-6] = 0.    # Set a floor at five sigma to prevent numeric errors in division
 
     # intrinsic noise
     beam_area = bmaj * bmin * np.pi / (4.*np.log(2.))    # in au^2 for default
-    pix_area  = np.abs(dx * dy)                          # in au for default
+    pix_area = np.abs(dx * dy)                          # in au for default
     sig_int = noise_std * np.sqrt(2. * pix_area / beam_area)    # deconvolved noise in Jy/pixel
     sig_int *= np.sqrt(nx * ny)    # Jy/pixel to Jy in Fourier space
 
@@ -495,7 +495,7 @@ def gpdeconvolve(
 
     # Build GP kernel on the padded grid.
     length_scale_pix = (bmaj + bmin)\
-    / (np.abs(dx) + np.abs(dy)) / (2.0 * np.sqrt(2.0 * np.log(2.0))) * scale_length
+        / (np.abs(dx) + np.abs(dy)) / (2.0 * np.sqrt(2.0 * np.log(2.0))) * scale_length
     kimg = make_periodic_gp_kernel(
         padded_shape,
         kernel=kernel,
@@ -510,7 +510,7 @@ def gpdeconvolve(
     # Posterior mean in Fourier space:
     # F_post = Shat / (Shat + sig_int^2) / Hhat * Y
     denom = Shat + sig_int**2
-    Ghat  = Shat / denom
+    Ghat = Shat / denom
     Ghat[Ghat <= 1e-6] = 0.    # Set a floor corresponding 5sigma of Gaussian to prevent numeric errors
     Fhat_post = Ghat / Hhat * Yhat
 
@@ -544,15 +544,16 @@ def gpdeconvolve(
         "xfreq": xfreq,
     }
 
-def _diagnose_gpdeconvolution(result, data, outname = None):
+
+def _diagnose_gpdeconvolution(result, data, outname=None):
     '''
     Make diagnostic plots for GP deconvolution.
     '''
     # radial plot
-    qy, qx   = np.meshgrid(result['yfreq'], result['xfreq'], indexing="ij")
+    qy, qx = np.meshgrid(result['yfreq'], result['xfreq'], indexing="ij")
     q_radius = np.sqrt(qx**2 + qy**2)
-    n_bins   = np.max([len(result['yfreq']), len(result['xfreq'])]) // 2
-    k_max    = np.nanmax(q_radius)
+    n_bins = np.max([len(result['yfreq']), len(result['xfreq'])]) // 2
+    k_max = np.nanmax(q_radius)
 
     outname_prof = 'gpdeconv_diagnostic_profiles.png'
     outname_maps = 'gpdeconv_diagnostic_maps.png'
@@ -561,7 +562,7 @@ def _diagnose_gpdeconvolution(result, data, outname = None):
         outname_maps = outname + '_' + outname_maps
 
     # figure
-    fig, axes = plt.subplots(1,2, figsize = (8.27, 3.6))
+    fig, axes = plt.subplots(1, 2, figsize=(8.27, 3.6))
     ax1, ax2 = axes
     cmap = plt.get_cmap('viridis')
 
@@ -569,15 +570,16 @@ def _diagnose_gpdeconvolution(result, data, outname = None):
     for _d, label, ci in zip(
         [result['FT_beam'], result['posterior_filter']],
         ['Beam', 'GP filter'],
-        [0.3, 0.6]):
+        [0.3, 0.6],
+    ):
         k_profile, amp_profile = radial_profile(
             np.abs(_d),
             q_radius,
             n_bins=n_bins,
             r_max=k_max,
         )
-        ax1.plot(k_profile, amp_profile, label = label,
-            color = cmap(ci), lw = 2.)
+        ax1.plot(k_profile, amp_profile, label=label,
+                 color=cmap(ci), lw=2.)
         amp_profs.append(amp_profile)
     for _d, label in zip([result['FT_image']], ['FT[img]']):
         k_profile, amp_profile = radial_profile(
@@ -586,26 +588,26 @@ def _diagnose_gpdeconvolution(result, data, outname = None):
             n_bins=n_bins,
             r_max=k_max,
         )
-        ax1.plot(k_profile, amp_profile / np.nanmax(amp_profile), label = label,
-            color = cmap(0.), lw=2)
+        ax1.plot(k_profile, amp_profile / np.nanmax(amp_profile), label=label,
+                 color=cmap(0.), lw=2)
         amp_profs.append(amp_profile)
     ax1.legend()
     ax1.set_ylabel('Normalized amplitude')
 
     ax2.set_ylabel('Amplitude')
     ax2.plot(k_profile, amp_profs[-1],
-        color = cmap(0.), lw = 2, label = 'FT[img] (Before deconv.)')
+             color=cmap(0.), lw=2, label='FT[img] (Before deconv.)')
     ax2.plot(k_profile, amp_profs[1] / amp_profs[0] * amp_profs[-1],
-        color = cmap(0.3), lw = 2, label = 'FT[img] (Deconvolved)')
+             color=cmap(0.3), lw=2, label='FT[img] (Deconvolved)')
     ax2.legend()
 
     k_plt_max = np.nanmin(k_profile[amp_profs[0] <= 4.e-5])
     for ax in axes:
         ax.set_xlim(0, k_plt_max)
-        #ax.set_ylim(-1e-4,1e-4)
+        # ax.set_ylim(-1e-4,1e-4)
         ax.set_xlabel('Frequency')
     fig.tight_layout()
-    fig.savefig(outname_prof, dpi = 300)
+    fig.savefig(outname_prof, dpi=300)
     plt.close()
 
     # 2D plot
@@ -632,12 +634,12 @@ def _diagnose_gpdeconvolution(result, data, outname = None):
     for ax in axs:
         ax.set_xticks([])
         ax.set_yticks([])
-        #ny, nx = data.shape
-        #ax.set_xlim(nx//2 -10,nx//2 +10)
-        #ax.set_ylim(ny//2 -20,ny//2 + 0)
+        # ny, nx = data.shape
+        # ax.set_xlim(nx//2 -10,nx//2 +10)
+        # ax.set_ylim(ny//2 -20,ny//2 + 0)
 
     fig.tight_layout()
-    fig.savefig(outname_maps, dpi = 300)
+    fig.savefig(outname_maps, dpi=300)
     plt.close()
 
 
@@ -664,12 +666,11 @@ def estimate_noise(_d, nitr=1000, thr=2.):
     return rms
 
 
-def radial_profile(
-    values: np.ndarray,
-    radius: np.ndarray,
-    n_bins: int,
-    r_max: float | None = None,
-    ) -> tuple[np.ndarray, np.ndarray]:
+def radial_profile(values: np.ndarray,
+                   radius: np.ndarray,
+                   n_bins: int,
+                   r_max: float | None = None,
+                   ) -> tuple[np.ndarray, np.ndarray]:
     """Return an azimuthally averaged radial profile."""
     valid = np.isfinite(values) & np.isfinite(radius)
     if r_max is None:
@@ -717,11 +718,11 @@ class ChannelFit(ReadFits):
                  scaling: str = 'uniform',
                  progressbar: bool = True,
                  scaling_gp_args: dict = {
-                 'scale_length': 2.,
-                 'kernel': 'rbf',
-                 'sigma_f': None,
-                 'pad_factor': 2,
-                 'noise_clip_threshold': -1}) -> None:
+                     'scale_length': 2.,
+                     'kernel': 'rbf',
+                     'sigma_f': None,
+                     'pad_factor': 2,
+                     'noise_clip_threshold': -1}) -> None:
         """Initialize channel-map fitting options."""
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2',
                           'pI', 'Rin', 'Ienv',
@@ -925,8 +926,8 @@ class ChannelFit(ReadFits):
                                           loadtxt=loaddeconvolved)
         elif self.scaling == 'mom0gp':
             res = gpdeconvolve(self.mom0, self.sigma_mom0,
-                self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
-                **self.scaling_gp_args)
+                               self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
+                               **self.scaling_gp_args)
             self.mom0decon = res["deconvolved"]
         if 'mom0' in self.scaling:
             c = convolve(self.mom0decon, self.gaussbeam, mode='same')
@@ -936,11 +937,11 @@ class ChannelFit(ReadFits):
             print(f'Max and rms are {maxres:.1f}sigma '
                   + f'and {rmsres:.1f}sigma in Moment 0 residual.')
 
-    def diagnose_gpdeconvolution(self, outname = None):
+    def diagnose_gpdeconvolution(self, outname=None):
         res = gpdeconvolve(self.mom0, self.sigma_mom0,
-                self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
-                **self.scaling_gp_args)
-        _diagnose_gpdeconvolution(res, self.mom0, outname = outname)
+                           self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
+                           **self.scaling_gp_args)
+        _diagnose_gpdeconvolution(res, self.mom0, outname=outname)
 
     def update_pa(self, pa: float):
         self.Xnest, self.Ynest = rot(self.Xnest0, self.Ynest0, np.radians(pa))
