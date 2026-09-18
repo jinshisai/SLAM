@@ -570,7 +570,8 @@ def _diagnose_gpdeconvolution(result, data, outname=None):
     for _d, label, ci in zip(
         [result['FT_beam'], result['posterior_filter']],
         ['Beam', 'GP filter'],
-        [0.3, 0.6]):
+        [0.3, 0.6],
+    ):
         k_profile, amp_profile = radial_profile(
             np.abs(_d),
             q_radius,
@@ -578,7 +579,7 @@ def _diagnose_gpdeconvolution(result, data, outname=None):
             r_max=k_max,
         )
         ax1.plot(k_profile, amp_profile, label=label,
-            color=cmap(ci), lw=2.)
+                 color=cmap(ci), lw=2.)
         amp_profs.append(amp_profile)
     for _d, label in zip([result['FT_image']], ['FT[img]']):
         k_profile, amp_profile = radial_profile(
@@ -588,16 +589,16 @@ def _diagnose_gpdeconvolution(result, data, outname=None):
             r_max=k_max,
         )
         ax1.plot(k_profile, amp_profile / np.nanmax(amp_profile), label=label,
-            color=cmap(0.), lw=2)
+                 color=cmap(0.), lw=2)
         amp_profs.append(amp_profile)
     ax1.legend()
     ax1.set_ylabel('Normalized amplitude')
 
     ax2.set_ylabel('Amplitude')
     ax2.plot(k_profile, amp_profs[-1],
-        color=cmap(0.), lw=2, label='FT[img] (Before deconv.)')
+             color=cmap(0.), lw=2, label='FT[img] (Before deconv.)')
     ax2.plot(k_profile, amp_profs[1] / amp_profs[0] * amp_profs[-1],
-        color=cmap(0.3), lw=2, label='FT[img] (Deconvolved)')
+             color=cmap(0.3), lw=2, label='FT[img] (Deconvolved)')
     ax2.legend()
 
     k_plt_max = np.nanmin(k_profile[amp_profs[0] <= 4.e-5])
@@ -925,8 +926,8 @@ class ChannelFit(ReadFits):
                                           loadtxt=loaddeconvolved)
         elif self.scaling == 'mom0gp':
             res = gpdeconvolve(self.mom0, self.sigma_mom0,
-                self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
-                **self.scaling_gp_args)
+                               self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
+                               **self.scaling_gp_args)
             self.mom0decon = res["deconvolved"]
         if 'mom0' in self.scaling:
             c = convolve(self.mom0decon, self.gaussbeam, mode='same')
@@ -938,8 +939,8 @@ class ChannelFit(ReadFits):
 
     def diagnose_gpdeconvolution(self, outname=None):
         res = gpdeconvolve(self.mom0, self.sigma_mom0,
-                self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
-                **self.scaling_gp_args)
+                           self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
+                           **self.scaling_gp_args)
         _diagnose_gpdeconvolution(res, self.mom0, outname=outname)
 
     def update_pa(self, pa: float):
