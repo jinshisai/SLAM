@@ -419,7 +419,10 @@ def gpdeconvolve(
     kernel : {"rbf", "matern32", "matern52"}
         Kernel that determines the covariance of the prior. Default is RBF.
     sigma_f : float or None
-        Prior standard deviation of the latent image.
+        Prior standard deviation of the latent image in unit of sigma_int,
+        which is the intrinsic noise in the FT domain. This parameter determines how top-hat
+        the filtering function is. A larger value results in a more top-hat filter.
+        To conserve the image flux density, values more than 10 are recommended.
         If None, estimated from the image flux density.
     scale_length : float
         GP correlation length in a unit of the beam size.
