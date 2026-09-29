@@ -3,3 +3,12 @@ nbsphinx
 myst_parser
 sphinx>=8
 sphinx_rtd_theme
+astropy>=7.2
+corner
+dynesty
+emcee>=3.1.5
+matplotlib
+numba
+numpy>=2.0
+scipy
+tqdm
