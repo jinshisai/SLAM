@@ -1,5 +1,5 @@
 [![Documentation Status](https://readthedocs.org/projects/slam-astro/badge/?version=latest)](https://slam-astro.readthedocs.io/en/latest/?badge=latest)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7944158.svg)](https://doi.org/10.5281/zenodo.7944158)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23053006.svg)](https://doi.org/10.5281/zenodo.23053006)
 
 
 # SLAM: Spectral Line Analysis/Modeling
@@ -58,7 +58,7 @@ export PYTHONPATH=${PYTHONPATH}:/YOUR_PATH_TO/SLAM
 
 ## Citation
 
-If you use SLAM for publications, please cite Aso, Sai et al. (2026 in prep) after it comes out, as well as [the latest release in Zenodo](https://doi.org/10.5281/zenodo.7944158):
+If you use SLAM for publications, please cite Aso, Sai et al. (2026 in prep) after it comes out, as well as [the latest release in Zenodo](https://doi.org/10.5281/zenodo.23053006):
 
 ```
 @software{aso_2026_7944158,
