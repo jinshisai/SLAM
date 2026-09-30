@@ -26,9 +26,8 @@ show_pv = True  # figures will be made regardless of this option.
 show_corner = True  # figures will be made regardless of this option.
 minabserr = 0.1  # minimum absolute errorbar in the unit of bmaj or dv.
 minrelerr = 0.01  # minimum relative errorbar.
-calc_evidence = False # If calculate Bayesian evidence or not.
+calc_evidence = False  # If calculate Bayesian evidence or not.
 '------------------------'
-
 
 
 '-------- HOW TO DO EACH STEP --------'
@@ -48,12 +47,12 @@ impv.fit_edgeridge(include_vsys=include_vsys,
                    calc_evidence=calc_evidence)
 impv.output_fitresult()
 impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot, flipaxis=False,
-                    clevels=[-9,-6,-3,3,6,9], outname=outname,
+                    clevels=[-9, -6, -3, 3, 6, 9], outname=outname,
                     show=show_pv, logcolor=True, Tbcolor=False,
-                    kwargs_pcolormesh={'cmap':'viridis'},
-                    kwargs_contour={'colors':'lime'},
-                    fmt={'edge':'v', 'ridge':'o'},
-                    linestyle={'edge':'--', 'ridge':'-'},
+                    kwargs_pcolormesh={'cmap': 'viridis'},
+                    kwargs_contour={'colors': 'lime'},
+                    fmt={'edge': 'v', 'ridge': 'o'},
+                    linestyle={'edge': '--', 'ridge': '-'},
                     plotridgepoint=True, plotedgepoint=True,
                     plotridgemodel=True, plotedgemodel=True)
 '-------------------------------------'

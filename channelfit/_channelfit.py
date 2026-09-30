@@ -1,14 +1,7 @@
 # -*- coding: utf-8 -*-
-#----------------------------------------------------------------------------
-# Created By  : Yusuke Aso
-# Created Date: 2022 Jan 27
-# version = alpha
-# ---------------------------------------------------------------------------
 """
 This script makes model channel maps from the observed mom0 by assuming 2D velocity pattern.
 The main class ChannelFit can be imported to do each steps separately.
-
-Note. FITS files with multiple beams are not supported. The dynamic range for xlim_plot and vlim_plot should be >10 for nice tick labels.
 """
 
 import numpy as np
@@ -33,30 +26,38 @@ vunit = np.sqrt(GG * M_sun / au) * 1e-3
 
 
 def avefour(a: np.ndarray) -> np.ndarray:
-    b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2] 
+    b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2]
          + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
     return b
-    
-def makemom01(d: np.ndarray, v: np.ndarray, sigma: float) -> dict:
+
+
+def makemom012(d: np.ndarray, v: np.ndarray, sigma: float,
+               threshold: float = 3) -> dict:
     dmasked = np.nan_to_num(d)
     dv = np.min(v[1:] - v[:-1])
-    mom0 = np.sum(d, axis=0) * dv
+    mom0 = np.sum(dmasked, axis=0) * dv
     sigma_mom0 = sigma * dv * np.sqrt(len(d))
-    vv = np.moveaxis([[v]], 2, 0)
-    dmasked[dmasked < 3 * sigma] = 0
-    mom1 = np.sum(d * vv, axis=0) / np.sum(d, axis=0)
-    mom2 = np.sqrt(np.sum(d * (vv - mom1)**2, axis=0), np.sum(d, axis=0))
-    mom1[mom0 < 3 * sigma_mom0] = np.nan
-    return {'mom0':mom0, 'mom1':mom1, 'mom2':mom2, 'sigma_mom0':sigma_mom0}
-    
+    dmasked[dmasked < threshold * sigma] = 0
+    dsum = np.sum(dmasked, axis=0)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        mom1 = np.sum(dmasked * v[:, None, None], axis=0) / dsum
+        Iv2 = np.sum(dmasked * (v[:, None, None] - mom1)**2, axis=0)
+        mom2 = np.sqrt(Iv2 / dsum)
+    mom1[mom0 < threshold * sigma_mom0] = np.nan
+    mom2[mom0 < threshold * sigma_mom0] = np.nan
+    return {'mom0': mom0, 'mom1': mom1, 'mom2': mom2,
+            'sigma_mom0': sigma_mom0}
+
+
 def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
           threshold: float = 2, gain: float = 0.01,
           weakestcomponent: float = 0.3,
           savetxt: str | None = None, loadtxt: str | None = None) -> np.ndarray:
     if loadtxt is not None:
-        print(f'Load clean components of moment 0 from {loadtxt}.')
+        print(f'Load deconvolved moment 0 from {loadtxt}.')
         cleancomponent = np.loadtxt(loadtxt)
         return cleancomponent
+
     shape = np.shape(data)
     cleancomponent = data * 0
     cleanresidual = data * 1
@@ -85,7 +86,8 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     if savetxt is not None:
         np.savetxt(savetxt, cleancomponent)
     return cleancomponent
-    
+
+
 def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bmaj: float, bmin: float, bpa: float, sigma: float,
                     savetxt: str | None = None, loadtxt: str | None = None,
@@ -135,6 +137,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         bounds = [np.zeros_like(p0), np.full_like(p0, np.max(drot))]
         popt, _ = curve_fit(model, [Yi, Xi], np.ravel(drot),
                             p0=p0, bounds=bounds)
+        print('Found a deconvolved solution.')
     else:
         niter = 20
         if progressbar:
@@ -155,6 +158,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         Par0[i_p, j_p] = 0
                     else:
                         bounds = [0, dd]
+
                         def model(x, par):
                             values = Par0 + 0
                             values[i_p, j_p] = par
@@ -166,7 +170,8 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
                                             sigma=[sigma], absolute_sigma=True,
                                             bounds=bounds)
-                        Par0[i_p, j_p] = popt
+                        Par0[i_p, j_p] = popt[0]
+        print('Found a deconvolved solution.')
         print('')
         popt = np.ravel(Par0)
     if savetxt is not None:
@@ -177,9 +182,38 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     decon = f(tuple(rot(*np.meshgrid(x, y), np.radians(bpa)))[::-1])
     return decon, xmodel, ymodel, zmodel
 
+
 def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
-                  bmaj: float, bmin: float, bpa: float,
-                  sigma: float, threshold: float = 3) -> np.ndarray:
+                 bmaj: float, bmin: float, bpa: float,
+                 tikhonov_threshold: float = 6.25e-2,
+                 savetxt: str | None = None, loadtxt: str | None = None
+                 ) -> np.ndarray:
+    """
+    Deconvolve an image with a Gaussian beam using zero-order Tikhonov
+    regularization in Fourier space.
+
+    Notes
+    -----
+    The FFT calculation assumes periodic (circular) convolution, so boundary
+    pixels can be affected by wrap-around and other edge artifacts. The input
+    image should contain an emission-free margin of at least one beam major
+    axis around the scientifically useful region; a wider margin is
+    preferable.
+
+    A cosine taper is applied within approximately one beam major-axis width
+    of the boundary after calculating the Tikhonov solution. The returned
+    image is therefore a deliberately edge-tapered version of that solution,
+    and pixels in the tapered region should not be interpreted quantitatively.
+
+    For an even-sized axis, the first row or column is temporarily omitted to
+    construct an odd-sized FFT grid and restored as zeros after deconvolution.
+    This assumes that the input boundaries contain no significant emission.
+    """
+    if loadtxt is not None:
+        print(f'Load deconvolved moment 0 from {loadtxt}.')
+        dnew = np.loadtxt(loadtxt)
+        return dnew
+
     xd = x[int(len(x) % 2 == 0):]
     yd = y[int(len(y) % 2 == 0):]
     d = data[int(len(y) % 2 == 0):, int(len(x) % 2 == 0):]
@@ -195,27 +229,504 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     u, v = np.meshgrid(u, v)
     phase0 = 2 * np.pi * (u * (xg[-1] + dx) + v * (yg[-1] + dy))
     FTg = np.fft.fftshift(np.fft.fft2(g)) * np.exp(-1j * phase0)
-    rFTg = np.real(FTg)
-    FTg = rFTg + 1j * 0
-    FTg[rFTg < np.max(rFTg) * 1e-2] = 1 + 1j * 0
     phase0 = 2 * np.pi * (u * (xd[-1] + dx) + v * (yd[-1] + dy))
     FTd = np.fft.fftshift(np.fft.fft2(d)) * np.exp(-1j * phase0)
-    FTdnew = FTd / FTg
+    abs_FTg = np.abs(FTg)
+    thre = tikhonov_threshold * np.max(abs_FTg)
+    inverse_filter = np.conj(FTg) / (abs_FTg**2 + thre**2)
+    # ----------------------------------------------------------------
+    # FTdnew is the zero-order Tikhonov solution on the periodic FFT grid:
+    #
+    #   argmin_X sum(|FTg * X - FTd|^2 + thre^2 * |X|^2).
+    #
+    # By Parseval's theorem, this is equivalent, up to the common FFT
+    # normalization, to minimizing
+    #
+    #   sum(|g (*) dnew - d|^2 + thre^2 * |dnew|^2),
+    #
+    # where (*) denotes circular convolution. The image-domain edge taper
+    # applied below is intentional post-processing and changes the returned
+    # image from this exact minimizer.
+    # ----------------------------------------------------------------
+    FTdnew = FTd * inverse_filter
+    print('Tikhonov regularization is used for Fourier-space deconvolution '
+          + f'with a transition at {tikhonov_threshold:.4f} times'
+          + ' the FT[beam] peak.')
     dnew = np.real(np.fft.ifft2(np.fft.ifftshift(FTdnew * np.exp(1j * phase0))))
-    dnew[np.abs(d) < sigma * threshold] = 0
     if len(x) % 2 == 0:
         dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
     if len(y) % 2 == 0:
         dnew = np.concatenate((np.zeros((1, np.shape(dnew)[1])), dnew), axis=0)
+    edge_width = int(bmaj / min(abs(dx), abs(dy)) + 0.5)
+    if edge_width > 0:
+        # Suppress unreliable boundary behavior caused by circular
+        # convolution. This post-processing assumes that scientifically useful
+        # emission is separated from the boundary by a sufficiently wide,
+        # emission-free margin.
+        if 2 * edge_width >= min(dnew.shape):
+            warnings.warn(
+                'The edge-taper regions overlap or occupy the entire image. '
+                'Use a wider input image for mom0ft deconvolution.'
+            )
+        iy = np.arange(np.shape(dnew)[0])
+        ix = np.arange(np.shape(dnew)[1])
+        ydist = np.minimum(iy, iy[::-1])
+        xdist = np.minimum(ix, ix[::-1])
+        dist = np.minimum(ydist[:, None], xdist[None, :])
+        taper = np.ones_like(dnew)
+        edge = dist < edge_width
+        taper[edge] = 0.5 * (1 - np.cos(np.pi * dist[edge] / edge_width))
+        dnew = dnew * taper
+    if savetxt is not None:
+        np.savetxt(savetxt, dnew)
     return dnew
 
+
+def _periodic_distance_axis(n):
+    """
+    Periodic distance from index 0 on a length-n grid:
+    [0, 1, 2, ..., floor(n/2), ..., 2, 1]
+    """
+    idx = np.arange(n)
+    return np.minimum(idx, n - idx)
+
+
+def make_periodic_gp_kernel(
+    shape,
+    kernel="rbf",
+    sigma_f=1.0,
+    length_scale_pix=3.0,
+):
+    """
+    Create a stationary GP covariance kernel image on a periodic grid.
+
+    This kernel image is used to build the covariance eigenvalues by FFT.
+
+    Parameters
+    ----------
+    shape : tuple[int, int]
+        Shape (ny, nx).
+    kernel : {"rbf", "matern32", "matern52"}
+        Choice of GP kernel.
+    sigma_f : float
+        Prior standard deviation of the latent image.
+    length_scale_pix : float
+        Correlation length in pixels.
+
+    Returns
+    -------
+    kimg : ndarray
+        Kernel image whose FFT gives the prior power per Fourier mode.
+    """
+    ny, nx = shape
+    dy = _periodic_distance_axis(ny)
+    dx = _periodic_distance_axis(nx)
+    yy, xx = np.meshgrid(dy, dx, indexing="ij")
+    r = np.sqrt(xx**2 + yy**2)
+
+    ell = float(length_scale_pix)
+    if ell <= 0:
+        raise ValueError("length_scale_pix must be > 0")
+
+    if kernel == "rbf":
+        kimg = np.exp(-0.5 * (r / ell) ** 2)
+    elif kernel == "matern32":
+        z = np.sqrt(3.0) * r / ell
+        kimg = (1.0 + z) * np.exp(-z)
+    elif kernel == "matern52":
+        z = np.sqrt(5.0) * r / ell
+        kimg = (1.0 + z + z**2 / 3.0) * np.exp(-z)
+    else:
+        raise ValueError("kernel must be one of: 'rbf', 'matern32', 'matern52'")
+
+    # normalize
+    kimg /= kimg.sum()
+    kimg *= sigma_f**2
+
+    return kimg
+
+
+def _pad_to_shape(arr, out_shape):
+    """Zero-pad a 2D array to out_shape, centering the original array."""
+    in_y, in_x = arr.shape
+    out_y, out_x = out_shape
+    if in_y > out_y or in_x > out_x:
+        raise ValueError("Input array is larger than output shape.")
+
+    y0 = (out_y - in_y) // 2
+    x0 = (out_x - in_x) // 2
+
+    out = np.zeros(out_shape, dtype=float)
+    out[y0:y0 + in_y, x0:x0 + in_x] = arr
+    return out, (y0, x0)
+
+
+def _crop_center(arr, shape):
+    """Crop the central region of arr to shape."""
+    in_y, in_x = arr.shape
+    out_y, out_x = shape
+    y0 = (in_y - out_y) // 2
+    x0 = (in_x - out_x) // 2
+    return arr[y0:y0 + out_y, x0:x0 + out_x]
+
+
+def gpdeconvolve(
+    image: np.ndarray, noise_std: float,
+    bmaj: float, bmin: float, bpa: float,
+    dx: float, dy: float,
+    kernel: str = "rbf",
+    sigma_f: float | None = None,
+    scale_length: float = 1.0,
+    pad_factor: int = 2,
+    noise_clip_threshold: float = -1,
+):
+    """
+    Gaussian prior deconvolution of a 2D image using Fourier-domain posterior mean
+    based on Gaussian Process (GP).
+
+    Model
+    -----
+    y = H f + n,
+     where y is the vectorized, observed image, H is the beam convolution matrix,
+     f is the true image to guess, n is the intrinsic thermal noise.
+
+    Assumptions
+    -----------
+    f ~ N(0, K); K is the covariance matrix
+    n ~ N(0, noise_std^2 I); I is the identity matrix
+
+    Parameters
+    ----------
+    image : ndarray
+        Observed 2D image (ny, nx).
+    noise_std : float
+        Standard deviation of the image noise in the same intensity unit
+        as the image.
+    bmaj : float
+        Beam major FWHM. Unit can be arbitral
+        but must be the same as that of the pixel length.
+    bmin : float
+        Beam minor FWHM. Unit can be arbitral
+        but must be the same as that of the pixel length.
+    bpa : float
+        Position angle of the beam (deg).
+    dx : float
+        pixel size along x axis. Unit can be arbitral
+        but must be the same as that of the beam size.
+    dy : float
+        pixel size along y axis. Unit can be arbitral
+        but must be the same as that of the beam size.
+    kernel : {"rbf", "matern32", "matern52"}
+        Kernel that determines the covariance of the prior. Default is RBF.
+    sigma_f : float or None
+        Prior standard deviation of the latent image in unit of sigma_int,
+        which is the intrinsic noise in the FT domain. This parameter determines how top-hat
+        the filtering function is. A larger value results in a more top-hat filter.
+        To conserve the image flux density, values more than 10 are recommended.
+        If None, estimated from the image flux density.
+    scale_length : float
+        GP correlation length in a unit of the beam size.
+        E.g., scale_length = 2 means the correlation length is twice the beam size.
+    pad_factor : int
+        Zero-padding factor to reduce FFT wrap-around artifacts.
+        1 means no extra padding. 2 is a good default.
+    noise_clip_threshold : float
+        Threshold to clip noise in the deconvolved model image.
+        If negative values are given, no noise clipping will be performed.
+
+    Returns
+    -------
+    result : dict
+        Dictionary containing:
+        - "deconvolved": posterior mean latent image in Jy/pixel
+        - "reconvolved": posterior mean convolved back with the PSF
+        - "residual": image - reconvolved
+        - "FT_image": Fourier transform of the input image in Jy.
+        - "FT_beam": Fourier transform of the beam.
+        - "posterior_filter": GP Filter function in the Fourier space.
+        - "yfreq": Frequency in the Fourier space, corresponding to the y axis in the image domain.
+        - "xfreq": Frequency in the Fourier space, corresponding to the x axis in the image domain.
+    """
+    image = np.asarray(image, dtype=float)
+
+    if image.ndim != 2:
+        raise ValueError("image and psf must both be 2D arrays")
+    if noise_std <= 0:
+        raise ValueError("noise_std must be > 0")
+
+    # Padded shape; always odd size for simplicity in FFT
+    ny, nx = image.shape
+    py = int(pad_factor * ny)
+    px = int(pad_factor * nx)
+    py = py + 1 if py % 2 == 0 else py
+    px = px + 1 if px % 2 == 0 else px
+    padded_shape = (py, px)
+
+    # Pad image to a larger grid to reduce periodic wrap-around.
+    image_pad, _ = _pad_to_shape(image, padded_shape)
+
+    # Generate PSF
+    pyh, pxh = (py - 1) // 2, (px - 1) // 2
+    xg = np.linspace(-pxh * dx, pxh * dx, px)
+    yg = np.linspace(-pyh * dy, pyh * dy, py)
+    s, t = rot(*np.meshgrid(xg, yg), np.radians(bpa))
+    psf_pad = np.exp2(-4 * ((t / bmaj)**2 + (s / bmin)**2))
+    # psf_pad[psf_pad <= 1e-6] = 0.    # Set a floor at five sigma to prevent numeric errors in division
+
+    # intrinsic noise
+    beam_area = bmaj * bmin * np.pi / (4.*np.log(2.))    # in au^2 for default
+    pix_area = np.abs(dx * dy)                          # in au for default
+    sig_int = noise_std * np.sqrt(2. * pix_area / beam_area)    # deconvolved noise in Jy/pixel
+    sig_int *= np.sqrt(nx * ny)    # Jy/pixel to Jy in Fourier space
+
+    # Normalize PSF if needed.
+    psf_sum = psf_pad.sum()
+    if psf_sum <= 0:
+        raise ValueError("PSF sum must be positive")
+    psf_pad = psf_pad / psf_sum
+
+    # Fourier-domain quantities.
+    # PSF is assumed centered in the middle of the array.
+    # ifftshift moves its center to [0,0] for correct FFT convolution.
+    Hhat = np.fft.fft2(np.fft.ifftshift(psf_pad))
+    Yhat = np.fft.fft2(image_pad)
+
+    if sigma_f is None:
+        sigma_f = np.nanmax(np.abs(Yhat)) * pix_area / beam_area    # flux in Jy
+    else:
+        sigma_f *= sig_int    # scaled by sig_int
+
+    # Build GP kernel on the padded grid.
+    length_scale_pix = (bmaj + bmin)\
+        / (np.abs(dx) + np.abs(dy)) / (2.0 * np.sqrt(2.0 * np.log(2.0))) * scale_length
+    kimg = make_periodic_gp_kernel(
+        padded_shape,
+        kernel=kernel,
+        sigma_f=sigma_f,
+        length_scale_pix=length_scale_pix,
+    )
+
+    # Prior power for each Fourier mode.
+    # Numerical round-off can make tiny negative values; clip them.
+    Shat = np.real(np.fft.fft2(kimg))
+
+    # Posterior mean in Fourier space:
+    # F_post = Shat / (Shat + sig_int^2) / Hhat * Y
+    denom = Shat + sig_int**2
+    Ghat = Shat / denom
+    Ghat[Ghat <= 1e-6] = 0.    # Set a floor corresponding 5sigma of Gaussian to prevent numeric errors
+    Fhat_post = Ghat / Hhat * Yhat
+
+    # Back to image space.
+    f_post_pad = np.real(np.fft.ifft2(Fhat_post))
+
+    if noise_clip_threshold > 0.:
+        noise_dec = estimate_noise(f_post_pad)
+        f_post_pad[f_post_pad < noise_clip_threshold * noise_dec] = 0.
+
+    # Reconvolution for consistency check.
+    reconv_pad = np.real(np.fft.ifft2(Hhat * np.fft.fft2(f_post_pad)))
+
+    # Crop back to original image size.
+    deconvolved = _crop_center(f_post_pad, image.shape)
+    reconvolved = _crop_center(reconv_pad, image.shape)
+    residual = image - reconvolved
+
+    # for check
+    yfreq = np.fft.fftfreq(py)    # unshifted; np.fft.fftshift if shifted
+    xfreq = np.fft.fftfreq(px)    # unshifted; np.fft.fftshift if shifted
+
+    return {
+        "deconvolved": deconvolved * pix_area / beam_area,    # in Jy/pixel
+        "reconvolved": reconvolved,
+        "residual": residual,
+        "FT_image": Yhat * pix_area / beam_area,    # in Jy
+        "FT_beam": Hhat,
+        "posterior_filter": Ghat,
+        "yfreq": yfreq,
+        "xfreq": xfreq,
+    }
+
+
+def _diagnose_gpdeconvolution(result, data, outname=None):
+    '''
+    Make diagnostic plots for GP deconvolution.
+    '''
+    # radial plot
+    qy, qx = np.meshgrid(result['yfreq'], result['xfreq'], indexing="ij")
+    q_radius = np.sqrt(qx**2 + qy**2)
+    n_bins = np.max([len(result['yfreq']), len(result['xfreq'])]) // 2
+    k_max = np.nanmax(q_radius)
+
+    outname_prof = 'gpdeconv_diagnostic_profiles.png'
+    outname_maps = 'gpdeconv_diagnostic_maps.png'
+    if outname is not None:
+        outname_prof = outname + '_' + outname_prof
+        outname_maps = outname + '_' + outname_maps
+
+    # figure
+    fig, axes = plt.subplots(1, 2, figsize=(8.27, 3.6))
+    ax1, ax2 = axes
+    cmap = plt.get_cmap('viridis')
+
+    amp_profs = []
+    for _d, label, ci in zip(
+        [result['FT_beam'], result['posterior_filter']],
+        ['Beam', 'GP filter'],
+        [0.3, 0.6],
+    ):
+        k_profile, amp_profile = radial_profile(
+            np.abs(_d),
+            q_radius,
+            n_bins=n_bins,
+            r_max=k_max,
+        )
+        ax1.plot(k_profile, amp_profile, label=label,
+                 color=cmap(ci), lw=2.)
+        amp_profs.append(amp_profile)
+    for _d, label in zip([result['FT_image']], ['FT[img]']):
+        k_profile, amp_profile = radial_profile(
+            np.abs(_d),
+            q_radius,
+            n_bins=n_bins,
+            r_max=k_max,
+        )
+        ax1.plot(k_profile, amp_profile / np.nanmax(amp_profile), label=label,
+                 color=cmap(0.), lw=2)
+        amp_profs.append(amp_profile)
+    ax1.legend()
+    ax1.set_ylabel('Normalized amplitude')
+
+    ax2.set_ylabel('Amplitude')
+    ax2.plot(k_profile, amp_profs[-1],
+             color=cmap(0.), lw=2, label='FT[img] (Before deconv.)')
+    ax2.plot(k_profile, amp_profs[1] / amp_profs[0] * amp_profs[-1],
+             color=cmap(0.3), lw=2, label='FT[img] (Deconvolved)')
+    ax2.legend()
+
+    k_plt_max = np.nanmin(k_profile[amp_profs[0] <= 4.e-5])
+    for ax in axes:
+        ax.set_xlim(0, k_plt_max)
+        # ax.set_ylim(-1e-4,1e-4)
+        ax.set_xlabel('Frequency')
+    fig.tight_layout()
+    fig.savefig(outname_prof, dpi=300)
+    plt.close()
+
+    # 2D plot
+    fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+    axs = axes.ravel()
+
+    # data
+    im0 = axs[0].imshow(data, origin="lower")
+    axs[0].set_title("Observed data")
+    plt.colorbar(im0, ax=axs[0], fraction=0.046)
+
+    im1 = axs[1].imshow(result['deconvolved'], origin="lower")
+    axs[1].set_title("Model (deconvolved)")
+    plt.colorbar(im1, ax=axs[1], fraction=0.046)
+
+    im2 = axs[2].imshow(result['reconvolved'], origin="lower")
+    axs[2].set_title("Model (convolved)")
+    plt.colorbar(im2, ax=axs[2], fraction=0.046)
+
+    im3 = axs[3].imshow(result['residual'], origin="lower")
+    axs[3].set_title("Residual")
+    plt.colorbar(im3, ax=axs[3], fraction=0.046)
+
+    for ax in axs:
+        ax.set_xticks([])
+        ax.set_yticks([])
+        # ny, nx = data.shape
+        # ax.set_xlim(nx//2 -10,nx//2 +10)
+        # ax.set_ylim(ny//2 -20,ny//2 + 0)
+
+    fig.tight_layout()
+    fig.savefig(outname_maps, dpi=300)
+    plt.close()
+
+
+def estimate_noise(_d, nitr=1000, thr=2.):
+    '''
+    Estimate map noise
+
+    _d (array): Data
+    nitr (int): Number of the maximum iteration
+    thr (float): Threshold of the each iteration
+    '''
+
+    d = _d.copy().ravel()
+    rms = np.sqrt(np.nanmean(d*d))
+    for i in range(nitr):
+        rms_p = rms
+        d[d >= thr*rms] = np.nan
+        rms = np.sqrt(np.nanmean(d*d))
+
+        if (rms - rms_p)*(rms - rms_p) < 1e-20:
+            return rms
+
+    print('Reach maximum number of iteration.')
+    return rms
+
+
+def radial_profile(values: np.ndarray,
+                   radius: np.ndarray,
+                   n_bins: int,
+                   r_max: float | None = None,
+                   ) -> tuple[np.ndarray, np.ndarray]:
+    """Return an azimuthally averaged radial profile."""
+    valid = np.isfinite(values) & np.isfinite(radius)
+    if r_max is None:
+        r_max = float(np.nanmax(radius[valid]))
+    edges = np.linspace(0.0, r_max, n_bins + 1)
+    which = np.digitize(radius[valid], edges) - 1
+    in_range = (0 <= which) & (which < n_bins)
+    which = which[in_range]
+    vals = values[valid][in_range]
+
+    sums = np.bincount(which, weights=vals, minlength=n_bins)
+    counts = np.bincount(which, minlength=n_bins)
+    profile = np.full(n_bins, np.nan, dtype=float)
+    filled = counts > 0
+    profile[filled] = sums[filled] / counts[filled]
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    return centers, profile
+
+
 class ChannelFit(ReadFits):
+    """Fit a Keplerian disk or infalling envelope model directly to channel maps.
+
+    Args:
+        disk (bool, optional): Whether to include the disk component. Defaults
+            to True.
+        envelope (bool, optional): Whether to include the envelope component.
+            Defaults to False.
+        scaling (str, optional): Method used to set the model intensity.
+            ``'uniform'`` does not use the observed moment-0 map as a spatial
+            template: the intensity follows the ``pI`` and ``Ienv`` model,
+            and one global scale factor is fitted to the cube. Each method
+            whose name begins with ``'mom0'`` instead normalizes the
+            velocity-integrated model at every sky position to a deconvolved
+            observed moment-0 map. ``'mom0clean'`` obtains that map with
+            CLEAN, ``'mom0model'`` uses a nonnegative model-grid
+            deconvolution, and ``'mom0ft'`` uses zero-order Tikhonov
+            regularization in Fourier space. Defaults to ``'uniform'``.
+        progressbar (bool, optional): Whether to display progress bars during
+            deconvolution and fitting. Defaults to True.
+    """
 
     def __init__(self,
                  disk: bool = True,
                  envelope: bool = False,
                  scaling: str = 'uniform',
-                 progressbar: bool = True):
+                 progressbar: bool = True,
+                 scaling_gp_args: dict = {
+                     'scale_length': 2.,
+                     'kernel': 'rbf',
+                     'sigma_f': None,
+                     'pad_factor': 2,
+                     'noise_clip_threshold': -1}) -> None:
+        """Initialize channel-map fitting options."""
         self.paramkeys = ['Mstar', 'Rc', 'cs', 'h1', 'h2',
                           'pI', 'Rin', 'Ienv',
                           'xoff', 'yoff', 'voff', 'incloff', 'paoff']
@@ -223,6 +734,7 @@ class ChannelFit(ReadFits):
         self.envelope = envelope
         self.scaling = scaling
         self.progressbar = progressbar
+        self.scaling_gp_args = scaling_gp_args
 
     def makegrid(self, cubefits: str | None = None,
                  pa: float = 0, incl: float = 90, dist: float = 1,
@@ -230,13 +742,65 @@ class ChannelFit(ReadFits):
                  rmax: float = 1e4,
                  vlim: tuple[float, float, float, float] = (-100, 0, 0, 100),
                  sigma: float | None = None, nlayer: int = 3,
-                 xskip: int = 1, yskip: int = 1, skipto: int | None = False,
+                 xskip: int = 1, yskip: int = 1,
+                 skipto: int | bool | None = False,
                  gaussmargin: float = 1.6,
+                 tikhonov_threshold: float = 6.25e-2,
                  savedeconvolved: str | None = None,
                  loaddeconvolved: str | None = None,
                  signmajor: int | None = None,
-                 signminor: int | None = None):
-        if not (cubefits is None):
+                 signminor: int | None = None) -> None:
+        """Read a cube and prepare the observational and nested model grids.
+
+        Args:
+            cubefits (str or None, optional): Input channel-map FITS file.
+                Defaults to None.
+            pa (float, optional): Position angle of the disk major axis in
+                degrees. Defaults to 0.
+            incl (float, optional): Disk inclination in degrees. Defaults to
+                90.
+            dist (float, optional): Source distance in pc. Defaults to 1.
+            center (str or None, optional): Sky coordinates of the model
+                center. Defaults to None.
+            vsys (float, optional): Systemic velocity in km/s. Defaults to 0.
+            rmax (float, optional): Half-width of the fitted area in au.
+                Defaults to 1e4.
+            vlim (tuple, optional): Boundaries of the fitted blue and red
+                velocity ranges, relative to ``vsys``, in km/s. Defaults to
+                (-100, 0, 0, 100).
+            sigma (float or None, optional): RMS noise of the cube. None means
+                automatic estimation. Defaults to None.
+            nlayer (int, optional): Number of nested model-grid layers.
+                Defaults to 3.
+            xskip (int, optional): Pixel stride along the x axis. Defaults to
+                1.
+            yskip (int, optional): Pixel stride along the y axis. Defaults to
+                1.
+            skipto (int, bool, or None, optional): Approximate number of
+                pixels per beam minor axis after resampling. False or None
+                disables automatic resampling. Defaults to False.
+            gaussmargin (float, optional): Beam-kernel margin in units of the
+                beam major axis. Defaults to 1.6.
+            tikhonov_threshold (float, optional): Regularization threshold for
+                Fourier deconvolution. Defaults to 6.25e-2.
+            savedeconvolved (str or None, optional): File in which to save the
+                deconvolved moment-0 map. Defaults to None.
+            loaddeconvolved (str or None, optional): File from which to load a
+                previously deconvolved moment-0 map. Defaults to None.
+            signmajor (int or None, optional): Sign of the rotational
+                line-of-sight velocity. +1 makes the positive major-axis side (i.e., pa)
+                redshifted and -1 makes it blueshifted. Zero suppresses the
+                rotational contribution. None determines the sign from the
+                observed moment-1 map. Defaults to None.
+            signminor (int or None, optional): Sign of the radial-infall
+                line-of-sight velocity. For inward motion, +1 makes the
+                positive minor-axis side blueshifted (i.e., pa+90) and -1 makes it
+                redshifted. Zero suppresses the radial contribution. This
+                option affects only a model with radial motion, such as when
+                ``envelope=True``. None determines the sign from the observed
+                moment-1 map. Defaults to None.
+        """
+        if cubefits is not None:
             self.read_cubefits(cubefits, center, dist, vsys,
                                -rmax, rmax, -rmax, rmax, None, None,
                                xskip, yskip, sigma)
@@ -261,7 +825,7 @@ class ChannelFit(ReadFits):
         self.cospa = np.cos(pa_rad)
         self.sinpa = np.sin(pa_rad)
         self.X, self.Y = np.meshgrid(self.x, self.y)
-        
+
         self.v_nanblue = v[v < vlim[0]]
         self.v_blue = v[(vlim[0] <= v) * (v <= vlim[1])]
         self.v_nanmid = v[(vlim[1] < v) * (v < vlim[2])]
@@ -271,9 +835,9 @@ class ChannelFit(ReadFits):
 
         self.data_blue = self.data[(vlim[0] <= v) * (v <= vlim[1])]
         self.data_red = self.data[(vlim[2] <= v) * (v <= vlim[3])]
-        self.data_valid = np.append(self.data_blue, self.data_red, axis=0) 
-        
-        m = makemom01(self.data_valid, self.v_valid, sigma)
+        self.data_valid = np.append(self.data_blue, self.data_red, axis=0)
+
+        m = makemom012(self.data_valid, self.v_valid, sigma)
         self.mom0 = m['mom0']
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
@@ -287,7 +851,7 @@ class ChannelFit(ReadFits):
             self.signminor = np.sign(np.nansum(self.mom1 * X)) * (-1)
         else:
             self.signminor = signminor
-        
+
         # 2d nested grid on the disk plane.
         # x and y are minor and major axis coordinates before projection.
         r_need = rmax + gaussmargin * self.bmaj
@@ -325,15 +889,15 @@ class ChannelFit(ReadFits):
                   + f' {xnest[l][1]-xnest[l][0]:.2f} au,'
                   + f' {npix:d}')
         print('-----------------------------')
-        
+
         ngauss = int(gaussmargin * self.bmaj / dpix + 0.5)  # 0.5 is for rounding
         xb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         yb = (np.arange(2 * ngauss + 1) - ngauss) * dpix
         xb, yb = rot(*np.meshgrid(xb, yb), np.radians(self.bpa))
-        gaussbeam = np.exp2(-4 *((yb / self.bmaj)**2 + (xb / self.bmin)**2))
+        gaussbeam = np.exp2(-4 * ((yb / self.bmaj)**2 + (xb / self.bmin)**2))
         self.pixperbeam = np.sum(gaussbeam)
         self.gaussbeam = gaussbeam  # The 1st (x) axis is in the model order.
-        
+
         n_need = int(r_need / dpix + 0.5)
         self.ineed0 = npix // 2 - n_need
         self.ineed1 = npix // 2 + n_need
@@ -342,10 +906,10 @@ class ChannelFit(ReadFits):
 
         if 'mom0' in self.scaling:
             # Change the 1st (x) axis to the observational order.
-            self.gaussbeam = self.gaussbeam[:, ::-1]  
+            self.gaussbeam = self.gaussbeam[:, ::-1]
         if self.scaling == 'mom0clean':
             self.mom0decon = clean(data=self.mom0, beam=self.gaussbeam,
-                                   sigma=self.sigma_mom0,
+                                   sigma=self.sigma_mom0, threshold=2,
                                    savetxt=savedeconvolved,
                                    loadtxt=loaddeconvolved)
         elif self.scaling == 'mom0model':
@@ -356,12 +920,18 @@ class ChannelFit(ReadFits):
                                 loadtxt=loaddeconvolved,
                                 progressbar=self.progressbar)
             self.mom0decon, self.xdecon, self.ydecon, self.zdecon = d
-            print('Found a deconvolved solution.')
         elif self.scaling == 'mom0ft':
             self.mom0decon = ftdeconvolve(x=self.x, y=self.y, data=self.mom0,
-                                           bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
-                                           sigma = self.sigma_mom0, threshold=3)
-            print('Divided in the Fourier space.')
+                                          bmaj=self.bmaj, bmin=self.bmin,
+                                          bpa=self.bpa,
+                                          tikhonov_threshold=tikhonov_threshold,
+                                          savetxt=savedeconvolved,
+                                          loadtxt=loaddeconvolved)
+        elif self.scaling == 'mom0gp':
+            res = gpdeconvolve(self.mom0, self.sigma_mom0,
+                               self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
+                               **self.scaling_gp_args)
+            self.mom0decon = res["deconvolved"]
         if 'mom0' in self.scaling:
             c = convolve(self.mom0decon, self.gaussbeam, mode='same')
             self.resdecon = self.mom0 - c
@@ -369,6 +939,12 @@ class ChannelFit(ReadFits):
             rmsres = np.sqrt(np.mean(self.resdecon**2)) / self.sigma_mom0
             print(f'Max and rms are {maxres:.1f}sigma '
                   + f'and {rmsres:.1f}sigma in Moment 0 residual.')
+
+    def diagnose_gpdeconvolution(self, outname=None):
+        res = gpdeconvolve(self.mom0, self.sigma_mom0,
+                           self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
+                           **self.scaling_gp_args)
+        _diagnose_gpdeconvolution(res, self.mom0, outname=outname)
 
     def update_pa(self, pa: float):
         self.Xnest, self.Ynest = rot(self.Xnest0, self.Ynest0, np.radians(pa))
@@ -378,7 +954,7 @@ class ChannelFit(ReadFits):
         self.sini = np.sin(i)
         self.cosi = np.cos(i)
         self.tani = np.tan(i)
-        
+
     def update_xdisk(self, h1: float, h2: float = -1):
         x = [None] * 4
         for i, hdisk in zip([0, 2], [h1, h2]):
@@ -447,10 +1023,10 @@ class ChannelFit(ReadFits):
                 vlos[~c] = np.nan
             return vlos
         self.getvlos = getvlos
-        
+
     def update_vlos(self, h1: float, h2: float):
         self.vlos = [self.getvlos(x, h) for x, h in zip(self.xdisk, [h1, h1, h2, h2])]
-    
+
     def get_Iunif(self, Mstar: float, Rc: float, pI: float,
                   Ienv: float, offvsys: float) -> np.ndarray:
         Iunif = 0
@@ -472,7 +1048,7 @@ class ChannelFit(ReadFits):
         Iunif = Iunif[:, 0, self.ineed0:self.ineed1, self.ineed0:self.ineed1]  # v, y, x
         return Iunif
 
-    def rgi2d(self, xoff: float, yoff:float,
+    def rgi2d(self, xoff: float, yoff: float,
               I_in: np.ndarray) -> np.ndarray:
         Iout = [None] * len(I_in)
         for i, c in enumerate(I_in):
@@ -482,23 +1058,15 @@ class ChannelFit(ReadFits):
         Iout = np.array(Iout)
         return Iout
 
-    def get_scale(self, Iout) -> np.ndarray:
-        gf = np.full_like(self.v_valid, np.sum(Iout * self.data_valid))
-        ff = np.full_like(self.v_valid, np.sum(Iout * Iout))
-        scale = gf / ff
-        scale[(ff == 0) + (scale < 0)] = 0
+    def get_scale(self, Iout) -> float:
+        fg = np.sum(Iout * self.data_valid)
+        ff = np.sum(Iout * Iout)
+        scale = 0.0 if ff == 0 else fg / ff
         return scale
-
-    def peaktounity(self, I_in: np.ndarray) -> np.ndarray:
-        xypeak = np.max(I_in, axis=(1, 2))
-        scale = 1 / xypeak
-        scale[xypeak == 0] = 0
-        Iout = I_in * np.moveaxis([[scale]], 2, 0)
-        return Iout
 
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   h1: float = 0, h2: float = -1, pI: float = 0,
-                  Rin: float = 0, Ienv: float = 0, 
+                  Rin: float = 0, Ienv: float = 0,
                   xoff: float = 0, yoff: float = 0, voff: float = 0,
                   incloff: float = 90, paoff: float = 0,
                   convolving: bool = True):
@@ -513,7 +1081,7 @@ class ChannelFit(ReadFits):
         if self.free['paoff'] or self.free['Rc'] or self.free['Rin']:
             self.update_getvlos(Rc, Rin)
         if self.free['paoff'] or self.free['h1'] or self.free['h2'] \
-            or self.free['Rc'] or self.free['Rin']:
+                or self.free['Rc'] or self.free['Rin']:
             self.update_vlos(h1, h2)
 
         Iunif = self.get_Iunif(Mstar, Rc, pI, Ienv, voff)
@@ -523,19 +1091,22 @@ class ChannelFit(ReadFits):
             mom0unif[mom0unif < 0] = np.nan
             Iunif = Iunif * self.mom0decon / mom0unif
             Iunif = np.nan_to_num(Iunif)
-        if convolving:
-            # The 1st (x) axis of Iunif is in the observational order
-            # if 'mom0' in self.scaling because of rgi2d.
-            # For this reason, self.gaussbeam is inverted in the x direction in advance.
-            Iout = convolve(Iunif, [self.gaussbeam], mode='same')
-        else:
-            Iout = self.peaktounity(Iunif)
-        if not ('mom0' in self.scaling):
+        # The 1st (x) axis of Iunif is in the observational order
+        # if 'mom0' in self.scaling because of rgi2d.
+        # For this reason, self.gaussbeam is inverted in the x direction
+        # in advance.
+        Iout = convolve(Iunif, [self.gaussbeam], mode='same')
+        if 'mom0' not in self.scaling:
             Iout = self.rgi2d(xoff, yoff, Iout)  # 1st axis in the observational order
             scale = self.get_scale(Iout)
-            Iout = Iout * np.moveaxis([[scale]], 2, 0)
+            Iout = Iout * scale
+            if not convolving:
+                Iunif = self.rgi2d(xoff, yoff, Iunif)
+                Iunif = Iunif * scale
+        if not convolving:
+            Iout = Iunif
         return Iout
-                  
+
     def fitting(self, Mstar_range: list = [0.01, 10],
                 Rc_range: list = [1, 1000],
                 cs_range: list = [0.01, 1],
@@ -552,10 +1123,67 @@ class ChannelFit(ReadFits):
                 fixed_params: dict = {},
                 filename: str = 'channelfit',
                 show: bool = False,
-                kwargs_emcee_corner: dict = {}):
+                save_result: bool = True,
+                save_corner: bool = True,
+                print_result: bool = True,
+                kwargs_emcee_corner: dict = {}) -> dict:
+        """Fit the channel-map model parameters with MCMC.
 
-        p_fixed = {k:fixed_params[k] if k in fixed_params else None for k in self.paramkeys}
-        self.free = {k:p_fixed[k] is None for k in self.paramkeys}
+        Args:
+            Mstar_range (list, optional): Prior range of stellar mass in solar
+                masses. Defaults to [0.01, 10].
+            Rc_range (list, optional): Prior range of disk radius in au.
+                Defaults to [1, 1000].
+            cs_range (list, optional): Prior range of line width in km/s.
+                Defaults to [0.01, 1].
+            h1_range (list, optional): Prior range of the first disk scale
+                height divided by radius. Defaults to [0.01, 1].
+            h2_range (list, optional): Prior range of the second disk scale
+                height divided by radius. Always h1 < h2, regardless of h1_range and h2_range. Defaults to [0.01, 1].
+            pI_range (list, optional): Prior range of the radial intensity
+                power-law index. Defaults to [-2, 2].
+            Rin_range (list, optional): Prior range of inner radius in au.
+                Defaults to [0, 1000].
+            Ienv_range (list, optional): Prior range of ``Ienv``, the
+                intrinsic intensity immediately outside ``Rc`` divided by
+                that immediately inside ``Rc``, before final intensity
+                scaling. ``Ienv=0`` gives no envelope emission, ``Ienv=1``
+                gives equal intensity across ``Rc``, values between 0 and 1
+                make the envelope fainter than the disk, and values greater
+                than 1 make it brighter. This parameter matters only when the
+                envelope component is enabled. Defaults to [0.01, 100].
+            xoff_range (list, optional): Prior range of x offsets in au.
+                Defaults to [-100, 100].
+            yoff_range (list, optional): Prior range of y offsets in au.
+                Defaults to [-100, 100].
+            voff_range (list, optional): Prior range of velocity offsets (i.e., the offset of systemic velocity) in
+                km/s. Defaults to [-0.2, 0.2].
+            incl_range (list, optional): Prior range of inclination offsets in
+                degrees, from ``incl`` givne in ``makegrid``. Defaults to [-45, 45].
+            pa_range (list, optional): Prior range of position-angle offsets
+                in degrees, from ``pa`` given in ``makegrid``. Defaults to [-45, 45].
+            fixed_params (dict, optional): Values of parameters to hold fixed.
+                Unspecified parameters remain free. Defaults to {}.
+            filename (str, optional): Prefix for fitting products. Defaults to
+                ``'channelfit'``.
+            show (bool, optional): Whether to show the corner plot. Defaults to
+                False.
+            save_result (bool, optional): Whether to save fitted parameter
+                values. Defaults to True.
+            save_corner (bool, optional): Whether to save the corner plot.
+                Defaults to True.
+            print_result (bool, optional): Whether to print fitted values.
+                Defaults to True.
+            kwargs_emcee_corner (dict, optional): Additional arguments passed
+                to ``emcee_corner``. Defaults to {}.
+
+        Returns:
+            dict: Best-fit, lower, median, and upper parameter dictionaries,
+            together with the reduced chi-square value.
+        """
+
+        p_fixed = {k: fixed_params[k] if k in fixed_params else None for k in self.paramkeys}
+        self.free = {k: p_fixed[k] is None for k in self.paramkeys}
 
         if not self.free['paoff']:
             self.update_pa(p_fixed['paoff'])
@@ -567,40 +1195,65 @@ class ChannelFit(ReadFits):
             self.update_xdisk(p_fixed['h1'], p_fixed['h2'])
         if not (self.free['paoff'] or self.free['Rc'] or self.free['Rin']):
             self.update_getvlos(p_fixed['Rc'], p_fixed['Rin'])
-        if not (self.free['paoff'] or self.free['h1'] or self.free['h2'] 
+        if not (self.free['paoff'] or self.free['h1'] or self.free['h2']
                 or self.free['Rc'] or self.free['Rin']):
             self.update_vlos(p_fixed['h1'], p_fixed['h2'])
-        
+
         p_fixed = np.array([p_fixed[k] for k in self.paramkeys])
+        self.chain = None
+        self.lnp = None
+        notfixed = np.equal(p_fixed, None)
         runfit = None in p_fixed
+
+        def chi2(q):
+            model = self.cubemodel(*q)
+            if not np.all(np.isfinite(model)):
+                return np.inf
+            return np.nansum((self.data_valid - model)**2) \
+                / self.sigma**2 / self.pixperbeam
+
+        def reduced_chi2(q):
+            n_data = np.count_nonzero(np.isfinite(self.data_valid)) \
+                / self.pixperbeam
+            n_free = np.count_nonzero(notfixed)
+            if 'mom0' not in self.scaling:
+                n_free += 1
+            dof = n_data - n_free
+            return chi2(q) / dof if dof > 0 else np.nan
+
         if runfit:
-            notfixed = p_fixed == None
             ilog = np.array([0, 1, 7])
-            i = ilog[p_fixed[ilog] != None]
+            i = ilog[np.not_equal(p_fixed[ilog], None)]
             p_fixed[i] = np.log10(p_fixed[i].astype('float'))
             labels = np.array(self.paramkeys).copy()
             labels[ilog] = ['log'+labels[i] for i in ilog]
             labels = labels[notfixed]
-            kwargs0 = {'nwalkers_per_ndim':16, 'nburnin':200, 'nsteps':500,
-                       'labels': labels,
-                       'rangelevel':None, 'range_corner':None,
-                       'figname':filename+'.corner.png', 'show_corner':show}
+            kwargs0 = {'nwalkers_per_ndim': 16, 'nburnin': 200,
+                       'nsteps': 500, 'labels': labels,
+                       'rangelevel': None, 'range_corner': None,
+                       'figname': f'{filename}.corner.png',
+                       'show_corner': show}
             kw = dict(kwargs0, **kwargs_emcee_corner)
+            if not save_corner:
+                kw['figname'] = None
             if self.progressbar:
                 total = kw['nwalkers_per_ndim'] * len(p_fixed[notfixed])
                 total *= kw['nburnin'] + kw['nsteps'] + 2
                 bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
+
             def lnprob(p):
                 if self.progressbar:
                     bar.update(1)
                 q = p_fixed.copy()
                 q[notfixed] = p
                 q[ilog] = 10**q[ilog]
-                model = self.cubemodel(*q)
-                chi2 = np.nansum((self.data_valid - model)**2) \
-                       / self.sigma**2 / self.pixperbeam
-                return -0.5 * chi2
+                h1, h2 = q[3], q[4]
+                if min(h1, h2) >= 0 and h1 > h2:
+                    return -np.inf
+
+                return -0.5 * chi2(q)
+
             plim = np.array([Mstar_range, Rc_range,
                              cs_range, h1_range, h2_range,
                              pI_range, Rin_range, Ienv_range,
@@ -614,8 +1267,20 @@ class ChannelFit(ReadFits):
                     r_c[i] = r_c[i] if type(r_c[i]) is float else np.log10(r_c[i])
                 r_c = [a for a, k in zip(r_c, self.paramkeys) if self.free[k]]
                 kw['range_corner'] = r_c
-                    
+
             mcmc = emcee_corner(plim, lnprob, simpleoutput=False, **kw)
+            i_mcmc = 4
+            if kw.get('return_chain', False):
+                chain_free = mcmc[i_mcmc]
+                i_mcmc += 1
+                chain = np.empty((len(p_fixed), chain_free.shape[1]), dtype=float)
+                chain[notfixed] = chain_free
+                chain[~notfixed] = p_fixed[~notfixed].astype(float)[:, None]
+                chain[ilog] = 10**chain[ilog]
+                self.chain = chain
+            if kw.get('return_lnp', False):
+                self.lnp = mcmc[i_mcmc]
+
             def get_p(i: int):
                 p = p_fixed.copy()
                 p[notfixed] = mcmc[i]
@@ -626,32 +1291,26 @@ class ChannelFit(ReadFits):
             self.pmid = get_p(2)
             self.phigh = get_p(3)
         else:
-            def chi2():
-                q = p_fixed.copy()
-                model = self.cubemodel(*q)
-                chi2 = np.nansum((self.data_valid - model)**2) \
-                       / self.sigma**2 / self.pixperbeam
-                return chi2
-            dof = np.prod(np.shape(self.data_valid))
-            # The number of paramter is assumed to be 6 but won't change dof much.
-            dof = dof / self.pixperbeam - 6 - 1
-            self.chi2r = chi2() / dof
-
             self.popt = p_fixed
             self.plow = p_fixed
             self.pmid = p_fixed
             self.phigh = p_fixed
-            
+
+        self.chi2r = reduced_chi2(self.popt)
+
         self.pa_rad = self.pa_rad + np.radians(self.popt[12])
         self.sinpa = np.sin(self.pa_rad)
         self.cospa = np.cos(self.pa_rad)
         ulist = ['Msun', 'au', 'km/s', '', '', '', 'au', '',
                  'au', 'au', 'km/s', 'deg', 'deg']
         digits = [2, 0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
-        for i, (k, d, u) in enumerate(zip(self.paramkeys, digits, ulist)):
-            p = [self.plow[i], self.popt[i], self.phigh[i]]
-            print(f'{k} = {p[0]:.{d:d}f}, {p[1]:.{d:d}f}, {p[2]:.{d:d}f} {u}')
-        if runfit:
+        if print_result:
+            print('Parameter values (opt, low, mid, high):')
+            for i, (k, d, u) in enumerate(zip(self.paramkeys, digits, ulist)):
+                p = [self.popt[i], self.plow[i], self.pmid[i], self.phigh[i]]
+                print(f'{k} = {p[0]:.{d}f}, {p[1]:.{d}f},'
+                      + f' {p[2]:.{d}f}, {p[3]:.{d}f} {u}')
+        if runfit and save_result:
             plist = [self.popt, self.plow, self.pmid, self.phigh]
             with open(filename+'.popt.txt', 'w') as f:
                 f.write('#Rows:' + ','.join(self.paramkeys) + '\n')
@@ -661,10 +1320,11 @@ class ChannelFit(ReadFits):
         self.plow = dict(zip(self.paramkeys, self.plow))
         self.pmid = dict(zip(self.paramkeys, self.pmid))
         self.phigh = dict(zip(self.paramkeys, self.phigh))
- 
-    def modeltofits(self, filehead: str = 'best', **kwargs):
-        w = wcs.WCS(naxis=3)
-        h = self.header
+        return {'popt': self.popt, 'plow': self.plow, 'pmid': self.pmid,
+                'phigh': self.phigh, 'chi2r': getattr(self, 'chi2r', None)}
+
+    def make_model_products(self, **kwargs):
+        h = self.header.copy()
         h['NAXIS1'] = len(self.x)
         h['NAXIS2'] = len(self.y)
         h['NAXIS3'] = len(self.v)
@@ -675,10 +1335,10 @@ class ChannelFit(ReadFits):
         ny = h['NAXIS2']
         for k in self.free.keys():
             self.free[k] = True
-        p = self.popt if kwargs == {} else kwargs 
+        p = self.popt if kwargs == {} else kwargs
         m = self.cubemodel(**p)
         m0 = self.cubemodel(**p, convolving=False)
-        
+
         def concat(m):
             if len(self.v_red) > 0:
                 m_blue = m[self.v_valid < np.min(self.v_red)]
@@ -703,26 +1363,65 @@ class ChannelFit(ReadFits):
             if len(nanred) > 0:
                 model = np.append(model, nanred, axis=0)
             return model
-                
+
+        model = concat(m)
+        return {'model': model,
+                'residual': self.data - model,
+                'beforeconvolving': concat(m0),
+                'header': h}
+
+    def modeltofits(self, filehead: str = 'best', **kwargs) -> None:
+        """Write the best-fit model and residual cubes to FITS files.
+
+        Args:
+            filehead (str, optional): Prefix of the output FITS files.
+                Defaults to ``'best'``.
+            **kwargs: Model parameters. The stored best-fit parameters are
+                used when no values are supplied.
+        """
+        w = wcs.WCS(naxis=3)
+        products = self.make_model_products(**kwargs)
+
         def tofits(d: np.ndarray, ext: str):
+            h = products['header'].copy()
+            if ext == 'beforeconvolving':
+                h['BUNIT'] = 'Jy/pixel'
+                for k in ['BMAJ', 'BMIN', 'BPA']:
+                    if k in h:
+                        del h[k]
             header = w.to_header()
             hdu = fits.PrimaryHDU(d, header=header)
             for k in h.keys():
                 if not ('COMMENT' in k or 'HISTORY' in k):
-                    hdu.header[k]=h[k]
+                    hdu.header[k] = h[k]
             hdu = fits.HDUList([hdu])
             hdu.writeto(f'{filehead}.{ext}.fits', overwrite=True)
-            
-        tofits((model := concat(m)), 'model')
-        tofits(self.data - model, 'residual')
-        tofits(concat(m0), 'beforeconvolving')
-        
-    def plotmom(self, mode: str, filename: str = 'mom01.png', **kwargs):
+
+        tofits(products['model'], 'model')
+        tofits(products['residual'], 'residual')
+        tofits(products['beforeconvolving'], 'beforeconvolving')
+
+    def plotmom(self, mode: str, filename: str = 'mom01.png',
+                save: bool = True, show: bool = False,
+                **kwargs: float) -> None:
+        """Plot moment-0 contours over a moment-1 image.
+
+        Args:
+            mode (str): Data product to plot: ``'obs'``, ``'model'``, or
+                ``'residual'``.
+            filename (str, optional): Output figure name. Defaults to
+                ``'mom01.png'``.
+            save (bool, optional): Whether to save the figure. Defaults to
+                True.
+            show (bool, optional): Whether to show the figure. Defaults to
+                False.
+            **kwargs: Model parameters used for model or residual plots.
+        """
         if 'mod' in mode or 'res' in mode or 'clean' in mode:
             if kwargs != {}:
                 self.popt = kwargs
             d = self.cubemodel(**self.popt)
-            m = makemom01(d, self.v_valid, self.sigma)
+            m = makemom012(d, self.v_valid, self.sigma)
         if 'obs' in mode:
             mom0 = self.mom0
             mom1 = self.mom1
@@ -735,12 +1434,11 @@ class ChannelFit(ReadFits):
             mom0 = self.mom0 - m['mom0']
             mom1 = self.mom1 - m['mom1']
             label = r'Obs. $-$ model'
-        levels = (3 if 'res' in mode else 6) * self.sigma_mom0
-        levels = np.arange(1, 20) * levels
+        levels = np.arange(1, 20) * 3 * self.sigma_mom0
         levels = np.sort(np.r_[-levels, levels])
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
-        vplot = (np.nanpercentile(self.mom1, 99) 
+        vplot = (np.nanpercentile(self.mom1, 99)
                  - np.nanpercentile(self.mom1, 1)) / 2.
         m = ax.pcolormesh(self.x, self.y, mom1, cmap='jet',
                           shading='nearest', vmin=-vplot, vmax=vplot)
@@ -758,27 +1456,34 @@ class ChannelFit(ReadFits):
         ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
         ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
         ax.set_aspect(1)
-        fig.savefig(filename)
+        if save:
+            fig.savefig(filename)
+        if show:
+            plt.show()
         plt.close()
 
-    def plotdecon(self, filename: str = 'decon.png'):
-        if not(hasattr(self, 'mom0decon') and hasattr(self, 'resdecon')):
+    def plotdecon(self, filehead: str = 'test', save: bool = True,
+                  show: bool = False):
+        if not (hasattr(self, 'mom0decon') and hasattr(self, 'resdecon')):
             print('No deconvolution solutions and residual generated.')
-            return 
+            return
         cc = self.mom0decon / self.sigma_mom0
         cr = self.resdecon / self.sigma_mom0
         ccmax = np.max(cc)
         ccmin = np.min(cc)
-        for c, vmin, vmax, s in zip([cc, cr], [ccmin, -6], [ccmax, 6],
-                                    ['deconvolved mom0', 'mom0 residual']):
+        for c, vmin, vmax, s, ext in zip([cc, cr],
+                                         [ccmin, -6],
+                                         [ccmax, 6],
+                                         ['deconvolved mom0', 'mom0 residual'],
+                                         ['decon', 'resdecon']):
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
             m = ax.pcolormesh(self.x, self.y, c, cmap='jet',
                               shading='nearest', vmin=vmin, vmax=vmax)
             fig.colorbar(m, ax=ax, label=f'{s} / ' + r'$\sigma$')
             r = np.linspace(-1, 1, 3) * self.x.max() * 1.42
-            ax.plot(r * self.sinpa, r * self.cospa, 'k:')
-            ax.plot(r * self.cospa, -r * self.sinpa, 'k:')
+            ax.plot(r * self.sinpa, r * self.cospa, ':', color='gray')
+            ax.plot(r * self.cospa, -r * self.sinpa, ':', color='gray')
             bpos = np.max(self.x) - 0.7 * self.bmaj
             e = Ellipse((bpos, -bpos), width=self.bmin, height=self.bmaj,
                         angle=self.bpa * np.sign(self.dx), facecolor='gray')
@@ -788,5 +1493,8 @@ class ChannelFit(ReadFits):
             ax.set_xlim(self.x.max() * 1.01, self.x.min() * 1.01)
             ax.set_ylim(self.y.min() * 1.01, self.y.max() * 1.01)
             ax.set_aspect(1)
-            fig.savefig(filename)
+            if save:
+                fig.savefig(f'{filehead}.{ext}.png')
+            if show:
+                plt.show()
             plt.close()

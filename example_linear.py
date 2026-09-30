@@ -24,7 +24,6 @@ minrelerr = 0.01  # minimum relative errorbar.
 '------------------------'
 
 
-
 '-------- HOW TO DO EACH STEP --------'
 impv = PVAnalysis(fitsfile, rms, vsys, dist, pa=None)
 impv.get_edgeridge(outname, thr=thr, ridgemode=ridgemode, incl=incl,
@@ -35,12 +34,12 @@ impv.get_edgeridge(outname, thr=thr, ridgemode=ridgemode, incl=incl,
 impv.write_edgeridge(outname=outname)
 impv.fit_linear(include_intercept=include_intercept)
 impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot,
-                    clevels=[-9,-6,-3,3,6,9], outname=outname,
+                    clevels=[-9, -6, -3, 3, 6, 9], outname=outname,
                     show=show_pv, logcolor=True, Tbcolor=False,
-                    kwargs_pcolormesh={'cmap':'viridis'},
-                    kwargs_contour={'colors':'lime'},
-                    fmt={'edge':'v', 'ridge':'o'},
-                    linestyle={'edge':'--', 'ridge':'-'},
+                    kwargs_pcolormesh={'cmap': 'viridis'},
+                    kwargs_contour={'colors': 'lime'},
+                    fmt={'edge': 'v', 'ridge': 'o'},
+                    linestyle={'edge': '--', 'ridge': '-'},
                     plotridgepoint=True, plotedgepoint=False,
                     plotridgemodel=True, plotedgemodel=True)
 '-------------------------------------'

@@ -1,14 +1,12 @@
 # -*- coding: utf-8 -*-
-#----------------------------------------------------------------------------
-# Created By  : Yusuke Aso
-# Created Date: 2022 Jan 27
-# version = alpha
-# ---------------------------------------------------------------------------
 """
-This script derives the 2D central position at each velocity channel from a channel map, in the FITS form (AXIS1=deg, AXIS2=deg, AXIS3=Hz) and fits the major-offset vs. velocity with a power-law function. The outputs are the central points on the R.A.-Dec., major-minor, and major-velocity planes.
-The main class ChannelAnalysis can be imported to do each steps separately: get the central points, write them, fit them, output the fit result, and plot the central points.
-
-Note. FITS files with multiple beams are not supported. The dynamic range for xlim_plot and vlim_plot should be >10 for nice tick labels.
+This script derives the 2D central position at each velocity channel from a
+channel map in FITS form (AXIS1=deg, AXIS2=deg, AXIS3=Hz), and fits the
+major-offset vs. velocity with a power-law function. The outputs are the
+central points on the R.A.-Dec., major-minor, and major-velocity planes.
+The main class ChannelAnalysis can be imported to perform each step separately:
+get the central points, write them, fit them, output the fit result, and plot
+the central points.
 """
 
 
@@ -26,21 +24,35 @@ M_sun = constants.M_sun.si.value
 au = units.au.to('m')
 unit = 1.e6 * au / GG / M_sun
 
+
 def gauss2d(xy, peak, cx, cy, wx, wy, pa):
     x, y = xy
     s, t = rot(x - cx, y - cy, pa)
     return np.ravel(peak * np.exp2(-s**2 / wx**2 - t**2 / wy**2))
 
-def emcee_custom(plim, lnprob, fixcenter):
-    popt, perr = emcee_corner(plim[:, -1:] if fixcenter else plim,
-                              lnprob,
-                              nwalkers_per_ndim=8,
-                              nburnin=2000, nsteps=8000,
-                              simpleoutput=True)
+
+def emcee_custom(plim, lnprob, fixcenter,
+                 return_chain=False, return_lnp=False):
+    mcmc = emcee_corner(plim[:, -1:] if fixcenter else plim,
+                        lnprob,
+                        nwalkers_per_ndim=8,
+                        nburnin=2000, nsteps=8000,
+                        simpleoutput=True,
+                        return_chain=return_chain,
+                        return_lnp=return_lnp)
+    popt, perr = mcmc[:2]
+    i_mcmc = 2
     if fixcenter:
-       popt = np.array([0, 0, popt[0]])
-       perr = np.array([0, 0, perr[0]])
-    return popt, perr
+        popt = np.array([0, 0, popt[0]])
+        perr = np.array([0, 0, perr[0]])
+    output = [popt, perr]
+    if return_chain:
+        output.append(mcmc[i_mcmc])
+        i_mcmc += 1
+    if return_lnp:
+        output.append(mcmc[i_mcmc])
+    return output
+
 
 def r_kep_out(v, M_p, v_break, p_low, vsys):
     v_s, v_a = np.sign(v - vsys), np.abs(v - vsys)
@@ -50,12 +62,25 @@ def r_kep_out(v, M_p, v_break, p_low, vsys):
 
 
 class VelGrad(ReadFits):
+    """Measure emission centers, a velocity gradient, and dynamical mass."""
 
-    #def __init__(self):
-    
     def get_2Dcenter(self, cutoff: float = 5, vmask: list = [0, 0],
                      minrelerr: float = 0.01, minabserr: float = 0.1,
-                     method: str = 'mean'):
+                     method: str = 'mean') -> None:
+        """Measure the two-dimensional emission center in each channel.
+
+        Args:
+            cutoff (float, optional): Intensity threshold in units of the RMS
+                noise. Defaults to 5.
+            vmask (list, optional): Velocity interval to exclude in km/s.
+                Defaults to [0, 0].
+            minrelerr (float, optional): Minimum relative center uncertainty.
+                Defaults to 0.01.
+            minabserr (float, optional): Minimum absolute center uncertainty in
+                units of the beam major axis. Defaults to 0.1.
+            method (str, optional): Center estimator: ``'mean'``, ``'peak'``,
+                or ``'gauss'``. Defaults to ``'mean'``.
+        """
         dx, dy = self.dx, self.dy
         xmax, ymax = np.max(self.x), np.max(self.y)
         sigma, data = self.sigma, self.data
@@ -76,26 +101,27 @@ class VelGrad(ReadFits):
                 if method == 'mean':
                     xval = np.sum(d * X) / np.sum(d)
                     xerr = corrected_sigma \
-                           * np.sqrt(np.sum((X - xval)**2)) / np.sum(d)
+                        * np.sqrt(np.sum((X - xval)**2)) / np.sum(d)
                     yval = np.sum(d * Y) / np.sum(d)
                     yerr = corrected_sigma \
-                           * np.sqrt(np.sum((Y - yval)**2)) / np.sum(d)
+                        * np.sqrt(np.sum((Y - yval)**2)) / np.sum(d)
                 elif method == 'peak':
                     xval = X[np.argmax(d)]
                     xerr = self.bmaj / (np.max(d) / sigma)
                     yval = Y[np.argmax(d)]
                     yerr = self.bmaj / (np.max(d) / sigma)
                 elif method == 'gauss':
-                    if len(d) < 7: continue
+                    if len(d) < 7:
+                        continue
                     bounds = [[0, -xmax, -ymax, dx, dy, 0],
                               [d.max() * 2, xmax, ymax, xmax, ymax, np.pi]]
                     try:
                         popt, pcov = curve_fit(gauss2d,
-                                         (X.ravel(), Y.ravel()),
-                                         d.ravel(), max_nfev=1000,
-                                         sigma=X.ravel() * 0 + corrected_sigma,
-                                         absolute_sigma=True,
-                                         bounds=bounds)
+                                               (X.ravel(), Y.ravel()),
+                                               d.ravel(), max_nfev=1000,
+                                               sigma=X.ravel() * 0 + corrected_sigma,
+                                               absolute_sigma=True,
+                                               bounds=bounds)
                         xval, yval = popt[[1, 2]]
                         xerr, yerr = np.sqrt(np.diag(pcov))[[1, 2]]
                     except RuntimeError:
@@ -107,11 +133,42 @@ class VelGrad(ReadFits):
             yc.append(yval)
             dyc.append(yerr)
         xc, dxc, yc, dyc = np.array([xc, dxc, yc, dyc])
-        self.center = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
-        
+        self.center = {'xc': xc, 'dxc': dxc, 'yc': yc, 'dyc': dyc}
+
     def filtering(self, pa0: float = 0.0, fixcenter: bool = True,
                   axisfilter: bool = False, lowvelfilter: bool = False,
-                  filename: str = 'velgrad'):
+                  filename: str = 'velgrad',
+                  save_points: bool = True,
+                  print_result: bool = True,
+                  return_chain: bool = False,
+                  return_lnp: bool = False) -> dict:
+        """Fit a velocity-gradient axis and filter inconsistent channels.
+
+        Args:
+            pa0 (float, optional): Initial position angle in degrees. Defaults
+                to 0.
+            fixcenter (bool, optional): Whether to fix the gradient center at
+                the image origin. Defaults to True.
+            axisfilter (bool, optional): Whether to reject centers inconsistent
+                with the fitted gradient axis. Defaults to False.
+            lowvelfilter (bool, optional): Whether to reject low-velocity
+                centers inside the maximum projected radius. Defaults to
+                False.
+            filename (str, optional): Prefix for the output point table.
+                Defaults to ``'velgrad'``.
+            save_points (bool, optional): Whether to write the retained channel
+                centers. Defaults to True.
+            print_result (bool, optional): Whether to print fit information in terminal.
+                Defaults to True.
+            return_chain (bool, optional): Whether to store the MCMC chain in
+                ``self.chain_grad``. Defaults to False.
+            return_lnp (bool, optional): Whether to store log probabilities in
+                ``self.lnp_grad``. Defaults to False.
+
+        Returns:
+            dict: Best-fit center and position angle, their uncertainties, the
+                reduced chi-square, and retained channel centers.
+        """
         xc = self.center['xc'] * 1
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
@@ -127,8 +184,8 @@ class VelGrad(ReadFits):
                     xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
                     xc[j] = yc[j] = dxc[j] = dyc[j] = np.nan
         if not np.any(~np.isnan(xc) * ~np.isnan(yc)):
-                print('No blue-red pair.')
-        
+            print('No blue-red pair.')
+
         def bad_channels(x_in, y_in, xoff, yoff, pa):
             if np.all(np.isnan(x_in) | np.isnan(y_in)):
                 return np.full_like(x_in, False)
@@ -169,7 +226,7 @@ class VelGrad(ReadFits):
             d3 = (x * np.cos(parad) - y * np.sin(parad))**2
             d3 = d3 / ((dx**2 + dy**2) / 2)
             return np.sum(d1 + d2 + d3)
-            
+
         def low_velocity(x_in, y_in, pa_in):
             parad = np.radians(pa_in)
             cospa = np.cos(parad)
@@ -191,6 +248,8 @@ class VelGrad(ReadFits):
 
         goodsolution = False
         xoff = yoff = pa_grad = np.nan
+        self.chain_grad = None
+        self.lnp_grad = None
         while not goodsolution:
             if np.all(np.isnan(xc) | np.isnan(yc)):
                 print('No point survived.')
@@ -203,51 +262,109 @@ class VelGrad(ReadFits):
                     args = np.array([xc, yc, dxc, dyc]) * 1
                     args[0][c1] = args[1][c1] = args[2][c1] = args[3][c1] = np.nan
                     if fixcenter:
-                        lnprob = lambda p: -0.5 * chi2([0, 0, p], *args)
+                        def lnprob(p):
+                            return -0.5 * chi2([0, 0, p], *args)
                     else:
-                        lnprob = lambda p: -0.5 * chi2(p, *args)
+                        def lnprob(p):
+                            return -0.5 * chi2(p, *args)
                     popt, perr = emcee_custom(plim, lnprob, fixcenter)
                     xoff, yoff, pa_grad = popt
-                    print('xoff, yoff, pa ='
-                          + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
-                          + f' {popt[1]:.2f}+/-{perr[1]:.2f} au,'
-                          + f' {popt[2]:.2f}+/-{perr[2]:.2f} deg')
+                    if print_result:
+                        print('xoff, yoff, pa ='
+                              + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
+                              + f' {popt[1]:.2f}+/-{perr[1]:.2f} au,'
+                              + f' {popt[2]:.2f}+/-{perr[2]:.2f} deg')
                     c1 = low_velocity(args[0] - xoff, args[1] - yoff, pa_grad)
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
             args = np.array([xc, yc, dxc, dyc])
             if fixcenter:
-                lnprob = lambda p: -0.5 * chi2([0, 0, p], *args)
+                def lnprob(p):
+                    return -0.5 * chi2([0, 0, p], *args)
             else:
-                lnprob = lambda p: -0.5 * chi2(p, *args)
-            popt, perr = emcee_custom(plim, lnprob, fixcenter)
+                def lnprob(p):
+                    return -0.5 * chi2(p, *args)
+            mcmc = emcee_custom(plim, lnprob, fixcenter,
+                                return_chain=return_chain,
+                                return_lnp=return_lnp)
+            popt, perr = mcmc[:2]
+            i_mcmc = 2
+            if return_chain:
+                self.chain_grad = mcmc[i_mcmc]
+                i_mcmc += 1
+            if return_lnp:
+                self.lnp_grad = mcmc[i_mcmc]
             xoff, yoff, pa_grad = popt
-            print('xoff, yoff, pa ='
-                  + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
-                  + f' {popt[1]:.2f}+/-{perr[1]:.2f} au,'
-                  + f' {popt[2]:.2f}+/-{perr[2]:.2f} deg')
+            if print_result:
+                print('xoff, yoff, pa ='
+                      + f' {popt[0]:.2f}+/-{perr[0]:.2f} au,'
+                      + f' {popt[1]:.2f}+/-{perr[1]:.2f} au,'
+                      + f' {popt[2]:.2f}+/-{perr[2]:.2f} deg')
             c2 = bad_channels(xc, yc, xoff, yoff, pa_grad)
             if np.any(c2):
                 xc[c2] = yc[c2] = dxc[c2] = dyc[c2] = np.nan
             else:
                 goodsolution = True
-        
+
         xc, yc = xc - xoff, yc - yoff
         self.xoff, self.yoff, self.pa_grad = popt
         self.dxoff, self.dyoff, self.dpa_grad = perr
-        self.kepler = {'xc':xc, 'dxc':dxc, 'yc':yc, 'dyc':dyc}
-        dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.) - 1
+        self.kepler = {'xc': xc, 'dxc': dxc, 'yc': yc, 'dyc': dyc}
+        dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.)
         self.chi2r_grad = chi2(popt, xc, yc, dxc, dyc) / dof
 
+        if save_points:
+            self.write_points(filename=filename, print_result=print_result)
+        return {'xoff': self.xoff, 'yoff': self.yoff,
+                'pa_grad': self.pa_grad,
+                'dxoff': self.dxoff, 'dyoff': self.dyoff,
+                'dpa_grad': self.dpa_grad,
+                'chi2r_grad': self.chi2r_grad,
+                'kepler': self.kepler}
+
+    def write_points(self, filename: str = 'velgrad',
+                     print_result: bool = True):
         fname = filename + '.points.txt'
-        res = np.c_[self.v, xc, dxc, yc, dyc][~np.isnan(xc)]
+        res = np.c_[self.v, self.kepler['xc'], self.kepler['dxc'],
+                    self.kepler['yc'], self.kepler['dyc']]
+        res = res[~np.isnan(self.kepler['xc'])]
         np.savetxt(fname, res,
                    header='v (km/s), x (au), dx (au), y (au), dy (au)')
-        print(f'- Wrote to {fname}')
-        
+        if print_result:
+            print(f'- Wrote to {fname}')
+        return res
+
     def calc_mstar(self, incl: float = 90,
                    voff_range: list = [-0.5, 0.5],
                    voff_fixed: float | None = 0,
-                   minabserr: float = 0.1, minrelerr: float = 0.01):
+                   minabserr: float = 0.1, minrelerr: float = 0.01,
+                   print_result: bool = True,
+                   return_chain: bool = False,
+                   return_lnp: bool = False) -> dict:
+        """Fit a rotation profile and estimate the central stellar mass.
+
+        Args:
+            incl (float, optional): Inclination angle in degrees. Defaults to
+                90.
+            voff_range (list, optional): Prior range of the systemic-velocity
+                offset in km/s. Defaults to [-0.5, 0.5].
+            voff_fixed (float or None, optional): Fixed velocity offset in
+                km/s. None fits the offset. Defaults to 0.
+            minabserr (float, optional): Minimum absolute radial uncertainty in
+                units of the beam major axis. Defaults to 0.1.
+            minrelerr (float, optional): Minimum relative radial uncertainty.
+                Defaults to 0.01.
+            print_result (bool, optional): Whether to print fitted values in terminal.
+                Defaults to True.
+            return_chain (bool, optional): Whether to store the MCMC chain in
+                ``self.chain_mstar``. Defaults to False.
+            return_lnp (bool, optional): Whether to store log probabilities in
+                ``self.lnp_mstar``. Defaults to False.
+
+        Returns:
+            dict: Stellar mass and uncertainty, characteristic radius and
+                velocity, fit parameters and uncertainties, and reduced
+                chi-square.
+        """
         self.incl = incl
         sini2 = np.sin(np.radians(incl))**2
         xc = self.kepler['xc'] * 1
@@ -259,6 +376,8 @@ class VelGrad(ReadFits):
         self.vmid = np.nan
         self.Mstar = np.nan
         self.popt = None
+        self.chain_mstar = None
+        self.lnp_mstar = None
         if not np.any(c := ~np.isnan(xc) * ~np.isnan(yc)):
             print('No point to calculate Rkep, Vkep, and Mstar.')
         else:
@@ -272,17 +391,19 @@ class VelGrad(ReadFits):
             s_model = np.sign(np.sum(r * v))
             Rkep = np.max(np.abs(r)) / 0.760  # Appendix A in Aso+15_ApJ_812_27
             Vkep = np.min(np.abs(v))
-            print(f'Max r = {Rkep:.1f} au at v = {Vkep:.2f} km/s'
-                  + ' (1/0.76 corrected)')
+            if print_result:
+                print(f'Max r = {Rkep:.1f} au at v = {Vkep:.2f} km/s'
+                      + ' (1/0.76 corrected)')
             self.Rkep = Rkep
             self.Vkep = Vkep
+
             def lnprob(p):
                 if voff_fixed is None:
                     M_p, v_break, p_low, vsys = p
                 else:
                     M_p, v_break, p_low = p
                     vsys = voff_fixed
-                r_model =  r_kep_out(v, M_p, v_break, p_low, vsys)
+                r_model = r_kep_out(v, M_p, v_break, p_low, vsys)
                 chi2 = np.sum(((r - s_model * r_model) / dr)**2)
                 return -0.5 * chi2
             Mmin = np.min(np.abs(r)) * np.min(np.abs(v))**2
@@ -294,13 +415,22 @@ class VelGrad(ReadFits):
                 plim[1, 2] = 2.001
             if voff_fixed is not None:
                 plim = plim[:, :-1]
-            popt, perr = emcee_custom(plim, lnprob, False)
-            dof = len(v) - len(popt) - 1
-            self.chi2r_mass = -2. * lnprob(popt) / dof
+            mcmc = emcee_custom(plim, lnprob, False,
+                                return_chain=return_chain,
+                                return_lnp=return_lnp)
+            popt, perr = mcmc[:2]
+            i_mcmc = 2
+            if return_chain:
+                self.chain_mstar = mcmc[i_mcmc]
+                i_mcmc += 1
+            if return_lnp:
+                self.lnp_mstar = mcmc[i_mcmc]
+            dof = len(v) - len(popt)
+            self.chi2r_mstar = -2. * lnprob(popt) / dof
             if voff_fixed is not None:
                 popt = np.r_[popt, 0]
                 perr = np.r_[perr, 0]
-            
+
             M_p, vb, p_low, voff = popt
             dM_p, dvb, dp_low, dvoff = perr
             Mstar = M_p * unit / sini2
@@ -313,15 +443,34 @@ class VelGrad(ReadFits):
             self.perr = perr
             self.Mstar = Mstar
             self.dMstar = dMstar
-            print(f'voff = {voff:.3f} +/- {dvoff:.3f}')
-            print(f'vb = {vb:.3f} +/- {dvb:.3f}')
-            print(f'pout = {p_low:.3f} +/- {dp_low:.3f}')
-            print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun (1/0.76 corrected)')
+            if print_result:
+                print(f'voff = {voff:.3f} +/- {dvoff:.3f}')
+                print(f'vb = {vb:.3f} +/- {dvb:.3f}')
+                print(f'pout = {p_low:.3f} +/- {dp_low:.3f}')
+                print(f'Mstar = {Mstar:.3f} +/- {dMstar:.3f} Msun (1/0.76 corrected)')
+        return {'Mstar': self.Mstar, 'dMstar': getattr(self, 'dMstar', np.nan),
+                'Rkep': self.Rkep, 'Vkep': self.Vkep,
+                'popt': self.popt, 'perr': getattr(self, 'perr', None),
+                'chi2r_mstar': getattr(self, 'chi2r_mstar', np.nan)}
 
-    def plot_center(self, pa: float = None,
-                     filehead: str = 'channelanalysis',
-                     show_figs: bool = False,
-                     title: str = None):
+    def plot_center(self, pa: float | None = None,
+                    filehead: str = 'velgrad',
+                    show_figs: bool = False,
+                    title: str | None = None,
+                    save: bool = True) -> None:
+        """Plot channel centers on the sky and in position-velocity space.
+
+        Args:
+            pa (float or None, optional): Reference position angle in degrees.
+                Defaults to None.
+            filehead (str, optional): Prefix for the ``.radec.png`` and
+                ``.majvel.png`` figures. Defaults to ``'velgrad'``.
+            show_figs (bool, optional): Whether to show the figures. Defaults
+                to False.
+            title (str or None, optional): Figure title. Defaults to None.
+            save (bool, optional): Whether to save the figures. Defaults to
+                True.
+        """
         plt.rcParams['font.size'] = 20
         plt.rcParams['axes.linewidth'] = 1.5
         plt.rcParams['xtick.direction'] = 'out'
@@ -334,14 +483,14 @@ class VelGrad(ReadFits):
         plt.rcParams['ytick.major.width'] = 1.5
         plt.rcParams['xtick.minor.width'] = 1.5
         plt.rcParams['ytick.minor.width'] = 1.5
-        
+
         kep = ~np.isnan(self.kepler['xc']) * ~np.isnan(self.kepler['yc'])
         if np.any(kep) > 0:
             vmax = np.abs(np.max(self.v[kep]))
         else:
             vmax = 1
         xmax, ymax = np.max(self.x), np.max(self.y)
-        
+
         fig = plt.figure()
         ax = fig.add_subplot(1, 1, 1)
         r = np.linspace(-xmax * 1.5, xmax * 1.5, 5)
@@ -394,11 +543,13 @@ class VelGrad(ReadFits):
         if title is not None:
             ax.set_title(title)
         fig.tight_layout()
-        fig.savefig(filehead + '.radec.png', transparent=True)
-        if show_figs: plt.show()
+        if save:
+            fig.savefig(filehead + '.radec.png', transparent=True)
+            print(f'- Plotted in {filehead}.radec.png')
+        if show_figs:
+            plt.show()
         plt.close()
-        print(f'- Plotted in {filehead}.radec.png')
-        
+
         x, y = self.kepler['xc'], self.kepler['yc']
         dx, dy = self.kepler['dxc'], self.kepler['dyc']
         x = np.abs(x * np.sin(p) + y * np.cos(p))
@@ -428,7 +579,7 @@ class VelGrad(ReadFits):
             xmin = xmax / 30
             vmax = np.max(self.v) * 1.5
             vmin = vmax / 30
-        
+
         fig = plt.figure(figsize=(5.3, 5.3))
         ax = fig.add_subplot(1, 1, 1)
         ax.set_xlim(xmin * 0.99, xmax * 1.01)  # au
@@ -451,6 +602,7 @@ class VelGrad(ReadFits):
             ax.plot(rp, vp, 'g-', zorder=4)
         ax.set_xscale('log')
         ax.set_yscale('log')
+
         def nice_ticks(ticks, tlim):
             order = 10**np.floor(np.log10(tlow := tlim[0]))
             tlow = np.ceil(tlow / order) * order
@@ -461,9 +613,10 @@ class VelGrad(ReadFits):
         yticks = nice_ticks(ax.get_yticks(), (vmin, vmax))
         ax.set_xticks(xticks)
         ax.set_yticks(yticks)
+
         def nice_labels(ticks):
             digits = np.floor(np.log10(ticks)).astype('int').clip(None, 0)
-            return [f'{t:.{d:d}f}' for t, d in zip(ticks, -digits)]
+            return [f'{t:.{d}f}' for t, d in zip(ticks, -digits)]
         ax.set_xticklabels(nice_labels(xticks))
         ax.set_yticklabels(nice_labels(yticks))
         ax.set_xlim(xmin * 0.99, xmax * 1.01)  # au
@@ -474,7 +627,9 @@ class VelGrad(ReadFits):
         if title is not None:
             ax.set_title(title)
         fig.tight_layout()
-        fig.savefig(filehead + '.majvel.png', transparent=True)
-        if show_figs: plt.show()
+        if save:
+            fig.savefig(f'{filehead}.majvel.png', transparent=True)
+            print(f'- Plotted in {filehead}.majvel.png')
+        if show_figs:
+            plt.show()
         plt.close()
-        print(f'- Plotted in {filehead}.majvel.png')
