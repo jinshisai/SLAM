@@ -839,10 +839,12 @@ class PVAnalysis():
             fixed_dp (float, optional): Index change used when ``include_dp``
                 is False. Zero means a single power law. Defaults to 0.
             rb_range (list or None, optional): Prior range of break radius in
-                au. None uses the range of measured points. Defaults to None.
+                au, shared by the edge and ridge fits. None uses the combined
+                absolute-radius range of both datasets. Defaults to None.
             vb_range (list or None, optional): Prior range of break velocity
-                in km/s. None uses the range of measured points. Defaults to
-                None.
+                in km/s, shared by the edge and ridge fits. None uses the
+                combined absolute-velocity range of both datasets. Defaults
+                to None.
             pin_range (list, optional): Prior range of the inner index.
                 Defaults to [0.01, 10].
             dp_range (list, optional): Prior range of the index change.
@@ -906,12 +908,15 @@ class PVAnalysis():
         def maxabs(a, i, j):
             return np.max(np.abs(np.r_[a[i], a[j]]))
 
+        if rb_range is None:
+            rb_range = [min(minabs(a, 1, 3) for a in Ds),
+                        max(maxabs(a, 1, 3) for a in Ds)]
+        if vb_range is None:
+            vb_range = [min(minabs(a, 0, 4) for a in Ds),
+                        max(maxabs(a, 0, 4) for a in Ds)]
+
         for args, ext, key, res in zip([Es, Rs], ['_e', '_r'],
                                        ['edge', 'ridge'], [popt_e, popt_r]):
-            if rb_range is None:
-                rb_range = [minabs(args, 1, 3), maxabs(args, 1, 3)]
-            if vb_range is None:
-                vb_range = [minabs(args, 0, 4), maxabs(args, 0, 4)]
             plim = np.transpose([rb_range, vb_range, pin_range, dp_range, vsys_range])
             q0 = np.array([0, np.sqrt(plim[0][1] * plim[1][1]),
                            fixed_pin, fixed_dp, 0])
