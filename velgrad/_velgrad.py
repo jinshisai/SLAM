@@ -4,7 +4,7 @@ This script derives the 2D central position at each velocity channel from a
 channel map in FITS form (AXIS1=deg, AXIS2=deg, AXIS3=Hz), and fits the
 major-offset vs. velocity with a power-law function. The outputs are the
 central points on the R.A.-Dec., major-minor, and major-velocity planes.
-The main class ChannelAnalysis can be imported to perform each step separately:
+The main class VelGrad can be imported to perform each step separately:
 get the central points, write them, fit them, output the fit result, and plot
 the central points.
 """
