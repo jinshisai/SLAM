@@ -7,6 +7,7 @@ The main class PVFitting can be imported to do each steps separately.
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from astropy.io import fits
 from astropy import wcs
 import warnings
@@ -68,9 +69,18 @@ class PVFitting(ReadFits):
             d.append(self.data)
         self.dpvmajor, self.dpvminor = d
 
-    def check_modelgrid(self, nsubgrid: float = 1,
-                        n_nest: list | None = None, reslim: float = 5):
-        # model grid
+    def check_modelgrid(self, nsubgrid: int = 1,
+                        n_nest: list[int] | None = None, reslim: float = 5) -> None:
+        """Construct a trial model grid and print its resolutions and limits.
+
+        Args:
+            nsubgrid (int, optional): Refinement factor for the original spatial
+                grid. Defaults to 1.
+            n_nest (list[int] or None, optional): Refinement factors for successive
+                nested levels. None disables nesting. Defaults to None.
+            reslim (float, optional): Half-width of each automatic refinement
+                region in parent-level cells. Defaults to 5.
+        """
         mpvd = MockPVD(self.x, self.x, self.v,
                        nsubgrid=nsubgrid, nnest=n_nest,
                        beam=self.beam, reslim=reslim)
@@ -203,7 +213,21 @@ class PVFitting(ReadFits):
                        num_threads=num_threads)
         rout = np.max(z)
 
-        def makemodel(Mstar, Rc, alphainfall, taumax, frho):
+        def makemodel(Mstar: float, Rc: float, alphainfall: float,
+                      taumax: float, frho: float) -> tuple[np.ndarray, np.ndarray]:
+            """Generate major/minor PV models with a shared fitted intensity scale.
+
+            Args:
+                Mstar (float): Stellar mass in solar masses.
+                Rc (float): Centrifugal radius in au.
+                alphainfall (float): Dimensionless radial infall velocity factor.
+                taumax (float): Maximum scaled optical depth.
+                frho (float): Disk-to-envelope density scaling factor.
+
+            Returns:
+                tuple: Major- and minor-axis PV arrays scaled together against the
+                observed diagrams. Returns zero arrays when model power is zero.
+            """
             major, minor = mpvd.generate_mockpvd(Mstar=Mstar, Rc=Rc,
                                                  alphainfall=alphainfall,
                                                  taumax=taumax, frho=frho,
@@ -227,7 +251,17 @@ class PVFitting(ReadFits):
         self.lnp = None
         notfixed = np.equal(p_fixed, None)
 
-        def chi2(q):
+        def chi2(q: list[float] | np.ndarray) -> float:
+            """Calculate the joint chi-square with a resolution correction.
+
+            Args:
+                q (list[float] or numpy.ndarray): Physical parameters ordered as
+                    Mstar, Rc, alphainfall, taumax, frho, and sig_mdl.
+
+            Returns:
+                float: Weighted squared residual sum divided by sqrt(Rarea), using
+                variances multiplied by 1 + sig_mdl**2. Infinity for nonfinite models.
+            """
             q = np.asarray(q, dtype=float)
             majsig2 = (1. + q[-1]**2) * majsig**2
             minsig2 = (1. + q[-1]**2) * minsig**2
@@ -239,7 +273,17 @@ class PVFitting(ReadFits):
             chi2min = np.nansum((minobs - minmod)**2 / minsig2)
             return (chi2maj + chi2min) / np.sqrt(Rarea)
 
-        def reduced_chi2(q):
+        def reduced_chi2(q: list[float] | np.ndarray) -> float:
+            """Divide the joint chi-square by the effective degrees of freedom.
+
+            Args:
+                q (list[float] or numpy.ndarray): Full parameter vector in physical
+                    units, in the order used by chi2.
+
+            Returns:
+                float: Reduced chi-square, including the fitted intensity scale in
+                the free-parameter count. NaN for nonpositive degrees of freedom.
+            """
             n_data = np.count_nonzero(np.isfinite(majobs)) \
                 + np.count_nonzero(np.isfinite(minobs))
             n_data = n_data / np.sqrt(Rarea)
@@ -271,7 +315,17 @@ class PVFitting(ReadFits):
                 bar.set_description('Within the ranges')
 
             # Modified log likelihood
-            def lnprob(p):
+            def lnprob(p: np.ndarray) -> float:
+                """Evaluate the joint Gaussian log likelihood of the two PV diagrams.
+
+                Args:
+                    p (numpy.ndarray): Free sampling parameters. The first five physical
+                        model parameters use base-10 logarithms; sig_mdl is linear.
+
+                Returns:
+                    float: Resolution-corrected log likelihood including the variable
+                    noise-variance terms, or negative infinity for nonfinite models.
+                """
                 if progressbar:
                     bar.update(1)
                 # parameter
@@ -316,7 +370,17 @@ class PVFitting(ReadFits):
                 self.lnp = mcmc[i_mcmc]
             # best parameters & errors
 
-            def get_p(i: int):
+            def get_p(i: int) -> np.ndarray:
+                """Restore a full physical parameter vector from an MCMC summary.
+
+                Args:
+                    i (int): Summary index: 0 for best-fit, 1 for lower, 2 for median,
+                        or 3 for upper values.
+
+                Returns:
+                    numpy.ndarray: Fixed and fitted parameters in paramkeys order, with
+                    logarithmic coordinates converted back to physical values.
+                """
                 p = p_fixed.copy()
                 p[notfixed] = mcmc[i]
                 p[ilog] = 10**p[ilog]
@@ -359,7 +423,7 @@ class PVFitting(ReadFits):
         self.plot_pvds(filename=filename, color='model', contour='obs',
                        vmask=vmask, title=title, show=show, log=log)
 
-    def read_fitres(self, f: str):
+    def read_fitres(self, f: str) -> None:
         '''
         Read fitting result.
 
@@ -371,13 +435,13 @@ class PVFitting(ReadFits):
 
     def plot_pvds(self, filename: str = 'PVfitting',
                   color: str = 'model', contour: str = 'obs',
-                  vmask: list[float, float] = [0., 0.],
+                  vmask: list[float] = [0., 0.],
                   cmap: str = 'viridis',
                   cmap_residual: str = 'bwr', ext: str = '.png',
                   title: str | None = None, show: bool = False,
                   shadecolor: str = 'white',
                   clevels: list[float] | None = None,
-                  log: bool = False):
+                  log: bool = False) -> list[Figure] | int:
         '''
         Plot observed and model PV diagrams.
         '''
@@ -411,10 +475,29 @@ class PVFitting(ReadFits):
         if clevels is None:
             clevels = (2**np.arange(0, 10) if log else np.arange(1, 11)) * 3 * self.sigma
 
-        def makeplots(data_color, data_contour, cmap,
-                      vmin=None, vmax=None, vmask=None,
-                      alpha=1., mode='model'):
+        def makeplots(data_color: list[np.ndarray],
+                      data_contour: list[np.ndarray], cmap: str,
+                      vmin: float | None = None, vmax: float | None = None,
+                      vmask: list[float] | None = None,
+                      alpha: float = 1., mode: str = 'model') -> Figure:
             # set figure
+            """Create a two-panel major/minor PV figure with contours.
+
+            Args:
+                data_color (list[numpy.ndarray]): Major- and minor-axis color images.
+                data_contour (list[numpy.ndarray]): Major- and minor-axis contour data.
+                cmap (str): Matplotlib colormap name.
+                vmin (float or None, optional): Lower color limit. Defaults to None.
+                vmax (float or None, optional): Upper color limit. Defaults to None.
+                vmask (list[float] or None, optional): Velocity interval to shade in
+                    km/s. None disables shading. Defaults to None.
+                alpha (float, optional): Color-image opacity. Defaults to 1.
+                mode (str, optional): Use 'model' for intensity plots or 'residual'
+                    for symmetric color limits and noise units. Defaults to 'model'.
+
+            Returns:
+                Figure: Figure containing both PV panels and a color bar.
+            """
             fig, axes = plt.subplots(1, 2,)
             fig.set_figheight(3.2)
             fig.set_figwidth(5)
@@ -520,7 +603,7 @@ class PVFitting(ReadFits):
 
         return figs
 
-    def modeltofits(self, filehead: str = 'best', **kwargs) -> None:
+    def modeltofits(self, filehead: str = 'best', **kwargs: float) -> None:
         """Write model and residual major/minor PV diagrams to FITS files.
 
         Args:
@@ -549,7 +632,14 @@ class PVFitting(ReadFits):
         majres = np.concatenate((nanblue, majres, nanred), axis=0)
         minres = np.concatenate((nanblue, minres, nanred), axis=0)
 
-        def tofits(d: np.ndarray, ext: str):
+        def tofits(d: np.ndarray, ext: str) -> None:
+            """Write one PV product using the prepared FITS metadata.
+
+            Args:
+                d (numpy.ndarray): Two-dimensional PV array to save.
+                ext (str): Product suffix in filehead.ext.fits. Existing files are
+                    overwritten.
+            """
             header = w.to_header()
             hdu = fits.PrimaryHDU(d, header=header)
             for k in h.keys():
@@ -564,7 +654,7 @@ class PVFitting(ReadFits):
         tofits(minres, 'residual.minor')
 
 
-def getquad(m):
+def getquad(m: np.ndarray) -> int:
     '''
     Get quadrant
     '''
