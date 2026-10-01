@@ -1,5 +1,5 @@
 '''
-Analysis tools for PVfit
+Analysis tools for pvanalysis
 
 '''
 

@@ -66,8 +66,8 @@ class PVAnalysis():
                       incl: float | None = None,
                       quadrant: str | None = None,
                       ridgemode: str = 'mean',
-                      pixrng_vcut: int | None = None,
-                      pixrng_xcut: int | None = None,
+                      pixrng_vcut: int | np.integer | None = None,
+                      pixrng_xcut: int | np.integer | None = None,
                       Mlim: list[float] = [0, 1e10],
                       xlim: list[float] = [-1e10, 0, 0, 1e10],
                       vlim: list[float] = [-1e10, 0, 0, 1e10],
@@ -177,12 +177,12 @@ class PVAnalysis():
 
         # Get rigde/edge
         if use_position:
-            self.get_edgeridge_xcut(outname, thr=thr, incl=incl,
+            self.get_edgeridge_xcut(outname, thr=thr,
                                     xlim=xlim, vlim=vlim, Mlim=Mlim,
                                     ridgemode=ridgemode, pixrng=pixrng_xcut,
                                     interp_ridge=interp_ridge)
         if use_velocity:
-            self.get_edgeridge_vcut(outname, thr=thr, incl=incl,
+            self.get_edgeridge_vcut(outname, thr=thr,
                                     xlim=xlim, vlim=vlim, Mlim=Mlim,
                                     ridgemode=ridgemode, pixrng=pixrng_vcut,
                                     interp_ridge=interp_ridge)
@@ -196,10 +196,11 @@ class PVAnalysis():
         # self.plotresults_pvdiagram()
         # self.plotresults_rvplane()
 
-    def sort_fitresults(self, minrelerr=0.01, minabserr=0.1,
+    def sort_fitresults(self, minrelerr: float = 0.01,
+                        minabserr: float = 0.1,
                         nanbeforemax: bool = True,
                         nanopposite: bool = True,
-                        nanbeforecross: bool = True):
+                        nanbeforecross: bool = True) -> None:
         """Sort fitting results.
 
         Args:
@@ -346,10 +347,16 @@ class PVAnalysis():
                 self.results_sorted[re][rb] = res_comb
             self.results_filtered[re] = res_f
 
-    def get_edgeridge_vcut(self, outname, thr=5., incl=90., xlim=[-1e10, 0, 0, 1e10],
-                           vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='gauss',
-                           pixrng=None, multipeaks=False, i_peak=0, prominence=1.5,
-                           inverse=False, interp_ridge=False):
+    def get_edgeridge_vcut(self, outname: str, thr: float = 5.,
+                           xlim: list[float] | tuple[float, ...] | np.ndarray = [-1e10, 0, 0, 1e10],
+                           vlim: list[float] | tuple[float, ...] | np.ndarray = [-1e10, 0, 0, 1e10],
+                           Mlim: list[float] | tuple[float, ...] | np.ndarray = [0, 1e10],
+                           ridgemode: str = 'gauss',
+                           pixrng: int | np.integer | None = None,
+                           multipeaks: bool = False, i_peak: int = 0,
+                           prominence: float = 1.5,
+                           inverse: bool = False,
+                           interp_ridge: bool = False) -> None:
         """Get edge/ridge along the velocity axis, i.e., determine
            representative velocity at each offset.
 
@@ -359,9 +366,6 @@ class PVAnalysis():
                ridge in the unit of 'rms' Defaults to 5.
                xlim, vlim: x and v ranges for the fitting. Must be given
                as a list, [outlimit1, inlimit1, inlimit2, outlimit2].
-            incl (float): Inclination angle of the object. Defaults to 90,
-               which means no correction for estimate of the protostellar
-               mass.
             Mlim (list): Reliable mass range. Data points that do
                not come within this range is removed. Defaults to [0, 1e10].
             xlim (list): Range of offset where edge/ridge is
@@ -372,7 +376,7 @@ class PVAnalysis():
                derived as the intensity weighted mean. When ridgemode='gauss',
                ridge is derived as the mean of the fitted Gaussian function.
                Defaults to 'mean'.
-            pixrng (float): Pixel range for the fitting around the maximum
+            pixrng (int or None): Pixel range for the fitting around the maximum
                intensity. Only velocity channels +/- pixrng around the channel
                with the maximum intensity are used for the fitting.
                Only applied when ridgemode='gauss'.
@@ -589,10 +593,15 @@ class PVAnalysis():
         fig.savefig(outname + ".pvfit.vcut.png")
         plt.close()
 
-    def get_edgeridge_xcut(self, outname, thr=5., incl=90., xlim=[-1e10, 0, 0, 1e10],
-                           vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='mean',
-                           pixrng=None, multipeaks=False, i_peak=0,
-                           prominence=1.5, interp_ridge=False):
+    def get_edgeridge_xcut(self, outname: str, thr: float = 5.,
+                           xlim: list[float] | tuple[float, ...] | np.ndarray = [-1e10, 0, 0, 1e10],
+                           vlim: list[float] | tuple[float, ...] | np.ndarray = [-1e10, 0, 0, 1e10],
+                           Mlim: list[float] | tuple[float, ...] | np.ndarray = [0, 1e10],
+                           ridgemode: str = 'mean',
+                           pixrng: int | np.integer | None = None,
+                           multipeaks: bool = False, i_peak: int = 0,
+                           prominence: float = 1.5,
+                           interp_ridge: bool = False) -> None:
         """Get edge/ridge along x-axis, i.e., determine representative
            position at each velocity.
 
@@ -602,9 +611,6 @@ class PVAnalysis():
                ridge in the unit of 'rms' Defaults to 5.
                xlim, vlim: x and v ranges for the fitting. Must be given
                as a list, [outlimit1, inlimit1, inlimit2, outlimit2].
-            incl (float): Inclination angle of the object. Defaults to 90,
-               which means no correction for estimate of the protostellar
-               mass.
             Mlim (list): Reliable mass range. Data points that do
                not come within this range is removed. Defaults to [0, 1e10].
             xlim (list): Range of offset where edge/ridge is
@@ -615,7 +621,7 @@ class PVAnalysis():
                derived as the intensity weighted mean. When ridgemode='gauss',
                ridge is derived as the mean of the fitted Gaussian function.
                Defaults to 'mean'.
-            pixrng (float): Pixel range for the fitting around the maximum
+            pixrng (int or None): Pixel range for the fitting around the maximum
                intensity. Only pixels +/- pixrng around the (re-samped) pixel
                with the maximum intensity are used for the fitting.
                Only applied when ridgemode='gauss'.
@@ -837,17 +843,18 @@ class PVAnalysis():
                       include_pin: bool = False,
                       fixed_pin: float = 0.5,
                       fixed_dp: float = 0,
-                      rb_range: list | None = None,
-                      vb_range: list | None = None,
-                      pin_range: list = [0.01, 10],
-                      dp_range: list = [0, 10],
-                      vsys_range: list = [-1, 1],
+                      rb_range: list[float] | None = None,
+                      vb_range: list[float] | None = None,
+                      pin_range: list[float] = [0.01, 10],
+                      dp_range: list[float] = [0, 10],
+                      vsys_range: list[float] = [-1, 1],
                       outname: str = 'pvanalysis',
-                      rangelevel: float = 0.8,
+                      rangelevel: float | None = 0.8,
                       show_corner: bool = False,
                       return_chain: bool = False,
                       return_lnp: bool = False,
-                      calc_evidence: bool = False) -> dict | int:
+                      calc_evidence: bool = False
+                      ) -> dict[str, dict[str, np.ndarray]] | int:
         """Fit the edge and ridge points with a double power law using MCMC.
 
         Args:
@@ -1056,7 +1063,8 @@ class PVAnalysis():
                   'ridge': {'popt': popt_r[0], 'perr': popt_r[1]}}
         return result
 
-    def fit_linear(self, include_intercept: bool = True) -> dict | int:
+    def fit_linear(self, include_intercept: bool = True
+                   ) -> dict[str, dict[str, list[float] | np.ndarray]] | int:
         """Fit the ridge points analytically with a linear function.
 
         Args:
@@ -1226,7 +1234,7 @@ class PVAnalysis():
         print('Derived points in'
               + f' {outname}.edge.dat and {outname}.ridge.dat.')
 
-    def get_range(self):
+    def get_range(self) -> dict[str, dict[str, list[float]]]:
         """Calculate the ranges of the edge/ridge positions (radii) and velocities.
 
         Args:
@@ -1330,22 +1338,22 @@ class PVAnalysis():
             print(f'M_out = {M_out:.3f} +/- {dM_out:.3f} Msun')
             print(f'M_b   = {M_b:.3f} +/- {dM_b:.3f} Msun')
 
-    def plot_fitresult(self, vlim: list = [0, 1e10],
-                       xlim: list = [0, 1e10],
-                       clevels: list = [3, 6],
+    def plot_fitresult(self, vlim: list[float] = [0, 1e10],
+                       xlim: list[float] = [0, 1e10],
+                       clevels: list[float] = [3, 6],
                        outname: str = 'pvanalysis',
                        logcolor: bool = False,
                        Tbcolor: bool = False,
                        cblabel: str | None = None,
                        show: bool = True,
-                       kwargs_pcolormesh: dict = {'cmap': 'viridis'},
-                       kwargs_contour: dict = {'colors': 'lime'},
+                       kwargs_pcolormesh: dict[str, object] = {'cmap': 'viridis'},
+                       kwargs_contour: dict[str, object] = {'colors': 'lime'},
                        plotedgepoint: bool = True,
                        plotridgepoint: bool = True,
                        plotedgemodel: bool = True,
                        plotridgemodel: bool = True,
-                       fmt: dict = {'edge': 'v', 'ridge': 'o'},
-                       linestyle: dict = {'edge': '--', 'ridge': '-'},
+                       fmt: dict[str, str] = {'edge': 'v', 'ridge': 'o'},
+                       linestyle: dict[str, str] = {'edge': '--', 'ridge': '-'},
                        flipaxis: bool = False) -> None:
         """Make linear and log-log PV diagrams with points and model lines.
 

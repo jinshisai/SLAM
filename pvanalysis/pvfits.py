@@ -47,7 +47,8 @@ class Impvfits:
         # self.results = []
 
     # Read fits file of Poistion-velocity (PV) diagram
-    def read_pvfits(self, pa=None, multibeam=False):
+    def read_pvfits(self, pa: float | None = None,
+                    multibeam: bool = False) -> None:
         '''
         Read fits file of pv diagram. P.A. angle of PV cut cab be given as an option.
         '''
@@ -401,7 +402,8 @@ class Impvfits:
 
 
 # Get one dimensional resolution
-def get_1dresolution(pa, bmaj, bmin, bpa):
+def get_1dresolution(pa: float, bmaj: float, bmin: float,
+                     bpa: float) -> float:
     '''Calculate one dimensional spatial resolution along a cut with P.A.=pa
 
     An ellipse of the beam
