@@ -49,6 +49,46 @@ def makemom012(d: np.ndarray, v: np.ndarray, sigma: float,
             'sigma_mom0': sigma_mom0}
 
 
+def cosine_taper_2d(f, x, y, length):
+    """Apply a cosine taper to the edges of a 2D image.
+
+    Args:
+        f (numpy.ndarray): 2D image with shape (len(y), len(x)).
+        x (numpy.ndarray): 1D coordinates along the x axis.
+        y (numpy.ndarray): 1D coordinates along the y axis.
+        length (float): Taper width at each edge, in the same units as x
+            and y. Must be finite and positive. The same physical width is
+            used along both axes. If the taper regions overlap, the weights
+            remain symmetric but do not reach one, and a warning is issued.
+
+    Returns:
+        numpy.ndarray: Tapered 2D image.
+
+    Raises:
+        ValueError: If length is not finite and positive.
+    """
+
+    if not np.isfinite(length) or length <= 0:
+        raise ValueError('Taper length must be finite and positive.')
+    if 2 * length > min(x.max() - x.min(), y.max() - y.min()):
+        warnings.warn(
+            'The edge-taper regions overlap. Even the image center is '
+            'attenuated; use a wider input image.',
+            stacklevel=2,
+        )
+
+    def taper_1d(coord):
+        cmin = coord.min()
+        cmax = coord.max()
+        dist = np.minimum(coord - cmin, cmax - coord)
+        return 0.5 * (1.0 - np.cos(np.pi * np.clip(dist / length, 0, 1)))
+
+    wx = taper_1d(x)
+    wy = taper_1d(y)
+    taper = wy[:, None] * wx[None, :]
+    return f * taper
+
+
 def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
           threshold: float = 2, gain: float = 0.01,
           weakestcomponent: float = 0.3,
@@ -200,10 +240,9 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     axis around the scientifically useful region; a wider margin is
     preferable.
 
-    A cosine taper is applied within approximately one beam major-axis width
-    of the boundary after calculating the Tikhonov solution. The returned
-    image is therefore a deliberately edge-tapered version of that solution,
-    and pixels in the tapered region should not be interpreted quantitatively.
+    A cosine taper is applied to the input within one beam major-axis width
+    of each boundary before calculating the Tikhonov solution. Pixels in
+    the tapered region should not be interpreted quantitatively.
 
     For an even-sized axis, the first row or column is temporarily omitted to
     construct an odd-sized FFT grid and restored as zeros after deconvolution.
@@ -217,6 +256,7 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     xd = x[int(len(x) % 2 == 0):]
     yd = y[int(len(y) % 2 == 0):]
     d = data[int(len(y) % 2 == 0):, int(len(x) % 2 == 0):]
+    d = cosine_taper_2d(d, xd, yd, length=bmaj)
     ny, nx = np.shape(d)
     nyh, nxh = (ny - 1) // 2, (nx - 1) // 2
     dx, dy = x[1] - x[0], y[1] - y[0]
@@ -244,9 +284,7 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     #
     #   sum(|g (*) dnew - d|^2 + thre^2 * |dnew|^2),
     #
-    # where (*) denotes circular convolution. The image-domain edge taper
-    # applied below is intentional post-processing and changes the returned
-    # image from this exact minimizer.
+    # where (*) denotes circular convolution and d is the tapered input.
     # ----------------------------------------------------------------
     FTdnew = FTd * inverse_filter
     print('Tikhonov regularization is used for Fourier-space deconvolution '
@@ -257,26 +295,6 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
     if len(y) % 2 == 0:
         dnew = np.concatenate((np.zeros((1, np.shape(dnew)[1])), dnew), axis=0)
-    edge_width = int(bmaj / min(abs(dx), abs(dy)) + 0.5)
-    if edge_width > 0:
-        # Suppress unreliable boundary behavior caused by circular
-        # convolution. This post-processing assumes that scientifically useful
-        # emission is separated from the boundary by a sufficiently wide,
-        # emission-free margin.
-        if 2 * edge_width >= min(dnew.shape):
-            warnings.warn(
-                'The edge-taper regions overlap or occupy the entire image. '
-                'Use a wider input image for mom0ft deconvolution.'
-            )
-        iy = np.arange(np.shape(dnew)[0])
-        ix = np.arange(np.shape(dnew)[1])
-        ydist = np.minimum(iy, iy[::-1])
-        xdist = np.minimum(ix, ix[::-1])
-        dist = np.minimum(ydist[:, None], xdist[None, :])
-        taper = np.ones_like(dnew)
-        edge = dist < edge_width
-        taper[edge] = 0.5 * (1 - np.cos(np.pi * dist[edge] / edge_width))
-        dnew = dnew * taper
     if savetxt is not None:
         np.savetxt(savetxt, dnew)
     return dnew
