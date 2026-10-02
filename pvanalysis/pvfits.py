@@ -110,11 +110,11 @@ class Impvfits:
                 res_offs = []
                 for i in range(len(self.beam)):
                     bmaj, bmin, bpa, _, _ = self.beam[i]
-                    res_offs.append(get_1dresolution(pa, bmaj, bmin, bpa))
+                    res_offs.append(get_1dresolution(self.pa, bmaj, bmin, bpa))
                 self.res_off = np.nanmax(res_offs)
             elif self.beam is not None:
                 bmaj, bmin, bpa = self.beam
-                self.res_off = get_1dresolution(pa, bmaj, bmin, bpa)
+                self.res_off = get_1dresolution(self.pa, bmaj, bmin, bpa)
             else:
                 self.res_off = None
         # rest frequency (Hz)
@@ -419,4 +419,4 @@ def get_1dresolution(pa: float, bmaj: float, bmin: float,
     '''
     del_pa = np.radians(pa - bpa)
     term2 = np.hypot(np.sin(del_pa) / bmin, np.cos(del_pa) / bmaj)
-    return (1. / term2)
+    return float(1. / term2)

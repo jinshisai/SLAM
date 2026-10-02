@@ -27,7 +27,8 @@ def gauss1d(x: float | np.ndarray, amp: float, mean: float,
     Returns:
         float or np.ndarray: Gaussian evaluated at ``x``.
     """
-    return amp * np.exp(-(x-mean)*(x-mean)/(2.0*sig*sig))
+    result = amp * np.exp(-(x-mean)*(x-mean)/(2.0*sig*sig))
+    return float(result) if np.ndim(result) == 0 else result
 
 
 # for chi-square
@@ -76,7 +77,7 @@ def edge(xdata: np.ndarray, ydata: np.ndarray, yerr: float,
     val = x[0] if edgesign < 0 else x[-1]
     grad = grad[0] if edgesign < 0 else grad[-1]
     err = yerr / np.abs(grad)
-    return [val, err]
+    return [float(val), float(err)]
 
 
 '''
@@ -110,6 +111,9 @@ def gaussfit(xdata: np.ndarray, ydata: np.ndarray,
             uncertainties. Arrays contain NaNs when a fit cannot be obtained.
     """
 
+    if len(xdata) < 3:
+        return np.full(3, np.nan), np.full(3, np.nan)
+
     # Get estimate of the initial parameters
     indx_pini = ydata >= 3.*yerr
     mx = np.nansum(ydata[indx_pini]*xdata[indx_pini])/np.nansum(ydata[indx_pini])  # weighted mean
@@ -121,11 +125,6 @@ def gaussfit(xdata: np.ndarray, ydata: np.ndarray,
 
     amp = np.nanmax(ydata)
     pinp = [amp, mx, sigx]
-
-    if len(xdata) < 3:
-        param_out = np.full(3, np.nan)
-        param_err = np.full(3, np.nan)
-        return param_out, param_err
 
     # fitting
     results = optimize.leastsq(chi_gauss1d, pinp, args=(xdata, ydata, yerr), full_output=True)
@@ -142,7 +141,7 @@ def gaussfit(xdata: np.ndarray, ydata: np.ndarray,
         ])
     else:
         param_err = np.full(3, np.nan)
-        param_out = np.full(3, np.nan) if (param_out == pinp).all else param_out
+        param_out = np.full(3, np.nan) if (param_out == pinp).all() else param_out
 
     # print results
     # print ('Chi2: ', reduced_chi2)
@@ -171,7 +170,7 @@ def ridge_mean(xdata: np.ndarray, ydata: np.ndarray,
         return np.nan, np.nan
     val = np.average(xdata, weights=ydata)
     err = yerr * np.sqrt(np.sum((xdata - val)**2)) / np.sum(ydata)
-    return val, err
+    return float(val), float(err)
 
 
 '''
