@@ -4,6 +4,8 @@ This script makes model channel maps from the observed mom0 by assuming 2D veloc
 The main class ChannelFit can be imported to do each steps separately.
 """
 
+from typing import Any
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
@@ -41,7 +43,7 @@ def avefour(a: np.ndarray) -> np.ndarray:
 
 
 def makemom012(d: np.ndarray, v: np.ndarray, sigma: float,
-               threshold: float = 3) -> dict:
+               threshold: float = 3) -> dict[str, np.ndarray | float]:
     """Calculate integrated intensity, mean velocity, and velocity dispersion.
 
     Args:
@@ -187,7 +189,8 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
 def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bmaj: float, bmin: float, bpa: float, sigma: float,
                     savetxt: str | None = None, loadtxt: str | None = None,
-                    direct: bool = False, progressbar: bool = True) -> tuple:
+                    direct: bool = False, progressbar: bool = True
+                    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Fit a nonnegative intensity grid convolved with a Gaussian beam.
 
     Args:
@@ -838,7 +841,7 @@ class ChannelFit(ReadFits):
                  envelope: bool = False,
                  scaling: str = 'uniform',
                  progressbar: bool = True,
-                 scaling_gp_args: dict = {
+                 scaling_gp_args: dict[str, Any] = {
                      'scale_length': 2.,
                      'kernel': 'rbf',
                      'sigma_f': None,
@@ -1350,26 +1353,27 @@ class ChannelFit(ReadFits):
             Iout = Iunif
         return Iout
 
-    def fitting(self, Mstar_range: list = [0.01, 10],
-                Rc_range: list = [1, 1000],
-                cs_range: list = [0.01, 1],
-                h1_range: list = [0.01, 1],
-                h2_range: list = [0.01, 1],
-                pI_range: list = [-2, 2],
-                Rin_range: list = [0, 1000],
-                Ienv_range: list = [0.01, 100],
-                xoff_range: list = [-100, 100],
-                yoff_range: list = [-100, 100],
-                voff_range: list = [-0.2, 0.2],
-                incl_range: list = [-45, 45],
-                pa_range: list = [-45, 45],
-                fixed_params: dict = {},
+    def fitting(self, Mstar_range: list[float] = [0.01, 10],
+                Rc_range: list[float] = [1, 1000],
+                cs_range: list[float] = [0.01, 1],
+                h1_range: list[float] = [0.01, 1],
+                h2_range: list[float] = [0.01, 1],
+                pI_range: list[float] = [-2, 2],
+                Rin_range: list[float] = [0, 1000],
+                Ienv_range: list[float] = [0.01, 100],
+                xoff_range: list[float] = [-100, 100],
+                yoff_range: list[float] = [-100, 100],
+                voff_range: list[float] = [-0.2, 0.2],
+                incl_range: list[float] = [-45, 45],
+                pa_range: list[float] = [-45, 45],
+                fixed_params: dict[str, float | None] = {},
                 filename: str = 'channelfit',
                 show: bool = False,
                 save_result: bool = True,
                 save_corner: bool = True,
                 print_result: bool = True,
-                kwargs_emcee_corner: dict = {}) -> dict:
+                kwargs_emcee_corner: dict[str, Any] = {}
+                ) -> dict[str, dict[str, float] | float | None]:
         """Fit the channel-map model parameters with MCMC.
 
         Args:
@@ -1606,7 +1610,8 @@ class ChannelFit(ReadFits):
         return {'popt': self.popt, 'plow': self.plow, 'pmid': self.pmid,
                 'phigh': self.phigh, 'chi2r': getattr(self, 'chi2r', None)}
 
-    def make_model_products(self, **kwargs: float) -> dict:
+    def make_model_products(self, **kwargs: float
+                            ) -> dict[str, np.ndarray | fits.Header]:
         """Build model and residual cubes with an adjusted FITS header.
 
         Args:
