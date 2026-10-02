@@ -11,6 +11,7 @@ the central points.
 
 
 from collections.abc import Callable
+from typing import Literal
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -114,15 +115,16 @@ def r_kep_out(v: float | np.ndarray, M_p: float, v_break: float,
     v_s, v_a = np.sign(v - vsys), np.abs(v - vsys)
     p = 2. + (p_low - 2.) * (1 + np.sign(v_break - v_a)) / 2.
     r_break = M_p / v_break**2
-    return v_s * r_break * (v_a / v_break)**(-p)
+    radius = v_s * r_break * (v_a / v_break)**(-p)
+    return float(radius) if np.ndim(radius) == 0 else radius
 
 
 class VelGrad(ReadFits):
     """Measure emission centers, a velocity gradient, and dynamical mass."""
 
-    def get_2Dcenter(self, cutoff: float = 5, vmask: list = [0, 0],
+    def get_2Dcenter(self, cutoff: float = 5, vmask: list[float] = [0, 0],
                      minrelerr: float = 0.01, minabserr: float = 0.1,
-                     method: str = 'mean') -> None:
+                     method: Literal['mean', 'peak', 'gauss'] = 'mean') -> None:
         """Measure the two-dimensional emission center in each channel.
 
         Args:
@@ -152,7 +154,7 @@ class VelGrad(ReadFits):
                 float: Maximum of err, minrelerr times the absolute coordinate,
                 and minabserr times the beam major axis.
             """
-            return max(err, minrelerr * np.abs(val), minabserr * self.bmaj)
+            return float(max(err, minrelerr * np.abs(val), minabserr * self.bmaj))
 
         X_org, Y_org = np.meshgrid(self.x, self.y)
         xc, yc, dxc, dyc = [], [], [], []
@@ -207,7 +209,8 @@ class VelGrad(ReadFits):
                   save_points: bool = True,
                   print_result: bool = True,
                   return_chain: bool = False,
-                  return_lnp: bool = False) -> dict:
+                  return_lnp: bool = False
+                  ) -> dict[str, float | dict[str, np.ndarray]]:
         """Fit a velocity-gradient axis and filter inconsistent channels.
 
         Args:
@@ -244,7 +247,7 @@ class VelGrad(ReadFits):
         if not fixcenter:
             for i in range(n):
                 j = 2 * n0 - i
-                if 0 < j or j <= n:
+                if j < 0 or n <= j:
                     xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
                 elif np.isnan(xc[i]) or np.isnan(yc[i]):
                     xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
@@ -270,7 +273,7 @@ class VelGrad(ReadFits):
                 all false-valued entries if no valid centers exist.
             """
             if np.all(np.isnan(x_in) | np.isnan(y_in)):
-                return np.full_like(x_in, False)
+                return np.full_like(x_in, False, dtype=bool)
             x0 = x_in - xoff
             y0 = y_in - yoff
             if fixcenter:
@@ -324,7 +327,7 @@ class VelGrad(ReadFits):
             parad = np.radians(pa)
             d3 = (x * np.cos(parad) - y * np.sin(parad))**2
             d3 = d3 / ((dx**2 + dy**2) / 2)
-            return np.sum(d1 + d2 + d3)
+            return float(np.sum(d1 + d2 + d3))
 
         def low_velocity(x_in: np.ndarray, y_in: np.ndarray,
                          pa_in: float) -> np.ndarray:
@@ -345,7 +348,7 @@ class VelGrad(ReadFits):
             parad = np.radians(pa_in)
             cospa = np.cos(parad)
             sinpa = np.sin(parad)
-            c = np.full_like(x_in, False)
+            c = np.full_like(x_in, False, dtype=bool)
             if np.all(np.isnan(x_in) | np.isnan(y_in)):
                 return c
             x = x_in[:n0]
@@ -497,12 +500,13 @@ class VelGrad(ReadFits):
         return res
 
     def calc_mstar(self, incl: float = 90,
-                   voff_range: list = [-0.5, 0.5],
+                   voff_range: list[float] = [-0.5, 0.5],
                    voff_fixed: float | None = 0,
                    minabserr: float = 0.1, minrelerr: float = 0.01,
                    print_result: bool = True,
                    return_chain: bool = False,
-                   return_lnp: bool = False) -> dict:
+                   return_lnp: bool = False
+                   ) -> dict[str, float | np.ndarray | None]:
         """Fit a rotation profile and estimate the central stellar mass.
 
         Args:
@@ -579,7 +583,7 @@ class VelGrad(ReadFits):
                     vsys = voff_fixed
                 r_model = r_kep_out(v, M_p, v_break, p_low, vsys)
                 chi2 = np.sum(((r - s_model * r_model) / dr)**2)
-                return -0.5 * chi2
+                return float(-0.5 * chi2)
             Mmin = np.min(np.abs(r)) * np.min(np.abs(v))**2
             Mmax = np.max(np.abs(r)) * np.max(np.abs(v))**2
             plim = np.array([[Mmin, np.min(np.abs(v)), -10, voff_range[0]],
