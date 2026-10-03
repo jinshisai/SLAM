@@ -861,7 +861,7 @@ class ChannelFit(ReadFits):
                  pa: float = 0, incl: float = 90, dist: float = 1,
                  center: str | None = None, vsys: float = 0,
                  rmax: float = 1e4,
-                 vlim: tuple[float, float, float, float] = (-100, 0, 0, 100),
+                 vlim: list[float] = [-100, 0, 0, 100],
                  sigma: float | None = None, nlayer: int = 3,
                  xskip: int = 1, yskip: int = 1,
                  skipto: int | bool | None = False,
@@ -885,9 +885,9 @@ class ChannelFit(ReadFits):
             vsys (float, optional): Systemic velocity in km/s. Defaults to 0.
             rmax (float, optional): Half-width of the fitted area in au.
                 Defaults to 1e4.
-            vlim (tuple, optional): Boundaries of the fitted blue and red
+            vlim (list, optional): Boundaries of the fitted blue and red
                 velocity ranges, relative to ``vsys``, in km/s. Defaults to
-                (-100, 0, 0, 100).
+                [-100, 0, 0, 100].
             sigma (float or None, optional): RMS noise of the cube. None means
                 automatic estimation. Defaults to None.
             nlayer (int, optional): Number of nested model-grid layers.

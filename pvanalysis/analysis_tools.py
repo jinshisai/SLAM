@@ -105,7 +105,8 @@ def p_inout(p_in: float, dp: float, t0: float | np.ndarray,
         float or np.ndarray: ``p_in`` where ``t0 < t1`` and ``p_in + dp``
             where ``t0 > t1``. Equality gives ``p_in + dp / 2``.
     """
-    return p_in + dp * (1 + np.sign(t0 - t1)) / 2.
+    result = p_in + dp * (1 + np.sign(t0 - t1)) / 2.
+    return float(result) if np.ndim(result) == 0 else result
 
 
 def doublepower_v(r: float | np.ndarray, r_break: float, v_break: float,
@@ -126,7 +127,8 @@ def doublepower_v(r: float | np.ndarray, r_break: float, v_break: float,
     """
     r_s, r_a = np.sign(r), np.abs(r)
     p = p_inout(p_in, dp, r_a, r_break)
-    return v_break * r_s / (r_a / r_break)**p + vsys
+    result = v_break * r_s / (r_a / r_break)**p + vsys
+    return float(result) if np.ndim(result) == 0 else result
 
 
 def doublepower_v_error(r: float | np.ndarray, r_break: float,
@@ -182,7 +184,8 @@ def doublepower_r(v: float | np.ndarray, r_break: float, v_break: float,
     """
     v_s, v_a = np.sign(v - vsys), np.abs(v - vsys)
     p = p_inout(p_in, dp, v_break, v_a)
-    return r_break * v_s / (v_a / v_break)**(1 / p)
+    result = r_break * v_s / (v_a / v_break)**(1 / p)
+    return float(result) if np.ndim(result) == 0 else result
 
 
 def doublepower_r_error(v: float | np.ndarray, r_break: float,
@@ -216,7 +219,7 @@ def doublepower_r_error(v: float | np.ndarray, r_break: float,
     perr = p_inout(dp_in, dp_out - dp_in, v_break, v_a)
     err2 = (dr_break / r_break)**2 + (dv_break / v_break / p)**2 \
         + (np.log(v_break / v_a) * perr / p**2)**2 + (dvsys / v_a / p)**2
-    return np.sqrt(err2) * r0
+    return np.sqrt(err2) * np.abs(r0)
 
 
 '''

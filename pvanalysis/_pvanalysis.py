@@ -68,9 +68,9 @@ class PVAnalysis():
                       ridgemode: str = 'mean',
                       pixrng_vcut: int | np.integer | None = None,
                       pixrng_xcut: int | np.integer | None = None,
-                      Mlim: list[float] = [0, 1e10],
-                      xlim: list[float] = [-1e10, 0, 0, 1e10],
-                      vlim: list[float] = [-1e10, 0, 0, 1e10],
+                      Mlim: list[float] | np.ndarray = [0, 1e10],
+                      xlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
+                      vlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
                       use_velocity: bool = True,
                       use_position: bool = True,
                       interp_ridge: bool = False,
@@ -96,11 +96,11 @@ class PVAnalysis():
             pixrng_xcut (int or None, optional): Pixel range fitted around a
                 peak along the position axis in Gaussian mode. Defaults to
                 None.
-            Mlim (list, optional): Accepted dynamical-mass range in solar
+            Mlim (list or numpy.ndarray, optional): Accepted dynamical-mass range in solar
                 masses. Defaults to [0, 1e10].
-            xlim (list, optional): Position ranges in au.
+            xlim (list or numpy.ndarray, optional): Position ranges in au.
                 Defaults to [-1e10, 0, 0, 1e10].
-            vlim (list, optional): Velocity ranges in km/s.
+            vlim (list or numpy.ndarray, optional): Velocity ranges in km/s.
                 Defaults to [-1e10, 0, 0, 1e10].
             use_velocity (bool, optional): Whether to derive the edge/ridge velocity as a
                 function of position. Defaults to True.
@@ -144,10 +144,10 @@ class PVAnalysis():
                 float: Sum in the lower-left and upper-right array blocks minus the
                 other two blocks, using the enclosing image midpoints.
             """
-            return (np.sum(a[:nvh, :nxh])
-                    + np.sum(a[nvh:, nxh:])
-                    - np.sum(a[:nvh, nxh:])
-                    - np.sum(a[nvh:, :nxh]))
+            return float(np.sum(a[:nvh, :nxh])
+                         + np.sum(a[nvh:, nxh:])
+                         - np.sum(a[:nvh, nxh:])
+                         - np.sum(a[nvh:, :nxh]))
 
         q = np.sign(quadcheck(data))
         if quadrant is None:
@@ -348,9 +348,9 @@ class PVAnalysis():
             self.results_filtered[re] = res_f
 
     def get_edgeridge_vcut(self, outname: str, thr: float = 5.,
-                           xlim: list[float] | tuple[float, ...] | np.ndarray = [-1e10, 0, 0, 1e10],
-                           vlim: list[float] | tuple[float, ...] | np.ndarray = [-1e10, 0, 0, 1e10],
-                           Mlim: list[float] | tuple[float, ...] | np.ndarray = [0, 1e10],
+                           xlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
+                           vlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
+                           Mlim: list[float] | np.ndarray = [0, 1e10],
                            ridgemode: str = 'gauss',
                            pixrng: int | np.integer | None = None,
                            multipeaks: bool = False, i_peak: int = 0,
@@ -594,9 +594,9 @@ class PVAnalysis():
         plt.close()
 
     def get_edgeridge_xcut(self, outname: str, thr: float = 5.,
-                           xlim: list[float] | tuple[float, ...] | np.ndarray = [-1e10, 0, 0, 1e10],
-                           vlim: list[float] | tuple[float, ...] | np.ndarray = [-1e10, 0, 0, 1e10],
-                           Mlim: list[float] | tuple[float, ...] | np.ndarray = [0, 1e10],
+                           xlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
+                           vlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
+                           Mlim: list[float] | np.ndarray = [0, 1e10],
                            ridgemode: str = 'mean',
                            pixrng: int | np.integer | None = None,
                            multipeaks: bool = False, i_peak: int = 0,
@@ -843,11 +843,11 @@ class PVAnalysis():
                       include_pin: bool = False,
                       fixed_pin: float = 0.5,
                       fixed_dp: float = 0,
-                      rb_range: list[float] | None = None,
-                      vb_range: list[float] | None = None,
-                      pin_range: list[float] = [0.01, 10],
-                      dp_range: list[float] = [0, 10],
-                      vsys_range: list[float] = [-1, 1],
+                      rb_range: list[float] | np.ndarray | None = None,
+                      vb_range: list[float] | np.ndarray | None = None,
+                      pin_range: list[float] | np.ndarray = [0.01, 10],
+                      dp_range: list[float] | np.ndarray = [0, 10],
+                      vsys_range: list[float] | np.ndarray = [-1, 1],
                       outname: str = 'pvanalysis',
                       rangelevel: float | None = 0.8,
                       show_corner: bool = False,
@@ -868,18 +868,18 @@ class PVAnalysis():
                 is False. A value of 0.5 means Keplerian. Defaults to 0.5.
             fixed_dp (float, optional): Index change used when ``include_dp``
                 is False. Zero means a single power law. Defaults to 0.
-            rb_range (list or None, optional): Prior range of break radius in
+            rb_range (list, numpy.ndarray or None, optional): Prior range of break radius in
                 au, shared by the edge and ridge fits. None uses the combined
                 absolute-radius range of both datasets. Defaults to None.
-            vb_range (list or None, optional): Prior range of break velocity
+            vb_range (list, numpy.ndarray or None, optional): Prior range of break velocity
                 in km/s, shared by the edge and ridge fits. None uses the
                 combined absolute-velocity range of both datasets. Defaults
                 to None.
-            pin_range (list, optional): Prior range of the inner index.
+            pin_range (list or numpy.ndarray, optional): Prior range of the inner index.
                 Defaults to [0.01, 10].
-            dp_range (list, optional): Prior range of the index change.
+            dp_range (list or numpy.ndarray, optional): Prior range of the index change.
                 Defaults to [0, 10].
-            vsys_range (list, optional): Prior range of the systemic-velocity
+            vsys_range (list or numpy.ndarray, optional): Prior range of the systemic-velocity
                 offset in km/s. Defaults to [-1, 1].
             outname (str, optional): Prefix for edge and ridge corner plots.
                 Defaults to ``'pvanalysis'``.
@@ -943,7 +943,7 @@ class PVAnalysis():
             Returns:
                 float: Minimum absolute value in the concatenated arrays.
             """
-            return np.min(np.abs(np.r_[a[i], a[j]]))
+            return float(np.min(np.abs(np.r_[a[i], a[j]])))
 
         def maxabs(a: list[np.ndarray], i: int, j: int) -> float:
             """Find the largest absolute value across two data arrays.
@@ -956,7 +956,7 @@ class PVAnalysis():
             Returns:
                 float: Maximum absolute value in the concatenated arrays.
             """
-            return np.max(np.abs(np.r_[a[i], a[j]]))
+            return float(np.max(np.abs(np.r_[a[i], a[j]])))
 
         if rb_range is None:
             rb_range = [min(minabs(a, 1, 3) for a in Ds),
@@ -1122,7 +1122,7 @@ class PVAnalysis():
                 Returns:
                     float: Sum of a / dy**2.
                 """
-                return np.sum(a / dy**2)
+                return float(np.sum(a / dy**2))
 
             b = np.array([wsum(y), wsum(y * x)])
             A = np.array([[wsum(1), wsum(x)],
@@ -1153,7 +1153,7 @@ class PVAnalysis():
                 Returns:
                     float: Sum of a / dy**2.
                 """
-                return np.sum(a / dy**2)
+                return float(np.sum(a / dy**2))
 
             c = np.array([0, wsum(x * y) / wsum(x**2)])
             dc = np.array([0, 1. / np.sqrt(wsum(x**2))])
@@ -1281,7 +1281,7 @@ class PVAnalysis():
                 vout = doublepower_v(rout, *popt)
             else:
                 rout = doublepower_r(vout, *popt)
-            return [[rin, rout], [vin, vout]]
+            return [[float(rin), float(rout)], [float(vin), float(vout)]]
         lims_e = inout(*self.__Es, self.popt['edge'][0])
         lims_r = inout(*self.__Rs, self.popt['ridge'][0])
         self.rvlim = {'edge': lims_e, 'ridge': lims_r}
@@ -1338,9 +1338,10 @@ class PVAnalysis():
             print(f'M_out = {M_out:.3f} +/- {dM_out:.3f} Msun')
             print(f'M_b   = {M_b:.3f} +/- {dM_b:.3f} Msun')
 
-    def plot_fitresult(self, vlim: list[float] = [0, 1e10],
-                       xlim: list[float] = [0, 1e10],
-                       clevels: list[float] = [3, 6],
+    def plot_fitresult(self,
+                       vlim: list[float] | np.ndarray = [0, 1e10],
+                       xlim: list[float] | np.ndarray = [0, 1e10],
+                       clevels: list[float] | np.ndarray = [3, 6],
                        outname: str = 'pvanalysis',
                        logcolor: bool = False,
                        Tbcolor: bool = False,
@@ -1358,11 +1359,11 @@ class PVAnalysis():
         """Make linear and log-log PV diagrams with points and model lines.
 
         Args:
-            vlim (list, optional): Absolute velocity range relative to the
+            vlim (list or numpy.ndarray, optional): Absolute velocity range relative to the
                 systemic velocity in km/s. Defaults to [0, 1e10].
-            xlim (list, optional): Absolute position range in au. Defaults to
+            xlim (list or numpy.ndarray, optional): Absolute position range in au. Defaults to
                 [0, 1e10].
-            clevels (list, optional): Contour levels in the unit of sigma.
+            clevels (list or numpy.ndarray, optional): Contour levels in the unit of sigma.
                 Defaults to [3, 6].
             outname (str, optional): Prefix for ``.linear.png`` and
                 ``.log.png``. Defaults to ``'pvanalysis'``.
@@ -1683,7 +1684,8 @@ def kepler_mass(r: float | np.ndarray, v: float | np.ndarray,
     Returns:
         float or numpy.ndarray: Keplerian mass in the units set by unit.
     """
-    return v**2 * np.abs(r) * unit
+    result = v**2 * np.abs(r) * unit
+    return float(result) if np.ndim(result) == 0 else result
 
 
 def kepler_mass_error(r: float | np.ndarray, v: float | np.ndarray,
@@ -1703,7 +1705,8 @@ def kepler_mass_error(r: float | np.ndarray, v: float | np.ndarray,
         float or numpy.ndarray: Mass uncertainty from first-order propagation,
         neglecting covariance between radius and velocity.
     """
-    return kepler_mass(r, v, unit) * np.sqrt((2*dv/v)**2 + (dr/r)**2)
+    result = kepler_mass(r, v, unit) * np.sqrt((2*dv/v)**2 + (dr/r)**2)
+    return float(result) if np.ndim(result) == 0 else result
 
 
 def between(t: np.ndarray,
@@ -1722,4 +1725,4 @@ def between(t: np.ndarray,
     if not (len(tlim) == 2):
         return np.full(np.shape(t), True)
     else:
-        return (tlim[0] < t) * (t < tlim[1])
+        return np.asarray((tlim[0] < t) & (t < tlim[1]), dtype=bool)
