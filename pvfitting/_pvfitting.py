@@ -5,6 +5,8 @@ This script makes position-velocity diagrams along the major and minor axes,
 The main class PVFitting can be imported to do each steps separately.
 """
 
+from typing import Literal
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
@@ -35,6 +37,7 @@ class PVFitting(ReadFits):
             dist (float): Source distance in pc.
             vsys (float): Systemic velocity in km/s.
             rmax (float or None): Maximum absolute position in au.
+                None uses the full position range.
             vmin (float or None): Minimum velocity relative to ``vsys`` in
                 km/s.
             vmax (float or None): Maximum velocity relative to ``vsys`` in
@@ -46,10 +49,11 @@ class PVFitting(ReadFits):
             skipto (int or None, optional): Approximate number of pixels per
                 beam minor axis after resampling. Defaults to None.
         """
+        xmin = None if rmax is None else -rmax
         d = []
         for pvfits in [pvmajorfits, pvminorfits]:
             self.read_pvfits(pvfits=pvfits, dist=dist, vsys=vsys,
-                             xmin=-rmax, xmax=rmax, xskip=xskip, sigma=sigma)
+                             xmin=xmin, xmax=rmax, xskip=xskip, sigma=sigma)
             if type(skipto) is int:
                 iskip = int(self.bmin / (np.abs(self.dx) / xskip) / skipto)
                 if iskip == 0:
@@ -64,7 +68,7 @@ class PVFitting(ReadFits):
                 iskip = xskip
             self.vorg = self.v
             self.read_pvfits(pvfits=pvfits, dist=dist, vsys=vsys,
-                             xmin=-rmax, xmax=rmax, xskip=iskip, sigma=sigma,
+                             xmin=xmin, xmax=rmax, xskip=iskip, sigma=sigma,
                              vmin=vmin, vmax=vmax)
             d.append(self.data)
         self.dpvmajor, self.dpvminor = d
@@ -93,7 +97,7 @@ class PVFitting(ReadFits):
                     taumax_range: list[float] = [0.1, 1e3],
                     frho_range: list[float] = [1., 1e4],
                     sig_mdl_range: list[float] = [0., 10.],
-                    fixed_params: dict = {'Mstar': None, 'Rc': None,
+                    fixed_params: dict[str, float | None] = {'Mstar': None, 'Rc': None,
                                           'alphainfall': None, 'taumax': None,
                                           'frho': None, 'sig_mdl': None},
                     vmask: list[float] = [0, 0],
@@ -104,16 +108,16 @@ class PVFitting(ReadFits):
                     save_corner: bool = True,
                     print_result: bool = True,
                     progressbar: bool = True,
-                    kwargs_emcee_corner: dict = {},
+                    kwargs_emcee_corner: dict[str, object] = {},
                     signmajor: int | None = None, signminor: int | None = None,
                     pa_major: float = 0., pa_minor: float = 90.,
                     linewidth: float | None = None,
                     nsubgrid: int = 1,
-                    n_nest: list[int] = [2, 2, 2, 2, 2, 2],
+                    n_nest: list[int] | None = [2, 2, 2, 2, 2, 2],
                     reslim: float = 10,
                     title: str | None = None,
                     log: bool = False,
-                    num_threads: int | str | None = None) -> None:
+                    num_threads: int | Literal['all'] | None = None) -> None:
         """Fit mock major- and minor-axis PV diagrams with MCMC.
 
         Args:
@@ -170,8 +174,8 @@ class PVFitting(ReadFits):
                 Defaults to None.
             nsubgrid (int, optional): Initial model subgrid refinement factor.
                 Defaults to 1.
-            n_nest (list, optional): Refinement factors for nested model-grid
-                levels. Defaults to [2, 2, 2, 2, 2, 2].
+            n_nest (list or None, optional): Refinement factors for nested model-grid
+                levels. None disables nesting. Defaults to [2, 2, 2, 2, 2, 2].
             reslim (float, optional): Threshold defining the next nested-grid
                 extent. Defaults to 10.
             title (str or None, optional): Figure title. Defaults to None.
@@ -271,7 +275,7 @@ class PVFitting(ReadFits):
                 return np.inf
             chi2maj = np.nansum((majobs - majmod)**2 / majsig2)
             chi2min = np.nansum((minobs - minmod)**2 / minsig2)
-            return (chi2maj + chi2min) / np.sqrt(Rarea)
+            return float((chi2maj + chi2min) / np.sqrt(Rarea))
 
         def reduced_chi2(q: list[float] | np.ndarray) -> float:
             """Divide the joint chi-square by the effective degrees of freedom.
@@ -289,7 +293,7 @@ class PVFitting(ReadFits):
             n_data = n_data / np.sqrt(Rarea)
             n_free = np.count_nonzero(notfixed) + 1  # +1 is due to fflux
             dof = n_data - n_free
-            return chi2(q) / dof if dof > 0 else np.nan
+            return float(chi2(q) / dof) if dof > 0 else np.nan
 
         runfit = None in p_fixed
         if runfit:
@@ -342,7 +346,7 @@ class PVFitting(ReadFits):
                     return -np.inf
                 chi2maj = np.nansum((majobs - majmod)**2 / majsig2 + np.log(majsig2))
                 chi2min = np.nansum((minobs - minmod)**2 / minsig2 + np.log(minsig2))
-                return -0.5 * (chi2maj + chi2min) / np.sqrt(Rarea)
+                return float(-0.5 * (chi2maj + chi2min) / np.sqrt(Rarea))
             # prior
             plim = np.array([Mstar_range, Rc_range, alphainfall_range,
                              taumax_range, frho_range, sig_mdl_range])
@@ -440,7 +444,7 @@ class PVFitting(ReadFits):
                   cmap_residual: str = 'bwr', ext: str = '.png',
                   title: str | None = None, show: bool = False,
                   shadecolor: str = 'white',
-                  clevels: list[float] | None = None,
+                  clevels: list[float] | np.ndarray | None = None,
                   log: bool = False) -> list[Figure] | int:
         '''
         Plot observed and model PV diagrams.
@@ -576,9 +580,9 @@ class PVFitting(ReadFits):
         # main plot
         vmin = 2 * self.sigma if log else np.nanmin(np.array(d_col))
         vmax = np.nanmax(np.array(d_col))
-        vmask = vmask if vmask[1] > vmask[0] else None
+        vmask_plot = vmask if vmask[1] > vmask[0] else None
         fig = makeplots(d_col, d_con, cmap, vmin=vmin, vmax=vmax,
-                        vmask=vmask, alpha=0.8)
+                        vmask=vmask_plot, alpha=0.8)
         fig.tight_layout()
         fig.subplots_adjust(wspace=0.1)
         fig.savefig(filename + outlabel + ext, dpi=300)
@@ -617,9 +621,9 @@ class PVFitting(ReadFits):
         h['NAXIS1'] = len(self.x)
         h['CRPIX1'] = h['CRPIX1'] - self.offpix[0]
         nx = h['NAXIS1']
-        p = self.popt if kwargs == {} else kwargs
-        if 'sig_mdl' in p.keys():
-            del p['sig_mdl']
+        # Copy popt not to change self.popt.
+        p = (self.popt if kwargs == {} else kwargs).copy()
+        p.pop('sig_mdl', None)
         majmod, minmod = self.makemodel(**p)
         majres = self.dpvmajor - majmod
         minres = self.dpvminor - minmod
