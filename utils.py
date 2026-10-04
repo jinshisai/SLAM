@@ -35,9 +35,9 @@ def emcee_corner(bounds: list[list[float]] | np.ndarray,
                  nwalkers_per_ndim: int = 16,
                  nburnin: int = 2000, nsteps: int = 2000,
                  gr_check: bool = False, ndata: int = 1000,
-                 labels: list[str] | None = None,
+                 labels: list[str] | np.ndarray | None = None,
                  rangelevel: float | None = 0.8,
-                 range_corner: list[float | tuple[float, float]] | None = None,
+                 range_corner: list[float | list[float] | np.ndarray] | None = None,
                  figname: str | None = None, show_corner: bool = False,
                  plot_chain: bool = False, show_chain: bool = False,
                  ncore: int = 1, simpleoutput: bool = True,
@@ -62,14 +62,15 @@ def emcee_corner(bounds: list[list[float]] | np.ndarray,
             convergence statistic. Defaults to False.
         ndata (int, optional): Number of data points used in the convergence
             correction. Defaults to 1000.
-        labels (list or None, optional): Parameter labels for the corner and
+        labels (list, np.ndarray or None, optional): Parameter labels for the corner and
             chain plots. Defaults to None.
         rangelevel (float or None, optional): Fraction of samples shown for
             every parameter in the corner plot. None uses ``bounds``.
             Defaults to 0.8.
         range_corner (list or None, optional): Per-parameter corner-plot
             ranges. Each entry is either a sample fraction or an explicit
-            ``(minimum, maximum)`` pair. Defaults to None.
+            ``[minimum, maximum]`` pair supplied as a list or NumPy
+            array. Defaults to None.
         figname (str or None, optional): Corner-plot output filename. When
             chain plotting is enabled, it is also used to derive the chain
             filename. Defaults to None.
@@ -175,7 +176,8 @@ def emcee_corner(bounds: list[list[float]] | np.ndarray,
         for i, ax in enumerate(axes):
             for iwalk in range(nwalkers):
                 ax.plot(xplot, _samples[iwalk, :, i].T, 'k')
-            ax.set_ylabel(labels[i])
+            if labels is not None:
+                ax.set_ylabel(labels[i])
             ax.tick_params(which='both', direction='in',
                            bottom=True, top=True,
                            left=True, right=True,
@@ -207,7 +209,7 @@ def emcee_corner(bounds: list[list[float]] | np.ndarray,
 def dynesty_corner(bounds: list[list[float]] | np.ndarray,
                    log_prob_fn: Callable[..., float],
                    args: list[object] = [],
-                   labels: list[str] | None = None,
+                   labels: list[str] | np.ndarray | None = None,
                    figname: str | None = None,
                    show_corner: bool = False,
                    return_evidence: bool = False,
@@ -223,7 +225,7 @@ def dynesty_corner(bounds: list[list[float]] | np.ndarray,
             vector followed by the values in ``args``.
         args (list, optional): Additional positional arguments passed to
             ``log_prob_fn``. Defaults to an empty list.
-        labels (list or None, optional): Parameter labels for the corner plot.
+        labels (list, np.ndarray or None, optional): Parameter labels for the corner plot.
             Defaults to None.
         figname (str or None, optional): Corner-plot output filename. Defaults
             to None.
@@ -419,6 +421,7 @@ class ReadFits:
         self.x, self.dx, self.nx = x, dx, len(x)
         self.y, self.dy, self.ny = y, dy, len(y)
         self.v, self.dv, self.nv = v, dv, len(v)
+        sigma = float(sigma)
         self.data, self.header, self.sigma = d, h, sigma
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.beam = np.array([bmaj, bmin, bpa])
@@ -510,6 +513,7 @@ class ReadFits:
             print('No valid beam in the FITS file.')
         self.x, self.dx, self.nx = x, dx, len(x)
         self.v, self.dv, self.nv = v, dv, len(v)
+        sigma = float(sigma)
         self.data, self.header, self.sigma = d, h, sigma
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.beam = np.array([bmaj, bmin, bpa])
