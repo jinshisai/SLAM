@@ -161,9 +161,12 @@ def emcee_corner(bounds: list[list[float]] | np.ndarray,
     else:
         r_c = range_corner
     if show_corner or figname is not None:
-        corner.corner(samples, truths=popt,
-                      quantiles=[0.16, 0.5, 0.84], show_titles=True,
-                      range=r_c, labels=labels),
+        fig = corner.corner(samples, truths=None if ndim == 1 else popt,
+                            quantiles=[0.16, 0.5, 0.84], show_titles=True,
+                            range=r_c, labels=labels)
+        if ndim == 1:
+            # corner's truth overlay indexes a scalar Axes as a 2D array.
+            fig.axes[0].axvline(popt[0], color='#4682b4')
         if figname is not None:
             plt.savefig(figname)
         if show_corner:
@@ -172,6 +175,7 @@ def emcee_corner(bounds: list[list[float]] | np.ndarray,
 
     if plot_chain:
         fig, axes = plt.subplots(ndim, 1, sharex=True)
+        axes = np.atleast_1d(axes)
         xplot = np.arange(0, nsteps, 1)
         for i, ax in enumerate(axes):
             for iwalk in range(nwalkers):
