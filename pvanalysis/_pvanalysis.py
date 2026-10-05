@@ -18,7 +18,8 @@ from pvanalysis.pvplot import PVPlot
 from pvanalysis.analysis_tools import (doublepower_r,
                                        doublepower_v,
                                        doublepower_v_error,
-                                       doublepower_r_error)
+                                       doublepower_r_error,
+                                       p_inout)
 from utils import emcee_corner, dynesty_corner
 
 
@@ -1292,6 +1293,22 @@ class PVAnalysis():
     def output_fitresult(self) -> None:
         """Output the fitting result in the terminal.
         """
+        def _mass_error(r, v, mass, fixed_velocity, params):
+            """Propagate local mass errors, neglecting parameter covariances."""
+            rb, vb, pin, dp, vsys, drb, dvb, dpin, ddp, dvsys = params
+            # Handle the offset through the full mass expression, rather than
+            # treating radius and offset-corrected velocity as independent.
+            params_no_dvsys = [*params[:-1], 0.]
+            u = v - vsys
+            if fixed_velocity:
+                dr = doublepower_r_error(v, *params_no_dvsys)
+                p = p_inout(pin, dp, vb, abs(u))
+                relvar = (dr / r)**2 + ((2. - 1. / p) * dvsys / u)**2
+                return mass * np.sqrt(relvar)
+            # At fixed radius, the additive offset cancels in v_model - vsys.
+            dv = doublepower_v_error(r, *params_no_dvsys)
+            return 2. * mass * dv / abs(u)
+
         if not hasattr(self, 'rvlim'):
             self.get_range()
         for i in ['edge', 'ridge']:
@@ -1321,18 +1338,9 @@ class PVAnalysis():
             M_in = kepler_mass(rin, vin - vsys, self.__unit/self.dist)
             M_b = kepler_mass(rb, vb, self.__unit/self.dist)
             M_out = kepler_mass(rout, vout - vsys, self.__unit/self.dist)
-            if self.__use_position:
-                drin = doublepower_r_error(vin, *params)
-                dM_in = M_in * drin / rin
-            else:
-                dvin = doublepower_v_error(rin, *params)
-                dM_in = 2. * M_in * dvin / vin
-            if self.__use_velocity:
-                dvout = doublepower_v_error(rout, *params)
-                dM_out = 2. * M_out * dvout / vout
-            else:
-                drout = doublepower_r_error(vout, *params)
-                dM_out = M_out * drout / rout
+            dM_in = _mass_error(rin, vin, M_in, self.__use_position, params)
+            dM_out = _mass_error(rout, vout, M_out,
+                                 not self.__use_velocity, params)
             dM_b = kepler_mass_error(rb, vb, drb, dvb, self.__unit/self.dist)
             print(f'M_in  = {M_in:.3f} +/- {dM_in:.3f} Msun')
             print(f'M_out = {M_out:.3f} +/- {dM_out:.3f} Msun')
