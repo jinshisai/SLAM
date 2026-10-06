@@ -18,7 +18,8 @@ from pvanalysis.pvplot import PVPlot
 from pvanalysis.analysis_tools import (doublepower_r,
                                        doublepower_v,
                                        doublepower_v_error,
-                                       doublepower_r_error)
+                                       doublepower_r_error,
+                                       p_inout)
 from utils import emcee_corner, dynesty_corner
 
 
@@ -66,11 +67,11 @@ class PVAnalysis():
                       incl: float | None = None,
                       quadrant: str | None = None,
                       ridgemode: str = 'mean',
-                      pixrng_vcut: int | None = None,
-                      pixrng_xcut: int | None = None,
-                      Mlim: list[float] = [0, 1e10],
-                      xlim: list[float] = [-1e10, 0, 0, 1e10],
-                      vlim: list[float] = [-1e10, 0, 0, 1e10],
+                      pixrng_vcut: int | np.integer | None = None,
+                      pixrng_xcut: int | np.integer | None = None,
+                      Mlim: list[float] | np.ndarray = [0, 1e10],
+                      xlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
+                      vlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
                       use_velocity: bool = True,
                       use_position: bool = True,
                       interp_ridge: bool = False,
@@ -96,11 +97,11 @@ class PVAnalysis():
             pixrng_xcut (int or None, optional): Pixel range fitted around a
                 peak along the position axis in Gaussian mode. Defaults to
                 None.
-            Mlim (list, optional): Accepted dynamical-mass range in solar
+            Mlim (list or numpy.ndarray, optional): Accepted dynamical-mass range in solar
                 masses. Defaults to [0, 1e10].
-            xlim (list, optional): Position ranges in au.
+            xlim (list or numpy.ndarray, optional): Position ranges in au.
                 Defaults to [-1e10, 0, 0, 1e10].
-            vlim (list, optional): Velocity ranges in km/s.
+            vlim (list or numpy.ndarray, optional): Velocity ranges in km/s.
                 Defaults to [-1e10, 0, 0, 1e10].
             use_velocity (bool, optional): Whether to derive the edge/ridge velocity as a
                 function of position. Defaults to True.
@@ -133,11 +134,21 @@ class PVAnalysis():
             data = np.squeeze(data)  # Remove stokes I
         # check quadrant
 
-        def quadcheck(a):
-            return (np.sum(a[:nvh, :nxh])
-                    + np.sum(a[nvh:, nxh:])
-                    - np.sum(a[:nvh, nxh:])
-                    - np.sum(a[nvh:, :nxh]))
+        def quadcheck(a: np.ndarray) -> float:
+            """Measure the intensity contrast between the two diagonal quadrant pairs.
+
+            Args:
+                a (numpy.ndarray): PV image with velocity along the first axis and
+                    position along the second axis.
+
+            Returns:
+                float: Sum in the lower-left and upper-right array blocks minus the
+                other two blocks, using the enclosing image midpoints.
+            """
+            return float(np.sum(a[:nvh, :nxh])
+                         + np.sum(a[nvh:, nxh:])
+                         - np.sum(a[:nvh, nxh:])
+                         - np.sum(a[nvh:, :nxh]))
 
         q = np.sign(quadcheck(data))
         if quadrant is None:
@@ -167,12 +178,12 @@ class PVAnalysis():
 
         # Get rigde/edge
         if use_position:
-            self.get_edgeridge_xcut(outname, thr=thr, incl=incl,
+            self.get_edgeridge_xcut(outname, thr=thr,
                                     xlim=xlim, vlim=vlim, Mlim=Mlim,
                                     ridgemode=ridgemode, pixrng=pixrng_xcut,
                                     interp_ridge=interp_ridge)
         if use_velocity:
-            self.get_edgeridge_vcut(outname, thr=thr, incl=incl,
+            self.get_edgeridge_vcut(outname, thr=thr,
                                     xlim=xlim, vlim=vlim, Mlim=Mlim,
                                     ridgemode=ridgemode, pixrng=pixrng_vcut,
                                     interp_ridge=interp_ridge)
@@ -186,10 +197,11 @@ class PVAnalysis():
         # self.plotresults_pvdiagram()
         # self.plotresults_rvplane()
 
-    def sort_fitresults(self, minrelerr=0.01, minabserr=0.1,
+    def sort_fitresults(self, minrelerr: float = 0.01,
+                        minabserr: float = 0.1,
                         nanbeforemax: bool = True,
                         nanopposite: bool = True,
-                        nanbeforecross: bool = True):
+                        nanbeforecross: bool = True) -> None:
         """Sort fitting results.
 
         Args:
@@ -210,7 +222,20 @@ class PVAnalysis():
         self.results_filtered = {'ridge': None, 'edge': None}
 
         # error clip
-        def clipped_error(err, val, mode):
+        def clipped_error(err: np.ndarray, val: np.ndarray,
+                          mode: str) -> np.ndarray:
+            """Apply relative and resolution-based floors to point uncertainties.
+
+            Args:
+                err (numpy.ndarray): Measured uncertainties.
+                val (numpy.ndarray): Corresponding positions or velocities.
+                mode (str): Use spatial resolution for ``'x'`` and channel spacing
+                    otherwise. Values and errors must use the corresponding units.
+
+            Returns:
+                numpy.ndarray: Elementwise maximum of the input errors, the relative
+                error floor, and the absolute resolution-based floor.
+            """
             res = self.res_off if mode == 'x' else self.delv
             minabs = [minabserr * res] * len(err)
             return np.max([err, minrelerr * np.abs(val), minabs], axis=0)
@@ -323,10 +348,16 @@ class PVAnalysis():
                 self.results_sorted[re][rb] = res_comb
             self.results_filtered[re] = res_f
 
-    def get_edgeridge_vcut(self, outname, thr=5., incl=90., xlim=[-1e10, 0, 0, 1e10],
-                           vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='gauss',
-                           pixrng=None, multipeaks=False, i_peak=0, prominence=1.5,
-                           inverse=False, interp_ridge=False):
+    def get_edgeridge_vcut(self, outname: str, thr: float = 5.,
+                           xlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
+                           vlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
+                           Mlim: list[float] | np.ndarray = [0, 1e10],
+                           ridgemode: str = 'gauss',
+                           pixrng: int | np.integer | None = None,
+                           multipeaks: bool = False, i_peak: int = 0,
+                           prominence: float = 1.5,
+                           inverse: bool = False,
+                           interp_ridge: bool = False) -> None:
         """Get edge/ridge along the velocity axis, i.e., determine
            representative velocity at each offset.
 
@@ -336,9 +367,6 @@ class PVAnalysis():
                ridge in the unit of 'rms' Defaults to 5.
                xlim, vlim: x and v ranges for the fitting. Must be given
                as a list, [outlimit1, inlimit1, inlimit2, outlimit2].
-            incl (float): Inclination angle of the object. Defaults to 90,
-               which means no correction for estimate of the protostellar
-               mass.
             Mlim (list): Reliable mass range. Data points that do
                not come within this range is removed. Defaults to [0, 1e10].
             xlim (list): Range of offset where edge/ridge is
@@ -349,7 +377,7 @@ class PVAnalysis():
                derived as the intensity weighted mean. When ridgemode='gauss',
                ridge is derived as the mean of the fitted Gaussian function.
                Defaults to 'mean'.
-            pixrng (float): Pixel range for the fitting around the maximum
+            pixrng (int or None): Pixel range for the fitting around the maximum
                intensity. Only velocity channels +/- pixrng around the channel
                with the maximum intensity are used for the fitting.
                Only applied when ridgemode='gauss'.
@@ -566,10 +594,15 @@ class PVAnalysis():
         fig.savefig(outname + ".pvfit.vcut.png")
         plt.close()
 
-    def get_edgeridge_xcut(self, outname, thr=5., incl=90., xlim=[-1e10, 0, 0, 1e10],
-                           vlim=[-1e10, 0, 0, 1e10], Mlim=[0, 1e10], ridgemode='mean',
-                           pixrng=None, multipeaks=False, i_peak=0,
-                           prominence=1.5, interp_ridge=False):
+    def get_edgeridge_xcut(self, outname: str, thr: float = 5.,
+                           xlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
+                           vlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
+                           Mlim: list[float] | np.ndarray = [0, 1e10],
+                           ridgemode: str = 'mean',
+                           pixrng: int | np.integer | None = None,
+                           multipeaks: bool = False, i_peak: int = 0,
+                           prominence: float = 1.5,
+                           interp_ridge: bool = False) -> None:
         """Get edge/ridge along x-axis, i.e., determine representative
            position at each velocity.
 
@@ -579,9 +612,6 @@ class PVAnalysis():
                ridge in the unit of 'rms' Defaults to 5.
                xlim, vlim: x and v ranges for the fitting. Must be given
                as a list, [outlimit1, inlimit1, inlimit2, outlimit2].
-            incl (float): Inclination angle of the object. Defaults to 90,
-               which means no correction for estimate of the protostellar
-               mass.
             Mlim (list): Reliable mass range. Data points that do
                not come within this range is removed. Defaults to [0, 1e10].
             xlim (list): Range of offset where edge/ridge is
@@ -592,7 +622,7 @@ class PVAnalysis():
                derived as the intensity weighted mean. When ridgemode='gauss',
                ridge is derived as the mean of the fitted Gaussian function.
                Defaults to 'mean'.
-            pixrng (float): Pixel range for the fitting around the maximum
+            pixrng (int or None): Pixel range for the fitting around the maximum
                intensity. Only pixels +/- pixrng around the (re-samped) pixel
                with the maximum intensity are used for the fitting.
                Only applied when ridgemode='gauss'.
@@ -814,17 +844,18 @@ class PVAnalysis():
                       include_pin: bool = False,
                       fixed_pin: float = 0.5,
                       fixed_dp: float = 0,
-                      rb_range: list | None = None,
-                      vb_range: list | None = None,
-                      pin_range: list = [0.01, 10],
-                      dp_range: list = [0, 10],
-                      vsys_range: list = [-1, 1],
+                      rb_range: list[float] | np.ndarray | None = None,
+                      vb_range: list[float] | np.ndarray | None = None,
+                      pin_range: list[float] | np.ndarray = [0.01, 10],
+                      dp_range: list[float] | np.ndarray = [0, 10],
+                      vsys_range: list[float] | np.ndarray = [-1, 1],
                       outname: str = 'pvanalysis',
-                      rangelevel: float = 0.8,
+                      rangelevel: float | None = 0.8,
                       show_corner: bool = False,
                       return_chain: bool = False,
                       return_lnp: bool = False,
-                      calc_evidence: bool = False) -> dict | int:
+                      calc_evidence: bool = False
+                      ) -> dict[str, dict[str, np.ndarray]] | int:
         """Fit the edge and ridge points with a double power law using MCMC.
 
         Args:
@@ -838,18 +869,18 @@ class PVAnalysis():
                 is False. A value of 0.5 means Keplerian. Defaults to 0.5.
             fixed_dp (float, optional): Index change used when ``include_dp``
                 is False. Zero means a single power law. Defaults to 0.
-            rb_range (list or None, optional): Prior range of break radius in
+            rb_range (list, numpy.ndarray or None, optional): Prior range of break radius in
                 au, shared by the edge and ridge fits. None uses the combined
                 absolute-radius range of both datasets. Defaults to None.
-            vb_range (list or None, optional): Prior range of break velocity
+            vb_range (list, numpy.ndarray or None, optional): Prior range of break velocity
                 in km/s, shared by the edge and ridge fits. None uses the
                 combined absolute-velocity range of both datasets. Defaults
                 to None.
-            pin_range (list, optional): Prior range of the inner index.
+            pin_range (list or numpy.ndarray, optional): Prior range of the inner index.
                 Defaults to [0.01, 10].
-            dp_range (list, optional): Prior range of the index change.
+            dp_range (list or numpy.ndarray, optional): Prior range of the index change.
                 Defaults to [0, 10].
-            vsys_range (list, optional): Prior range of the systemic-velocity
+            vsys_range (list or numpy.ndarray, optional): Prior range of the systemic-velocity
                 offset in km/s. Defaults to [-1, 1].
             outname (str, optional): Prefix for edge and ridge corner plots.
                 Defaults to ``'pvanalysis'``.
@@ -902,11 +933,31 @@ class PVAnalysis():
         self.chain = {'edge': None, 'ridge': None} if return_chain else None
         self.lnp = {'edge': None, 'ridge': None} if return_lnp else None
 
-        def minabs(a, i, j):
-            return np.min(np.abs(np.r_[a[i], a[j]]))
+        def minabs(a: list[np.ndarray], i: int, j: int) -> float:
+            """Find the smallest absolute value across two data arrays.
 
-        def maxabs(a, i, j):
-            return np.max(np.abs(np.r_[a[i], a[j]]))
+            Args:
+                a (list[numpy.ndarray]): Collection of fit-data arrays.
+                i (int): Index of the first array.
+                j (int): Index of the second array.
+
+            Returns:
+                float: Minimum absolute value in the concatenated arrays.
+            """
+            return float(np.min(np.abs(np.r_[a[i], a[j]])))
+
+        def maxabs(a: list[np.ndarray], i: int, j: int) -> float:
+            """Find the largest absolute value across two data arrays.
+
+            Args:
+                a (list[numpy.ndarray]): Collection of fit-data arrays.
+                i (int): Index of the first array.
+                j (int): Index of the second array.
+
+            Returns:
+                float: Maximum absolute value in the concatenated arrays.
+            """
+            return float(np.max(np.abs(np.r_[a[i], a[j]])))
 
         if rb_range is None:
             rb_range = [min(minabs(a, 1, 3) for a in Ds),
@@ -922,15 +973,57 @@ class PVAnalysis():
                            fixed_pin, fixed_dp, 0])
             q0 = np.where(include, np.nan, q0)
 
-            def wpow_r_custom(v, *p):
+            def wpow_r_custom(v: float | np.ndarray,
+                              *p: float) -> float | np.ndarray:
+                """Evaluate the radius model after restoring fixed fit parameters.
+
+                Args:
+                    v (float or numpy.ndarray): Velocities in km/s, including the fitted
+                        systemic offset.
+                    *p (float): Free parameters in the order selected from r_break,
+                        v_break, p_in, dp, and vsys. Radius is in au and velocity in km/s.
+
+                Returns:
+                    float or numpy.ndarray: Signed model positions in au.
+                """
                 (q := q0 * 1)[np.isnan(q0)] = p
                 return doublepower_r(v, *q)
 
-            def wpow_v_custom(r, *p):
+            def wpow_v_custom(r: float | np.ndarray,
+                              *p: float) -> float | np.ndarray:
+                """Evaluate the velocity model after restoring fixed fit parameters.
+
+                Args:
+                    r (float or numpy.ndarray): Signed positions in au.
+                    *p (float): Free parameters in the order selected from r_break,
+                        v_break, p_in, dp, and vsys. Radius is in au and velocity in km/s.
+
+                Returns:
+                    float or numpy.ndarray: Model velocities in km/s, including the
+                    fitted systemic offset.
+                """
                 (q := q0 * 1)[np.isnan(q0)] = p
                 return doublepower_v(r, *q)
 
-            def lnprob(p, v0, x1, dx1, x0, v1, dv1):
+            def lnprob(p: np.ndarray, v0: np.ndarray, x1: np.ndarray,
+                       dx1: np.ndarray, x0: np.ndarray, v1: np.ndarray,
+                       dv1: np.ndarray) -> float:
+                """Evaluate the combined position-cut and velocity-cut log likelihood.
+
+                Args:
+                    p (numpy.ndarray): Free model parameters in the selected fit order.
+                    v0 (numpy.ndarray): Channel velocities for position measurements,
+                        in km/s.
+                    x1 (numpy.ndarray): Measured signed positions at v0, in au.
+                    dx1 (numpy.ndarray): Position uncertainties in au.
+                    x0 (numpy.ndarray): Signed positions for velocity measurements, in au.
+                    v1 (numpy.ndarray): Measured velocities at x0, in km/s.
+                    dv1 (numpy.ndarray): Velocity uncertainties in km/s.
+
+                Returns:
+                    float: Minus half the sum of squared residuals normalized by their
+                    measurement uncertainties.
+                """
                 chi2 = np.sum(((x1 - wpow_r_custom(v0, *p)) / dx1)**2) \
                     + np.sum(((v1 - wpow_v_custom(x0, *p)) / dv1)**2)
                 return -0.5 * chi2
@@ -971,7 +1064,8 @@ class PVAnalysis():
                   'ridge': {'popt': popt_r[0], 'perr': popt_r[1]}}
         return result
 
-    def fit_linear(self, include_intercept: bool = True) -> dict | int:
+    def fit_linear(self, include_intercept: bool = True
+                   ) -> dict[str, dict[str, list[float] | np.ndarray]] | int:
         """Fit the ridge points analytically with a linear function.
 
         Args:
@@ -1007,9 +1101,29 @@ class PVAnalysis():
                 print('No ridge point was found.')
             return -1
 
-        def linfit(x, y, dy):
-            def wsum(a):
-                return np.sum(a / dy**2)
+        def linfit(x: np.ndarray, y: np.ndarray,
+                   dy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            """Fit an intercept and slope with inverse-variance weighting.
+
+            Args:
+                x (numpy.ndarray): Independent coordinates.
+                y (numpy.ndarray): Dependent measurements.
+                dy (numpy.ndarray): Nonzero measurement uncertainties in y units.
+
+            Returns:
+                tuple: Arrays of [intercept, slope] and their formal uncertainties,
+                obtained from the inverse normal matrix without residual rescaling.
+            """
+            def wsum(a: float | np.ndarray) -> float:
+                """Sum values using the enclosing fit's inverse-variance weights.
+
+                Args:
+                    a (float or numpy.ndarray): Scalar or array broadcastable to dy.
+
+                Returns:
+                    float: Sum of a / dy**2.
+                """
+                return float(np.sum(a / dy**2))
 
             b = np.array([wsum(y), wsum(y * x)])
             A = np.array([[wsum(1), wsum(x)],
@@ -1018,9 +1132,29 @@ class PVAnalysis():
             dc = np.sqrt([Ainv[0, 0], Ainv[1, 1]])
             return c, dc
 
-        def grafit(x, y, dy):
-            def wsum(a):
-                return np.sum(a / dy**2)
+        def grafit(x: np.ndarray, y: np.ndarray,
+                   dy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+            """Fit an inverse-variance-weighted line through the origin.
+
+            Args:
+                x (numpy.ndarray): Independent coordinates.
+                y (numpy.ndarray): Dependent measurements.
+                dy (numpy.ndarray): Nonzero measurement uncertainties in y units.
+
+            Returns:
+                tuple: Arrays of [0, slope] and [0, slope uncertainty], with the
+                uncertainty calculated from the supplied measurement errors.
+            """
+            def wsum(a: float | np.ndarray) -> float:
+                """Sum values using the enclosing fit's inverse-variance weights.
+
+                Args:
+                    a (float or numpy.ndarray): Scalar or array broadcastable to dy.
+
+                Returns:
+                    float: Sum of a / dy**2.
+                """
+                return float(np.sum(a / dy**2))
 
             c = np.array([0, wsum(x * y) / wsum(x**2)])
             dc = np.array([0, 1. / np.sqrt(wsum(x**2))])
@@ -1038,7 +1172,19 @@ class PVAnalysis():
             vlim = np.array([np.min(Rs[0]), np.max(Rs[0])])
             xlim = np.sort(c[0] + c[1] * vlim)
 
-            def gradinv(c, dc):
+            def gradinv(c: list[float] | np.ndarray,
+                        dc: list[float] | np.ndarray
+                        ) -> tuple[np.ndarray, np.ndarray]:
+                """Invert a fitted line and propagate its coefficient uncertainties.
+
+                Args:
+                    c (list[float] or numpy.ndarray): Original intercept and nonzero slope.
+                    dc (list[float] or numpy.ndarray): Corresponding uncertainties.
+
+                Returns:
+                    tuple: Inverse-line coefficients [-intercept / slope, 1 / slope]
+                    and their propagated uncertainties, neglecting coefficient covariance.
+                """
                 err = [dc[0]**2 / c[1]**2 + dc[1]**2 * c[0]**2 / c[1]**4,
                        dc[1]**2 / c[1]**4]
                 err = np.sqrt(err)
@@ -1089,7 +1235,7 @@ class PVAnalysis():
         print('Derived points in'
               + f' {outname}.edge.dat and {outname}.ridge.dat.')
 
-    def get_range(self):
+    def get_range(self) -> dict[str, dict[str, list[float]]]:
         """Calculate the ranges of the edge/ridge positions (radii) and velocities.
 
         Args:
@@ -1101,7 +1247,26 @@ class PVAnalysis():
             'rlim' is a list of [r_minimum, r_maximum].
             'vlim' is a list of [v_minimum, v_maximum].
         """
-        def inout(v0, x1, dx1, x0, v1, dv1, popt):
+        def inout(v0: np.ndarray, x1: np.ndarray, dx1: np.ndarray,
+                  x0: np.ndarray, v1: np.ndarray, dv1: np.ndarray,
+                  popt: list[float] | np.ndarray) -> list[list[float]]:
+            """Estimate inner and outer radius-velocity pairs from points and a model.
+
+            Args:
+                v0 (numpy.ndarray): Velocities of position-cut points in km/s.
+                x1 (numpy.ndarray): Positions of position-cut points in au.
+                dx1 (numpy.ndarray): Position uncertainties, unused in this calculation.
+                x0 (numpy.ndarray): Positions of velocity-cut points in au.
+                v1 (numpy.ndarray): Velocities of velocity-cut points in km/s.
+                dv1 (numpy.ndarray): Velocity uncertainties, unused in this calculation.
+                popt (list[float] or numpy.ndarray): Model parameters ordered as
+                    r_break, v_break, p_in, dp, and vsys.
+
+            Returns:
+                list: [[inner radius, outer radius], [inner velocity, outer velocity]]
+                in au and km/s. The enabled cut directions determine which limits
+                come from measured extrema and which are inferred from the model.
+            """
             xall, vall = np.abs(np.r_[x0, x1]), np.abs(np.r_[v0, v1])
             rin, rout = np.nan, np.nan
             if len(xall) > 0:
@@ -1117,7 +1282,7 @@ class PVAnalysis():
                 vout = doublepower_v(rout, *popt)
             else:
                 rout = doublepower_r(vout, *popt)
-            return [[rin, rout], [vin, vout]]
+            return [[float(rin), float(rout)], [float(vin), float(vout)]]
         lims_e = inout(*self.__Es, self.popt['edge'][0])
         lims_r = inout(*self.__Rs, self.popt['ridge'][0])
         self.rvlim = {'edge': lims_e, 'ridge': lims_r}
@@ -1128,6 +1293,22 @@ class PVAnalysis():
     def output_fitresult(self) -> None:
         """Output the fitting result in the terminal.
         """
+        def _mass_error(r, v, mass, fixed_velocity, params):
+            """Propagate local mass errors, neglecting parameter covariances."""
+            rb, vb, pin, dp, vsys, drb, dvb, dpin, ddp, dvsys = params
+            # Handle the offset through the full mass expression, rather than
+            # treating radius and offset-corrected velocity as independent.
+            params_no_dvsys = [*params[:-1], 0.]
+            u = v - vsys
+            if fixed_velocity:
+                dr = doublepower_r_error(v, *params_no_dvsys)
+                p = p_inout(pin, dp, vb, abs(u))
+                relvar = (dr / r)**2 + ((2. - 1. / p) * dvsys / u)**2
+                return mass * np.sqrt(relvar)
+            # At fixed radius, the additive offset cancels in v_model - vsys.
+            dv = doublepower_v_error(r, *params_no_dvsys)
+            return 2. * mass * dv / abs(u)
+
         if not hasattr(self, 'rvlim'):
             self.get_range()
         for i in ['edge', 'ridge']:
@@ -1157,48 +1338,40 @@ class PVAnalysis():
             M_in = kepler_mass(rin, vin - vsys, self.__unit/self.dist)
             M_b = kepler_mass(rb, vb, self.__unit/self.dist)
             M_out = kepler_mass(rout, vout - vsys, self.__unit/self.dist)
-            if self.__use_position:
-                drin = doublepower_r_error(vin, *params)
-                dM_in = M_in * drin / rin
-            else:
-                dvin = doublepower_v_error(rin, *params)
-                dM_in = 2. * M_in * dvin / vin
-            if self.__use_velocity:
-                dvout = doublepower_v_error(rout, *params)
-                dM_out = 2. * M_out * dvout / vout
-            else:
-                drout = doublepower_r_error(vout, *params)
-                dM_out = M_out * drout / rout
+            dM_in = _mass_error(rin, vin, M_in, self.__use_position, params)
+            dM_out = _mass_error(rout, vout, M_out,
+                                 not self.__use_velocity, params)
             dM_b = kepler_mass_error(rb, vb, drb, dvb, self.__unit/self.dist)
             print(f'M_in  = {M_in:.3f} +/- {dM_in:.3f} Msun')
             print(f'M_out = {M_out:.3f} +/- {dM_out:.3f} Msun')
             print(f'M_b   = {M_b:.3f} +/- {dM_b:.3f} Msun')
 
-    def plot_fitresult(self, vlim: list = [0, 1e10],
-                       xlim: list = [0, 1e10],
-                       clevels: list = [3, 6],
+    def plot_fitresult(self,
+                       vlim: list[float] | np.ndarray = [0, 1e10],
+                       xlim: list[float] | np.ndarray = [0, 1e10],
+                       clevels: list[float] | np.ndarray = [3, 6],
                        outname: str = 'pvanalysis',
                        logcolor: bool = False,
                        Tbcolor: bool = False,
                        cblabel: str | None = None,
                        show: bool = True,
-                       kwargs_pcolormesh: dict = {'cmap': 'viridis'},
-                       kwargs_contour: dict = {'colors': 'lime'},
+                       kwargs_pcolormesh: dict[str, object] = {'cmap': 'viridis'},
+                       kwargs_contour: dict[str, object] = {'colors': 'lime'},
                        plotedgepoint: bool = True,
                        plotridgepoint: bool = True,
                        plotedgemodel: bool = True,
                        plotridgemodel: bool = True,
-                       fmt: dict = {'edge': 'v', 'ridge': 'o'},
-                       linestyle: dict = {'edge': '--', 'ridge': '-'},
+                       fmt: dict[str, str] = {'edge': 'v', 'ridge': 'o'},
+                       linestyle: dict[str, str] = {'edge': '--', 'ridge': '-'},
                        flipaxis: bool = False) -> None:
         """Make linear and log-log PV diagrams with points and model lines.
 
         Args:
-            vlim (list, optional): Absolute velocity range relative to the
+            vlim (list or numpy.ndarray, optional): Absolute velocity range relative to the
                 systemic velocity in km/s. Defaults to [0, 1e10].
-            xlim (list, optional): Absolute position range in au. Defaults to
+            xlim (list or numpy.ndarray, optional): Absolute position range in au. Defaults to
                 [0, 1e10].
-            clevels (list, optional): Contour levels in the unit of sigma.
+            clevels (list or numpy.ndarray, optional): Contour levels in the unit of sigma.
                 Defaults to [3, 6].
             outname (str, optional): Prefix for ``.linear.png`` and
                 ``.log.png``. Defaults to ``'pvanalysis'``.
@@ -1306,7 +1479,15 @@ class PVAnalysis():
             if len(popt) == 5:
                 popt[4] -= self.avevsys
 
-        def fx_model(x):
+        def fx_model(x: np.ndarray) -> np.ndarray:
+            """Evaluate the selected plotting model with its current parameters.
+
+            Args:
+                x (numpy.ndarray): Signed model positions in au.
+
+            Returns:
+                numpy.ndarray: Model velocities in km/s.
+            """
             return model(x, *popt)
 
         if not hasattr(self, 'rvlim'):
@@ -1498,16 +1679,58 @@ class PVAnalysis():
 
 
 # functions
-def kepler_mass(r, v, unit):
-    return v**2 * np.abs(r) * unit
+def kepler_mass(r: float | np.ndarray, v: float | np.ndarray,
+                unit: float) -> float | np.ndarray:
+    """Calculate a Keplerian mass from radius and rotation speed.
+
+    Args:
+        r (float or numpy.ndarray): Radius or signed position.
+        v (float or numpy.ndarray): Rotation speed in the units expected by unit.
+        unit (float): Factor converting v**2 * abs(r) to the desired mass
+            units, including any required inclination correction.
+
+    Returns:
+        float or numpy.ndarray: Keplerian mass in the units set by unit.
+    """
+    result = v**2 * np.abs(r) * unit
+    return float(result) if np.ndim(result) == 0 else result
 
 
-def kepler_mass_error(r, v, dr, dv, unit):
-    return kepler_mass(r, v, unit) * np.sqrt((2*dv/v)**2 + (dr/r)**2)
+def kepler_mass_error(r: float | np.ndarray, v: float | np.ndarray,
+                      dr: float | np.ndarray, dv: float | np.ndarray,
+                      unit: float) -> float | np.ndarray:
+    """Propagate independent radius and velocity errors to Keplerian mass.
+
+    Args:
+        r (float or numpy.ndarray): Nonzero radius or signed position.
+        v (float or numpy.ndarray): Nonzero rotation speed.
+        dr (float or numpy.ndarray): Radius uncertainty in the same units as r.
+        dv (float or numpy.ndarray): Velocity uncertainty in the same units as v.
+        unit (float): Mass conversion factor passed to kepler_mass, treated
+            as exact.
+
+    Returns:
+        float or numpy.ndarray: Mass uncertainty from first-order propagation,
+        neglecting covariance between radius and velocity.
+    """
+    result = kepler_mass(r, v, unit) * np.sqrt((2*dv/v)**2 + (dr/r)**2)
+    return float(result) if np.ndim(result) == 0 else result
 
 
-def between(t, tlim):
+def between(t: np.ndarray,
+            tlim: list[float] | tuple[float, float] | np.ndarray) -> np.ndarray:
+    """Select array values strictly inside a pair of limits.
+
+    Args:
+        t (numpy.ndarray): Values to compare.
+        tlim (list[float] or tuple[float, float] or numpy.ndarray): Lower and
+            upper limits. Any length other than two disables filtering.
+
+    Returns:
+        numpy.ndarray: Boolean mask with the shape of t. All entries are True
+        when filtering is disabled; values equal to a limit are excluded.
+    """
     if not (len(tlim) == 2):
         return np.full(np.shape(t), True)
     else:
-        return (tlim[0] < t) * (t < tlim[1])
+        return np.asarray((tlim[0] < t) & (t < tlim[1]), dtype=bool)

@@ -1,3 +1,5 @@
+from typing import Literal
+
 import numpy as np
 from astropy import constants, units
 from scipy.signal import convolve
@@ -83,7 +85,7 @@ class MockPVD(object):
                  reslim: float = 10,
                  signmajor: int = 1, signminor: int = 1,
                  pa_major: float = 0, pa_minor: float = 90,
-                 num_threads: int | str | None = None) -> None:
+                 num_threads: int | Literal['all'] | None = None) -> None:
         """Initialize the model coordinates, orientation, beam, and grid.
         """
         super(MockPVD, self).__init__()
@@ -301,7 +303,7 @@ class MockPVD(object):
               alphainfall: float = 1., frho: float = 1.,
               rin: float = 1.0, rout: float | None = None,
               collapse: bool = False, normalize: bool = True,
-              axis: str = 'major'
+              axis: Literal['major', 'minor'] = 'major'
               ) -> (tuple[list[np.ndarray], list[np.ndarray]]
                     | tuple[np.ndarray, np.ndarray]):
         """Build density and line-of-sight velocity fields on the model grid.
@@ -401,9 +403,11 @@ class MockPVD(object):
 
         Args:
             rho (np.ndarray or list): Density field, either on one grid or as
-                flattened arrays for all nested levels.
+                flattened arrays for all nested levels. A single array is
+                accepted only when the model has no nested refinement.
             vlos (np.ndarray or list): Line-of-sight velocity field in km/s,
-                with the same organization and shapes as ``rho``.
+                with the same organization and shapes as ``rho``. For nested
+                grids, pass per-level lists from build(collapse=False).
             taumax (float, optional): Maximum scaled optical depth. Defaults to
                 1.
             beam (list, np.ndarray, or None, optional): Beam major axis, minor
@@ -419,6 +423,10 @@ class MockPVD(object):
             np.ndarray: Normalized intensity of the mock PV diagram, with
                 shape ``(nv, nx)`` on the original velocity and position axes.
 
+        Raises:
+            ValueError: If rho or vlos is a single array and the model has
+                nested refinement.
+
         Notes:
             Optical depth is integrated along z from the innermost nested
             level outward. The normalized intensity is calculated as
@@ -426,6 +434,15 @@ class MockPVD(object):
             ``taumax``. Spectral and beam kernels are cached in
             :mod:`pvfitting.precalculation`.
         """
+        if self.grid.nlevels > 1 and (
+            isinstance(rho, np.ndarray) or isinstance(vlos, np.ndarray)
+        ):
+            raise ValueError(
+                'Nested grids require per-level lists for both rho and vlos. '
+                'Use build(collapse=False); single arrays are supported only '
+                'without nested refinement.'
+            )
+
         ny = self.grid.ny
         # integrate along Z axis
         v = self.v.copy()

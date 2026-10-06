@@ -4,11 +4,14 @@ This script derives the 2D central position at each velocity channel from a
 channel map in FITS form (AXIS1=deg, AXIS2=deg, AXIS3=Hz), and fits the
 major-offset vs. velocity with a power-law function. The outputs are the
 central points on the R.A.-Dec., major-minor, and major-velocity planes.
-The main class ChannelAnalysis can be imported to perform each step separately:
+The main class VelGrad can be imported to perform each step separately:
 get the central points, write them, fit them, output the fit result, and plot
 the central points.
 """
 
+
+from collections.abc import Callable
+from typing import Literal
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,14 +28,52 @@ au = units.au.to('m')
 unit = 1.e6 * au / GG / M_sun
 
 
-def gauss2d(xy, peak, cx, cy, wx, wy, pa):
+def gauss2d(xy: tuple[np.ndarray, np.ndarray] | np.ndarray,
+            peak: float, cx: float, cy: float, wx: float, wy: float,
+            pa: float) -> np.ndarray:
+    """Evaluate a rotated elliptical Gaussian and flatten the result.
+
+    Args:
+        xy (tuple): Broadcast-compatible x and y coordinate arrays.
+        peak (float): Peak intensity of the Gaussian.
+        cx (float): Center along the x axis, in coordinate units.
+        cy (float): Center along the y axis, in coordinate units.
+        wx (float): Half-width at half maximum along the rotated s axis,
+            in coordinate units.
+        wy (float): Half-width at half maximum along the rotated t axis,
+            in coordinate units.
+        pa (float): Rotation angle passed to rot, in radians.
+
+    Returns:
+        numpy.ndarray: Flattened Gaussian intensities.
+    """
     x, y = xy
     s, t = rot(x - cx, y - cy, pa)
     return np.ravel(peak * np.exp2(-s**2 / wx**2 - t**2 / wy**2))
 
 
-def emcee_custom(plim, lnprob, fixcenter,
-                 return_chain=False, return_lnp=False):
+def emcee_custom(plim: np.ndarray, lnprob: Callable[[np.ndarray], float],
+                 fixcenter: bool, return_chain: bool = False,
+                 return_lnp: bool = False) -> list[np.ndarray]:
+    """Run MCMC with the sampling settings used by velocity-gradient fits.
+
+    Args:
+        plim (numpy.ndarray): Lower and upper parameter bounds with shape
+            (2, nparameter).
+        lnprob (callable): Log-probability function accepting the sampled
+            parameter vector.
+        fixcenter (bool): Sample only the final parameter column and prepend
+            two zero center offsets to the fitted values and uncertainties.
+        return_chain (bool, optional): Append the sampled chain to the
+            returned list. Defaults to False.
+        return_lnp (bool, optional): Append sampled log probabilities to the
+            returned list, after the chain if requested. Defaults to False.
+
+    Returns:
+        list: Fitted parameters and uncertainties, followed by any requested
+        chain and log probabilities. Optional sampling outputs retain only
+        sampled parameters; they are not padded with fixed center offsets.
+    """
     mcmc = emcee_corner(plim[:, -1:] if fixcenter else plim,
                         lnprob,
                         nwalkers_per_ndim=8,
@@ -54,19 +95,36 @@ def emcee_custom(plim, lnprob, fixcenter,
     return output
 
 
-def r_kep_out(v, M_p, v_break, p_low, vsys):
+def r_kep_out(v: float | np.ndarray, M_p: float, v_break: float,
+              p_low: float, vsys: float) -> float | np.ndarray:
+    """Evaluate a signed broken power law for radius as a function of velocity.
+
+    Args:
+        v (float or numpy.ndarray): Velocities in km/s.
+        M_p (float): Radius-velocity normalization in au (km/s)**2, giving
+            r_break = M_p / v_break**2.
+        v_break (float): Positive break speed relative to vsys, in km/s.
+        p_low (float): Exponent in radius proportional to speed**(-p_low)
+            below the break. Above the break the exponent is 2.
+        vsys (float): Systemic-velocity offset in the same frame as v, in km/s.
+
+    Returns:
+        float or numpy.ndarray: Signed radius in au, positive for v > vsys
+        and negative for v < vsys. The expression is singular at v = vsys.
+    """
     v_s, v_a = np.sign(v - vsys), np.abs(v - vsys)
     p = 2. + (p_low - 2.) * (1 + np.sign(v_break - v_a)) / 2.
     r_break = M_p / v_break**2
-    return v_s * r_break * (v_a / v_break)**(-p)
+    radius = v_s * r_break * (v_a / v_break)**(-p)
+    return float(radius) if np.ndim(radius) == 0 else radius
 
 
 class VelGrad(ReadFits):
     """Measure emission centers, a velocity gradient, and dynamical mass."""
 
-    def get_2Dcenter(self, cutoff: float = 5, vmask: list = [0, 0],
+    def get_2Dcenter(self, cutoff: float = 5, vmask: list[float] = [0, 0],
                      minrelerr: float = 0.01, minabserr: float = 0.1,
-                     method: str = 'mean') -> None:
+                     method: Literal['mean', 'peak', 'gauss'] = 'mean') -> None:
         """Measure the two-dimensional emission center in each channel.
 
         Args:
@@ -85,8 +143,18 @@ class VelGrad(ReadFits):
         xmax, ymax = np.max(self.x), np.max(self.y)
         sigma, data = self.sigma, self.data
 
-        def clipped_error(err, val):
-            return max(err, minrelerr * np.abs(val), minabserr * self.bmaj)
+        def clipped_error(err: float, val: float) -> float:
+            """Apply the relative and beam-based floors to a center uncertainty.
+
+            Args:
+                err (float): Estimated center uncertainty in au.
+                val (float): Measured center coordinate in au.
+
+            Returns:
+                float: Maximum of err, minrelerr times the absolute coordinate,
+                and minabserr times the beam major axis.
+            """
+            return float(max(err, minrelerr * np.abs(val), minabserr * self.bmaj))
 
         X_org, Y_org = np.meshgrid(self.x, self.y)
         xc, yc, dxc, dyc = [], [], [], []
@@ -141,7 +209,8 @@ class VelGrad(ReadFits):
                   save_points: bool = True,
                   print_result: bool = True,
                   return_chain: bool = False,
-                  return_lnp: bool = False) -> dict:
+                  return_lnp: bool = False
+                  ) -> dict[str, float | dict[str, np.ndarray]]:
         """Fit a velocity-gradient axis and filter inconsistent channels.
 
         Args:
@@ -178,7 +247,7 @@ class VelGrad(ReadFits):
         if not fixcenter:
             for i in range(n):
                 j = 2 * n0 - i
-                if 0 < j or j <= n:
+                if j < 0 or n <= j:
                     xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
                 elif np.isnan(xc[i]) or np.isnan(yc[i]):
                     xc[i] = yc[i] = dxc[i] = dyc[i] = np.nan
@@ -186,9 +255,25 @@ class VelGrad(ReadFits):
         if not np.any(~np.isnan(xc) * ~np.isnan(yc)):
             print('No blue-red pair.')
 
-        def bad_channels(x_in, y_in, xoff, yoff, pa):
+        def bad_channels(x_in: np.ndarray, y_in: np.ndarray,
+                         xoff: float, yoff: float, pa: float) -> np.ndarray:
+            """Flag channel centers inconsistent with the fitted geometry.
+
+            Args:
+                x_in (numpy.ndarray): Channel-center x coordinates in au.
+                y_in (numpy.ndarray): Channel-center y coordinates in au.
+                xoff (float): Fitted center x offset in au.
+                yoff (float): Fitted center y offset in au.
+                pa (float): Fitted gradient position angle in degrees.
+
+            Returns:
+                numpy.ndarray: Rejection flags from the normalized symmetry and
+                axis residuals. Symmetry is tested only when fixcenter is False;
+                axis residuals are tested only when axisfilter is True. Returns
+                all false-valued entries if no valid centers exist.
+            """
             if np.all(np.isnan(x_in) | np.isnan(y_in)):
-                return np.full_like(x_in, False)
+                return np.full_like(x_in, False, dtype=bool)
             x0 = x_in - xoff
             y0 = y_in - yoff
             if fixcenter:
@@ -210,7 +295,24 @@ class VelGrad(ReadFits):
             else:
                 return a > 7.82  # 7.82, 11.35, 13.94 covers 95, 99, 99.7%
 
-        def chi2(p, x_in, y_in, dx_in, dy_in):
+        def chi2(p: list[float | np.ndarray] | np.ndarray,
+                 x_in: np.ndarray, y_in: np.ndarray,
+                 dx_in: np.ndarray, dy_in: np.ndarray) -> float:
+            """Calculate the fitting objective for a center and gradient angle.
+
+            Args:
+                p (array-like): Center x offset in au, center y offset in au, and
+                    gradient position angle in degrees.
+                x_in (numpy.ndarray): Channel-center x coordinates in au.
+                y_in (numpy.ndarray): Channel-center y coordinates in au.
+                dx_in (numpy.ndarray): Uncertainties in x coordinates in au.
+                dy_in (numpy.ndarray): Uncertainties in y coordinates in au.
+
+            Returns:
+                float: Sum of weighted axis residuals and, when the center is free,
+                symmetry residuals between reversed channel pairs. Centers with
+                NaN x or y coordinates are excluded.
+            """
             xoff, yoff, pa = p
             c = ~np.isnan(x_in) & ~np.isnan(y_in)
             x, y, dx, dy = x_in[c], y_in[c], dx_in[c], dy_in[c]
@@ -225,13 +327,28 @@ class VelGrad(ReadFits):
             parad = np.radians(pa)
             d3 = (x * np.cos(parad) - y * np.sin(parad))**2
             d3 = d3 / ((dx**2 + dy**2) / 2)
-            return np.sum(d1 + d2 + d3)
+            return float(np.sum(d1 + d2 + d3))
 
-        def low_velocity(x_in, y_in, pa_in):
+        def low_velocity(x_in: np.ndarray, y_in: np.ndarray,
+                         pa_in: float) -> np.ndarray:
+            """Flag channels toward zero velocity from each side's largest offset.
+
+            Args:
+                x_in (numpy.ndarray): Center-subtracted x coordinates in au, in
+                    channel order.
+                y_in (numpy.ndarray): Center-subtracted y coordinates in au, in
+                    channel order.
+                pa_in (float): Gradient position angle in degrees.
+
+            Returns:
+                numpy.ndarray: Rejection flags between each side's largest absolute
+                projected offset and the channel nearest zero velocity. All entries
+                are false-valued when no valid centers exist.
+            """
             parad = np.radians(pa_in)
             cospa = np.cos(parad)
             sinpa = np.sin(parad)
-            c = np.full_like(x_in, False)
+            c = np.full_like(x_in, False, dtype=bool)
             if np.all(np.isnan(x_in) | np.isnan(y_in)):
                 return c
             x = x_in[:n0]
@@ -262,10 +379,28 @@ class VelGrad(ReadFits):
                     args = np.array([xc, yc, dxc, dyc]) * 1
                     args[0][c1] = args[1][c1] = args[2][c1] = args[3][c1] = np.nan
                     if fixcenter:
-                        def lnprob(p):
+                        def lnprob(p: np.ndarray) -> float:
+                            """Evaluate the gradient log likelihood with the center fixed at zero.
+
+                            Args:
+                                p (array-like): Sampled position angle in degrees, as a one-element
+                                    parameter vector.
+
+                            Returns:
+                                float: Minus half the fitting objective for the current channel subset.
+                            """
                             return -0.5 * chi2([0, 0, p], *args)
                     else:
-                        def lnprob(p):
+                        def lnprob(p: np.ndarray) -> float:
+                            """Evaluate the gradient log likelihood with a free center.
+
+                            Args:
+                                p (array-like): Center x and y offsets in au, followed by the gradient
+                                    position angle in degrees.
+
+                            Returns:
+                                float: Minus half the fitting objective for the current channel subset.
+                            """
                             return -0.5 * chi2(p, *args)
                     popt, perr = emcee_custom(plim, lnprob, fixcenter)
                     xoff, yoff, pa_grad = popt
@@ -278,10 +413,28 @@ class VelGrad(ReadFits):
                 xc[c1] = yc[c1] = dxc[c1] = dyc[c1] = np.nan
             args = np.array([xc, yc, dxc, dyc])
             if fixcenter:
-                def lnprob(p):
+                def lnprob(p: np.ndarray) -> float:
+                    """Evaluate the gradient log likelihood with the center fixed at zero.
+
+                    Args:
+                        p (array-like): Sampled position angle in degrees, as a one-element
+                            parameter vector.
+
+                    Returns:
+                        float: Minus half the fitting objective for the current channel subset.
+                    """
                     return -0.5 * chi2([0, 0, p], *args)
             else:
-                def lnprob(p):
+                def lnprob(p: np.ndarray) -> float:
+                    """Evaluate the gradient log likelihood with a free center.
+
+                    Args:
+                        p (array-like): Center x and y offsets in au, followed by the gradient
+                            position angle in degrees.
+
+                    Returns:
+                        float: Minus half the fitting objective for the current channel subset.
+                    """
                     return -0.5 * chi2(p, *args)
             mcmc = emcee_custom(plim, lnprob, fixcenter,
                                 return_chain=return_chain,
@@ -322,7 +475,20 @@ class VelGrad(ReadFits):
                 'kepler': self.kepler}
 
     def write_points(self, filename: str = 'velgrad',
-                     print_result: bool = True):
+                     print_result: bool = True) -> np.ndarray:
+        """Write the retained, center-subtracted channel positions to a table.
+
+        Args:
+            filename (str, optional): Output prefix; the table is written to
+                filename.points.txt. Defaults to ``'velgrad'``.
+            print_result (bool, optional): Print the output filename.
+                Defaults to True.
+
+        Returns:
+            numpy.ndarray: Saved rows containing velocity in km/s, x and its
+            uncertainty in au, and y and its uncertainty in au. Rows with NaN x
+            coordinates are omitted. Requires self.kepler from filtering.
+        """
         fname = filename + '.points.txt'
         res = np.c_[self.v, self.kepler['xc'], self.kepler['dxc'],
                     self.kepler['yc'], self.kepler['dyc']]
@@ -334,12 +500,13 @@ class VelGrad(ReadFits):
         return res
 
     def calc_mstar(self, incl: float = 90,
-                   voff_range: list = [-0.5, 0.5],
+                   voff_range: list[float] = [-0.5, 0.5],
                    voff_fixed: float | None = 0,
                    minabserr: float = 0.1, minrelerr: float = 0.01,
                    print_result: bool = True,
                    return_chain: bool = False,
-                   return_lnp: bool = False) -> dict:
+                   return_lnp: bool = False
+                   ) -> dict[str, float | np.ndarray | None]:
         """Fit a rotation profile and estimate the central stellar mass.
 
         Args:
@@ -397,7 +564,18 @@ class VelGrad(ReadFits):
             self.Rkep = Rkep
             self.Vkep = Vkep
 
-            def lnprob(p):
+            def lnprob(p: np.ndarray) -> float:
+                """Evaluate the radial-profile log likelihood for the selected centers.
+
+                Args:
+                    p (array-like): M_p in au (km/s)**2, break speed in km/s, and the
+                        low-speed radius exponent. Includes a fourth systemic-velocity
+                        offset in km/s when voff_fixed is None.
+
+                Returns:
+                    float: Minus half the squared radial residuals normalized by their
+                    uncertainties, using the observed rotation sign.
+                """
                 if voff_fixed is None:
                     M_p, v_break, p_low, vsys = p
                 else:
@@ -405,7 +583,7 @@ class VelGrad(ReadFits):
                     vsys = voff_fixed
                 r_model = r_kep_out(v, M_p, v_break, p_low, vsys)
                 chi2 = np.sum(((r - s_model * r_model) / dr)**2)
-                return -0.5 * chi2
+                return float(-0.5 * chi2)
             Mmin = np.min(np.abs(r)) * np.min(np.abs(v))**2
             Mmax = np.max(np.abs(r)) * np.max(np.abs(v))**2
             plim = np.array([[Mmin, np.min(np.abs(v)), -10, voff_range[0]],
@@ -603,7 +781,19 @@ class VelGrad(ReadFits):
         ax.set_xscale('log')
         ax.set_yscale('log')
 
-        def nice_ticks(ticks, tlim):
+        def nice_ticks(ticks: np.ndarray,
+                       tlim: tuple[float, float]) -> np.ndarray:
+            """Add rounded tick positions near the limits of a logarithmic axis.
+
+            Args:
+                ticks (array-like): Existing tick positions.
+                tlim (tuple): Positive lower and upper axis limits.
+
+            Returns:
+                numpy.ndarray: Sorted existing ticks plus a lower limit rounded up
+                and an upper limit rounded down at their respective decimal orders.
+                Duplicate ticks and ticks outside the limits are retained.
+            """
             order = 10**np.floor(np.log10(tlow := tlim[0]))
             tlow = np.ceil(tlow / order) * order
             order = 10**np.floor(np.log10(tup := tlim[1]))
@@ -614,7 +804,16 @@ class VelGrad(ReadFits):
         ax.set_xticks(xticks)
         ax.set_yticks(yticks)
 
-        def nice_labels(ticks):
+        def nice_labels(ticks: np.ndarray) -> list[str]:
+            """Format positive logarithmic tick positions in fixed-point notation.
+
+            Args:
+                ticks (numpy.ndarray): Positive tick positions.
+
+            Returns:
+                list: Tick labels with decimal precision based on each tick's order
+                of magnitude; values of one or greater use no decimal places.
+            """
             digits = np.floor(np.log10(ticks)).astype('int').clip(None, 0)
             return [f'{t:.{d}f}' for t, d in zip(ticks, -digits)]
         ax.set_xticklabels(nice_labels(xticks))
