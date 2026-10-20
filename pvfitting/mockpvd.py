@@ -540,7 +540,7 @@ def binning(data: np.ndarray, nbin: int) -> np.ndarray:
         The current implementation pairs identical stride offsets on the y
         and x axes; it does not combine all ``nbin**2`` offset pairs.
     """
-    d_avg = np.array([data[:, i::nbin, i::nbin]
+    d_avg = np.array([data[:, j::nbin, i::nbin]
                       for j in range(nbin)
                       for i in range(nbin)])
     return np.nanmean(d_avg, axis=0)
