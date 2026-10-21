@@ -97,9 +97,10 @@ class PVFitting(ReadFits):
                     taumax_range: list[float] = [0.1, 1e3],
                     frho_range: list[float] = [1., 1e4],
                     sig_mdl_range: list[float] = [0., 10.],
-                    fixed_params: dict[str, float | None] = {'Mstar': None, 'Rc': None,
-                                          'alphainfall': None, 'taumax': None,
-                                          'frho': None, 'sig_mdl': None},
+                    fixed_params: dict[str, float | None] = {
+                        'Mstar': None, 'Rc': None, 'alphainfall': None,
+                        'taumax': None, 'frho': None, 'sig_mdl': None
+                        },
                     vmask: list[float] = [0, 0],
                     zmax: float | None = None,
                     filename: str = 'PVfitting',
