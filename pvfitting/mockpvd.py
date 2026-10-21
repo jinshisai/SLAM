@@ -537,8 +537,8 @@ def binning(data: np.ndarray, nbin: int) -> np.ndarray:
             divisible by ``nbin``.
 
     Notes:
-        The current implementation pairs identical stride offsets on the y
-        and x axes; it does not combine all ``nbin**2`` offset pairs.
+        Averages all ``nbin**2`` spatial offset pairs within each bin,
+        ignoring NaNs.
     """
     d_avg = np.array([data[:, j::nbin, i::nbin]
                       for j in range(nbin)
