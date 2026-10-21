@@ -117,9 +117,9 @@ class Nested3DGrid(object):
         zlim = []
         _dx, _dy, _dz = self.dx, self.dy, self.dz
         for l in range(self.nlevels - 1):
-            xlim.append([-_dx * reslim, _dx * reslim])
-            ylim.append([-_dy * reslim, _dy * reslim])
-            zlim.append([-_dz * reslim, _dz * reslim])
+            xlim.append([float(-_dx * reslim), float(_dx * reslim)])
+            ylim.append([float(-_dy * reslim), float(_dy * reslim)])
+            zlim.append([float(-_dz * reslim), float(_dz * reslim)])
             _dx, _dy, _dz = np.array([_dx, _dy, _dz]) / self.nsub[l]
 
         return xlim, ylim, zlim
@@ -411,13 +411,13 @@ def index_between(
             return np.full(np.shape(t), True)
     else:
         if mode == 'all':
-            return (tlim[0] <= t) * (t <= tlim[1])
+            return np.asarray((tlim[0] <= t) & (t <= tlim[1]), dtype=bool)
         elif mode == 'edge':
             nonzero = np.nonzero((tlim[0] <= t) * (t <= tlim[1]))
-            return tuple([[np.min(i), np.max(i)] for i in nonzero])
+            return tuple([[int(np.min(i)), int(np.max(i))] for i in nonzero])
         else:
             print('index_between: mode parameter is not right.')
-            return (tlim[0] <= t) * (t <= tlim[1])
+            return np.asarray((tlim[0] <= t) & (t <= tlim[1]), dtype=bool)
 
 
 def nestgrid_3D(

@@ -41,4 +41,5 @@ p = chan.popt
 chan.modeltofits(**p, filehead=filehead)
 for s in ['obs', 'model', 'residual']:
     chan.plotmom(mode=s, **p, filename=f'{filehead}.{s}mom01.png')
+chan.plotdecon(filehead=filehead, save=True, show=False)
 '-------------------------------------'
