@@ -1,6 +1,7 @@
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Literal
 
 import numpy as np
 from numba import config, get_num_threads, jit, prange, set_num_threads
@@ -9,7 +10,7 @@ from numba import config, get_num_threads, jit, prange, set_num_threads
 DEFAULT_NUMBA_THREAD_CAP = 4
 
 
-def resolve_num_threads(num_threads: int | str | None = None) -> int:
+def resolve_num_threads(num_threads: int | Literal['all'] | None = None) -> int:
     """Resolve the Numba thread budget used for PV integration.
 
     Args:
@@ -49,7 +50,8 @@ def resolve_num_threads(num_threads: int | str | None = None) -> int:
 
 
 @contextmanager
-def numba_thread_limit(num_threads: int | str | None = None) -> Iterator[int]:
+def numba_thread_limit(num_threads: int | Literal['all'] | None = None
+                       ) -> Iterator[int]:
     """Temporarily apply a Numba thread budget.
 
     Args:
@@ -79,7 +81,8 @@ class diskenvelope():
 
     Args:
         radius (np.ndarray or None, optional): Spherical radius normalized by
-            the centrifugal radius. Defaults to None.
+            the centrifugal radius. Converted to floating point before
+            calculation. Defaults to None.
         theta (np.ndarray or None, optional): Polar angle in radians, measured
             from +z toward ``(x, y) = (sin(phi), -cos(phi))``. Defaults to
             None.
@@ -111,7 +114,7 @@ class diskenvelope():
             self.mu = np.abs(mu)
             self.sin_theta = np.sin(theta).clip(1e-10, None)
             if radius is not None:
-                self.radius = radius
+                self.radius = np.asarray(radius, dtype=float)
                 self.R = self.radius * self.sin_theta
                 self.z = self.radius * self.mu
                 self.H = self.H0 * self.R**(1. + self.plh)
@@ -224,11 +227,13 @@ def rotbase(t: float | np.ndarray, p: float | np.ndarray
         t (float or np.ndarray): Polar angle in radians, measured from +z
             toward ``(x, y) = (sin(p), -cos(p))``.
         p (float or np.ndarray): Azimuth in radians, measured from -y toward
-            +x.
+            +x. Must be broadcast-compatible with t.
 
     Returns:
-        tuple: Radial, polar, and azimuthal basis vectors ``(er, et, ep)``.
+        tuple: Radial, polar, and azimuthal basis vectors ``(er, et, ep)``,
+            each with shape (3, *broadcast_shape). Scalar angles give (3,).
     """
+    t, p = np.broadcast_arrays(t, p)
     er = np.array([np.sin(t) * np.sin(p), -np.sin(t) * np.cos(p), np.cos(t)])
     et = np.array([np.cos(t) * np.sin(p), -np.cos(t) * np.cos(p), -np.sin(t)])
     ep = np.array([np.cos(p), np.sin(p), np.zeros_like(p)])
@@ -303,7 +308,7 @@ def _rho2tau_parallel(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
 
 
 def rho2tau(vlos: np.ndarray, rho: np.ndarray,
-            num_threads: int | str | None = None) -> np.ndarray:
+            num_threads: int | Literal['all'] | None = None) -> np.ndarray:
     """Integrate density by velocity channel with bounded parallelism.
 
     Args:
@@ -351,7 +356,7 @@ j_org = {'major': [None] * lmax, 'minor': [None] * lmax}
 
 
 def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: float,
-           axis: str, l: int) -> None:
+           axis: Literal['major', 'minor'], l: int) -> None:
     """Cache geometry and lookup indices for one nested model-grid level.
 
     Args:
@@ -359,7 +364,7 @@ def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: flo
         theta (np.ndarray): Polar angles in radians.
         phi (np.ndarray): Azimuthal angles in radians.
         incl (float): Inclination in radians used for line-of-sight projection.
-        axis (str): PV-cut axis, normally ``'major'`` or ``'minor'``.
+        axis (str): PV-cut axis, either ``'major'`` or ``'minor'``.
         l (int): Nested-grid level stored in the module-level caches.
     """
     m = diskenvelope(theta=theta, phi=phi, incl=incl)
@@ -374,7 +379,8 @@ def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: flo
 
 
 def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
-                 axis: str, l: int) -> tuple[np.ndarray, np.ndarray]:
+                 axis: Literal['major', 'minor'],
+                 l: int) -> tuple[np.ndarray, np.ndarray]:
     """Interpolate cached disk-envelope density and line-of-sight velocity.
 
     Args:

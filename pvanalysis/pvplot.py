@@ -5,7 +5,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from astropy import constants, units
 from scipy.interpolate import RectBivariateSpline as RBS
-from typing import Any
+from typing import Any, Literal
 
 from pvanalysis.pvfits import Impvfits
 
@@ -111,7 +111,8 @@ class PVPlot():
                  v: np.ndarray | None = None,
                  xlim: list[float] = [1e-10, 1e10],
                  vlim: list[float] = [1e-10, 1e10],
-                 flipaxis: bool = False, quadrant: str | None = None,
+                 flipaxis: bool = False,
+                 quadrant: Literal['13', '24'] | None = None,
                  loglog: bool = False) -> None:
         """Initialize a PV figure from a FITS file or supplied arrays."""
         set_rcparams()
@@ -217,20 +218,30 @@ class PVPlot():
             cbticklabels (list or None, optional): Explicit color-bar tick
                 labels. Defaults to None.
             **kwargs: Additional arguments passed to ``Axes.pcolormesh``.
+
+        Raises:
+            ValueError: If Tb is True and required beam parameters or the
+                rest frequency are unavailable. Beam metadata is not required
+                when Tb is False.
         """
         kwargs0 = {'cmap': 'viridis', 'zorder': 1, 'shading': 'nearest'}
-        if restfrq is None:
-            restfrq = self.restfrq
-        if bmaj is None or bmin is None or bpa is None:
-            if self.multibeam:
-                bmaj = self.beam['BMAJ']
-                bmin = self.beam['BMIN']
-                bpa = self.beam['BPA']
-                if self.loglog:
-                    ichan = np.nanargmax(bmaj * bmin)
-                    bmaj, bmin, bpa = bmaj[ichan], bmin[ichan], bpa[ichan]
-            else:
-                bmaj, bmin, bpa = self.beam
+        if Tb:
+            if restfrq is None:
+                restfrq = self.restfrq
+            if bmaj is None or bmin is None or bpa is None:
+                if self.beam is None:
+                    raise ValueError('Beam parameters are required when Tb=True.')
+                if self.multibeam:
+                    bmaj = self.beam['BMAJ']
+                    bmin = self.beam['BMIN']
+                    bpa = self.beam['BPA']
+                    if self.loglog:
+                        ichan = np.nanargmax(bmaj * bmin)
+                        bmaj, bmin, bpa = bmaj[ichan], bmin[ichan], bpa[ichan]
+                else:
+                    bmaj, bmin, bpa = self.beam
+            if restfrq is None:
+                raise ValueError('A rest frequency is required when Tb=True.')
         if self.loglog:
             self.gen_loglog()
             x, v, d = self.xl, self.vl, self.dl
@@ -271,7 +282,7 @@ class PVPlot():
             if cbticks is not None:
                 cb.set_ticks(np.log10(cbticks) if log else cbticks)
             if cbticklabels is not None:
-                cb.set_ticklables(cbticklabels)
+                cb.set_ticklabels(cbticklabels)
             elif log:
                 t = cb.get_ticks()
                 t = t[(kwargs['vmin'] < t) * (t < kwargs['vmax'])]
@@ -307,20 +318,30 @@ class PVPlot():
             levels (list or np.ndarray, optional): Contour levels in units of
                 ``rms``. Defaults to [3, 6].
             **kwargs: Additional arguments passed to ``Axes.contour``.
+
+        Raises:
+            ValueError: If Tb is True and required beam parameters or the
+                rest frequency are unavailable. Beam metadata is not required
+                when Tb is False.
         """
         kwargs0 = {'colors': 'lime', 'linewidths': 1.2, 'zorder': 2}
-        if restfrq is None:
-            restfrq = self.restfrq
-        if None in [bmaj, bmin, bpa]:
-            if self.multibeam:
-                bmaj = self.beam['BMAJ']
-                bmin = self.beam['BMIN']
-                bpa = self.beam['BPA']
-                if self.loglog:
-                    ichan = np.nanargmax(bmaj * bmin)
-                    bmaj, bmin, bpa = bmaj[ichan], bmin[ichan], bpa[ichan]
-            else:
-                bmaj, bmin, bpa = self.beam
+        if Tb:
+            if restfrq is None:
+                restfrq = self.restfrq
+            if bmaj is None or bmin is None or bpa is None:
+                if self.beam is None:
+                    raise ValueError('Beam parameters are required when Tb=True.')
+                if self.multibeam:
+                    bmaj = self.beam['BMAJ']
+                    bmin = self.beam['BMIN']
+                    bpa = self.beam['BPA']
+                    if self.loglog:
+                        ichan = np.nanargmax(bmaj * bmin)
+                        bmaj, bmin, bpa = bmaj[ichan], bmin[ichan], bpa[ichan]
+                else:
+                    bmaj, bmin, bpa = self.beam
+            if restfrq is None:
+                raise ValueError('A rest frequency is required when Tb=True.')
         if self.loglog:
             self.gen_loglog()
             x, v, d = self.xl, self.vl, self.dl
@@ -334,7 +355,7 @@ class PVPlot():
             lam = constants.c.to('m/s').value / restfrq
             Jy2K = units.Jy.to('J*s**(-1)*m**(-2)*Hz**(-1)') \
                 * lam**2 / 2. / constants.k_B.to('J/K').value / Omega
-            d *= Jy2K
+            d = d * Jy2K
         if rms is None:
             rms = (np.std(d[:5, :]) + np.std(d[-5:, :])
                    + np.std(d[:, :5]) + np.std(d[:, -5:])) / 4.

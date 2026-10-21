@@ -4,6 +4,8 @@ This script makes model channel maps from the observed mom0 by assuming 2D veloc
 The main class ChannelFit can be imported to do each steps separately.
 """
 
+from typing import Any
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
@@ -26,13 +28,37 @@ vunit = np.sqrt(GG * M_sun / au) * 1e-3
 
 
 def avefour(a: np.ndarray) -> np.ndarray:
+    """Average adjacent 2-by-2 spatial pixels in a cube.
+
+    Args:
+        a (numpy.ndarray): Array with shape (nchannel, ny, nx). Both spatial
+            dimensions must be even.
+
+    Returns:
+        numpy.ndarray: Averaged array with shape (nchannel, ny / 2, nx / 2).
+    """
     b = (a[:, 0::2, 0::2] + a[:, 0::2, 1::2]
          + a[:, 1::2, 0::2] + a[:, 1::2, 1::2]) / 4.
     return b
 
 
 def makemom012(d: np.ndarray, v: np.ndarray, sigma: float,
-               threshold: float = 3) -> dict:
+               threshold: float = 3) -> dict[str, np.ndarray | float]:
+    """Calculate integrated intensity, mean velocity, and velocity dispersion.
+
+    Args:
+        d (numpy.ndarray): Channel cube with shape (len(v), ny, nx).
+        v (numpy.ndarray): Increasing channel velocities, assumed uniformly
+            spaced. Their units set the velocity units of the output maps.
+        sigma (float): RMS noise per channel in the same intensity units as d.
+        threshold (float, optional): Noise multiplier for masking moments 1
+            and 2 in both channel intensity and integrated intensity.
+            Moment 0 uses all channels. Defaults to 3.
+
+    Returns:
+        dict: Maps under ``mom0``, ``mom1``, and ``mom2``, and the integrated
+        intensity noise under ``sigma_mom0``. Masked moments 1 and 2 are NaN.
+    """
     dmasked = np.nan_to_num(d)
     dv = np.min(v[1:] - v[:-1])
     mom0 = np.sum(dmasked, axis=0) * dv
@@ -49,10 +75,82 @@ def makemom012(d: np.ndarray, v: np.ndarray, sigma: float,
             'sigma_mom0': sigma_mom0}
 
 
+def cosine_taper_2d(f: np.ndarray, x: np.ndarray, y: np.ndarray,
+                    length: float) -> np.ndarray:
+    """Apply a cosine taper to the edges of a 2D image.
+
+    Args:
+        f (numpy.ndarray): 2D image with shape (len(y), len(x)).
+        x (numpy.ndarray): 1D coordinates along the x axis.
+        y (numpy.ndarray): 1D coordinates along the y axis.
+        length (float): Taper width at each edge, in the same units as x
+            and y. Must be finite and positive. The same physical width is
+            used along both axes. If the taper regions overlap, the weights
+            remain symmetric but do not reach one, and a warning is issued.
+
+    Returns:
+        numpy.ndarray: Tapered 2D image.
+
+    Raises:
+        ValueError: If length is not finite and positive.
+    """
+
+    if not np.isfinite(length) or length <= 0:
+        raise ValueError('Taper length must be finite and positive.')
+    if 2 * length > min(x.max() - x.min(), y.max() - y.min()):
+        warnings.warn(
+            'The edge-taper regions overlap. Even the image center is '
+            'attenuated; use a wider input image.',
+            stacklevel=2,
+        )
+
+    def taper_1d(coord: np.ndarray) -> np.ndarray:
+        """Calculate cosine weights from the nearest edge of an axis.
+
+        Args:
+            coord (numpy.ndarray): 1D coordinates in the same units as length.
+
+        Returns:
+            numpy.ndarray: Symmetric weights between zero and one, using the
+            enclosing function's taper length.
+        """
+        cmin = coord.min()
+        cmax = coord.max()
+        dist = np.minimum(coord - cmin, cmax - coord)
+        return 0.5 * (1.0 - np.cos(np.pi * np.clip(dist / length, 0, 1)))
+
+    wx = taper_1d(x)
+    wy = taper_1d(y)
+    taper = wy[:, None] * wx[None, :]
+    return f * taper
+
+
 def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
           threshold: float = 2, gain: float = 0.01,
           weakestcomponent: float = 0.3,
           savetxt: str | None = None, loadtxt: str | None = None) -> np.ndarray:
+    """Deconvolve an image by iteratively subtracting positive beam components.
+
+    Args:
+        data (numpy.ndarray): 2D image to deconvolve.
+        beam (numpy.ndarray): 2D beam kernel whose sum gives the beam area
+            in pixels.
+        sigma (float): RMS noise in the same units as data.
+        threshold (float, optional): Stop when the residual peak is below
+            this multiple of sigma. Defaults to 2.
+        gain (float, optional): Fraction of the residual peak removed per
+            iteration, subject to weakestcomponent. Defaults to 0.01.
+        weakestcomponent (float, optional): Minimum subtraction amplitude
+            in units of sigma before beam-area normalization. Defaults to 0.3.
+        savetxt (str or None, optional): Output text file for the deconvolved
+            image. Defaults to None.
+        loadtxt (str or None, optional): Text file to load instead of running
+            deconvolution. Returns immediately when supplied. Defaults to None.
+
+    Returns:
+        numpy.ndarray: CLEAN components plus the residual divided by the
+        beam area, or the loaded image.
+    """
     if loadtxt is not None:
         print(f'Load deconvolved moment 0 from {loadtxt}.')
         cleancomponent = np.loadtxt(loadtxt)
@@ -91,7 +189,34 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
 def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     bmaj: float, bmin: float, bpa: float, sigma: float,
                     savetxt: str | None = None, loadtxt: str | None = None,
-                    direct: bool = False, progressbar: bool = True) -> tuple:
+                    direct: bool = False, progressbar: bool = True
+                    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Fit a nonnegative intensity grid convolved with a Gaussian beam.
+
+    Args:
+        data (numpy.ndarray): 2D image with shape (len(y), len(x)).
+        x (numpy.ndarray): Uniformly spaced x coordinates.
+        y (numpy.ndarray): Uniformly spaced y coordinates, in the units of x.
+        bmaj (float): Beam major-axis FWHM in coordinate units. Must span at
+            least two y pixels for the model-grid stride to be nonzero.
+        bmin (float): Beam minor-axis FWHM in coordinate units. Must span at
+            least two x pixels for the model-grid stride to be nonzero.
+        bpa (float): Beam position angle in degrees.
+        sigma (float): RMS noise in the same units as data, used by the
+            iterative fit for thresholding and uncertainties.
+        savetxt (str or None, optional): Text file for the flattened fitted
+            model-grid intensities. Defaults to None.
+        loadtxt (str or None, optional): Text file containing model-grid
+            intensities to use instead of fitting. Defaults to None.
+        direct (bool, optional): Fit all grid intensities jointly. False uses
+            20 passes of individual grid-point fits. Defaults to False.
+        progressbar (bool, optional): Show progress for the iterative fit.
+            Defaults to True.
+
+    Returns:
+        tuple: Deconvolved image on the input grid, model x coordinates,
+        model y coordinates, and 2D model-grid intensities in the rotated frame.
+    """
     nx = len(x)
     ny = len(y)
     dx = np.abs(x[1] - x[0])
@@ -127,7 +252,16 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         popt = np.loadtxt(loadtxt)
         print(f'Load a deconvolved model of moment 0 from {loadtxt}.')
     elif direct:
-        def model(x, *par):
+        def model(x: np.ndarray, *par: float) -> np.ndarray:
+            """Interpolate and convolve all fitted grid intensities.
+
+            Args:
+                x (array-like): Evaluation coordinate arrays in y, x order.
+                *par (float): Flattened model-grid intensities.
+
+            Returns:
+                numpy.ndarray: Flattened beam-convolved image.
+            """
             values = np.reshape(par, (ynpar, xnpar))
             f = RGI((ymodel, xmodel), values, method='linear',
                     bounds_error=False, fill_value=0)
@@ -159,7 +293,16 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                     else:
                         bounds = [0, dd]
 
-                        def model(x, par):
+                        def model(x: np.ndarray, par: float) -> float:
+                            """Predict the intensity at the grid point currently being fitted.
+
+                            Args:
+                                x (array-like): Evaluation coordinate arrays in y, x order.
+                                par (float): Trial intensity replacing the current model-grid value.
+
+                            Returns:
+                                float: Intensity integrated against the beam centered on that point.
+                            """
                             values = Par0 + 0
                             values[i_p, j_p] = par
                             f = RGI((ymodel, xmodel), values, method='linear',
@@ -200,10 +343,9 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     axis around the scientifically useful region; a wider margin is
     preferable.
 
-    A cosine taper is applied within approximately one beam major-axis width
-    of the boundary after calculating the Tikhonov solution. The returned
-    image is therefore a deliberately edge-tapered version of that solution,
-    and pixels in the tapered region should not be interpreted quantitatively.
+    A cosine taper is applied to the input within one beam major-axis width
+    of each boundary before calculating the Tikhonov solution. Pixels in
+    the tapered region should not be interpreted quantitatively.
 
     For an even-sized axis, the first row or column is temporarily omitted to
     construct an odd-sized FFT grid and restored as zeros after deconvolution.
@@ -217,6 +359,7 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     xd = x[int(len(x) % 2 == 0):]
     yd = y[int(len(y) % 2 == 0):]
     d = data[int(len(y) % 2 == 0):, int(len(x) % 2 == 0):]
+    d = cosine_taper_2d(d, xd, yd, length=bmaj)
     ny, nx = np.shape(d)
     nyh, nxh = (ny - 1) // 2, (nx - 1) // 2
     dx, dy = x[1] - x[0], y[1] - y[0]
@@ -244,9 +387,7 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
     #
     #   sum(|g (*) dnew - d|^2 + thre^2 * |dnew|^2),
     #
-    # where (*) denotes circular convolution. The image-domain edge taper
-    # applied below is intentional post-processing and changes the returned
-    # image from this exact minimizer.
+    # where (*) denotes circular convolution and d is the tapered input.
     # ----------------------------------------------------------------
     FTdnew = FTd * inverse_filter
     print('Tikhonov regularization is used for Fourier-space deconvolution '
@@ -257,26 +398,6 @@ def ftdeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         dnew = np.concatenate((np.zeros((np.shape(dnew)[0], 1)), dnew), axis=1)
     if len(y) % 2 == 0:
         dnew = np.concatenate((np.zeros((1, np.shape(dnew)[1])), dnew), axis=0)
-    edge_width = int(bmaj / min(abs(dx), abs(dy)) + 0.5)
-    if edge_width > 0:
-        # Suppress unreliable boundary behavior caused by circular
-        # convolution. This post-processing assumes that scientifically useful
-        # emission is separated from the boundary by a sufficiently wide,
-        # emission-free margin.
-        if 2 * edge_width >= min(dnew.shape):
-            warnings.warn(
-                'The edge-taper regions overlap or occupy the entire image. '
-                'Use a wider input image for mom0ft deconvolution.'
-            )
-        iy = np.arange(np.shape(dnew)[0])
-        ix = np.arange(np.shape(dnew)[1])
-        ydist = np.minimum(iy, iy[::-1])
-        xdist = np.minimum(ix, ix[::-1])
-        dist = np.minimum(ydist[:, None], xdist[None, :])
-        taper = np.ones_like(dnew)
-        edge = dist < edge_width
-        taper[edge] = 0.5 * (1 - np.cos(np.pi * dist[edge] / edge_width))
-        dnew = dnew * taper
     if savetxt is not None:
         np.savetxt(savetxt, dnew)
     return dnew
@@ -720,7 +841,7 @@ class ChannelFit(ReadFits):
                  envelope: bool = False,
                  scaling: str = 'uniform',
                  progressbar: bool = True,
-                 scaling_gp_args: dict = {
+                 scaling_gp_args: dict[str, Any] = {
                      'scale_length': 2.,
                      'kernel': 'rbf',
                      'sigma_f': None,
@@ -736,11 +857,11 @@ class ChannelFit(ReadFits):
         self.progressbar = progressbar
         self.scaling_gp_args = scaling_gp_args
 
-    def makegrid(self, cubefits: str | None = None,
+    def makegrid(self, cubefits: str,
                  pa: float = 0, incl: float = 90, dist: float = 1,
                  center: str | None = None, vsys: float = 0,
                  rmax: float = 1e4,
-                 vlim: tuple[float, float, float, float] = (-100, 0, 0, 100),
+                 vlim: list[float] = [-100, 0, 0, 100],
                  sigma: float | None = None, nlayer: int = 3,
                  xskip: int = 1, yskip: int = 1,
                  skipto: int | bool | None = False,
@@ -753,8 +874,7 @@ class ChannelFit(ReadFits):
         """Read a cube and prepare the observational and nested model grids.
 
         Args:
-            cubefits (str or None, optional): Input channel-map FITS file.
-                Defaults to None.
+            cubefits (str): Required input channel-map FITS file.
             pa (float, optional): Position angle of the disk major axis in
                 degrees. Defaults to 0.
             incl (float, optional): Disk inclination in degrees. Defaults to
@@ -765,9 +885,9 @@ class ChannelFit(ReadFits):
             vsys (float, optional): Systemic velocity in km/s. Defaults to 0.
             rmax (float, optional): Half-width of the fitted area in au.
                 Defaults to 1e4.
-            vlim (tuple, optional): Boundaries of the fitted blue and red
+            vlim (list, optional): Boundaries of the fitted blue and red
                 velocity ranges, relative to ``vsys``, in km/s. Defaults to
-                (-100, 0, 0, 100).
+                [-100, 0, 0, 100].
             sigma (float or None, optional): RMS noise of the cube. None means
                 automatic estimation. Defaults to None.
             nlayer (int, optional): Number of nested model-grid layers.
@@ -800,25 +920,26 @@ class ChannelFit(ReadFits):
                 ``envelope=True``. None determines the sign from the observed
                 moment-1 map. Defaults to None.
         """
-        if cubefits is not None:
+        if cubefits is None:
+            raise ValueError('cubefits must be supplied.')
+        self.read_cubefits(cubefits, center, dist, vsys,
+                           -rmax, rmax, -rmax, rmax, None, None,
+                           xskip, yskip, sigma)
+        dpix = min([np.abs(self.dx), np.abs(self.dy)])
+        if type(skipto) is int:
+            iskip = int(self.bmin / (dpix / xskip) / skipto)
+            if iskip == 0:
+                print('WARNING: \'skipto\' is ignored because the beam minor axis is smaller than \'skipto\' pixels.')
+                iskip = 1
             self.read_cubefits(cubefits, center, dist, vsys,
                                -rmax, rmax, -rmax, rmax, None, None,
-                               xskip, yskip, sigma)
+                               iskip, iskip, sigma)
             dpix = min([np.abs(self.dx), np.abs(self.dy)])
-            if type(skipto) is int:
-                iskip = int(self.bmin / (dpix / xskip) / skipto)
-                if iskip == 0:
-                    print('WARNING: \'skipto\' is ignored because the beam minor axis is smaller than \'skipto\' pixels.')
-                    iskip = 1
-                self.read_cubefits(cubefits, center, dist, vsys,
-                                   -rmax, rmax, -rmax, rmax, None, None,
-                                   iskip, iskip, sigma)
-                dpix = min([np.abs(self.dx), np.abs(self.dy)])
-                ibmaj = self.bmaj / dpix
-                ibmin = self.bmin / dpix
-                print(f'Adopt xskip={iskip:d} and yskip={iskip:d}.')
-                print(f'Beam major/minor axis is {ibmaj:.1f}/{ibmin:.1f} pixels.')
-            v = self.v
+            ibmaj = self.bmaj / dpix
+            ibmin = self.bmin / dpix
+            print(f'Adopt xskip={iskip:d} and yskip={iskip:d}.')
+            print(f'Beam major/minor axis is {ibmaj:.1f}/{ibmin:.1f} pixels.')
+        v = self.v
         self.incl0 = incl
         pa_rad = np.radians(pa)
         self.pa_rad = pa_rad
@@ -837,7 +958,7 @@ class ChannelFit(ReadFits):
         self.data_red = self.data[(vlim[2] <= v) * (v <= vlim[3])]
         self.data_valid = np.append(self.data_blue, self.data_red, axis=0)
 
-        m = makemom012(self.data_valid, self.v_valid, sigma)
+        m = makemom012(self.data_valid, self.v_valid, self.sigma)
         self.mom0 = m['mom0']
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
@@ -940,22 +1061,43 @@ class ChannelFit(ReadFits):
             print(f'Max and rms are {maxres:.1f}sigma '
                   + f'and {rmsres:.1f}sigma in Moment 0 residual.')
 
-    def diagnose_gpdeconvolution(self, outname=None):
+    def diagnose_gpdeconvolution(self, outname: str | None = None) -> None:
         res = gpdeconvolve(self.mom0, self.sigma_mom0,
                            self.bmaj, self.bmin, self.bpa, self.dx, self.dy,
                            **self.scaling_gp_args)
         _diagnose_gpdeconvolution(res, self.mom0, outname=outname)
 
-    def update_pa(self, pa: float):
+    def update_pa(self, pa: float) -> None:
+        """Rotate the stored reference grids by a position-angle offset.
+
+        Args:
+            pa (float): Position-angle offset in degrees.
+        """
         self.Xnest, self.Ynest = rot(self.Xnest0, self.Ynest0, np.radians(pa))
 
-    def update_incl(self, incl: float):
+    def update_incl(self, incl: float) -> None:
+        """Update inclination trigonometric factors relative to the base angle.
+
+        Args:
+            incl (float): Offset in degrees from the inclination set by makegrid.
+        """
         i = np.radians(self.incl0 + incl)
         self.sini = np.sin(i)
         self.cosi = np.cos(i)
         self.tani = np.tan(i)
 
-    def update_xdisk(self, h1: float, h2: float = -1):
+    def update_xdisk(self, h1: float, h2: float = -1) -> None:
+        """Update line-of-sight intersections with the two emitting surfaces.
+
+        Args:
+            h1 (float): First surface height divided by radius. Negative values
+                disable the surface; values below 0.01 use a thin disk.
+            h2 (float, optional): Second surface height divided by radius, with
+                the same conventions as h1. Defaults to -1.
+
+        The four entries stored in ``self.xdisk`` contain up to two intersections
+        per surface; disabled or unavailable branches are None.
+        """
         x = [None] * 4
         for i, hdisk in zip([0, 2], [h1, h2]):
             if hdisk < 0:
@@ -985,7 +1127,13 @@ class ChannelFit(ReadFits):
             x[i], x[i + 1] = x1, x2
         self.xdisk = x
 
-    def update_prof(self, cs: float):
+    def update_prof(self, cs: float) -> None:
+        """Update the sampled Gaussian profile integrated over a channel.
+
+        Args:
+            cs (float): Gaussian velocity dispersion in km/s. Values below
+                0.01 times the channel width use a top-hat profile.
+        """
         cs_over_dv = cs / self.dv
         w = max([cs_over_dv * 2.35482, 1])  # 2.35482 ~ sqrt(8ln2)
         vmax_over_w = 2  # in the unit of max(FWHM, dv)
@@ -1002,8 +1150,30 @@ class ChannelFit(ReadFits):
             p[0] = p[n - 1] = 0
         self.prof, self.prof_n, self.prof_d = p, n - 1, d
 
-    def update_getvlos(self, Rc: float, Rin: float):
-        def getvlos(x_in: np.ndarray | None, h_in: float):
+    def update_getvlos(self, Rc: float, Rin: float) -> None:
+        """Set the velocity evaluator for the current disk and envelope geometry.
+
+        Args:
+            Rc (float): Disk outer radius and disk-envelope transition radius
+                in au.
+            Rin (float): Inner emission cutoff radius in au.
+
+        The evaluator stored in ``self.getvlos`` uses a one-solar-mass central
+        object; get_Iunif applies the stellar-mass scaling.
+        """
+        def getvlos(x_in: np.ndarray | None,
+                    h_in: float) -> np.ndarray | None:
+            """Evaluate projected velocities for one emitting-surface intersection.
+
+            Args:
+                x_in (numpy.ndarray or None): Disk-plane coordinates in au on the
+                    nested grids, or None for an unavailable intersection.
+                h_in (float): Surface height divided by radius.
+
+            Returns:
+                numpy.ndarray or None: Velocities in km/s for a one-solar-mass central
+                object, with excluded regions set to NaN. None if x_in is None.
+            """
             if x_in is None:
                 return None
             r = np.hypot(x_in, self.Ynest)
@@ -1024,11 +1194,31 @@ class ChannelFit(ReadFits):
             return vlos
         self.getvlos = getvlos
 
-    def update_vlos(self, h1: float, h2: float):
+    def update_vlos(self, h1: float, h2: float) -> None:
+        """Update projected velocities for all stored surface intersections.
+
+        Args:
+            h1 (float): First surface height divided by radius.
+            h2 (float): Second surface height divided by radius.
+        """
         self.vlos = [self.getvlos(x, h) for x, h in zip(self.xdisk, [h1, h1, h2, h2])]
 
     def get_Iunif(self, Mstar: float, Rc: float, pI: float,
                   Ienv: float, offvsys: float) -> np.ndarray:
+        """Build the intrinsic channel cube before final intensity scaling.
+
+        Args:
+            Mstar (float): Central stellar mass in solar masses.
+            Rc (float): Disk-envelope intensity transition radius in au.
+            pI (float): Radial intensity exponent, giving a factor of r**(-pI).
+            Ienv (float): Envelope-to-disk intensity ratio at Rc before final
+                intensity scaling.
+            offvsys (float): Offset from the reference systemic velocity in km/s.
+
+        Returns:
+            numpy.ndarray: Cube with shape (len(self.v_valid), len(self.yneed),
+            len(self.xneed)), combining surfaces and averaging finer grid layers.
+        """
         Iunif = 0
         for vlos_in, x_in in zip(self.vlos, self.xdisk):
             if vlos_in is None:
@@ -1050,6 +1240,17 @@ class ChannelFit(ReadFits):
 
     def rgi2d(self, xoff: float, yoff: float,
               I_in: np.ndarray) -> np.ndarray:
+        """Interpolate and shift each model channel onto the observational grid.
+
+        Args:
+            xoff (float): Model displacement along the x axis in au.
+            yoff (float): Model displacement along the y axis in au.
+            I_in (numpy.ndarray): Cube sampled on self.yneed and self.xneed.
+
+        Returns:
+            numpy.ndarray: Cube on the observational spatial grid, with zero
+            intensity outside the input grid.
+        """
         Iout = [None] * len(I_in)
         for i, c in enumerate(I_in):
             interp = RGI((self.yneed, self.xneed), c, method='linear',
@@ -1058,18 +1259,63 @@ class ChannelFit(ReadFits):
         Iout = np.array(Iout)
         return Iout
 
-    def get_scale(self, Iout) -> float:
+    def get_scale(self, Iout: np.ndarray) -> float:
+        """Calculate the least-squares intensity scale against the observed cube.
+
+        Args:
+            Iout (numpy.ndarray): Model cube matching self.data_valid in shape
+                and channel order.
+
+        Returns:
+            float: Dot product of model and data divided by the squared model
+            norm, or zero when that norm is zero.
+        """
         fg = np.sum(Iout * self.data_valid)
         ff = np.sum(Iout * Iout)
         scale = 0.0 if ff == 0 else fg / ff
-        return scale
+        return float(scale)
 
     def cubemodel(self, Mstar: float, Rc: float, cs: float,
                   h1: float = 0, h2: float = -1, pI: float = 0,
                   Rin: float = 0, Ienv: float = 0,
                   xoff: float = 0, yoff: float = 0, voff: float = 0,
                   incloff: float = 90, paoff: float = 0,
-                  convolving: bool = True):
+                  convolving: bool = True) -> np.ndarray:
+        """Generate a scaled channel cube using the prepared model grids.
+
+        Args:
+            Mstar (float): Central stellar mass in solar masses.
+            Rc (float): Disk outer radius and disk-envelope transition radius
+                in au.
+            cs (float): Gaussian velocity dispersion in km/s.
+            h1 (float, optional): First surface height divided by radius.
+                Negative values disable the surface. Defaults to 0.
+            h2 (float, optional): Second surface height divided by radius.
+                Negative values disable the surface. Defaults to -1.
+            pI (float, optional): Radial intensity exponent for r**(-pI).
+                Defaults to 0.
+            Rin (float, optional): Inner emission cutoff radius in au.
+                Defaults to 0.
+            Ienv (float, optional): Envelope-to-disk intensity ratio at Rc before
+                final intensity scaling. Defaults to 0.
+            xoff (float, optional): Model x displacement in au. Defaults to 0.
+            yoff (float, optional): Model y displacement in au. Defaults to 0.
+            voff (float, optional): Systemic-velocity offset in km/s. Defaults to 0.
+            incloff (float, optional): Offset from the makegrid inclination in
+                degrees. Defaults to 90.
+            paoff (float, optional): Offset from the makegrid position angle in
+                degrees. Defaults to 0.
+            convolving (bool, optional): Return the beam-convolved cube. False
+                returns the intrinsic cube with the same intensity scaling.
+                Defaults to True.
+
+        Returns:
+            numpy.ndarray: Model cube on the observational spatial grid for the
+            selected channels in self.v_valid.
+
+        Cached geometry and profiles are refreshed according to ``self.free``;
+        fixed parameters must already have their corresponding caches prepared.
+        """
         if self.free['paoff']:
             self.update_pa(paoff)
         if self.free['incloff']:
@@ -1107,26 +1353,27 @@ class ChannelFit(ReadFits):
             Iout = Iunif
         return Iout
 
-    def fitting(self, Mstar_range: list = [0.01, 10],
-                Rc_range: list = [1, 1000],
-                cs_range: list = [0.01, 1],
-                h1_range: list = [0.01, 1],
-                h2_range: list = [0.01, 1],
-                pI_range: list = [-2, 2],
-                Rin_range: list = [0, 1000],
-                Ienv_range: list = [0.01, 100],
-                xoff_range: list = [-100, 100],
-                yoff_range: list = [-100, 100],
-                voff_range: list = [-0.2, 0.2],
-                incl_range: list = [-45, 45],
-                pa_range: list = [-45, 45],
-                fixed_params: dict = {},
+    def fitting(self, Mstar_range: list[float] = [0.01, 10],
+                Rc_range: list[float] = [1, 1000],
+                cs_range: list[float] = [0.01, 1],
+                h1_range: list[float] = [0.01, 1],
+                h2_range: list[float] = [0.01, 1],
+                pI_range: list[float] = [-2, 2],
+                Rin_range: list[float] = [0, 1000],
+                Ienv_range: list[float] = [0.01, 100],
+                xoff_range: list[float] = [-100, 100],
+                yoff_range: list[float] = [-100, 100],
+                voff_range: list[float] = [-0.2, 0.2],
+                incl_range: list[float] = [-45, 45],
+                pa_range: list[float] = [-45, 45],
+                fixed_params: dict[str, float | None] = {},
                 filename: str = 'channelfit',
                 show: bool = False,
                 save_result: bool = True,
                 save_corner: bool = True,
                 print_result: bool = True,
-                kwargs_emcee_corner: dict = {}) -> dict:
+                kwargs_emcee_corner: dict[str, Any] = {}
+                ) -> dict[str, dict[str, float] | float | None]:
         """Fit the channel-map model parameters with MCMC.
 
         Args:
@@ -1205,14 +1452,34 @@ class ChannelFit(ReadFits):
         notfixed = np.equal(p_fixed, None)
         runfit = None in p_fixed
 
-        def chi2(q):
+        def chi2(q: list[float] | np.ndarray) -> float:
+            """Calculate chi-square with a correction for pixels per beam.
+
+            Args:
+                q (array-like): Full model parameter vector in self.paramkeys order,
+                    in physical units rather than logarithmic sampling coordinates.
+
+            Returns:
+                float: Noise- and beam-area-normalized squared residual sum, or
+                infinity if the model contains nonfinite values.
+            """
             model = self.cubemodel(*q)
             if not np.all(np.isfinite(model)):
                 return np.inf
             return np.nansum((self.data_valid - model)**2) \
                 / self.sigma**2 / self.pixperbeam
 
-        def reduced_chi2(q):
+        def reduced_chi2(q: list[float] | np.ndarray) -> float:
+            """Divide chi-square by the effective number of degrees of freedom.
+
+            Args:
+                q (array-like): Full model parameter vector in physical units and
+                    self.paramkeys order.
+
+            Returns:
+                float: Reduced chi-square, counting an extra fitted intensity scale
+                when moment-0 scaling is disabled. NaN for nonpositive degrees of freedom.
+            """
             n_data = np.count_nonzero(np.isfinite(self.data_valid)) \
                 / self.pixperbeam
             n_free = np.count_nonzero(notfixed)
@@ -1242,7 +1509,17 @@ class ChannelFit(ReadFits):
                 bar = tqdm(total=total)
                 bar.set_description('Within the ranges')
 
-            def lnprob(p):
+            def lnprob(p: np.ndarray) -> float:
+                """Evaluate the log likelihood after restoring fixed parameters.
+
+                Args:
+                    p (array-like): Free parameters in sampling coordinates, with Mstar,
+                        Rc, and Ienv represented by their base-10 logarithms when free.
+
+                Returns:
+                    float: Minus half the chi-square, or negative infinity if both
+                    surfaces are enabled and h1 exceeds h2.
+                """
                 if self.progressbar:
                     bar.update(1)
                 q = p_fixed.copy()
@@ -1281,7 +1558,17 @@ class ChannelFit(ReadFits):
             if kw.get('return_lnp', False):
                 self.lnp = mcmc[i_mcmc]
 
-            def get_p(i: int):
+            def get_p(i: int) -> np.ndarray:
+                """Restore a full physical parameter vector from an MCMC summary.
+
+                Args:
+                    i (int): Summary index: 0 for best-fit, 1 for lower, 2 for median,
+                        or 3 for upper values.
+
+                Returns:
+                    numpy.ndarray: Fixed and fitted parameters in self.paramkeys order,
+                    with logarithmic sampling coordinates converted to physical values.
+                """
                 p = p_fixed.copy()
                 p[notfixed] = mcmc[i]
                 p[ilog] = 10**p[ilog]
@@ -1323,7 +1610,20 @@ class ChannelFit(ReadFits):
         return {'popt': self.popt, 'plow': self.plow, 'pmid': self.pmid,
                 'phigh': self.phigh, 'chi2r': getattr(self, 'chi2r', None)}
 
-    def make_model_products(self, **kwargs):
+    def make_model_products(self, **kwargs: float
+                            ) -> dict[str, np.ndarray | fits.Header]:
+        """Build model and residual cubes with an adjusted FITS header.
+
+        Args:
+            **kwargs: Parameters passed to cubemodel. Uses self.popt when no
+                parameters are supplied; supplied values replace that dictionary.
+
+        Returns:
+            dict: Cubes under ``model``, ``residual``, and ``beforeconvolving``,
+            plus the cropped-grid FITS ``header``. Unmodeled channels contain NaN.
+
+        All model parameters are marked free to refresh cached model quantities.
+        """
         h = self.header.copy()
         h['NAXIS1'] = len(self.x)
         h['NAXIS2'] = len(self.y)
@@ -1339,7 +1639,15 @@ class ChannelFit(ReadFits):
         m = self.cubemodel(**p)
         m0 = self.cubemodel(**p, convolving=False)
 
-        def concat(m):
+        def concat(m: np.ndarray) -> np.ndarray:
+            """Restore omitted velocity channels as NaN planes.
+
+            Args:
+                m (numpy.ndarray): Model cube containing the selected velocity channels.
+
+            Returns:
+                numpy.ndarray: Cube covering self.v, with NaN in excluded channels.
+            """
             if len(self.v_red) > 0:
                 m_blue = m[self.v_valid < np.min(self.v_red)]
             else:
@@ -1370,7 +1678,7 @@ class ChannelFit(ReadFits):
                 'beforeconvolving': concat(m0),
                 'header': h}
 
-    def modeltofits(self, filehead: str = 'best', **kwargs) -> None:
+    def modeltofits(self, filehead: str = 'best', **kwargs: float) -> None:
         """Write the best-fit model and residual cubes to FITS files.
 
         Args:
@@ -1382,7 +1690,15 @@ class ChannelFit(ReadFits):
         w = wcs.WCS(naxis=3)
         products = self.make_model_products(**kwargs)
 
-        def tofits(d: np.ndarray, ext: str):
+        def tofits(d: np.ndarray, ext: str) -> None:
+            """Write one model product using its adjusted FITS metadata.
+
+            Args:
+                d (numpy.ndarray): Cube to write.
+                ext (str): Product suffix in the output name filehead.ext.fits.
+                    For ``'beforeconvolving'``, set units to Jy/pixel and remove beam
+                    metadata. Existing files are overwritten.
+            """
             h = products['header'].copy()
             if ext == 'beforeconvolving':
                 h['BUNIT'] = 'Jy/pixel'
@@ -1463,7 +1779,17 @@ class ChannelFit(ReadFits):
         plt.close()
 
     def plotdecon(self, filehead: str = 'test', save: bool = True,
-                  show: bool = False):
+                  show: bool = False) -> None:
+        """Plot the deconvolved moment-0 map and its residual in noise units.
+
+        Args:
+            filehead (str, optional): Prefix for the output figures, saved as
+                filehead.decon.png and filehead.resdecon.png. Defaults to ``'test'``.
+            save (bool, optional): Save the figures. Defaults to True.
+            show (bool, optional): Display the figures. Defaults to False.
+
+        Prints a message and returns if deconvolution products are unavailable.
+        """
         if not (hasattr(self, 'mom0decon') and hasattr(self, 'resdecon')):
             print('No deconvolution solutions and residual generated.')
             return
