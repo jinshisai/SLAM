@@ -7,7 +7,7 @@ authors:
   - family-names: Sai
     given-names: Jinshi
     orcid: https://orcid.org/0000-0003-4361-5577
-title: SLAM v2.1.0
-version: 2.1.0
+title: SLAM v2.1.1
+version: 2.1.1
 date-released: 2026-09-29
 url: https://github.com/jinshisai/SLAM
