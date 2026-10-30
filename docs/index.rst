@@ -6,11 +6,43 @@
 SLAM: Spectral Line Analysis/Modeling
 =====================================
 
-**SLAM (Spectral Line Analysis/Modeling)** is a Python library for analyzing and modeling spectral line data at (sub)millimeter wavelengths, with a particular focus on rotational motions around (proto)stellar objects. The second release includes several packages for deriving rotation curves and estimating the dynamical mass of the central object. Details of the methods are presented `Aso & Sai (2024) <https://ui.adsabs.harvard.edu/abs/2024PKAS...39...27A/abstract>`_ and Aso, Sai et al. (2026) in prep.
+**SLAM (Spectral Line Analysis/Modeling)** is a Python library for analyzing and modeling spectral line data at (sub)millimeter wavelengths, with a particular focus on rotational motions of disks around (proto)stellar objects. The second release includes several packages for deriving rotation curves and estimating the dynamical mass of the central object. Details of the methods are presented `Aso & Sai (2024) <https://ui.adsabs.harvard.edu/abs/2024PKAS...39...27A/abstract>`_ and Aso, Sai et al. (2026 in prep).
 
 
 Installation
 ==================
+
+**Stable versions**
+
+You can install stable versions of SLAM with :code:`pip`
+
+::
+
+   pip install slam-astro
+
+
+or :code:`conda install` through conda-forge.
+
+::
+
+   conda install slam-astro
+
+To update,
+
+::
+
+   pip install --upgrade slam-astro
+
+or
+
+::
+
+   conda update slam-astro
+
+
+**git clone**
+
+You can also install SLAM with :code:`git clone`.
 
 In a local directory where you would like to install SLAM, type
 
@@ -24,9 +56,6 @@ Also, setting the path in .bashrc (or .zshrc etc.) will be useful.
 
    export PYTHONPATH=${PYTHONPATH}:/YOUR_PATH_TO/SLAM
 
-
-Versions
-==================
 
 The latest stable version is |release|.
 

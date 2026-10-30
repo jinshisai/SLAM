@@ -1,11 +1,16 @@
-[![Documentation Status](https://readthedocs.org/projects/slam-astro/badge/?version=latest)](https://slam-astro.readthedocs.io/en/latest/?badge=latest)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23053006.svg)](https://doi.org/10.5281/zenodo.23053006)
+<div align="center">
+  <br>
+  <img src="docs/images/SLAM_logo_bg.png" alt="SLAM logo" width="800">
+  <br><br>
+  <a href="https://slam-astro.readthedocs.io/en/latest/?badge=latest">
+    <img src="https://readthedocs.org/projects/slam-astro/badge/?version=latest" alt="Documentation Status">
+  </a>
+  <a href="https://doi.org/10.5281/zenodo.23053006">
+    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.23053006.svg" alt="DOI">
+  </a>
+</div>
 
-
-# SLAM: Spectral Line Analysis/Modeling
-**SLAM (Spectral Line Analysis/Modeling)** is a Python library for analyzing and modeling spectral line data at (sub)millimeter wavelengths, with a particular focus on rotational motions around (proto)stellar objects. The current release (v2) includes several packages for deriving rotation curves and estimating the dynamical mass of the central object. Details of the methods are presented [Aso & Sai (2024)](https://ui.adsabs.harvard.edu/abs/2024PKAS...39...27A/abstract) and Aso, Sai et al. (2026) in prep.
-
-Documentation is available on [Read the Docs](https://slam-astro.readthedocs.io/en/latest/).
+**SLAM (Spectral Line Analysis/Modeling)** is a Python library for analyzing and modeling spectral line data at (sub)millimeter wavelengths, with a particular focus on rotational motions of disks around (proto)stellar objects. The current release (v2) includes several packages for deriving rotation curves and estimating the dynamical mass of the central object. Details of the methods are presented [Aso & Sai (2024)](https://ui.adsabs.harvard.edu/abs/2024PKAS...39...27A/abstract) and Aso, Sai et al. (2026 in prep).
 
 
 ## Features
@@ -30,10 +35,27 @@ For basic usages, please see `example_xxx.py` in this library, where xxx is the 
 * numpy>=2.0
 * scipy
 * tqdm
+
  
 ## Installation
- 
-You can install SLAM with `git clone`.
+
+**Stable versions**
+
+You can install stable versions of SLAM with `pip`
+
+```
+pip install slam-astro
+```
+
+or `conda install` through conda-forge.
+
+```
+conda install slam-astro
+```
+
+**git clone**
+
+You can also install SLAM with `git clone`.
 
 ```bash 
 git clone https://github.com/jinshisai/SLAM
@@ -45,12 +67,12 @@ To keep the library updated, type the command below in the directory SLAM, alway
 git pull
 ```
 
-Also, setting the path in .bashrc (or .zshrc etc.) will be useful.
+Also, if you install it with `git clone`, setting the path in .bashrc (or .zshrc etc.) will be useful.
 
 ```bash
 export PYTHONPATH=${PYTHONPATH}:/YOUR_PATH_TO/SLAM
-``` 
- 
+```
+
 ## Authors
 
 * *Jinshi Sai*, Kagoshima University (jinshi.sai@sci.kagoshima-u.ac.jp)
