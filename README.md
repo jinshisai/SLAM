@@ -1,6 +1,6 @@
 <div align="center">
   <br>
-  <img src="docs/images/SLAM_logo.svg" alt="SLAM logo" width="600">
+  <img src="docs/images/SLAM_logo.svg" alt="SLAM logo" width="600" style="background-color: #ffffff;">
   <br><br>
   <a href="https://slam-astro.readthedocs.io/en/latest/?badge=latest">
     <img src="https://readthedocs.org/projects/slam-astro/badge/?version=latest" alt="Documentation Status">
