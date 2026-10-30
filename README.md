@@ -5,8 +5,8 @@
   <a href="https://slam-astro.readthedocs.io/en/latest/?badge=latest">
     <img src="https://readthedocs.org/projects/slam-astro/badge/?version=latest" alt="Documentation Status">
   </a>
-  <a href="https://doi.org/10.5281/zenodo.23053006">
-    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.23053006.svg" alt="DOI">
+  <a href="https://doi.org/10.5281/zenodo.23791058">
+    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.23791058.svg" alt="DOI">
   </a>
 </div>
 
@@ -80,19 +80,19 @@ export PYTHONPATH=${PYTHONPATH}:/YOUR_PATH_TO/SLAM
 
 ## Citation
 
-If you use SLAM for publications, please cite Aso, Sai et al. (2026 in prep) after it comes out, as well as [the latest release in Zenodo](https://doi.org/10.5281/zenodo.23053006):
+If you use SLAM for publications, please cite Aso, Sai et al. (2026 in prep) after it comes out, as well as [the latest release in Zenodo](https://doi.org/10.5281/zenodo.7783867):
 
 ```
-@software{aso_2026_23053006,
+@software{aso_2026_23791058,
   author       = {Aso, Yusuke and
                   Sai, Jinshi},
   title        = {SLAM v2.1.1},
-  month        = sep,
+  month        = oct,
   year         = 2026,
   publisher    = {Zenodo},
   version      = {v2.1.1},
-  doi          = {10.5281/zenodo.23053006},
-  url          = {https://doi.org/10.5281/zenodo.23053006},
+  doi          = {10.5281/zenodo.23791058},
+  url          = {https://doi.org/10.5281/zenodo.23791058},
 }
 ```
 
