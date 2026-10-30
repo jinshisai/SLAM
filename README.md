@@ -1,6 +1,6 @@
 [![Documentation Status](https://readthedocs.org/projects/slam-astro/badge/?version=latest)](https://slam-astro.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23053006.svg)](https://doi.org/10.5281/zenodo.23053006)
-![SLAM logo](docs/images/logo.svg)
+![SLAM logo](docs/images/SLAM_logo.svg)
 
 
 # SLAM: Spectral Line Analysis/Modeling
