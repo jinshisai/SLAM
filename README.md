@@ -1,6 +1,12 @@
+<div align="center">
+  <img src="docs/images/SLAM_logo.svg" alt="SLAM logo" width="500">
+  <br><br>
+  <a ref="https://slam-astro.readthedocs.io/en/latest/?badge=latest"><img src="https://readthedocs.org/projects/slam-astro/badge/?version=latest" alt="Documentation Status"></a>
+  <a ref="https://doi.org/10.5281/zenodo.23053006"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.23053006.svg" alt="DOI"></a>
+</div>
+
 [![Documentation Status](https://readthedocs.org/projects/slam-astro/badge/?version=latest)](https://slam-astro.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23053006.svg)](https://doi.org/10.5281/zenodo.23053006)
-![SLAM logo](docs/images/SLAM_logo.svg)
 
 
 # SLAM: Spectral Line Analysis/Modeling
