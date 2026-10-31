@@ -2,6 +2,7 @@ from typing import Literal
 
 import numpy as np
 from astropy import constants, units
+from scipy.fft import irfft, next_fast_len, rfft
 from scipy.signal import convolve
 
 from pvfitting.grid import Nested3DGrid
@@ -14,6 +15,36 @@ au = units.au.to('m')
 GG = constants.G.si.value
 M_sun = constants.M_sun.si.value
 deg = units.deg.to('radian')
+
+
+class _PVRowConvolver:
+    """Evaluate one row of a zero-padded spatial convolution in 'same' mode.
+
+    Cache the beam's x transforms. For each input row, select the kernel row
+    that contributes to the requested output row, including the full-to-same
+    offset used by scipy.signal.convolve. No beam separability is assumed.
+    """
+
+    def __init__(self, shape: tuple[int, int], kernel: np.ndarray,
+                 row: int) -> None:
+        ny, nx = shape
+        ky, kx = kernel.shape
+        self.nfft = next_fast_len(nx + kx - 1, real=True)
+        full_row = row + (ky - 1) // 2
+        self.start = max(0, full_row - ky + 1)
+        self.stop = min(ny, full_row + 1)
+        self.crop = (kx - 1) // 2
+        self.nx = nx
+        rows = full_row - np.arange(self.start, self.stop)
+        self.weights = rfft(kernel[rows], n=self.nfft, axis=-1)
+
+    def __call__(self, cube: np.ndarray) -> np.ndarray:
+        transformed = rfft(cube[:, self.start:self.stop, :],
+                           n=self.nfft, axis=-1)
+        # The f-axis is the FT counterpart of the x-axis.
+        spectrum = np.einsum('vyf,yf->vf', transformed, self.weights)
+        result = irfft(spectrum, n=self.nfft, axis=-1)
+        return result[:, self.crop:self.crop + self.nx]
 
 
 class MockPVD(object):
@@ -510,12 +541,15 @@ class MockPVD(object):
                 xb, yb = rot(*np.meshgrid(self.x, self.y), -np.radians(bpa - pa))
                 gaussbeam = np.exp2(-4 * ((xb / bmaj)**2 + (yb / bmin)**2))
                 gaussbeam /= np.sum(gaussbeam)
-                precalculation.gauss_xy = gaussbeam[np.newaxis, :, :]
+                precalculation.gauss_xy = gaussbeam
             g = precalculation.gauss_xy
-            I_cube = convolve(I_cube, g, mode='same')
-
-        # output
-        I_pv = I_cube[:, ny//2, :]
+            if getattr(self, '_pv_beam_kernel', None) is not g:
+                self._pv_row_convolver = _PVRowConvolver(I_cube.shape[1:],
+                                                         g, ny // 2)
+                self._pv_beam_kernel = g
+            I_pv = self._pv_row_convolver(I_cube)
+        else:
+            I_pv = I_cube[:, ny//2, :]
 
         if self.nsubgrid > 1:
             I_pv = np.nanmean(np.array([I_pv[:, i::self.nsubgrid]

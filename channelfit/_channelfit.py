@@ -1478,7 +1478,7 @@ class ChannelFit(ReadFits):
 
             Returns:
                 float: Reduced chi-square, counting an extra fitted intensity scale
-                when moment-0 scaling is disabled. NaN for nonpositive degrees of freedom.
+                when moment-0 scaling is disabled. Infinity for nonpositive degrees of freedom.
             """
             n_data = np.count_nonzero(np.isfinite(self.data_valid)) \
                 / self.pixperbeam
@@ -1486,7 +1486,7 @@ class ChannelFit(ReadFits):
             if 'mom0' not in self.scaling:
                 n_free += 1
             dof = n_data - n_free
-            return chi2(q) / dof if dof > 0 else np.nan
+            return chi2(q) / dof if dof > 0 else np.inf
 
         if runfit:
             ilog = np.array([0, 1, 7])

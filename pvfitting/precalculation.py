@@ -276,7 +276,7 @@ def XYZ2rtp(incl: float, phi: float,
     return r, t, p
 
 
-gauss_xy = None
+gauss_xy = None  # Shared spatial beam, shape (ny, nx); independent of velocity.
 gauss_v = None
 vedge = None
 

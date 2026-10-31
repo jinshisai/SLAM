@@ -1053,9 +1053,9 @@ class PVAnalysis():
             dof = len(args[0]) + len(args[3]) - len(plim[0])
             chi2 = -2 * lnprob(popt, *args)
             if ext == '_e':
-                self.chi2r_e = chi2 / dof
+                self.chi2r_e = chi2 / dof if dof > 0 else np.inf
             else:
-                self.chi2r_r = chi2 / dof
+                self.chi2r_r = chi2 / dof if dof > 0 else np.inf
 
         print(f'Corner plots in {outname}.corner_e.png '
               + f'and {outname}.corner_r.png')
