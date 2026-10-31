@@ -11,7 +11,7 @@ DEFAULT_NUMBA_THREAD_CAP = 4
 
 
 def resolve_num_threads(num_threads: int | Literal['all'] | None = None) -> int:
-    """Resolve the Numba thread budget used for PV integration.
+    """Resolve the Numba thread budget used for PV model calculations.
 
     Args:
         num_threads (int, str, or None, optional): Positive thread count,
@@ -404,7 +404,7 @@ def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: flo
     j_org[axis][l] = (np.log(radius_org) - lnr0) / dlnr + 0.5
 
 
-@jit(nopython=True)
+@jit(nopython=True, parallel=True)
 def _lookup_rho_vlos(i: np.ndarray, j_base: np.ndarray, radial_shift: float,
                      rho_jump: float, alphainfall: float,
                      er: np.ndarray, et: np.ndarray, ep: np.ndarray,
@@ -414,14 +414,14 @@ def _lookup_rho_vlos(i: np.ndarray, j_base: np.ndarray, radial_shift: float,
     """Fuse cached table lookups and projection without temporary cell arrays.
 
     Inputs are flattened geometry arrays and explicit two-dimensional tables.
-    The serial compiled loop leaves the existing Numba thread budget untouched.
+    Independent cells are evaluated in parallel under the caller's thread budget.
     Clipping, truncation, and arithmetic order match the NumPy implementation;
     fast-math transformations are deliberately disabled.
     """
     rho = np.empty(i.size, dtype=np.float64)
     vlos = np.empty(i.size, dtype=np.float64)
     last = density_env.shape[1] - 1
-    for cell in range(i.size):
+    for cell in prange(i.size):
         radial_index = j_base[cell] - radial_shift
         j = int(min(max(radial_index, 0.0), last))
         theta_index = i[cell]
@@ -436,7 +436,9 @@ def _lookup_rho_vlos(i: np.ndarray, j_base: np.ndarray, radial_shift: float,
 
 def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
                  axis: Literal['major', 'minor'],
-                 l: int) -> tuple[np.ndarray, np.ndarray]:
+                 l: int,
+                 num_threads: int | Literal['all'] | None = None
+                 ) -> tuple[np.ndarray, np.ndarray]:
     """Look up cached disk-envelope density and line-of-sight velocity.
 
     Args:
@@ -446,16 +448,19 @@ def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
         alphainfall (float): Scaling applied to radial infall velocity.
         axis (str): PV-cut axis used in :func:`update`.
         l (int): Nested-grid level used in :func:`update`.
+        num_threads (int, str, or None, optional): Thread budget accepted by
+            :func:`resolve_num_threads`. Defaults to None.
 
     Returns:
         tuple: Dimensionless density and line-of-sight velocity arrays for the
             requested grid level.
     """
     i = idx_t[axis][l]
-    rho, vlos = _lookup_rho_vlos(
-        i.ravel(), j_org[axis][l].ravel(), np.log(Rc) / dlnr,
-        rho_jump, alphainfall,
-        elos_r[axis][l].ravel(), elos_t[axis][l].ravel(),
-        elos_p[axis][l].ravel(), rho_env, rho_disk, vr_env, vt_env, vp_all,
-    )
+    with numba_thread_limit(num_threads):
+        rho, vlos = _lookup_rho_vlos(
+            i.ravel(), j_org[axis][l].ravel(), np.log(Rc) / dlnr,
+            rho_jump, alphainfall,
+            elos_r[axis][l].ravel(), elos_t[axis][l].ravel(),
+            elos_p[axis][l].ravel(), rho_env, rho_disk, vr_env, vt_env, vp_all,
+        )
     return rho.reshape(i.shape), vlos.reshape(i.shape)

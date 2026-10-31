@@ -96,7 +96,7 @@ class MockPVD(object):
         pa_minor (float, optional): Position angle of the positive minor-axis
             offset in degrees. Defaults to 90.
         num_threads (int, str, or None, optional): Number of Numba threads for
-            line-of-sight integration. None uses a conservative automatic
+            model lookup and line-of-sight integration. None uses an automatic
             budget; ``'all'`` uses every thread available to Numba. Defaults
             to None.
 
@@ -394,7 +394,8 @@ class MockPVD(object):
                 precalculation.update(r * Rc, t, p, irad, axis, l)
             r_org = precalculation.r_org[axis][l]
             # get density and velocity
-            rho, vlos = precalculation.get_rho_vlos(Rc, frho, alphainfall, axis, l)
+            rho, vlos = precalculation.get_rho_vlos(
+                Rc, frho, alphainfall, axis, l, num_threads=self.num_threads)
             vlos = vlos * vunit
 
             # inner and outer edge
