@@ -11,7 +11,7 @@ DEFAULT_NUMBA_THREAD_CAP = 4
 
 
 def resolve_num_threads(num_threads: int | Literal['all'] | None = None) -> int:
-    """Resolve the Numba thread budget used for PV integration.
+    """Resolve the Numba thread budget used for PV model calculations.
 
     Args:
         num_threads (int, str, or None, optional): Positive thread count,
@@ -276,34 +276,57 @@ def XYZ2rtp(incl: float, phi: float,
     return r, t, p
 
 
-gauss_xy = None
+gauss_xy = None  # Shared spatial beam, shape (ny, nx); independent of velocity.
 gauss_v = None
 vedge = None
 
 
 @jit(parallel=True)
-def _rho2tau_parallel(vlos: np.ndarray, rho: np.ndarray) -> np.ndarray:
-    """Integrate density into global velocity bins in parallel.
+def _rho2tau_parallel(vlos: np.ndarray, rho: np.ndarray,
+                      edges: np.ndarray) -> np.ndarray:
+    """Accumulate each cell into its velocity bin, parallel over sightlines.
 
     Args:
         vlos (np.ndarray): Line-of-sight velocity cube with shape
             ``(nx, ny, nz)``.
         rho (np.ndarray): Density cube with the same shape as ``vlos``.
+        edges (np.ndarray): Increasing velocity-bin edges, of length ``nv + 1``.
 
     Returns:
         np.ndarray: Density summed along z for every velocity channel, with
             shape ``(nv, ny, nx)``.
 
     Notes:
-        The module-level ``vedge`` array must contain ``nv + 1`` velocity-bin
-        edges before this internal JIT-compiled function is called.
+        Each sightline owns a distinct output column, so parallel additions
+        cannot race. Bins include their lower edge and exclude their upper
+        edge. Passing edges explicitly avoids freezing a global array at JIT
+        compilation time.
     """
-    nv = len(vedge) - 1
-    nx, ny, _ = np.shape(vlos)
+    nv = len(edges) - 1
+    nx, ny, nz = np.shape(vlos)
     tau = np.zeros((nv, ny, nx))
-    for i in prange(nv):
-        mask = (vedge[i] <= vlos) * (vlos < vedge[i + 1])
-        tau[i] = np.sum(mask * rho, axis=2).T
+    for sightline in prange(nx * ny):
+        x = sightline // ny
+        y = sightline % ny
+        nonfinite_density = False
+        for z in range(nz):
+            density = rho[x, y, z]
+            if not np.isfinite(density):
+                nonfinite_density = True
+            velocity = vlos[x, y, z]
+            if edges[0] <= velocity < edges[-1]:
+                channel = np.searchsorted(edges, velocity, side='right') - 1
+                tau[channel, y, x] += density
+        if nonfinite_density:
+            # Preserve the original mask * rho behavior, including 0 * NaN
+            # and 0 * inf, on exceptional sightlines.
+            for channel in range(nv):
+                total = 0.0
+                for z in range(nz):
+                    velocity = vlos[x, y, z]
+                    inside = edges[channel] <= velocity < edges[channel + 1]
+                    total += inside * rho[x, y, z]
+                tau[channel, y, x] = total
     return tau
 
 
@@ -327,14 +350,17 @@ def rho2tau(vlos: np.ndarray, rho: np.ndarray,
         calling this function.
     """
     with numba_thread_limit(num_threads):
-        return _rho2tau_parallel(vlos, rho)
+        return _rho2tau_parallel(vlos, rho, vedge)
 
 
 Nr = 1600
 lnr = np.linspace(np.log(1e-4), np.log(1e4), Nr)  # dr/r ~ dtheta ~ 0.01
 lnr0 = lnr[0]
-dlnr = np.exp(lnr[1] - lnr[0]) - 1
-Ntheta = int(np.pi / dlnr + 0.5)
+# Radial indices are linear in log(radius), not in fractional radius.
+dlnr = lnr[1] - lnr[0]
+# Keep the existing angular resolution independent of the indexing correction.
+fractional_dr = np.expm1(dlnr)
+Ntheta = int(np.pi / fractional_dr + 0.5)
 theta = np.linspace(0, np.pi, Ntheta)
 theta0 = theta[0]
 dtheta = theta[1] - theta[0]
@@ -378,10 +404,42 @@ def update(radius_org: np.ndarray, theta: np.ndarray, phi: np.ndarray, incl: flo
     j_org[axis][l] = (np.log(radius_org) - lnr0) / dlnr + 0.5
 
 
+@jit(nopython=True, parallel=True)
+def _lookup_rho_vlos(i: np.ndarray, j_base: np.ndarray, radial_shift: float,
+                     rho_jump: float, alphainfall: float,
+                     er: np.ndarray, et: np.ndarray, ep: np.ndarray,
+                     density_env: np.ndarray, density_disk: np.ndarray,
+                     velocity_r: np.ndarray, velocity_t: np.ndarray,
+                     velocity_p: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Fuse cached table lookups and projection without temporary cell arrays.
+
+    Inputs are flattened geometry arrays and explicit two-dimensional tables.
+    Independent cells are evaluated in parallel under the caller's thread budget.
+    Clipping, truncation, and arithmetic order match the NumPy implementation;
+    fast-math transformations are deliberately disabled.
+    """
+    rho = np.empty(i.size, dtype=np.float64)
+    vlos = np.empty(i.size, dtype=np.float64)
+    last = density_env.shape[1] - 1
+    for cell in prange(i.size):
+        radial_index = j_base[cell] - radial_shift
+        j = int(min(max(radial_index, 0.0), last))
+        theta_index = i[cell]
+        rho[cell] = (density_env[theta_index, j]
+                     + density_disk[theta_index, j] * rho_jump)
+        vr = velocity_r[theta_index, j] * alphainfall
+        vt = velocity_t[theta_index, j]
+        vp = velocity_p[theta_index, j]
+        vlos[cell] = vr * er[cell] + vt * et[cell] + vp * ep[cell]
+    return rho, vlos
+
+
 def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
                  axis: Literal['major', 'minor'],
-                 l: int) -> tuple[np.ndarray, np.ndarray]:
-    """Interpolate cached disk-envelope density and line-of-sight velocity.
+                 l: int,
+                 num_threads: int | Literal['all'] | None = None
+                 ) -> tuple[np.ndarray, np.ndarray]:
+    """Look up cached disk-envelope density and line-of-sight velocity.
 
     Args:
         Rc (float): Centrifugal radius in the same unit as the radii cached by
@@ -390,18 +448,19 @@ def get_rho_vlos(Rc: float, rho_jump: float, alphainfall: float,
         alphainfall (float): Scaling applied to radial infall velocity.
         axis (str): PV-cut axis used in :func:`update`.
         l (int): Nested-grid level used in :func:`update`.
+        num_threads (int, str, or None, optional): Thread budget accepted by
+            :func:`resolve_num_threads`. Defaults to None.
 
     Returns:
         tuple: Dimensionless density and line-of-sight velocity arrays for the
             requested grid level.
     """
     i = idx_t[axis][l]
-    j = j_org[axis][l] - np.log(Rc) / dlnr
-    j = np.clip(j, 0, Nr - 1)
-    j = j.astype(int)
-    rho = rho_env[i, j] + rho_disk[i, j] * rho_jump
-    vr = vr_env[i, j] * alphainfall
-    vt = vt_env[i, j]
-    vp = vp_all[i, j]
-    vlos = vr * elos_r[axis][l] + vt * elos_t[axis][l] + vp * elos_p[axis][l]
-    return rho, vlos
+    with numba_thread_limit(num_threads):
+        rho, vlos = _lookup_rho_vlos(
+            i.ravel(), j_org[axis][l].ravel(), np.log(Rc) / dlnr,
+            rho_jump, alphainfall,
+            elos_r[axis][l].ravel(), elos_t[axis][l].ravel(),
+            elos_p[axis][l].ravel(), rho_env, rho_disk, vr_env, vt_env, vp_all,
+        )
+    return rho.reshape(i.shape), vlos.reshape(i.shape)

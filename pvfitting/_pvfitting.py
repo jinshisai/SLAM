@@ -287,14 +287,14 @@ class PVFitting(ReadFits):
 
             Returns:
                 float: Reduced chi-square, including the fitted intensity scale in
-                the free-parameter count. NaN for nonpositive degrees of freedom.
+                the free-parameter count. Infinity for nonpositive degrees of freedom.
             """
             n_data = np.count_nonzero(np.isfinite(majobs)) \
                 + np.count_nonzero(np.isfinite(minobs))
             n_data = n_data / np.sqrt(Rarea)
             n_free = np.count_nonzero(notfixed) + 1  # +1 is due to fflux
             dof = n_data - n_free
-            return float(chi2(q) / dof) if dof > 0 else np.nan
+            return float(chi2(q) / dof) if dof > 0 else np.inf
 
         runfit = None in p_fixed
         if runfit:

@@ -463,7 +463,8 @@ class VelGrad(ReadFits):
         self.dxoff, self.dyoff, self.dpa_grad = perr
         self.kepler = {'xc': xc, 'dxc': dxc, 'yc': yc, 'dyc': dyc}
         dof = len(xc[~np.isnan(xc)]) - (1. if fixcenter else 3.)
-        self.chi2r_grad = chi2(popt, xc, yc, dxc, dyc) / dof
+        self.chi2r_grad = (chi2(popt, xc, yc, dxc, dyc) / dof
+                           if dof > 0 else np.inf)
 
         if save_points:
             self.write_points(filename=filename, print_result=print_result)
@@ -604,7 +605,7 @@ class VelGrad(ReadFits):
             if return_lnp:
                 self.lnp_mstar = mcmc[i_mcmc]
             dof = len(v) - len(popt)
-            self.chi2r_mstar = -2. * lnprob(popt) / dof
+            self.chi2r_mstar = -2. * lnprob(popt) / dof if dof > 0 else np.inf
             if voff_fixed is not None:
                 popt = np.r_[popt, 0]
                 perr = np.r_[perr, 0]
