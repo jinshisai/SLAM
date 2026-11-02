@@ -358,9 +358,10 @@ lnr = np.linspace(np.log(1e-4), np.log(1e4), Nr)  # dr/r ~ dtheta ~ 0.01
 lnr0 = lnr[0]
 # Radial indices are linear in log(radius), not in fractional radius.
 dlnr = lnr[1] - lnr[0]
-# Keep the existing angular resolution independent of the indexing correction.
+# Match angular arc spacing to the fractional_dr = (r_(i+1) - r_i) / r_i.
 fractional_dr = np.expm1(dlnr)
-Ntheta = int(np.pi / fractional_dr + 0.5)
+# Include both endpoints: the number of points is one more than the intervals.
+Ntheta = int(np.pi / fractional_dr + 0.5) + 1
 theta = np.linspace(0, np.pi, Ntheta)
 theta0 = theta[0]
 dtheta = theta[1] - theta[0]
