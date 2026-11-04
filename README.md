@@ -2,16 +2,13 @@
   <br>
   <img src="docs/images/SLAM_logo_bg.png" alt="SLAM logo" width="800">
   <br><br>
-  <a href="https://slam-astro.readthedocs.io/en/latest/?badge=latest">
-    <img src="https://readthedocs.org/projects/slam-astro/badge/?version=latest" alt="Documentation Status">
-  </a>
-  <a href="https://doi.org/10.5281/zenodo.23791058">
-    <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.23791058.svg" alt="DOI">
-  </a>
+  <a href="https://slam-astro.readthedocs.io/en/latest/?badge=latest"><img src="https://app.readthedocs.org/projects/slam-astro/badge/?version=latest" alt="Documentation Status"></a>
+  <a href="https://doi.org/10.5281/zenodo.23791058"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.23791058.svg" alt="DOI"></a>
 </div>
 
 **SLAM (Spectral Line Analysis/Modeling)** is a Python library for analyzing and modeling spectral line data at (sub)millimeter wavelengths, with a particular focus on rotational motions of disks around (proto)stellar objects. The current release (v2) includes several packages for deriving rotation curves and estimating the dynamical mass of the central object. Details of the methods are presented [Aso & Sai (2024)](https://ui.adsabs.harvard.edu/abs/2024PKAS...39...27A/abstract) and Aso, Sai et al. (2026 in prep).
 
+Documentation is available on [Read the Docs](https://slam-astro.readthedocs.io/en/latest/).
 
 ## Features
 
