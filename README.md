@@ -2,7 +2,7 @@
   <br>
   <img src="docs/images/SLAM_logo_bg.png" alt="SLAM logo" width="800">
   <br><br>
-  <a href="https://slam-astro.readthedocs.io/en/latest/?badge=latest"><img src="https://readthedocs.org/projects/slam-astro/badge/?version=latest" alt="Documentation Status"></a>
+  <a href="https://slam-astro.readthedocs.io/en/latest/?badge=latest"><img src="https://app.readthedocs.org/projects/slam-astro/badge/?version=latest" alt="Documentation Status"></a>
   <a href="https://doi.org/10.5281/zenodo.23791058"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.23791058.svg" alt="DOI"></a>
 </div>
 
