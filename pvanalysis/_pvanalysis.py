@@ -266,18 +266,18 @@ class PVAnalysis():
                 res_red = [k[rel > 0][::redsign] for k in results]
                 res_blue = [k[rel < 0][::-redsign] for k in results]
                 ival = 0 if xv == 'xcut' else 1
-                # nan before turn over
-                if nanbeforemax:
-                    for a in [res_red[ival], res_blue[ival]]:
-                        if np.any(~np.isnan(a)):
-                            a[:np.nanargmax(np.abs(a))] = np.nan
-                # nan in opposite quadrant
+                # Exclude opposite quadrants before finding the turnover or crossing.
                 if nanopposite:
                     s = self.xsign if xv == 'xcut' else 1
                     a = res_red[ival]
                     a[a * s < 0] = np.nan
                     a = res_blue[ival]
                     a[a * s > 0] = np.nan
+                # nan before turn over
+                if nanbeforemax:
+                    for a in [res_red[ival], res_blue[ival]]:
+                        if np.any(~np.isnan(a)):
+                            a[:np.nanargmax(np.abs(a))] = np.nan
                 # remove points outside Mlim
                 if len(self.Mlim) == 2:
                     for a in [res_red, res_blue]:
