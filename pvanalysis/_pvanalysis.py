@@ -1494,10 +1494,10 @@ class PVAnalysis():
             self.get_range()
         xmin, xmax = self.rvlim[method][0]
         if loglog:
-            x = np.geomspace(xmin, xmax, 100)
+            x = np.geomspace(xmin, xmax, 10001)
             y = (fx_model(x) - fx_model(-x)) / 2.
         else:
-            x = np.linspace(-xmax, xmax, 101)
+            x = np.linspace(-xmax, xmax, 10001)
             x[(-xmin < x) * (x < xmin)] = None
             y = fx_model(self.xsign * x)
         if flipaxis:
