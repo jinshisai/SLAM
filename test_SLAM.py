@@ -216,7 +216,14 @@ def test_pvanalysis_posterior_outputs(tmp_path, monkeypatch, capsys):
     paths = [Path(prefix + '.popt_' + suffix + '.txt') for suffix in ('e', 'r')]
     before = [path.read_bytes() for path in paths]
     for path in paths:
-        np.testing.assert_allclose(np.loadtxt(path), np.array([maximum, low, mid, high]).T)
+        table = np.loadtxt(path)
+        assert table.shape == (8, 4)
+        np.testing.assert_allclose(table[:5], np.array([maximum, low, mid, high]).T)
+        method = 'edge' if path.name.endswith('_e.txt') else 'ridge'
+        expected_masses = np.array([obj.mass_summaries[method][name][[2, 0, 1]]
+                                    for name in ('popt', 'plow', 'pmid', 'phigh')]).T
+        np.testing.assert_allclose(table[5:], expected_masses)
+        assert path.read_text().splitlines()[9].startswith('#Mass rows: M_b,M_in,M_out')
         assert '#Rows:Rb,Vb,p_in,dp,dVsys' in path.read_text()
     np.testing.assert_allclose(result['edge']['popt'], mid)
     np.testing.assert_allclose(result['edge']['perr'], (high-low)/2)

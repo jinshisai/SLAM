@@ -21,7 +21,8 @@
 successful fit. The prefix follows `outname`, just like the corner plots.
 Skipped fits do not write files; existing files are not removed.
 
-Each file has rows `Rb, Vb, p_in, dp, dVsys` and columns
+Each file has parameter rows `Rb, Vb, p_in, dp, dVsys` followed by a one-line
+mass note and rows `M_b, M_in, M_out` (in solar masses), with columns
 `popt, plow, pmid, phigh`: maximum posterior probability, 16th percentile,
 median, and 84th percentile. Radius is in au and velocity is in km/s;
 `dVsys` is an offset from the input systemic velocity. Fixed parameters have
@@ -57,5 +58,9 @@ All values use `value +/- error` formatting. Mass posterior summaries remain
 available for inspection but are not used for the `pmid` terminal report. These are reference Keplerian masses where the index differs
 from 0.5. Distance and inclination are held fixed in this posterior calculation.
 
-The parameter files contain fitted parameters only. `fit_linear` retains its
-existing workflow and does not produce these posterior files.
+The mass rows always contain the best-model mass in `popt` and the mass
+posterior percentiles in `plow, pmid, phigh`, independently of `best`. Thus their
+`pmid` column differs in definition from the legacy `best='pmid'` terminal
+mass calculation. `np.loadtxt` returns an 8-by-4 table, ignoring the comment
+note between the parameter and mass blocks. `fit_linear` retains its existing
+workflow and does not produce these posterior files.

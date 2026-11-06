@@ -1089,11 +1089,14 @@ class PVAnalysis():
         self.popt = {'edge': popt_e, 'ridge': popt_r}
         for key, suffix in [('edge', 'e'), ('ridge', 'r')]:
             with open(str(outname) + '.popt_' + suffix + '.txt', 'w') as f:
-                f.write('#Rows:Rb,Vb,p_in,dp,dVsys\n')
+                f.write('#Rows:Rb,Vb,p_in,dp,dVsys,M_b,M_in,M_out\n')
                 f.write('#Columns:popt,plow,pmid,phigh\n')
-                f.write('#Units:au,km/s,dimensionless,dimensionless,km/s\n')
+                f.write('#Units:au,km/s,dimensionless,dimensionless,km/s,Msun,Msun,Msun\n')
                 f.write('#dVsys is relative to the input systemic velocity.\n')
                 np.savetxt(f, np.array([self.fit_summaries[key][name]
+                                        for name in ('popt', 'plow', 'pmid', 'phigh')]).T)
+                f.write('#Mass rows: M_b,M_in,M_out (Msun); popt uses the best-fit model, plow/pmid/phigh are mass-posterior percentiles.\n')
+                np.savetxt(f, np.array([self.mass_summaries[key][name][[2, 0, 1]]
                                         for name in ('popt', 'plow', 'pmid', 'phigh')]).T)
         print(f'Fitting results in {outname}.popt_e.txt '
               + f'and {outname}.popt_r.txt.')
