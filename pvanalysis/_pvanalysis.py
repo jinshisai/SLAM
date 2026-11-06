@@ -266,18 +266,18 @@ class PVAnalysis():
                 res_red = [k[rel > 0][::redsign] for k in results]
                 res_blue = [k[rel < 0][::-redsign] for k in results]
                 ival = 0 if xv == 'xcut' else 1
-                # nan before turn over
-                if nanbeforemax:
-                    for a in [res_red[ival], res_blue[ival]]:
-                        if np.any(~np.isnan(a)):
-                            a[:np.nanargmax(np.abs(a))] = np.nan
-                # nan in opposite quadrant
+                # Exclude opposite quadrants before finding the turnover or crossing.
                 if nanopposite:
                     s = self.xsign if xv == 'xcut' else 1
                     a = res_red[ival]
                     a[a * s < 0] = np.nan
                     a = res_blue[ival]
                     a[a * s > 0] = np.nan
+                # nan before turn over
+                if nanbeforemax:
+                    for a in [res_red[ival], res_blue[ival]]:
+                        if np.any(~np.isnan(a)):
+                            a[:np.nanargmax(np.abs(a))] = np.nan
                 # remove points outside Mlim
                 if len(self.Mlim) == 2:
                     for a in [res_red, res_blue]:
@@ -854,7 +854,8 @@ class PVAnalysis():
                       show_corner: bool = False,
                       return_chain: bool = False,
                       return_lnp: bool = False,
-                      calc_evidence: bool = False
+                      calc_evidence: bool = False,
+                      best: str = 'pmid'
                       ) -> dict[str, dict[str, np.ndarray]] | int:
         """Fit the edge and ridge points with a double power law using MCMC.
 
@@ -882,7 +883,8 @@ class PVAnalysis():
                 Defaults to [0, 10].
             vsys_range (list or numpy.ndarray, optional): Prior range of the systemic-velocity
                 offset in km/s. Defaults to [-1, 1].
-            outname (str, optional): Prefix for edge and ridge corner plots.
+            outname (str, optional): Prefix for corner plots and the always-written
+                ``.popt_e.txt`` and ``.popt_r.txt`` parameter summaries.
                 Defaults to ``'pvanalysis'``.
             rangelevel (float, optional): Fraction of samples displayed in the
                 corner plots. Defaults to 0.8.
@@ -892,14 +894,26 @@ class PVAnalysis():
                 chains in ``self.chain``. Defaults to False.
             return_lnp (bool, optional): Whether to store log probabilities in
                 ``self.lnp``. Defaults to False.
+            best (str, optional): Display estimator, 'popt' for maximum posterior
+                probability or 'pmid' for marginal medians (the default). Files
+                always contain both estimators and the 16th/84th percentiles.
+                Joint samples also populate ``mass_samples`` (rows M_in, M_out,
+                M_b) and ``mass_summaries`` for each of edge and ridge.
             calc_evidence (bool, optional): Whether to calculate and print the
                 Bayesian evidence using dynesty.DynamicNestedSampler. Defaults to False.
 
         Returns:
             dict or int: Edge and ridge best-fit parameters and uncertainties.
+            For compatibility, returned ``popt`` and ``self.popt`` retain marginal
+            medians with symmetric half-percentile-width errors regardless of best.
+            Full summaries are available in ``self.fit_summaries``.
             Each parameter vector is ``[r_break, v_break, p_in, dp, vsys]``.
             Returns -1 when no edge or ridge points are available.
         """
+        self._select_best(best)
+        self.fit_summaries = {}
+        self.mass_samples = {}
+        self.mass_summaries = {}
         res_org = self.results_filtered
         Ds = [None, None]
         for i, er in enumerate(['edge', 'ridge']):
@@ -918,7 +932,7 @@ class PVAnalysis():
                 or (len(Rs[0]) == 0 and len(Rs[3]) == 0):
             if len(Es[0]) == 0 and len(Es[3]) == 0:
                 print('No edge point was found.')
-            if len(Rs[0]) == 0 and len(Es[3]) == 0:
+            if len(Rs[0]) == 0 and len(Rs[3]) == 0:
                 print('No ridge point was found.')
             print('Skip the fitting to edge/ridge points.')
             self.popt = {'edge': [[np.nan] * 5, [np.nan] * 5],
@@ -1033,13 +1047,26 @@ class PVAnalysis():
                                 figname=outname+'.corner'+ext+'.png',
                                 show_corner=show_corner,
                                 ndata=len(args[0]) + len(args[3]),
-                                return_chain=return_chain,
+                                simpleoutput=False, return_chain=True,
                                 return_lnp=return_lnp)
-            popt, perr = mcmc[:2]
-            i_mcmc = 2
+            summaries = {}
+            for name, values in zip(('popt', 'plow', 'pmid', 'phigh'), mcmc[:4]):
+                full = q0.copy()
+                full[include] = values
+                summaries[name] = full
+            self.fit_summaries[key] = summaries
+            samples = np.broadcast_to(q0[:, None], (5, mcmc[4].shape[1])).copy()
+            samples[include] = mcmc[4]
+            self.mass_samples[key] = self._masses(key, samples)
+            self.mass_summaries[key] = {
+                name: np.percentile(self.mass_samples[key], percentile, axis=1)
+                for name, percentile in [('plow', 16), ('pmid', 50), ('phigh', 84)]}
+            self.mass_summaries[key]['popt'] = self._masses(key, summaries['popt'])
+            popt = summaries['pmid'][include]
+            perr = (summaries['phigh'][include] - summaries['plow'][include]) / 2
+            i_mcmc = 5
             if return_chain:
-                self.chain[key] = mcmc[i_mcmc]
-                i_mcmc += 1
+                self.chain[key] = mcmc[4]
             if return_lnp:
                 self.lnp[key] = mcmc[i_mcmc]
             if calc_evidence:
@@ -1051,7 +1078,7 @@ class PVAnalysis():
             (qerr := q0 * 0)[np.isnan(q0)] = perr
             res[:] = [qopt, qerr]
             dof = len(args[0]) + len(args[3]) - len(plim[0])
-            chi2 = -2 * lnprob(popt, *args)
+            chi2 = -2 * lnprob(summaries[self.best][include], *args)
             if ext == '_e':
                 self.chi2r_e = chi2 / dof if dof > 0 else np.inf
             else:
@@ -1060,6 +1087,22 @@ class PVAnalysis():
         print(f'Corner plots in {outname}.corner_e.png '
               + f'and {outname}.corner_r.png')
         self.popt = {'edge': popt_e, 'ridge': popt_r}
+        for key, suffix in [('edge', 'e'), ('ridge', 'r')]:
+            with open(str(outname) + '.popt_' + suffix + '.txt', 'w') as f:
+                f.write('#Rows:Rb,Vb,p_in,dp,dVsys,M_b,M_in,M_out\n')
+                f.write('#Columns:popt,plow,pmid,phigh\n')
+                f.write('#Units:au,km/s,dimensionless,dimensionless,km/s,Msun,Msun,Msun\n')
+                f.write('#dVsys is relative to the input systemic velocity.\n')
+                np.savetxt(f, np.array([self.fit_summaries[key][name]
+                                        for name in ('popt', 'plow', 'pmid', 'phigh')]).T)
+                f.write('#Mass rows: M_b,M_in,M_out (Msun);'
+                        + ' popt uses the best-fit model, plow/pmid/phigh'
+                        + ' are mass-posterior percentiles.\n')
+                np.savetxt(f, np.array([self.mass_summaries[key][name][[2, 0, 1]]
+                                        for name in ('popt', 'plow', 'pmid', 'phigh')]).T)
+        print(f'Fitting results in {outname}.popt_e.txt '
+              + f'and {outname}.popt_r.txt.')
+        self.get_range()
         result = {'edge': {'popt': popt_e[0], 'perr': popt_e[1]},
                   'ridge': {'popt': popt_r[0], 'perr': popt_r[1]}}
         return result
@@ -1079,6 +1122,9 @@ class PVAnalysis():
             the edge arrays contain NaNs. Returns -1 when no points are
             available.
         """
+        self.fit_summaries = {}
+        self.mass_samples = {}
+        self.mass_summaries = {}
         res_org = self.results_filtered
         Ds = [None, None]
         for i, er in enumerate(['edge', 'ridge']):
@@ -1247,51 +1293,77 @@ class PVAnalysis():
             'rlim' is a list of [r_minimum, r_maximum].
             'vlim' is a list of [v_minimum, v_maximum].
         """
-        def inout(v0: np.ndarray, x1: np.ndarray, dx1: np.ndarray,
-                  x0: np.ndarray, v1: np.ndarray, dv1: np.ndarray,
-                  popt: list[float] | np.ndarray) -> list[list[float]]:
-            """Estimate inner and outer radius-velocity pairs from points and a model.
-
-            Args:
-                v0 (numpy.ndarray): Velocities of position-cut points in km/s.
-                x1 (numpy.ndarray): Positions of position-cut points in au.
-                dx1 (numpy.ndarray): Position uncertainties, unused in this calculation.
-                x0 (numpy.ndarray): Positions of velocity-cut points in au.
-                v1 (numpy.ndarray): Velocities of velocity-cut points in km/s.
-                dv1 (numpy.ndarray): Velocity uncertainties, unused in this calculation.
-                popt (list[float] or numpy.ndarray): Model parameters ordered as
-                    r_break, v_break, p_in, dp, and vsys.
-
-            Returns:
-                list: [[inner radius, outer radius], [inner velocity, outer velocity]]
-                in au and km/s. The enabled cut directions determine which limits
-                come from measured extrema and which are inferred from the model.
-            """
-            xall, vall = np.abs(np.r_[x0, x1]), np.abs(np.r_[v0, v1])
-            rin, rout = np.nan, np.nan
-            if len(xall) > 0:
-                rin, rout = np.min(xall), np.max(xall)
-            vin, vout = np.nan, np.nan
-            if len(vall) > 0:
-                vin, vout = np.max(vall), np.min(vall)
-            if self.__use_position:
-                rin = doublepower_r(vin, *popt)
-            else:
-                vin = doublepower_v(rin, *popt)
-            if self.__use_velocity:
-                vout = doublepower_v(rout, *popt)
-            else:
-                rout = doublepower_r(vout, *popt)
-            return [[float(rin), float(rout)], [float(vin), float(vout)]]
-        lims_e = inout(*self.__Es, self.popt['edge'][0])
-        lims_r = inout(*self.__Rs, self.popt['ridge'][0])
+        lims_e = self._range_for(*self.__Es, self._best_parameters('edge'))
+        lims_r = self._range_for(*self.__Rs, self._best_parameters('ridge'))
         self.rvlim = {'edge': lims_e, 'ridge': lims_r}
         result = {'edge': {'rlim': lims_e[0], 'vlim': lims_e[1]},
                   'ridge': {'rlim': lims_r[0], 'vlim': lims_r[1]}}
         return result
 
-    def output_fitresult(self) -> None:
-        """Output the fitting result in the terminal.
+    def _range_for(self, v0: np.ndarray, x1: np.ndarray, dx1: np.ndarray,
+                   x0: np.ndarray, v1: np.ndarray, dv1: np.ndarray,
+                   popt: list[float] | np.ndarray) -> list[list[float]]:
+        """Estimate inner and outer radius-velocity pairs from points and a model.
+
+        Args:
+            v0 (numpy.ndarray): Velocities of position-cut points in km/s.
+            x1 (numpy.ndarray): Positions of position-cut points in au.
+            dx1 (numpy.ndarray): Position uncertainties, unused in this calculation.
+            x0 (numpy.ndarray): Positions of velocity-cut points in au.
+            v1 (numpy.ndarray): Velocities of velocity-cut points in km/s.
+            dv1 (numpy.ndarray): Velocity uncertainties, unused in this calculation.
+            popt (list[float] or numpy.ndarray): Model parameters ordered as
+                r_break, v_break, p_in, dp, and vsys.
+
+        Returns:
+            list: [[inner radius, outer radius], [inner velocity, outer velocity]]
+            in au and km/s. The enabled cut directions determine which limits
+            come from measured extrema and which are inferred from the model.
+        """
+        xall, vall = np.abs(np.r_[x0, x1]), np.abs(np.r_[v0, v1])
+        rin, rout = np.nan, np.nan
+        if len(xall) > 0:
+            rin, rout = np.min(xall), np.max(xall)
+        vin, vout = np.nan, np.nan
+        if len(vall) > 0:
+            vin, vout = np.max(vall), np.min(vall)
+        if self.__use_position:
+            rin = doublepower_r(vin, *popt)
+        else:
+            vin = doublepower_v(rin, *popt)
+        if self.__use_velocity:
+            vout = doublepower_v(rout, *popt)
+        else:
+            rout = doublepower_r(vout, *popt)
+        return [[rin, rout], [vin, vout]]
+
+    def _select_best(self, best=None):
+        """Select display values without modifying stored posterior summaries."""
+        if best is not None:
+            if best not in ('popt', 'pmid'):
+                raise ValueError("best must be 'popt' or 'pmid'")
+            self.best = best
+        elif not hasattr(self, 'best'):
+            self.best = 'pmid'
+
+    def _best_parameters(self, method):
+        summaries = getattr(self, 'fit_summaries', {})
+        if method in summaries:
+            return summaries[method][self.best].copy()
+        return np.array(self.popt[method][0], copy=True)
+
+    def _masses(self, method, params):
+        """Evaluate joint samples using each sample's fitted range boundaries."""
+        data = self.__Es if method == 'edge' else self.__Rs
+        (rin, rout), (vin, vout) = self._range_for(*data, params)
+        rb, vb, _, _, offset = params
+        unit = self.__unit / self.dist
+        return np.array([kepler_mass(rin, vin - offset, unit),
+                         kepler_mass(rout, vout - offset, unit),
+                         kepler_mass(rb, vb, unit)])
+
+    def _output_median_fitresult(self) -> None:
+        """Report median-parameter masses and analytic errors using the original rules.
         """
         def _mass_error(r, v, mass, fixed_velocity, params):
             """Propagate local mass errors, neglecting parameter covariances."""
@@ -1346,6 +1418,49 @@ class PVAnalysis():
             print(f'M_out = {M_out:.3f} +/- {dM_out:.3f} Msun')
             print(f'M_b   = {M_b:.3f} +/- {dM_b:.3f} Msun')
 
+    def output_fitresult(self, best: str | None = None) -> None:
+        """Print selected parameters and masses with estimator-specific errors.
+
+        best selects 'popt' (maximum probability) or 'pmid' (median), and
+        persists for subsequent plots. None retains the current selection.
+        For pmid, preserve median-parameter masses and analytic symmetric errors.
+        For popt, use best-model masses and joint-posterior percentile bounds.
+        """
+        self._select_best(best)
+        self.get_range()
+        if self.best == 'pmid':
+            return self._output_median_fitresult()
+
+        def report(label, value, low, high, unit, digits):
+            minus, plus = max(value - low, 0), max(high - value, 0)
+            print(f'{label:<5} = {value:.{digits}f} '
+                  f'(-{minus:.{digits}f}, +{plus:.{digits}f}) {unit}')
+
+        for method in ('edge', 'ridge'):
+            if method not in getattr(self, 'fit_summaries', {}):
+                print(f'--- No {method} posterior result. ---')
+                continue
+            print(f'--- {method.title()} (best={self.best}) ---')
+            summary = self.fit_summaries[method]
+            values = self._best_parameters(method)
+            for j, (label, unit, digits) in enumerate(zip(
+                    ['R_b', 'V_b', 'p_in', 'dp', 'v_sys'],
+                    ['au', 'km/s', '', '', 'km/s'], [2, 3, 3, 3, 3])):
+                offset = self.vsys if j == 4 else 0
+                report(label, values[j] + offset,
+                       summary['plow'][j] + offset,
+                       summary['phigh'][j] + offset, unit, digits)
+            if values[3] == 0:
+                print('!!! Rb and Vb are reference values, not a break in single-power fitting. !!!')
+            (rin, rout), (vin, vout) = self.rvlim[method]
+            print(f'r     = {rin:.2f} --- {rout:.2f} au')
+            print(f'v     = {vout:.3f} --- {vin:.3f} km/s')
+            masses = self.mass_summaries[method]
+            central = masses[self.best]
+            for j, label in enumerate(['M_in', 'M_out', 'M_b']):
+                report(label, central[j], masses['plow'][j],
+                       masses['phigh'][j], 'Msun', 3)
+
     def plot_fitresult(self,
                        vlim: list[float] | np.ndarray = [0, 1e10],
                        xlim: list[float] | np.ndarray = [0, 1e10],
@@ -1363,7 +1478,8 @@ class PVAnalysis():
                        plotridgemodel: bool = True,
                        fmt: dict[str, str] = {'edge': 'v', 'ridge': 'o'},
                        linestyle: dict[str, str] = {'edge': '--', 'ridge': '-'},
-                       flipaxis: bool = False) -> None:
+                       flipaxis: bool = False,
+                       best: str | None = None) -> None:
         """Make linear and log-log PV diagrams with points and model lines.
 
         Args:
@@ -1400,12 +1516,17 @@ class PVAnalysis():
                 Defaults to {'edge': 'v', 'ridge': 'o'}.
             linestyle (dict, optional): Linestyle for plotting model lines.
                 Defaults to {'edge': '--', 'ridge': '-'}.
+            best (str or None, optional): 'popt' or 'pmid'. None retains the
+                selection from fitting or terminal reporting. Changing this
+                redraws models and ranges without resampling or rewriting files.
             flipaxis (bool, optional): Whether velocity is the horizontal axis
                 and position is the vertical axis. Defaults to False.
         """
+        self._select_best(best)
         if len(self.popt['ridge'][0]) == 5:
-            self.avevsys = (self.popt['edge'][0][4]
-                            + self.popt['ridge'][0][4]) / 2.
+            self.get_range()
+            self.avevsys = (self._best_parameters('edge')[4]
+                            + self._best_parameters('ridge')[4]) / 2.
             self.vsys_opt = self.vsys + self.avevsys
         else:
             self.vsys_opt = self.vsys
@@ -1475,7 +1596,7 @@ class PVAnalysis():
         if model is None:
             model = self.model
         if popt == []:
-            popt = self.popt[method][0].copy()
+            popt = self._best_parameters(method)
             if len(popt) == 5:
                 popt[4] -= self.avevsys
 
@@ -1494,10 +1615,10 @@ class PVAnalysis():
             self.get_range()
         xmin, xmax = self.rvlim[method][0]
         if loglog:
-            x = np.geomspace(xmin, xmax, 100)
+            x = np.geomspace(xmin, xmax, 10001)
             y = (fx_model(x) - fx_model(-x)) / 2.
         else:
-            x = np.linspace(-xmax, xmax, 101)
+            x = np.linspace(-xmax, xmax, 10001)
             x[(-xmin < x) * (x < xmin)] = None
             y = fx_model(self.xsign * x)
         if flipaxis:

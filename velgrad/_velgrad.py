@@ -775,7 +775,7 @@ class VelGrad(ReadFits):
             if vp.max() - vp.min() < 0.1:
                 vp = (vp.max() + vp.min()) / 2.
                 vp = np.array([vp - 0.05, vp + 0.05])
-            vp = np.geomspace(vp.min(), vp.max(), 100)
+            vp = np.geomspace(vp.min(), vp.max(), 10001)
             M_p, v_break, p_low, _ = self.popt
             rp = r_kep_out(vp, M_p, v_break, p_low, 0)
             ax.plot(rp, vp, 'g-', zorder=4)
