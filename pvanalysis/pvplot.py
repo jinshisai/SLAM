@@ -115,6 +115,8 @@ class PVPlot():
                  quadrant: Literal['13', '24'] | None = None,
                  loglog: bool = False) -> None:
         """Initialize a PV figure from a FITS file or supplied arrays."""
+        # list() not to modify the original input later on.
+        xlim, vlim = list(xlim), list(vlim)
         set_rcparams()
         if fig is None:
             fig = plt.figure(figsize=(7, 5))
