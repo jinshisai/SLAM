@@ -27,6 +27,7 @@ show_corner = True  # figures will be made regardless of this option.
 minabserr = 0.1  # minimum absolute errorbar in the unit of bmaj or dv.
 minrelerr = 0.01  # minimum relative errorbar.
 calc_evidence = False  # If calculate Bayesian evidence or not.
+best = 'pmid'  # 'popt': maximum probability; 'pmid': posterior medians.
 '------------------------'
 
 
@@ -44,7 +45,7 @@ impv.fit_edgeridge(include_vsys=include_vsys,
                    fixed_pin=fixed_pin, fixed_dp=fixed_dp,
                    outname=outname, rangelevel=0.8,
                    show_corner=show_corner,
-                   calc_evidence=calc_evidence)
+                   calc_evidence=calc_evidence, best=best)
 impv.output_fitresult()
 impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot, flipaxis=False,
                     clevels=[-9, -6, -3, 3, 6, 9], outname=outname,
