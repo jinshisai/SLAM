@@ -7,6 +7,7 @@ os.environ.setdefault(
 )
 
 import numpy as np
+import pytest
 
 from channelfit import ChannelFit
 from pvanalysis import PVAnalysis
@@ -173,13 +174,11 @@ def test_channelfit_makegrid_builds_deterministic_state():
     assert np.count_nonzero(np.isfinite(chan.mom0)) > 0
 
 
-def test_pvanalysis_posterior_outputs(tmp_path, monkeypatch, capsys):
-    """Joint samples drive files, asymmetric reports and selected model curves."""
+@pytest.fixture
+def posterior_fit(tmp_path, monkeypatch):
+    """Fit deterministic correlated samples without running MCMC."""
     import importlib
     from types import SimpleNamespace
-    import matplotlib.pyplot as plt
-    from pvanalysis.analysis_tools import doublepower_r, doublepower_v
-    from pvanalysis._pvanalysis import kepler_mass
 
     module = importlib.import_module('pvanalysis._pvanalysis')
     obj = PVAnalysis.__new__(PVAnalysis)
@@ -211,10 +210,24 @@ def test_pvanalysis_posterior_outputs(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(module, 'emcee_corner', sampler)
     prefix = str(tmp_path / 'pvanalysis')
     result = obj.fit_edgeridge(outname=prefix, include_pin=True,
-                              include_vsys=True, return_chain=True,
-                              return_lnp=True, best='popt')
+                               include_vsys=True, return_chain=True,
+                               return_lnp=True, best='popt')
+    return SimpleNamespace(obj=obj, module=module, samples=samples, maximum=maximum,
+                           low=low, mid=mid, high=high, lnp=lnp, result=result,
+                           prefix=prefix, empty=empty)
+
+
+def test_pvanalysis_posterior_outputs(posterior_fit):
+    obj = posterior_fit.obj
+    prefix = posterior_fit.prefix
+    maximum = posterior_fit.maximum
+    low = posterior_fit.low
+    mid = posterior_fit.mid
+    high = posterior_fit.high
+    result = posterior_fit.result
+    samples = posterior_fit.samples
+    lnp = posterior_fit.lnp
     paths = [Path(prefix + '.popt_' + suffix + '.txt') for suffix in ('e', 'r')]
-    before = [path.read_bytes() for path in paths]
     for path in paths:
         table = np.loadtxt(path)
         assert table.shape == (8, 4)
@@ -229,6 +242,14 @@ def test_pvanalysis_posterior_outputs(tmp_path, monkeypatch, capsys):
     np.testing.assert_allclose(result['edge']['perr'], (high-low)/2)
     np.testing.assert_array_equal(obj.chain['edge'], samples)
     np.testing.assert_array_equal(obj.lnp['ridge'], lnp)
+
+
+def test_pvanalysis_mass_posterior(posterior_fit):
+    obj = posterior_fit.obj
+    samples = posterior_fit.samples
+    from pvanalysis.analysis_tools import doublepower_r, doublepower_v
+    from pvanalysis._pvanalysis import kepler_mass
+
     expected = []
     for params in samples.T:
         rin = doublepower_r(3., *params)
@@ -239,6 +260,10 @@ def test_pvanalysis_posterior_outputs(tmp_path, monkeypatch, capsys):
     np.testing.assert_allclose(obj.mass_samples['edge'], np.array(expected).T)
     np.testing.assert_allclose(obj.mass_summaries['edge']['pmid'],
                                np.median(expected, axis=0))
+
+
+def test_pvanalysis_popt_report(posterior_fit, capsys):
+    obj = posterior_fit.obj
     capsys.readouterr()
     obj.output_fitresult(best='popt')
     output = capsys.readouterr().out
@@ -246,7 +271,14 @@ def test_pvanalysis_posterior_outputs(tmp_path, monkeypatch, capsys):
     assert 'R_b   = 90.00 (-53.60, +0.00)' in output
     assert 'dp    = 0.100 (-0.000, +0.268)' in output
     assert 'v_sys = 6.600' in output
-    assert f"M_b   = 1440.000" in output
+    assert "M_b   = 1440.000" in output
+
+
+def test_pvanalysis_mass_boundaries(posterior_fit):
+    obj = posterior_fit.obj
+    samples = posterior_fit.samples
+    from pvanalysis.analysis_tools import doublepower_r, doublepower_v
+    from pvanalysis._pvanalysis import kepler_mass
 
     # Vectorized mass boundaries must match scalar evaluation for each cut mode.
     for position, velocity in [(True, True), (True, False), (False, True)]:
@@ -265,16 +297,31 @@ def test_pvanalysis_posterior_outputs(tmp_path, monkeypatch, capsys):
     obj._PVAnalysis__use_position = True
     obj._PVAnalysis__use_velocity = True
 
+
+def test_pvanalysis_posterior_plot_selection(posterior_fit, monkeypatch):
+    obj = posterior_fit.obj
+    module = posterior_fit.module
+    prefix = posterior_fit.prefix
+    paths = [Path(prefix + '.popt_' + suffix + '.txt') for suffix in ('e', 'r')]
+    before = [path.read_bytes() for path in paths]
+    from types import SimpleNamespace
+    import matplotlib.pyplot as plt
+    from pvanalysis.analysis_tools import doublepower_r
+
     # Exercise the complete plotting entry point without image I/O.
     class Plot:
         def __init__(self, **kwargs):
             self.fig, self.ax = plt.subplots()
+
         def add_color(self, **kwargs):
             pass
+
         def add_contour(self, **kwargs):
             pass
+
         def set_axis(self):
             pass
+
         def savefig(self, **kwargs):
             curves.append(self.ax.lines[-1].get_ydata().copy())
             plt.close(self.fig)
@@ -282,15 +329,29 @@ def test_pvanalysis_posterior_outputs(tmp_path, monkeypatch, capsys):
     curves = []
     monkeypatch.setattr(module, 'PVPlot', Plot)
     obj.rms = .1
-    obj.fitsdata = SimpleNamespace(restfreq=1., beam=None, pa=0., data=None,
-                                  vaxis=None, xaxis=None, multibeam=False, header={})
+    obj.fitsdata = SimpleNamespace(
+        restfreq=1., beam=None, pa=0., data=None,
+        vaxis=None, xaxis=None, multibeam=False, header={})
     for best in ('popt', 'pmid'):
-        obj.plot_fitresult(best=best, show=False,
-                           plotedgepoint=False, plotridgepoint=False)
+        obj.plot_fitresult(
+            best=best, show=False,
+            plotedgepoint=False, plotridgepoint=False)
         assert obj.avevsys == obj.fit_summaries['edge'][best][4]
         np.testing.assert_allclose(obj.rvlim['edge'][0][0],
                                    doublepower_r(3., *obj.fit_summaries['edge'][best]))
     assert not np.allclose(curves[0], curves[2], equal_nan=True)
+    assert [path.read_bytes() for path in paths] == before
+
+
+def test_pvanalysis_median_report(posterior_fit, capsys):
+    obj = posterior_fit.obj
+    low = posterior_fit.low
+    mid = posterior_fit.mid
+    high = posterior_fit.high
+    from pvanalysis.analysis_tools import doublepower_r, doublepower_v
+    from pvanalysis._pvanalysis import kepler_mass
+
+    capsys.readouterr()
     obj.output_fitresult(best='pmid')
     median_output = capsys.readouterr().out
     assert 'R_b   = 50.00 +/- 13.60 au' in median_output
@@ -303,8 +364,8 @@ def test_pvanalysis_posterior_outputs(tmp_path, monkeypatch, capsys):
     assert capsys.readouterr().out == median_output
     obj.mass_summaries = saved_mass_summaries
     # Check the original local error propagation at both fitted boundaries.
-    from pvanalysis.analysis_tools import (doublepower_r_error,
-                                          doublepower_v_error, p_inout)
+    from pvanalysis.analysis_tools import (
+        doublepower_r_error, doublepower_v_error, p_inout)
     from pvanalysis._pvanalysis import kepler_mass_error
     errors = (high - low) / 2
     params = [*mid, *errors]
@@ -323,9 +384,19 @@ def test_pvanalysis_posterior_outputs(tmp_path, monkeypatch, capsys):
     for label, mass, error in [('M_in', m_in, dm_in),
                                ('M_out', m_out, dm_out), ('M_b', 200., dm_b)]:
         assert f'{label:<5} = {mass:.3f} +/- {error:.3f} Msun' in median_output
-    assert [path.read_bytes() for path in paths] == before
 
+
+def test_pvanalysis_fixed_posterior(posterior_fit, monkeypatch, capsys):
+    obj = posterior_fit.obj
+    module = posterior_fit.module
+    samples = posterior_fit.samples
+    maximum = posterior_fit.maximum
+    low = posterior_fit.low
+    mid = posterior_fit.mid
+    high = posterior_fit.high
+    prefix = posterior_fit.prefix
     # Fixed parameters occupy every summary and leave the opt-in chain unset.
+
     def fixed_sampler(bounds, logprob, **kwargs):
         chain = samples[:1]
         return [maximum[:1], low[:1], mid[:1], high[:1], chain]
@@ -337,7 +408,10 @@ def test_pvanalysis_posterior_outputs(tmp_path, monkeypatch, capsys):
     obj.output_fitresult(best='popt')
     assert 'p_in  = 0.500 (-0.000, +0.000)' in capsys.readouterr().out
 
-    import pytest
+
+def test_pvanalysis_invalid_or_empty_posterior(posterior_fit, tmp_path):
+    obj = posterior_fit.obj
+    empty = posterior_fit.empty
     with pytest.raises(ValueError, match='best'):
         obj.output_fitresult(best='unknown')
     for cut in ('xcut', 'vcut'):

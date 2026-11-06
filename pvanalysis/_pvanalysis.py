@@ -1095,7 +1095,9 @@ class PVAnalysis():
                 f.write('#dVsys is relative to the input systemic velocity.\n')
                 np.savetxt(f, np.array([self.fit_summaries[key][name]
                                         for name in ('popt', 'plow', 'pmid', 'phigh')]).T)
-                f.write('#Mass rows: M_b,M_in,M_out (Msun); popt uses the best-fit model, plow/pmid/phigh are mass-posterior percentiles.\n')
+                f.write('#Mass rows: M_b,M_in,M_out (Msun);'
+                        + ' popt uses the best-fit model, plow/pmid/phigh'
+                        + ' are mass-posterior percentiles.\n')
                 np.savetxt(f, np.array([self.mass_summaries[key][name][[2, 0, 1]]
                                         for name in ('popt', 'plow', 'pmid', 'phigh')]).T)
         print(f'Fitting results in {outname}.popt_e.txt '
@@ -1299,8 +1301,8 @@ class PVAnalysis():
         return result
 
     def _range_for(self, v0: np.ndarray, x1: np.ndarray, dx1: np.ndarray,
-              x0: np.ndarray, v1: np.ndarray, dv1: np.ndarray,
-              popt: list[float] | np.ndarray) -> list[list[float]]:
+                   x0: np.ndarray, v1: np.ndarray, dv1: np.ndarray,
+                   popt: list[float] | np.ndarray) -> list[list[float]]:
         """Estimate inner and outer radius-velocity pairs from points and a model.
 
         Args:
