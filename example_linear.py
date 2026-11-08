@@ -19,8 +19,8 @@ use_velocity = True  # cuts along the velocity direction
 use_position = True  # cuts along the positional direction
 include_intercept = True  # False means v(x=0) is fixed at 0.
 show_pv = True  # figures will be made regardless of this option.
-minabserr = 0.1  # minimum absolute errorbar in the unit of bmaj or dv.
-minrelerr = 0.01  # minimum relative errorbar.
+minabserr = 0  # minimum absolute errorbar in the unit of bmaj or dv.
+minrelerr = 0  # minimum relative errorbar.
 '------------------------'
 
 

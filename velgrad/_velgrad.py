@@ -123,7 +123,7 @@ class VelGrad(ReadFits):
     """Measure emission centers, a velocity gradient, and dynamical mass."""
 
     def get_2Dcenter(self, cutoff: float = 5, vmask: list[float] = [0, 0],
-                     minrelerr: float = 0.01, minabserr: float = 0.1,
+                     minrelerr: float = 0, minabserr: float = 0,
                      method: Literal['mean', 'peak', 'gauss'] = 'mean') -> None:
         """Measure the two-dimensional emission center in each channel.
 
@@ -132,12 +132,18 @@ class VelGrad(ReadFits):
                 noise. Defaults to 5.
             vmask (list, optional): Velocity interval to exclude in km/s.
                 Defaults to [0, 0].
-            minrelerr (float, optional): Minimum relative center uncertainty.
-                Defaults to 0.01.
-            minabserr (float, optional): Minimum absolute center uncertainty in
-                units of the beam major axis. Defaults to 0.1.
+            minrelerr (float, optional): Uncertainty floor as a fraction of the
+                absolute measured coordinate. Defaults to 0.
+            minabserr (float, optional): Uncertainty floor as a fraction of the
+                beam major axis. Defaults to 0.
             method (str, optional): Center estimator: ``'mean'``, ``'peak'``,
                 or ``'gauss'``. Defaults to ``'mean'``.
+
+        Note:
+            Fitting uses the largest of the measured uncertainty,
+            ``minabserr * beam_major_axis``, and ``minrelerr * abs(coordinate)``.
+            Both default to 0, imposing no additional floors. Positive values
+            limit the weight of precise points and may change fit results.
         """
         dx, dy = self.dx, self.dy
         xmax, ymax = np.max(self.x), np.max(self.y)
@@ -162,7 +168,8 @@ class VelGrad(ReadFits):
             cond = d_org > cutoff * sigma
             d, X, Y = d_org[cond], X_org[cond], Y_org[cond]
             xval, xerr, yval, yerr = np.nan, np.nan, np.nan, np.nan
-            if len(d) > 1 and (v < vmask[0] or vmask[1] < v):
+            if (len(np.unique(X)) > 1 and len(np.unique(Y)) > 1
+                    and (v < vmask[0] or vmask[1] < v)):
                 beamarea = np.pi * self.bmaj * self.bmin / 4 / np.log(2)
                 beamarea = beamarea / np.abs(self.dx * self.dy)  # pixel/beam
                 corrected_sigma = sigma * np.sqrt(beamarea)
@@ -503,7 +510,7 @@ class VelGrad(ReadFits):
     def calc_mstar(self, incl: float = 90,
                    voff_range: list[float] = [-0.5, 0.5],
                    voff_fixed: float | None = 0,
-                   minabserr: float = 0.1, minrelerr: float = 0.01,
+                   minabserr: float = 0, minrelerr: float = 0,
                    print_result: bool = True,
                    return_chain: bool = False,
                    return_lnp: bool = False
@@ -517,10 +524,10 @@ class VelGrad(ReadFits):
                 offset in km/s. Defaults to [-0.5, 0.5].
             voff_fixed (float or None, optional): Fixed velocity offset in
                 km/s. None fits the offset. Defaults to 0.
-            minabserr (float, optional): Minimum absolute radial uncertainty in
-                units of the beam major axis. Defaults to 0.1.
-            minrelerr (float, optional): Minimum relative radial uncertainty.
-                Defaults to 0.01.
+            minabserr (float, optional): Uncertainty floor as a fraction of the
+                beam major axis. Defaults to 0.
+            minrelerr (float, optional): Uncertainty floor as a fraction of the
+                absolute measured coordinate. Defaults to 0.
             print_result (bool, optional): Whether to print fitted values in terminal.
                 Defaults to True.
             return_chain (bool, optional): Whether to store the MCMC chain in
@@ -532,6 +539,12 @@ class VelGrad(ReadFits):
             dict: Stellar mass and uncertainty, characteristic radius and
                 velocity, fit parameters and uncertainties, and reduced
                 chi-square.
+
+        Note:
+            Fitting uses the largest of the measured uncertainty,
+            ``minabserr * beam_major_axis``, and ``minrelerr * abs(coordinate)``.
+            Both default to 0, imposing no additional floors. Positive values
+            limit the weight of precise points and may change fit results.
         """
         self.incl = incl
         sini2 = np.sin(np.radians(incl))**2

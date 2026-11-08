@@ -15,8 +15,8 @@ vmax = 3.6  # km/s; relative to vsys.
 vmin = -3.6  # km/s; relative to vsys.
 vmask = [-2.0, 2.0]  # km/s; relative to vsys. To exclude low velocity channels.
 show_figs = True
-minabserr = 0.1  # minimum absolute errorbar in the unit of bmaj or dv.
-minrelerr = 0.01  # minimum relative errorbar.
+minabserr = 0  # minimum absolute errorbar in the unit of bmaj or dv.
+minrelerr = 0  # minimum relative errorbar.
 method = 'mean'  # mean or gauss
 '------------------------'
 
