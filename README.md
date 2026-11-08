@@ -3,7 +3,7 @@
   <img src="docs/images/SLAM_logo_bg.png" alt="SLAM logo" width="800">
   <br><br>
   <a href="https://slam-astro.readthedocs.io/en/latest/?badge=latest"><img src="https://app.readthedocs.org/projects/slam-astro/badge/?version=latest" alt="Documentation Status"></a>
-  <a href="https://doi.org/10.5281/zenodo.23953714"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.23953714.svg" alt="DOI"></a>
+  <a href="https://doi.org/10.5281/zenodo.24052787"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.24052787.svg" alt="DOI"></a>
 </div>
 
 **SLAM (Spectral Line Analysis/Modeling)** is a Python library for analyzing and modeling spectral line data at (sub)millimeter wavelengths, with a particular focus on rotational motions of disks around (proto)stellar objects. The current release (v2) includes several packages for deriving rotation curves and estimating the dynamical mass of the central object. Details of the methods are presented [Aso & Sai (2024)](https://ui.adsabs.harvard.edu/abs/2024PKAS...39...27A/abstract) and Aso, Sai et al. (2026 in prep).
@@ -80,7 +80,7 @@ export PYTHONPATH=${PYTHONPATH}:/YOUR_PATH_TO/SLAM
 If you use SLAM for publications, please cite Aso, Sai et al. (2026 in prep) after it comes out, as well as [the latest release in Zenodo](https://doi.org/10.5281/zenodo.7783867):
 
 ```
-@software{aso_2026_23953714,
+@software{aso_2026_24052787,
   author       = {Aso, Yusuke and
                   Sai, Jinshi},
   title        = {SLAM v2.1.3},
@@ -88,8 +88,8 @@ If you use SLAM for publications, please cite Aso, Sai et al. (2026 in prep) aft
   year         = 2026,
   publisher    = {Zenodo},
   version      = {v2.1.3},
-  doi          = {10.5281/zenodo.23953714},
-  url          = {https://doi.org/10.5281/zenodo.23953714},
+  doi          = {10.5281/zenodo.24052787},
+  url          = {https://doi.org/10.5281/zenodo.24052787},
 }
 ```
 
