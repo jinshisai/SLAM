@@ -1406,7 +1406,7 @@ class PVAnalysis():
                 continue
             rvlim, popt = self.rvlim[i], self.popt[i]
             rin, rout, vin, vout = *rvlim[0], *rvlim[1]
-            print('--- ' + i.title() + ' ---')
+            print(f'--- {i.title()} (best=pmid) ---')
             rb, vb, pin, dp, vsys = popt[0]
             drb, dvb, dpin, ddp, dvsys = popt[1]
             params = [*popt[0], *popt[1]]
