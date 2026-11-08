@@ -132,12 +132,18 @@ class VelGrad(ReadFits):
                 noise. Defaults to 5.
             vmask (list, optional): Velocity interval to exclude in km/s.
                 Defaults to [0, 0].
-            minrelerr (float, optional): Minimum relative center uncertainty.
-                Defaults to 0.
-            minabserr (float, optional): Minimum absolute center uncertainty in
-                units of the beam major axis. Defaults to 0.
+            minrelerr (float, optional): Uncertainty floor as a fraction of the
+                absolute measured coordinate. Defaults to 0.
+            minabserr (float, optional): Uncertainty floor as a fraction of the
+                beam major axis. Defaults to 0.
             method (str, optional): Center estimator: ``'mean'``, ``'peak'``,
                 or ``'gauss'``. Defaults to ``'mean'``.
+
+        Note:
+            Fitting uses the largest of the measured uncertainty,
+            ``minabserr * beam_major_axis``, and ``minrelerr * abs(coordinate)``.
+            Both default to 0, imposing no additional floors. Positive values
+            limit the weight of precise points and may change fit results.
         """
         dx, dy = self.dx, self.dy
         xmax, ymax = np.max(self.x), np.max(self.y)
@@ -518,10 +524,10 @@ class VelGrad(ReadFits):
                 offset in km/s. Defaults to [-0.5, 0.5].
             voff_fixed (float or None, optional): Fixed velocity offset in
                 km/s. None fits the offset. Defaults to 0.
-            minabserr (float, optional): Minimum absolute radial uncertainty in
-                units of the beam major axis. Defaults to 0.
-            minrelerr (float, optional): Minimum relative radial uncertainty.
-                Defaults to 0.
+            minabserr (float, optional): Uncertainty floor as a fraction of the
+                beam major axis. Defaults to 0.
+            minrelerr (float, optional): Uncertainty floor as a fraction of the
+                absolute measured coordinate. Defaults to 0.
             print_result (bool, optional): Whether to print fitted values in terminal.
                 Defaults to True.
             return_chain (bool, optional): Whether to store the MCMC chain in
@@ -533,6 +539,12 @@ class VelGrad(ReadFits):
             dict: Stellar mass and uncertainty, characteristic radius and
                 velocity, fit parameters and uncertainties, and reduced
                 chi-square.
+
+        Note:
+            Fitting uses the largest of the measured uncertainty,
+            ``minabserr * beam_major_axis``, and ``minrelerr * abs(coordinate)``.
+            Both default to 0, imposing no additional floors. Positive values
+            limit the weight of precise points and may change fit results.
         """
         self.incl = incl
         sini2 = np.sin(np.radians(incl))**2

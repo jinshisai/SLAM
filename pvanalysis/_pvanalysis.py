@@ -109,10 +109,10 @@ class PVAnalysis():
                 function of velocity. Defaults to True.
             interp_ridge (bool, optional): Whether to spline-interpolate an
                 axis when deriving ridge points. Defaults to False.
-            minrelerr (float, optional): Minimum relative point uncertainty.
-                Defaults to 0.
-            minabserr (float, optional): Minimum absolute uncertainty in units
-                of the spatial or velocity resolution. Defaults to 0.
+            minrelerr (float, optional): Uncertainty floor as a fraction of the
+                absolute measured coordinate. Defaults to 0.
+            minabserr (float, optional): Uncertainty floor as a fraction of the
+                spatial or velocity resolution. Defaults to 0.
             nanbeforemax (bool, optional): Whether to remove points before the
                 rotation-curve turnover. Defaults to True.
             nanopposite (bool, optional): Whether to remove points in the
@@ -120,6 +120,12 @@ class PVAnalysis():
             nanbeforecross (bool, optional): Whether to remove points before
                 the position-cut and velocity-cut curves cross. Defaults to
                 True.
+
+        Note:
+            Fitting uses the largest of the measured uncertainty,
+            ``minabserr * resolution``, and ``minrelerr * abs(coordinate)``.
+            Both default to 0, imposing no additional floors. Positive values
+            limit the weight of precise points and may change fit results.
         """
         # remember output name
         self.outname = outname
@@ -205,14 +211,22 @@ class PVAnalysis():
         """Sort fitting results.
 
         Args:
-            minrelerr, minabserr (float): Parameters to clip too small errors.
-                Defaults to 0.01 and 0.1 respectively.
+            minrelerr (float, optional): Uncertainty floor as a fraction of the
+                absolute measured coordinate. Defaults to 0.
+            minabserr (float, optional): Uncertainty floor as a fraction of the
+                spatial or velocity resolution. Defaults to 0.
             nanbeforemax (bool, optional): Whether poins before turn over
                 are removed. Defaults to True.
             nanopposite (bool, optional): Whether points in the opposite
                 quadrant are removed. Defaults to True.
             nanbeforecross (bool, optional): Whether points before cross
                 of xcut and vcut are removed. Defaults to True.
+
+        Note:
+            Fitting uses the largest of the measured uncertainty,
+            ``minabserr * resolution``, and ``minrelerr * abs(coordinate)``.
+            Both default to 0, imposing no additional floors. Positive values
+            limit the weight of precise points and may change fit results.
         """
         # results are sorted?
         self.__sorted = True
