@@ -83,11 +83,11 @@ If you use SLAM for publications, please cite Aso, Sai et al. (2026 in prep) aft
 @software{aso_2026_23953714,
   author       = {Aso, Yusuke and
                   Sai, Jinshi},
-  title        = {SLAM v2.1.2},
+  title        = {SLAM v2.1.3},
   month        = nov,
   year         = 2026,
   publisher    = {Zenodo},
-  version      = {v2.1.2},
+  version      = {v2.1.3},
   doi          = {10.5281/zenodo.23953714},
   url          = {https://doi.org/10.5281/zenodo.23953714},
 }
