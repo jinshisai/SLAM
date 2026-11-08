@@ -162,7 +162,8 @@ class VelGrad(ReadFits):
             cond = d_org > cutoff * sigma
             d, X, Y = d_org[cond], X_org[cond], Y_org[cond]
             xval, xerr, yval, yerr = np.nan, np.nan, np.nan, np.nan
-            if len(d) > 1 and (v < vmask[0] or vmask[1] < v):
+            if (len(np.unique(X)) > 1 and len(np.unique(Y)) > 1
+                    and (v < vmask[0] or vmask[1] < v)):
                 beamarea = np.pi * self.bmaj * self.bmin / 4 / np.log(2)
                 beamarea = beamarea / np.abs(self.dx * self.dy)  # pixel/beam
                 corrected_sigma = sigma * np.sqrt(beamarea)
