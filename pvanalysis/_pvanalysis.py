@@ -75,7 +75,7 @@ class PVAnalysis():
                       use_velocity: bool = True,
                       use_position: bool = True,
                       interp_ridge: bool = False,
-                      minrelerr: float = 0.01, minabserr: float = 0.1,
+                      minrelerr: float = 0, minabserr: float = 0,
                       nanbeforemax: bool = True, nanopposite: bool = True,
                       nanbeforecross: bool = True) -> None:
         """Derive edge and ridge points along the position and velocity axes.
@@ -110,9 +110,9 @@ class PVAnalysis():
             interp_ridge (bool, optional): Whether to spline-interpolate an
                 axis when deriving ridge points. Defaults to False.
             minrelerr (float, optional): Minimum relative point uncertainty.
-                Defaults to 0.01.
+                Defaults to 0.
             minabserr (float, optional): Minimum absolute uncertainty in units
-                of the spatial or velocity resolution. Defaults to 0.1.
+                of the spatial or velocity resolution. Defaults to 0.
             nanbeforemax (bool, optional): Whether to remove points before the
                 rotation-curve turnover. Defaults to True.
             nanopposite (bool, optional): Whether to remove points in the
@@ -197,8 +197,8 @@ class PVAnalysis():
         # self.plotresults_pvdiagram()
         # self.plotresults_rvplane()
 
-    def sort_fitresults(self, minrelerr: float = 0.01,
-                        minabserr: float = 0.1,
+    def sort_fitresults(self, minrelerr: float = 0,
+                        minabserr: float = 0,
                         nanbeforemax: bool = True,
                         nanopposite: bool = True,
                         nanbeforecross: bool = True) -> None:

@@ -123,7 +123,7 @@ class VelGrad(ReadFits):
     """Measure emission centers, a velocity gradient, and dynamical mass."""
 
     def get_2Dcenter(self, cutoff: float = 5, vmask: list[float] = [0, 0],
-                     minrelerr: float = 0.01, minabserr: float = 0.1,
+                     minrelerr: float = 0, minabserr: float = 0,
                      method: Literal['mean', 'peak', 'gauss'] = 'mean') -> None:
         """Measure the two-dimensional emission center in each channel.
 
@@ -133,9 +133,9 @@ class VelGrad(ReadFits):
             vmask (list, optional): Velocity interval to exclude in km/s.
                 Defaults to [0, 0].
             minrelerr (float, optional): Minimum relative center uncertainty.
-                Defaults to 0.01.
+                Defaults to 0.
             minabserr (float, optional): Minimum absolute center uncertainty in
-                units of the beam major axis. Defaults to 0.1.
+                units of the beam major axis. Defaults to 0.
             method (str, optional): Center estimator: ``'mean'``, ``'peak'``,
                 or ``'gauss'``. Defaults to ``'mean'``.
         """
@@ -504,7 +504,7 @@ class VelGrad(ReadFits):
     def calc_mstar(self, incl: float = 90,
                    voff_range: list[float] = [-0.5, 0.5],
                    voff_fixed: float | None = 0,
-                   minabserr: float = 0.1, minrelerr: float = 0.01,
+                   minabserr: float = 0, minrelerr: float = 0,
                    print_result: bool = True,
                    return_chain: bool = False,
                    return_lnp: bool = False
@@ -519,9 +519,9 @@ class VelGrad(ReadFits):
             voff_fixed (float or None, optional): Fixed velocity offset in
                 km/s. None fits the offset. Defaults to 0.
             minabserr (float, optional): Minimum absolute radial uncertainty in
-                units of the beam major axis. Defaults to 0.1.
+                units of the beam major axis. Defaults to 0.
             minrelerr (float, optional): Minimum relative radial uncertainty.
-                Defaults to 0.01.
+                Defaults to 0.
             print_result (bool, optional): Whether to print fitted values in terminal.
                 Defaults to True.
             return_chain (bool, optional): Whether to store the MCMC chain in

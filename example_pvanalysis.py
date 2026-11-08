@@ -24,8 +24,8 @@ fixed_pin = 0.5  # Fixed pin when include_pin is False.
 fixed_dp = 0.0  # Fixed dp when include_dp is False.
 show_pv = True  # figures will be made regardless of this option.
 show_corner = True  # figures will be made regardless of this option.
-minabserr = 0.1  # minimum absolute errorbar in the unit of bmaj or dv.
-minrelerr = 0.01  # minimum relative errorbar.
+minabserr = 0  # minimum absolute errorbar in the unit of bmaj or dv.
+minrelerr = 0  # minimum relative errorbar.
 calc_evidence = False  # If calculate Bayesian evidence or not.
 best = 'pmid'  # 'popt': maximum probability; 'pmid': posterior medians.
 '------------------------'
