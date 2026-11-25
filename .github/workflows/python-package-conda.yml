@@ -5,30 +5,34 @@ on: [push]
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -el {0}
     strategy:
       max-parallel: 5
 
     steps:
     - uses: actions/checkout@v7
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v7
+    - name: Set up Conda and Python 3.12
+      uses: conda-incubator/setup-miniconda@v4
       with:
+        miniforge-version: latest
+        environment-file: environment.yml
+        activate-environment: SLAM
         python-version: '3.12'
-    - name: Add conda to system path
+        channels: conda-forge
+        channel-priority: strict
+        auto-activate: false
+    - name: Install test dependencies
       run: |
-        # $CONDA is an environment variable pointing to the root of the miniconda directory
-        echo $CONDA/bin >> $GITHUB_PATH
-    - name: Install dependencies
-      run: |
-        conda env update --file environment.yml --name base
+        conda install --yes python=3.12 flake8 pytest
+        python --version
     - name: Lint with flake8
       run: |
-        conda install flake8
         # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --extend-ignore=E402,E741 --statistics
+        python -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --extend-ignore=E402,E741 --statistics
     - name: Test with pytest
       run: |
-        conda install pytest
-        pytest
+        python -m pytest
