@@ -973,7 +973,9 @@ class PVAnalysis():
                       return_lnp: bool = False,
                       calc_evidence: bool = False,
                       best: str = 'pmid',
-                      methods: tuple[str, ...] = ('edge', 'ridge')
+                      methods: tuple[str, ...] = ('edge', 'ridge'),
+                      save_corner: bool = True,
+                      kwargs_emcee_corner: dict[str, object] | None = None
                       ) -> dict[str, dict[str, np.ndarray] | None]:
         """Fit the edge and ridge points with a double power law using MCMC.
 
@@ -1009,6 +1011,16 @@ class PVAnalysis():
                 corner plots. Defaults to 0.8.
             show_corner (bool, optional): Whether to show the corner plots.
                 Defaults to False.
+            save_corner (bool, optional): Whether to save corner plots. False
+                forces figname=None, including for derived chain-plot files,
+                without disabling display. Defaults to True.
+            kwargs_emcee_corner (dict or None, optional): Shared options passed
+                to emcee_corner for every selected method. These override
+                defaults, including rangelevel, show_corner, labels, and
+                figname. Internal arguments bounds, log_prob_fn, args, ndata,
+                simpleoutput, return_chain, and return_lnp cannot be overridden.
+                Use the top-level return_chain/return_lnp options for storage.
+                The supplied dictionary is not modified. Defaults to None.
             return_chain (bool, optional): Whether to store edge and ridge MCMC
                 chains in ``self.chain``. Defaults to False.
             return_lnp (bool, optional): Whether to store log probabilities in
@@ -1030,6 +1042,13 @@ class PVAnalysis():
             Unavailable methods have a None result; other methods can still fit.
         """
         methods = self._validate_methods(methods)
+        sampler_options = dict(kwargs_emcee_corner or {})
+        protected = {'bounds', 'log_prob_fn', 'args', 'ndata', 'simpleoutput',
+                     'return_chain', 'return_lnp'}
+        conflicts = protected.intersection(sampler_options)
+        if conflicts:
+            names = ', '.join(sorted(conflicts))
+            raise ValueError(f'kwargs_emcee_corner cannot override internal arguments: {names}')
         self._select_best(best)
         self._invalidate_fits(methods)
         for method in ('edge', 'ridge'):
@@ -1090,6 +1109,7 @@ class PVAnalysis():
             vb_range = [min(minabs(a, 0, 4) for a in active_data),
                         max(maxabs(a, 0, 4) for a in active_data)]
 
+        corner_files = []
         for args, ext, key, res in zip([Es, Rs], ['_e', '_r'],
                                        ['edge', 'ridge'], [popt_e, popt_r]):
             if key not in active:
@@ -1157,13 +1177,16 @@ class PVAnalysis():
                         + np.sum(((v1 - wpow_v_custom(x0, *p)) / dv1)**2)
                     return -0.5 * chi2
                 plim = plim[:, include]
+                options = {'labels': labels, 'rangelevel': rangelevel,
+                           'figname': f'{outname}.corner{ext}.png',
+                           'show_corner': show_corner}
+                options.update(sampler_options)
+                if not save_corner:
+                    options['figname'] = None
                 mcmc = emcee_corner(plim, lnprob, args=args,
-                                    labels=labels, rangelevel=rangelevel,
-                                    figname=f'{outname}.corner{ext}.png',
-                                    show_corner=show_corner,
                                     ndata=len(args[0]) + len(args[3]),
                                     simpleoutput=False, return_chain=True,
-                                    return_lnp=return_lnp)
+                                    return_lnp=return_lnp, **options)
                 summaries = {}
                 for name, values in zip(('popt', 'plow', 'pmid', 'phigh'),
                                         mcmc[:4]):
@@ -1206,13 +1229,15 @@ class PVAnalysis():
                     self.chi2r_e = chi2 / dof if dof > 0 else np.inf
                 else:
                     self.chi2r_r = chi2 / dof if dof > 0 else np.inf
+                if options['figname'] is not None:
+                    corner_files.append(str(options['figname']))
             except Exception:
                 self._invalidate_fits((key,))
                 self.fit_status[key] = 'failed'
                 raise
 
-        print('Corner plots in ' + ', '.join(f'{outname}.corner_{m[0]}.png'
-                                             for m in active))
+        if corner_files:
+            print('Corner plots in ' + ', '.join(corner_files))
         for key, suffix in [('edge', 'e'), ('ridge', 'r')]:
             if key not in active:
                 continue

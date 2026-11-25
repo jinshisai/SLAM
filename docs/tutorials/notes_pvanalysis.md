@@ -119,5 +119,46 @@ position extrema. Missing ranges are `None`.
 Both reporting estimators (`pmid` and `popt`) support independent methods; linear
 fits report their analytic coefficients for either selection.
 
-Plotting without fits, sampler/corner configuration, and reading saved point
-files are subsequent upgrade stages.
+### Shared emcee and corner options
+
+`fit_edgeridge()` accepts `kwargs_emcee_corner=None` and `save_corner=True`.
+Both settings apply to all methods selected in that call. Existing calls retain
+their sampling defaults and corner filenames (`.corner_e.png` and `.corner_r.png`).
+For example:
+
+```python
+impv.fit_edgeridge(
+    methods=('edge', 'ridge'),
+    save_corner=False,
+    kwargs_emcee_corner={
+        'nwalkers_per_ndim': 16,
+        'nburnin': 500,
+        'nsteps': 1000,
+        'rangelevel': None,
+    },
+)
+```
+
+Options are forwarded to `utils.emcee_corner`, including `range_corner`,
+`labels`, `moves`, and chain-plot controls. Supplied options override ordinary
+defaults, including the top-level `rangelevel` and `show_corner`. The dictionary
+is copied rather than modified. A custom `figname` applies to every selected
+method; use separate method calls to keep different custom filenames or sampling
+settings, preserving the other method's existing fit.
+
+`save_corner=False` overrides even a supplied `figname`, forcing it to None.
+It disables corner-file saving and derived chain-file saving, while display
+remains controlled by `show_corner` and `show_chain`. Setting `figname=None`
+in the options also disables saving. Parameter-summary files remain enabled,
+and terminal messages list only the corner filenames used for successful fits.
+Skipped methods produce no corner-file announcement.
+
+The internal arguments `bounds`, `log_prob_fn`, `args`, `ndata`, `simpleoutput`,
+`return_chain`, and `return_lnp` are protected. Supplying any of them in the
+options raises a clear ValueError before changing fit state. Use the top-level
+`return_chain` and `return_lnp` arguments to control stored outputs. Sampling
+always returns chains internally because mass posteriors require them.
+These options configure emcee; the optional dynesty evidence calculation keeps
+its existing configuration.
+
+Plotting without fits and reading saved point files are subsequent upgrade stages.
