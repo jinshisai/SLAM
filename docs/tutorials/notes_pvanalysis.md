@@ -92,6 +92,32 @@ Automatic prior ranges use only the selected nonempty datasets. `chain`, `lnp`,
 and `rvlim` are always dictionaries with both method keys; unavailable entries
 are `None`. Existing code indexing an unavailable fit must first check for None.
 
-These are the state foundations for independent workflows. Linear-fit/reporting
-integration, plotting without fits, sampler/corner configuration, and reading
-saved point files are subsequent upgrade stages.
+### Independent fitting and reporting
+
+`fit_edgeridge()` fits each requested nonempty method independently. Empty methods
+have a `no_points` status and a `None` result, without preventing the other fit.
+When both are fitted together, automatic priors remain shared across their
+combined data range. If neither has points, the method returns the current
+structured results without sampling or writing files. Unselected existing fits
+remain available. Exceptions propagate, mark the affected fit as `failed`, and
+clear its partial products.
+
+`fit_linear()` fits ridge points even when no edge points exist. It retains the
+existing preference for position cuts when available, but no longer deletes
+velocity-cut points. It replaces only the ridge fit; edge parameters, posterior
+products, and model remain available. `models` stores each method's model;
+`model` retains the legacy most-recent-fit interface. Linear results contain
+`[intercept, gradient]` and have no power-law mass posterior.
+
+`get_range()` and `output_fitresult()` handle absent fits, power-law fits, linear
+fits, and mixed edge/ridge fit types. Power-law range and mass calculations use
+the cut types actually present for that method. With both cuts, the inner
+boundary uses the maximum absolute position-cut velocity, and the outer boundary
+uses the maximum absolute velocity-cut position. With only position cuts, both
+boundaries use their velocity extrema; with only velocity cuts, both use their
+position extrema. Missing ranges are `None`.
+Both reporting estimators (`pmid` and `popt`) support independent methods; linear
+fits report their analytic coefficients for either selection.
+
+Plotting without fits, sampler/corner configuration, and reading saved point
+files are subsequent upgrade stages.
