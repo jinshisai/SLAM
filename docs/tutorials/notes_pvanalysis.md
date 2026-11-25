@@ -64,3 +64,34 @@ posterior percentiles in `plow, pmid, phigh`, independently of `best`. Thus thei
 mass calculation. `np.loadtxt` returns an 8-by-4 table, ignoring the comment
 note between the parameter and mass blocks. `fit_linear` retains its existing
 workflow and does not produce these posterior files.
+
+### Point and fit state
+
+`get_edgeridge(..., methods=('edge', 'ridge'))` and
+`fit_edgeridge(..., methods=('edge', 'ridge'))` select both methods by default.
+Pass `methods=('ridge',)` or `methods=('edge',)` to select one method.
+Extraction currently computes both estimators internally, retaining only the
+requested methods. Extraction replaces the complete point dataset, including
+previously enabled cuts; unselected methods contain empty arrays.
+
+Point containers exist immediately after initialization. Empty point arrays have
+shape `(4, 0)` in the existing `[x, v, dx, dv]` order. `point_status` distinguishes
+`not_run`, `disabled`, `no_points`, and `success`. Individual invalid measurements
+may still contain NaNs before filtering.
+
+`popt` always has `edge` and `ridge` keys. An unavailable fit is `None`; successful
+entries retain the existing `[parameters, uncertainties]` structure and parameter
+order. The return value of `fit_edgeridge` also has both keys, with `None` for
+unavailable fits. `fit_status` records `not_run`, `disabled`, `no_points`, `success`,
+or `failed` (a sampling error still propagates to the caller).
+
+Extracting or re-filtering points clears previous fit parameters, summaries,
+chains, mass samples, ranges, and reduced chi-square values. Fitting only one
+method replaces only its products, preserving any fit of the other method.
+Automatic prior ranges use only the selected nonempty datasets. `chain`, `lnp`,
+and `rvlim` are always dictionaries with both method keys; unavailable entries
+are `None`. Existing code indexing an unavailable fit must first check for None.
+
+These are the state foundations for independent workflows. Linear-fit/reporting
+integration, plotting without fits, sampler/corner configuration, and reading
+saved point files are subsequent upgrade stages.
