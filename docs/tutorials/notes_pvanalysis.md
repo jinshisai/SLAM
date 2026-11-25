@@ -355,10 +355,10 @@ scaling; their color layer is masked with a finite default color range.
 
 ## Regression checks
 
-Run the complete suite from the repository root with `python -m pytest -q`.
-`test_pvanalysis.py` covers independent methods, empty datasets, saved-point
-round trips, input validation, state invalidation, shared sampler controls,
-linear fits, reporting, velocity references, and plotting before fitting.
-Deterministic sampler substitutes check orchestration and output compatibility;
-short real emcee runs verify integration and actual PNG/corner-file generation.
-Those short chains test execution, rather than scientific convergence.
+Run the routine checks in `test_SLAM.py` from the repository root with
+`python -m pytest -q`. They cover independent and empty edge/ridge flows,
+saved-point round trips, invalid uncertainties, fitted velocity references,
+shared sampler options, named corner ranges, state invalidation, plotting
+without fits, and analytic ridge-only linear fitting. A short real emcee run
+also verifies sampling and corner-file generation; it checks integration,
+rather than scientific convergence.
