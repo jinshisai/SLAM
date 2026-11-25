@@ -210,6 +210,27 @@ is copied rather than modified. A custom `figname` applies to every selected
 method; use separate method calls to keep different custom filenames or sampling
 settings, preserving the other method's existing fit.
 
+`range_corner` accepts the existing ordered list or a dictionary keyed by
+`Rb`, `Vb`, `p_in`, `dp`, and `dVsys`. Dictionary entries are converted to the
+free-parameter order automatically, independently of custom display labels.
+Fixed-parameter and unrecognized entries are ignored. Missing free-parameter
+entries use the sample fraction `0.8`, independently of `rangelevel`, matching
+`pvfitting` and `channelfit`. For example:
+
+```python
+impv.fit_edgeridge(
+    include_dp=False, include_pin=True,
+    kwargs_emcee_corner={
+        'range_corner': {'Rb': [20, 200], 'p_in': [0.3, 0.8]},
+    },
+)
+```
+
+Here the plotted ranges are `[[20, 200], [0.3, 0.8]]` for the free parameters
+`Rb` and `p_in`. These are plotting ranges, not fitting priors; prior bounds
+remain controlled by `rb_range`, `pin_range`, and the other fitting arguments.
+The supplied dictionary is not modified.
+
 `save_corner=False` overrides even a supplied `figname`, forcing it to None.
 It disables corner-file saving and derived chain-file saving, while display
 remains controlled by `show_corner` and `show_chain`. Setting `figname=None`

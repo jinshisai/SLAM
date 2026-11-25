@@ -1030,7 +1030,11 @@ class PVAnalysis():
             kwargs_emcee_corner (dict or None, optional): Shared options passed
                 to emcee_corner for every selected method. These override
                 defaults, including rangelevel, show_corner, labels, and
-                figname. Internal arguments bounds, log_prob_fn, args, ndata,
+                figname. range_corner may map Rb, Vb, p_in, dp, and dVsys to
+                plotting ranges or sample fractions. Only free parameters are
+                included; missing entries default to 0.8, as in the sibling
+                modules. Parameter keys are independent of display labels.
+                Internal arguments bounds, log_prob_fn, args, ndata,
                 simpleoutput, return_chain, and return_lnp cannot be overridden.
                 Use the top-level return_chain/return_lnp options for storage.
                 The supplied dictionary is not modified. Defaults to None.
@@ -1194,6 +1198,10 @@ class PVAnalysis():
                            'figname': f'{outname}.corner{ext}.png',
                            'show_corner': show_corner}
                 options.update(sampler_options)
+                named_ranges = options.get('range_corner')
+                if isinstance(named_ranges, dict):
+                    options['range_corner'] = [named_ranges.get(name, 0.8)
+                                               for name in labels]
                 if not save_corner:
                     options['figname'] = None
                 mcmc = emcee_corner(plim, lnprob, args=args,
