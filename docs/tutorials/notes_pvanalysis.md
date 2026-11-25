@@ -10,15 +10,68 @@
 
 * The double power-law fitting, fit_edgeridge, uses chi2 = ((x - Xmodel(v)) / dx)^2 + ((v - Vmodel(x)) / dv)^2. Vmodel = sgn(x) Vb (|x|/Rb)^-p, where p=pin for |x| < Rb and p=pin+dp for |x| > Rb. Xmodel(v) is the inverse function of Vmodel(x).
 
-* dx and dv are the fitting undertainty for 'gaussian' ridge, the uncertainty propagated from the image noise for 'mean' ridge, and the image noise divided by the emission gradient for edge.
+* dx and dv are the fitting uncertainty for 'gauss' ridge, the uncertainty propagated from the image noise for 'mean' ridge, and the image noise divided by the emission gradient for edge.
 
 * Min, Mout, and Mb are stellar masses calculated from the best-fit model at the innermost, outermost, and Rb radii, respectively. When p is not 0.5, these masses are just for reference.
+
+## Reusing points for fitting trials
+
+Extraction, loading, fitting, and plotting can be run separately. In
+`example_pvanalysis.py`, choose `methods=('edge', 'ridge')`, `('ridge',)`, or
+`('edge',)`. The example extracts, writes, fits, and plots in sequence.
+The default selects both methods; saved-point loading is demonstrated below.
+`example_linear.py` demonstrates a ridge-only linear workflow.
+
+Extract and save once:
+
+```python
+impv = PVAnalysis(fitsfile, rms, vsys, dist, incl=incl)
+impv.get_edgeridge('points', thr=5.)
+impv.write_edgeridge('points')
+```
+
+Try different ridge models on those same points, using different output names:
+
+```python
+sampling = {'nburnin': 500, 'nsteps': 1000}
+single = impv.fit_edgeridge(
+    methods=('ridge',), include_dp=False, include_pin=True,
+    outname='ridge_single', save_corner=False, kwargs_emcee_corner=sampling,
+)
+broken = impv.fit_edgeridge(
+    methods=('ridge',), include_dp=True, include_pin=False,
+    outname='ridge_broken', save_corner=False, kwargs_emcee_corner=sampling,
+)
+```
+
+Run an edge-only fit independently. This preserves the current ridge fit:
+
+```python
+edge = impv.fit_edgeridge(
+    methods=('edge',), include_dp=False,
+    outname='edge_single', save_corner=True,
+    kwargs_emcee_corner={'nburnin': 500, 'nsteps': 1500},
+)
+impv.plot_fitresult(outname='combined_models', vsys_mode='input', show=False)
+```
+
+In a new session, construct a new `PVAnalysis` object and call
+`read_edgeridge('points')` before running the same fitting trials. To read only
+ridge data, use `methods=('ridge',)`; no edge file is required in that mode.
+Changing fitting assumptions does not require extraction or loading again.
+New extraction, loading, or explicit refiltering replaces or changes the input
+points and invalidates their fits. Skipped methods return `None`; check a result
+before indexing it, for example `if broken['ridge'] is not None:`.
+
+For a single call fitting both methods, `kwargs_emcee_corner` and `save_corner`
+are shared. Separate calls allow different settings. Sampling lengths in these
+examples are configurable; assess convergence for the scientific analysis.
 
 ## Posterior summaries and display selection
 
 `fit_edgeridge(outname='pvanalysis', best='pmid')` always writes
-`pvanalysis.popt_e.txt` (edge) and `pvanalysis.popt_r.txt` (ridge) after a
-successful fit. The prefix follows `outname`, just like the corner plots.
+`pvanalysis.popt_e.txt` (edge) and/or `pvanalysis.popt_r.txt` (ridge) for
+methods successfully fitted in that call. The prefix follows `outname`, just like the corner plots.
 Skipped fits do not write files; existing files are not removed.
 
 Each file has parameter rows `Rb, Vb, p_in, dp, dVsys` followed by a one-line
@@ -112,10 +165,15 @@ products, and model remain available. `models` stores each method's model;
 `get_range()` and `output_fitresult()` handle absent fits, power-law fits, linear
 fits, and mixed edge/ridge fit types. Power-law range and mass calculations use
 the cut types actually present for that method. With both cuts, the inner
-boundary uses the maximum absolute position-cut velocity, and the outer boundary
-uses the maximum absolute velocity-cut position. With only position cuts, both
-boundaries use their velocity extrema; with only velocity cuts, both use their
-position extrema. Missing ranges are `None`.
+boundary uses the maximum position-cut rotation speed relative to the fitted
+systemic velocity, and the outer boundary uses the maximum absolute velocity-cut
+position. With only position cuts, both boundaries use their rotation-speed
+extrema; with only velocity cuts, both use their position extrema. Speed-based
+limits are converted to the positive-radius model branch in the input-relative
+velocity convention before inversion. The extrema are calculated independently
+for each posterior sample's fitted systemic offset. Changing the input velocity
+reference while shifting the fitted offset consistently leaves physical radii
+and reference masses unchanged. Missing ranges are `None`.
 Both reporting estimators (`pmid` and `popt`) support independent methods; linear
 fits report their analytic coefficients for either selection.
 
@@ -267,3 +325,13 @@ diagrams retain absolute velocities. Position uncertainties remain nonnegative
 in both quadrants. The legacy image drawer supports 2D and singleton-Stokes PV
 arrays. Blank maps without positive intensities can use logarithmic color
 scaling; their color layer is masked with a finite default color range.
+
+## Regression checks
+
+Run the complete suite from the repository root with `python -m pytest -q`.
+`test_pvanalysis.py` covers independent methods, empty datasets, saved-point
+round trips, input validation, state invalidation, shared sampler controls,
+linear fits, reporting, velocity references, and plotting before fitting.
+Deterministic sampler substitutes check orchestration and output compatibility;
+short real emcee runs verify integration and actual PNG/corner-file generation.
+Those short chains test execution, rather than scientific convergence.

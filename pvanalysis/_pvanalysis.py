@@ -64,7 +64,7 @@ class PVAnalysis():
         self.results = {m: {cut: np.empty((4, 0)) for cut in ('xcut', 'vcut')}
                         for m in ('edge', 'ridge')}
         self.results_sorted = {m: {side: np.empty((4, 0))
-                                  for side in ('red', 'blue')}
+                                   for side in ('red', 'blue')}
                                for m in ('edge', 'ridge')}
         self.results_filtered = {m: self._empty_filtered()
                                  for m in ('edge', 'ridge')}
@@ -216,7 +216,7 @@ class PVAnalysis():
                 None.
             Mlim (list or numpy.ndarray, optional): Accepted dynamical-mass range in solar
                 masses. Defaults to [0, 1e10].
-            xlim (list or numpy.ndarray, optional): Position ranges in au.
+            xlim (list or numpy.ndarray, optional): Position ranges in arcseconds.
                 Defaults to [-1e10, 0, 0, 1e10].
             vlim (list or numpy.ndarray, optional): Velocity ranges in km/s.
                 Defaults to [-1e10, 0, 0, 1e10].
@@ -1608,13 +1608,22 @@ class PVAnalysis():
 
         Returns:
             list: [[inner radius, outer radius], [inner velocity, outer velocity]]
-            in au and km/s. The enabled cut directions determine which limits
-            come from measured extrema and which are inferred from the model.
+            in au and input-relative km/s. Position-cut speeds are measured
+            relative to the fitted systemic offset, then converted to the
+            positive-radius model branch. Posterior samples are evaluated
+            independently. Cut availability determines which limits come from
+            measured extrema and which are inferred from the model.
         """
         rin = rout = vin = vout = np.nan
         if len(v0) > 0:
             # Position cuts determine the inner boundary from their highest speed.
-            vin = np.max(np.abs(v0))
+            offset = popt[4]
+            velocities = v0
+            if np.ndim(offset) > 0:
+                # Compare every measured velocity with each posterior offset.
+                velocities = v0[:, None]
+            rotation_speeds = np.abs(velocities - offset)
+            vin = offset + np.max(rotation_speeds, axis=0)
             rin = doublepower_r(vin, *popt)
         elif len(x0) > 0:
             rin = np.min(np.abs(x0))
@@ -1624,7 +1633,7 @@ class PVAnalysis():
             rout = np.max(np.abs(x0))
             vout = doublepower_v(rout, *popt)
         elif len(v0) > 0:
-            vout = np.min(np.abs(v0))
+            vout = offset + np.min(rotation_speeds, axis=0)
             rout = doublepower_r(vout, *popt)
         return [[rin, rout], [vin, vout]]
 
