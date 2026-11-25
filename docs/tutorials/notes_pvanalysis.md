@@ -161,4 +161,57 @@ always returns chains internally because mass posteriors require them.
 These options configure emcee; the optional dynesty evidence calculation keeps
 its existing configuration.
 
-Plotting without fits and reading saved point files are subsequent upgrade stages.
+### Loading saved edge/ridge points
+
+`read_edgeridge(outname, methods=('edge', 'ridge'), quadrant=None)` loads the
+`.edge.dat` and `.ridge.dat` files written by `write_edgeridge()`. `outname` is
+the filename prefix, rather than the complete filename. Both strings and Path
+objects are accepted. To fit saved ridge points in a new session:
+
+```python
+impv = PVAnalysis(fitsfile, rms, vsys, dist, incl=incl)
+impv.read_edgeridge('saved_points', methods=('ridge',))
+impv.fit_edgeridge(
+    methods=('ridge',),
+    outname='new_fit',
+    save_corner=False,
+    kwargs_emcee_corner={'nburnin': 500, 'nsteps': 1000},
+)
+```
+
+Loading restores the fitting dataset directly, without applying turnover,
+quadrant, crossing, mass, or uncertainty-floor filters again. It populates the
+raw, filtered, and sorted point containers, replaces previous points, and clears
+all previous fits. Unrequested methods are cleared and marked `disabled`.
+A header-only file means `no_points`. Missing requested files raise
+FileNotFoundError; malformed rows or metadata raise ValueError. Every requested
+file is validated before existing state is changed.
+
+The numeric format remains four columns: `x, dx, v, dv` in au, au, km/s, km/s.
+`dv == 0` identifies position-cut points; `dx == 0` identifies velocity-cut
+points. Exactly one uncertainty must be zero and the other must be positive.
+All entries must be finite. Row validation errors include the filename and line.
+New files retain the original column header and add a versioned JSON comment
+recording the method, units, position-sign convention, xsign, and input systemic
+velocity. Existing `numpy.loadtxt` consumers can still read the numeric data.
+`write_edgeridge(..., methods=('ridge',))` writes only the requested method;
+requested empty methods produce header-only files.
+
+File positions are normalized by xsign; velocities are relative to the input
+systemic velocity. New metadata restores physical position signs. If the current
+input vsys differs from the saved value, loading shifts relative velocities to
+preserve absolute velocities. Saved red/blue grouping is retained. Positions
+remain in au without distance rescaling; the current distance is used only to
+reconstruct the raw arcsecond coordinates. The current inclination is retained.
+
+Legacy files without metadata assume the current input vsys. Orientation comes
+from an explicit `quadrant='13'` or `'24'`, the object's existing quadrant, or
+inference from the PV image, in that order. Supply the original quadrant when it
+was manually chosen during extraction. For new files, conflicting quadrant
+arguments or inconsistent edge/ridge coordinate metadata raise ValueError.
+
+The files contain already-filtered points, so loading cannot recover discarded
+measurements. Calling `sort_fitresults()` explicitly can refilter the surviving
+points; loading itself does not invoke it.
+
+Plotting without fits is a subsequent upgrade stage.

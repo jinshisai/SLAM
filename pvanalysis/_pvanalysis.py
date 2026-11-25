@@ -8,6 +8,8 @@ Made and developed by Yusuke ASO & Jinshi Sai.
 
 # modules
 import copy
+import json
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy import constants, units
@@ -57,7 +59,7 @@ class PVAnalysis():
         self.vsys = vsys
         self.dist = dist
         self.incl = incl
-        self.sini = np.sin(np.radians(incl))
+        self._update_geometry()
         # Stable containers exist before extraction or fitting.
         self.results = {m: {cut: np.empty((4, 0)) for cut in ('xcut', 'vcut')}
                         for m in ('edge', 'ridge')}
@@ -89,7 +91,6 @@ class PVAnalysis():
         self.res_off = self.fitsdata.res_off
         self.delv = self.fitsdata.delv
         self.__use_position = self.__use_velocity = True
-        self.__unit = 1e10 * self.dist * au / Ggrav / Msun / self.sini**2
 
     @staticmethod
     def _empty_filtered():
@@ -122,6 +123,41 @@ class PVAnalysis():
                     [np.empty(0) for _ in range(6)])
         self.avevsys = 0.
         self.vsys_opt = self.vsys
+
+    def _reset_point_results(self, outname, methods):
+        """Replace the point dataset and invalidate all dependent fit products."""
+        self._invalidate_fits(('edge', 'ridge'))
+        self.model = None
+        self.__sorted = False
+        self.outname = str(outname)
+        for method in ('edge', 'ridge'):
+            self.results[method] = {cut: np.empty((4, 0))
+                                    for cut in ('xcut', 'vcut')}
+            self.results_filtered[method] = self._empty_filtered()
+            self.results_sorted[method] = {side: np.empty((4, 0))
+                                           for side in ('red', 'blue')}
+            self.point_status[method] = 'not_run' if method in methods else 'disabled'
+
+    def _quadrant_contrast(self):
+        """Measure PV intensity contrast between the two diagonal quadrant pairs."""
+        data = np.squeeze(self.fitsdata.data)
+        nxh, nvh = self.fitsdata.nx // 2, self.fitsdata.nv // 2
+        return float(np.sum(data[:nvh, :nxh]) + np.sum(data[nvh:, nxh:])
+                     - np.sum(data[:nvh, nxh:]) - np.sum(data[nvh:, :nxh]))
+
+    def _set_quadrant(self, quadrant):
+        """Keep the selected quadrant and physical position-sign convention aligned."""
+        if quadrant not in ('13', '24'):
+            raise ValueError("quadrant must be '13' or '24'")
+        self.quadrant = quadrant
+        self.xsign = 1. if quadrant == '13' else -1.
+
+    def _update_geometry(self, incl=None):
+        """Refresh inclination and the conversion factor used for dynamical masses."""
+        if incl is not None:
+            self.incl = incl
+        self.sini = np.sin(np.radians(self.incl))
+        self.__unit = 1e10 * self.dist * au / Ggrav / Msun / self.sini**2
 
     def _fit_data(self, method):
         """Return likelihood coordinates without changing the extracted points."""
@@ -208,57 +244,18 @@ class PVAnalysis():
             limit the weight of precise points and may change fit results.
         """
         methods = self._validate_methods(methods)
-        # Extraction replaces the complete point dataset, including disabled cuts.
-        self._invalidate_fits(('edge', 'ridge'))
-        self.__sorted = False
-        for method in ('edge', 'ridge'):
-            self.results[method] = {cut: np.empty((4, 0))
-                                    for cut in ('xcut', 'vcut')}
-            self.point_status[method] = 'not_run' if method in methods else 'disabled'
-            self.results_filtered[method] = self._empty_filtered()
-            self.results_sorted[method] = {side: np.empty((4, 0))
-                                           for side in ('red', 'blue')}
-        # remember output name
-        self.outname = outname
-        # data
-        data = self.fitsdata.data
-        nxh = self.fitsdata.nx // 2
-        nvh = self.fitsdata.nv // 2
+        self._reset_point_results(outname, methods)
         if self.fitsdata.naxis not in [2, 3]:
             print('ERROR\tget_edgeridge: n_axis must be 2 or 3.')
             return
-        elif self.fitsdata.naxis == 3:
-            data = np.squeeze(data)  # Remove stokes I
-        # check quadrant
-
-        def quadcheck(a: np.ndarray) -> float:
-            """Measure the intensity contrast between the two diagonal quadrant pairs.
-
-            Args:
-                a (numpy.ndarray): PV image with velocity along the first axis and
-                    position along the second axis.
-
-            Returns:
-                float: Sum in the lower-left and upper-right array blocks minus the
-                other two blocks, using the enclosing image midpoints.
-            """
-            return float(np.sum(a[:nvh, :nxh])
-                         + np.sum(a[nvh:, nxh:])
-                         - np.sum(a[:nvh, nxh:])
-                         - np.sum(a[nvh:, :nxh]))
-
-        q = np.sign(quadcheck(data))
-        if quadrant is None:
-            self.quadrant = '13' if q > 0 else '24'
-        else:
-            self.quadrant = quadrant
-        if self.quadrant == '13':
-            self.xsign = 1.
-        elif self.quadrant == '24':
-            self.xsign = -1.
-        else:
+        q = np.sign(self._quadrant_contrast())
+        selected_quadrant = quadrant
+        if selected_quadrant is None:
+            selected_quadrant = '13' if q > 0 else '24'
+        if selected_quadrant not in ('13', '24'):
             print('ERROR\tget_edgeridge: quadrant must be 13 or 24.')
             return
+        self._set_quadrant(selected_quadrant)
         if self.xsign != q:
             print('WARNING\tget_edgeridge: '
                   + f'quadrant={quadrant} seems opposite.')
@@ -266,10 +263,7 @@ class PVAnalysis():
         self.xlim = xlim
         self.vlim = vlim
         self.Mlim = Mlim
-        if incl is not None:
-            self.incl = incl  # update incl
-            self.sini = np.sin(np.radians(incl))  # update sini
-        self.__unit = 1e10 * self.dist * au / Ggrav / Msun / self.sini**2
+        self._update_geometry(incl)
         self.__use_position = use_position
         self.__use_velocity = use_velocity
 
@@ -1400,29 +1394,173 @@ class PVAnalysis():
         self.chi2r_r = np.sum(residual**2) / dof if dof > 0 else np.inf
         return self._fit_results()
 
-    def write_edgeridge(self, outname: str = 'pvanalysis') -> None:
-        """Write the edge/ridge positions/velocities to a text file.
+    @staticmethod
+    def _read_edgeridge_file(filename: Path, method: str):
+        """Parse one point file without mutating the analysis object."""
+        rows = []
+        metadata = None
+        for lineno, line in enumerate(filename.read_text().splitlines(), 1):
+            line = line.strip()
+            if line.startswith('# pvanalysis_edgeridge:'):
+                if metadata is not None:
+                    raise ValueError(f'{filename}: duplicate format metadata')
+                try:
+                    metadata = json.loads(line.partition(':')[2])
+                except ValueError as exc:
+                    raise ValueError(f'{filename}: invalid format metadata') from exc
+                if not isinstance(metadata, dict):
+                    raise ValueError(f'{filename}: format metadata must be an object')
+                continue
+            fields = line.split('#', 1)[0].split()
+            if not fields:
+                continue
+            location = f'{filename}: line {lineno}'
+            if len(fields) != 4:
+                raise ValueError(f'{location}: expected four columns x, dx, v, dv')
+            try:
+                row = np.array([float(value) for value in fields])
+            except ValueError as exc:
+                raise ValueError(f'{location}: invalid numeric value') from exc
+            if not np.all(np.isfinite(row)):
+                raise ValueError(f'{location}: values must be finite')
+            dx, dv = row[1], row[3]
+            if dx < 0 or dv < 0:
+                raise ValueError(f'{location}: uncertainties must be nonnegative')
+            if (dx == 0) == (dv == 0):
+                raise ValueError(
+                    f'{location}: exactly one of dx and dv must be zero')
+            rows.append(row)
+        if metadata is not None:
+            expected = {'version': 1, 'method': method,
+                        'columns': ['x', 'dx', 'v', 'dv'],
+                        'units': ['au', 'au', 'km/s', 'km/s'],
+                        'position': 'xsign_times_offset',
+                        'velocity': 'relative_to_vsys'}
+            for key, value in expected.items():
+                if metadata.get(key) != value:
+                    raise ValueError(f'{filename}: unsupported or mismatched metadata: {key}')
+            if metadata.get('xsign') not in (-1, 1):
+                raise ValueError(f'{filename}: metadata xsign must be -1 or 1')
+            try:
+                source_vsys = float(metadata['vsys'])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ValueError(f'{filename}: metadata vsys must be finite') from exc
+            if not np.isfinite(source_vsys):
+                raise ValueError(f'{filename}: metadata vsys must be finite')
+        return np.asarray(rows, dtype=float).reshape(-1, 4).T, metadata
+
+    def read_edgeridge(self, outname: str | Path = 'pvanalysis',
+                       methods: tuple[str, ...] = ('edge', 'ridge'),
+                       quadrant: str | None = None) -> None:
+        """Restore writer-produced points without applying extraction filters.
 
         Args:
-            outname (str, optional): Prefix for ``.edge.dat`` and
-                ``.ridge.dat`` files. Each file contains x, dx, v, and dv in
-                au, au, km/s, and km/s, respectively. Defaults to
-                ``'pvanalysis'``.
+            outname: Prefix for .edge.dat and .ridge.dat files.
+            methods: Methods to load. Missing requested files raise
+                FileNotFoundError; unrequested methods are cleared and disabled.
+            quadrant: Original PV orientation ('13' or '24') for legacy files.
+                None uses file metadata, the current quadrant, or the PV image,
+                in that order. A conflicting metadata override raises ValueError.
+
+        Notes:
+            Files contain normalized x, dx, relative v, dv in au, au, km/s,
+            km/s. Exactly one uncertainty must be zero: dv=0 identifies xcut,
+            dx=0 identifies vcut. New metadata restores position signs and the
+            velocity reference; legacy files assume the current input vsys.
+            Saved red/blue grouping is retained. Empty files mean no points.
+            All requested files are validated before replacing points and
+            clearing previous fits. Previously discarded points cannot be
+            recovered from these files.
         """
-        res_org = self.results_filtered
-        for i, er in enumerate(['edge', 'ridge']):
-            xrb = [res_org[er]['xcut'][rb] for rb in ['red', 'blue']]
-            xcut = np.concatenate(xrb, axis=1)
-            v0, x1, dv0, dx1 = xcut[1], self.xsign * xcut[0], xcut[3], xcut[2]
-            vrb = [res_org[er]['vcut'][rb] for rb in ['red', 'blue']]
-            vcut = np.concatenate(vrb, axis=1)
-            x0, v1, dx0, dv1 = self.xsign * vcut[0], vcut[1], vcut[2], vcut[3]
-            np.savetxt(outname + '.' + er + '.dat',
-                       np.c_[np.r_[x1, x0], np.r_[dx1, dx0],
-                             np.r_[v0, v1], np.r_[dv0, dv1]],
-                       header='x (au), dx (au), v (km/s), dv (km/s)')
-        print('Derived points in'
-              + f' {outname}.edge.dat and {outname}.ridge.dat.')
+        methods = self._validate_methods(methods)
+        if quadrant not in (None, '13', '24'):
+            raise ValueError("quadrant must be '13', '24', or None")
+        loaded = {method: self._read_edgeridge_file(
+            Path(f'{outname}.{method}.dat'), method) for method in methods}
+        headers = [metadata for _, metadata in loaded.values()
+                   if metadata is not None]
+        if headers:
+            xsign = headers[0]['xsign']
+            source_vsys = float(headers[0]['vsys'])
+            if any(header['xsign'] != xsign or float(header['vsys']) != source_vsys
+                   for header in headers[1:]):
+                raise ValueError('Edge and ridge files have inconsistent coordinate references')
+            if quadrant is not None and xsign != (1 if quadrant == '13' else -1):
+                raise ValueError('quadrant conflicts with the saved point metadata')
+        else:
+            orientation = quadrant if quadrant is not None else self.quadrant
+            if orientation is not None:
+                xsign = 1 if orientation == '13' else -1
+            else:
+                xsign = 1 if self._quadrant_contrast() > 0 else -1
+
+        self._reset_point_results(outname, methods)
+        self._set_quadrant('13' if xsign == 1 else '24')
+        self.Mlim = []  # No mass filtering is implied by loading saved points.
+        self._update_geometry()
+        for method in ('edge', 'ridge'):
+            if method not in loaded:
+                continue
+            points, metadata = loaded[method]
+            reference_vsys = self.vsys if metadata is None else float(metadata['vsys'])
+            # File order is x, dx, v, dv; internal order is x, v, dx, dv.
+            restored = points[[0, 2, 1, 3]].copy()
+            restored[0] *= self.xsign
+            restored[1] += reference_vsys - self.vsys
+            for cut, mask in (('xcut', points[3] == 0), ('vcut', points[1] == 0)):
+                raw = restored[:, mask].copy()
+                raw[[0, 2]] /= self.dist
+                raw[1] += self.vsys
+                self.results[method][cut] = raw
+                # Group using the saved reference, without dropping or filtering rows.
+                relative = points[2] if cut == 'xcut' else points[0]
+                for side, side_mask in (('red', relative >= 0),
+                                        ('blue', relative < 0)):
+                    selected = mask & side_mask
+                    self.results_filtered[method][cut][side] = restored[:, selected].copy()
+            for side in ('red', 'blue'):
+                combined = np.concatenate([self.results_filtered[method][cut][side]
+                                           for cut in ('xcut', 'vcut')], axis=1)
+                order = np.argsort(np.abs(combined[0]))
+                self.results_sorted[method][side] = np.abs(combined[:, order])
+            self.point_status[method] = 'success' if points.shape[1] else 'no_points'
+        self.__use_position = any(self.results[m]['xcut'].shape[1]
+                                  for m in methods)
+        self.__use_velocity = any(self.results[m]['vcut'].shape[1]
+                                  for m in methods)
+        self.__sorted = True
+
+    def write_edgeridge(self, outname: str | Path = 'pvanalysis',
+                        methods: tuple[str, ...] = ('edge', 'ridge')) -> None:
+        """Write filtered points with four numeric columns and format metadata.
+
+        Args:
+            outname: Prefix for .edge.dat and .ridge.dat files. Columns are
+                x, dx, v, dv in au, au, km/s, km/s. Position is normalized by
+                xsign and velocity is relative to the input vsys.
+            methods: Methods to write. Requested empty datasets produce
+                header-only files. Defaults to both methods.
+        """
+        methods = self._validate_methods(methods)
+        filenames = []
+        for method in methods:
+            internal = np.concatenate([
+                self.results_filtered[method][cut][side]
+                for cut in ('xcut', 'vcut') for side in ('red', 'blue')
+            ], axis=1)
+            points = internal[[0, 2, 1, 3]].T.copy()
+            points[:, 0] *= self.xsign
+            metadata = {'version': 1, 'method': method,
+                        'columns': ['x', 'dx', 'v', 'dv'],
+                        'units': ['au', 'au', 'km/s', 'km/s'],
+                        'position': 'xsign_times_offset', 'velocity': 'relative_to_vsys',
+                        'xsign': float(self.xsign), 'vsys': float(self.vsys)}
+            header = ('x (au), dx (au), v (km/s), dv (km/s)\n'
+                      + 'pvanalysis_edgeridge: ' + json.dumps(metadata))
+            filename = Path(f'{outname}.{method}.dat')
+            np.savetxt(filename, points, header=header)
+            filenames.append(str(filename))
+        print('Derived points in ' + ', '.join(filenames) + '.')
 
     def get_range(self) -> dict[str, dict[str, list[float]] | None]:
         """Calculate the ranges of the edge/ridge positions (radii) and velocities.

@@ -25,9 +25,6 @@ fixed_dp = 0.0  # Fixed dp when include_dp is False.
 show_pv = True  # figures will be made regardless of this option.
 show_corner = True  # Display corner plots.
 save_corner = True  # Save corner plots independently of display.
-kwargs_emcee_corner = {  # Shared by the edge and ridge fits.
-    'nwalkers_per_ndim': 16, 'nburnin': 2000, 'nsteps': 2000,
-}
 minabserr = 0  # minimum absolute errorbar in the unit of bmaj or dv.
 minrelerr = 0  # minimum relative errorbar.
 calc_evidence = False  # If calculate Bayesian evidence or not.
@@ -43,13 +40,17 @@ impv.get_edgeridge(outname, thr=thr, ridgemode=ridgemode,
                    minabserr=minabserr, minrelerr=minrelerr,
                    nanbeforemax=True, nanopposite=True, nanbeforecross=True)
 impv.write_edgeridge(outname=outname)
+# To reuse saved points, replace get_ and write_edgeridge(...) above with:
+# impv.read_edgeridge(outname=outname)
 impv.fit_edgeridge(include_vsys=include_vsys,
                    include_dp=include_dp,
                    include_pin=include_pin,
                    fixed_pin=fixed_pin, fixed_dp=fixed_dp,
                    outname=outname, rangelevel=0.8,
                    show_corner=show_corner, save_corner=save_corner,
-                   kwargs_emcee_corner=kwargs_emcee_corner,
+                   kwargs_emcee_corner={'nwalkers_per_ndim': 16,
+                                        'nburnin': 2000,
+                                        'nsteps': 2000},
                    calc_evidence=calc_evidence, best=best)
 impv.output_fitresult()
 impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot, flipaxis=False,
