@@ -91,6 +91,7 @@ class PVAnalysis():
         self.res_off = self.fitsdata.res_off
         self.delv = self.fitsdata.delv
         self.__use_position = self.__use_velocity = True
+        self.outname = 'pvanalysis'
 
     @staticmethod
     def _empty_filtered():
@@ -1766,6 +1767,53 @@ class PVAnalysis():
                 report(label, central[j], masses['plow'][j],
                        masses['phigh'][j], 'Msun', 3)
 
+    def _set_plot_vsys(self, vsys_mode='input'):
+        """Choose a common velocity reference for the image and every overlay."""
+        if vsys_mode not in ('input', 'edge', 'ridge', 'mean'):
+            raise ValueError("vsys_mode must be 'input', 'edge', 'ridge', or 'mean'")
+        offsets = {}
+        for method in ('edge', 'ridge'):
+            parameters = self._best_parameters(method)
+            if (self.fit_status[method] == 'success' and parameters is not None
+                    and len(parameters) == 5 and np.isfinite(parameters[4])):
+                offsets[method] = parameters[4]
+        offset = 0.
+        if vsys_mode in ('edge', 'ridge'):
+            if vsys_mode not in offsets:
+                raise ValueError(f'No successful {vsys_mode} power-law fit supplies a systemic offset')
+            offset = offsets[vsys_mode]
+        elif vsys_mode == 'mean' and offsets:
+            offset = float(np.mean(list(offsets.values())))
+        self.avevsys = offset
+        self.vsys_opt = self.vsys + offset
+
+    def _plot_point_groups(self, method):
+        """Yield available point groups in physical au and input-relative km/s."""
+        self._validate_methods((method,))
+        filtered = self.results_filtered[method]
+        if self.__sorted or any(np.size(filtered[cut][side])
+                                for cut in ('xcut', 'vcut')
+                                for side in ('red', 'blue')):
+            for cut in ('xcut', 'vcut'):
+                for side in ('red', 'blue'):
+                    points = np.asarray(filtered[cut][side], dtype=float)
+                    if points.shape[1]:
+                        yield cut, side, points
+        else:
+            # Direct low-level extraction may not yet have been sorted. Plot
+            # those raw points without filtering or changing analysis state.
+            for cut in ('xcut', 'vcut'):
+                raw = self.results[method][cut]
+                if raw is None or np.size(raw) == 0:
+                    continue
+                points = np.array(raw, dtype=float, copy=True)
+                points[[0, 2]] *= self.dist
+                points[1] -= self.vsys
+                relative = points[1] if cut == 'xcut' else self.xsign * points[0]
+                for side, mask in (('red', relative >= 0), ('blue', relative < 0)):
+                    if np.any(mask):
+                        yield cut, side, points[:, mask]
+
     def plot_fitresult(self,
                        vlim: list[float] | np.ndarray = [0, 1e10],
                        xlim: list[float] | np.ndarray = [0, 1e10],
@@ -1784,8 +1832,12 @@ class PVAnalysis():
                        fmt: dict[str, str] = {'edge': 'v', 'ridge': 'o'},
                        linestyle: dict[str, str] = {'edge': '--', 'ridge': '-'},
                        flipaxis: bool = False,
-                       best: str | None = None) -> None:
-        """Make linear and log-log PV diagrams with points and model lines.
+                       best: str | None = None,
+                       vsys_mode: str = 'input') -> None:
+        """Make PV diagrams, overlaying only available points and fitted models.
+
+        Works immediately after initialization, before fitting, or with empty
+        datasets. Unavailable overlays are skipped without dummy fit parameters.
 
         Args:
             vlim (list or numpy.ndarray, optional): Absolute velocity range relative to the
@@ -1826,16 +1878,15 @@ class PVAnalysis():
                 redraws models and ranges without resampling or rewriting files.
             flipaxis (bool, optional): Whether velocity is the horizontal axis
                 and position is the vertical axis. Defaults to False.
+            vsys_mode (str, optional): Velocity reference: 'input' (default),
+                'edge', 'ridge', or 'mean'. Edge/ridge require a successful
+                power-law fit. Mean uses available power-law offsets, falling
+                back to input vsys when none exist. Linear intercepts are not
+                treated as systemic offsets.
         """
         self._select_best(best)
-        if len(self.popt['ridge'][0]) == 5:
-            self.get_range()
-            self.avevsys = (self._best_parameters('edge')[4]
-                            + self._best_parameters('ridge')[4]) / 2.
-            self.vsys_opt = self.vsys + self.avevsys
-        else:
-            self.vsys_opt = self.vsys
-            self.avevsys = 0
+        self._set_plot_vsys(vsys_mode)
+        self.get_range()
         if cblabel is None:
             cblabel_plot = (r'T$_{\rm b}$ (K)' if Tbcolor
                             else self.fitsdata.header.get('BUNIT'))
@@ -1848,89 +1899,115 @@ class PVAnalysis():
                         d=self.fitsdata.data, flipaxis=flipaxis,
                         v=self.fitsdata.vaxis, x=self.fitsdata.xaxis,
                         loglog=loglog, vlim=vlim, xlim=xlim,
-                        multibeam=self.fitsdata.multibeam)
+                        multibeam=self.fitsdata.multibeam,
+                        quadrant=self.quadrant)
             pp.add_color(log=logcolor, Tb=Tbcolor, cblabel=cblabel_plot,
                          **kwargs_pcolormesh)
             pp.add_contour(rms=self.rms, levels=clevels,
                            **kwargs_contour)
-            if plotedgepoint:
-                self.plot_point(ax=pp.ax, loglog=loglog, flipaxis=flipaxis,
-                                method='edge', fmt=fmt['edge'])
-            if plotridgepoint:
-                self.plot_point(ax=pp.ax, loglog=loglog, flipaxis=flipaxis,
-                                method='ridge', fmt=fmt['ridge'])
-            if plotedgemodel:
-                self.plot_model(ax=pp.ax, loglog=loglog, flipaxis=flipaxis,
-                                method='edge', ls=linestyle['edge'])
-            if plotridgemodel:
-                self.plot_model(ax=pp.ax, loglog=loglog, flipaxis=flipaxis,
-                                method='ridge', ls=linestyle['ridge'])
+            for method, draw_points, draw_model in (
+                    ('edge', plotedgepoint, plotedgemodel),
+                    ('ridge', plotridgepoint, plotridgemodel)):
+                point_groups = list(self._plot_point_groups(method))
+                if draw_points and point_groups:
+                    self.plot_point(ax=pp.ax, loglog=loglog, flipaxis=flipaxis,
+                                    method=method, fmt=fmt[method])
+                has_model = (self.popt[method] is not None
+                             and self.models[method] is not None)
+                if draw_model and has_model:
+                    self.plot_model(ax=pp.ax, loglog=loglog, flipaxis=flipaxis,
+                                    method=method, ls=linestyle[method])
             pp.set_axis()
-            pp.savefig(figname=outname + '.' + ext + '.png', show=show)
+            pp.savefig(figname=f'{outname}.{ext}.png', show=show)
 
     def plot_point(self, ax=None, loglog: bool = False,
                    method: str = 'ridge', fmt: str = 'o',
-                   flipaxis: bool = False) -> None:
+                   flipaxis: bool = False, vsys_mode: str | None = None) -> None:
+        """Overlay available points; None retains the current velocity reference."""
         if ax is None:
             print('Please input ax.')
             return -1
+        if vsys_mode is not None:
+            self._set_plot_vsys(vsys_mode)
         color = {'xcut': {'red': 'red', 'blue': 'blue'},
                  'vcut': {'red': 'pink', 'blue': 'cyan'}}
-        for xv in ['xcut', 'vcut']:
-            for rb in ['red', 'blue']:
-                x, v, dx, dv = self.results_filtered[method][xv][rb]
-                v = v - self.avevsys
-                if xv == 'xcut':
-                    dv = 0
-                if xv == 'vcut':
-                    dx = 0
-                if loglog:
-                    x, v = np.abs(x), np.abs(v)
-                if flipaxis:
-                    x, v, dx, dv = v, x, dv, dx
-                ax.errorbar(x, v, xerr=dx, yerr=dv, fmt=fmt,
-                            color=color[xv][rb], ms=5)
+        for cut, side, points in self._plot_point_groups(method):
+            x, v, dx, dv = points.copy()
+            v -= self.avevsys
+            valid = np.all(np.isfinite([x, v, dx, dv]), axis=0)
+            valid &= (dx >= 0) & (dv >= 0)
+            if loglog:
+                x, v = np.abs(x), np.abs(v)
+                valid &= (x > 0) & (v > 0)
+            if not np.any(valid):
+                continue
+            x, v, dx, dv = x[valid], v[valid], dx[valid], dv[valid]
+            if flipaxis:
+                x, v, dx, dv = v, x, dv, dx
+            ax.errorbar(x, v, xerr=dx, yerr=dv, fmt=fmt,
+                        color=color[cut][side], ms=5)
 
     def plot_model(self, ax=None, loglog: bool = False,
-                   model=None, popt: list = [],
+                   model=None, popt: list | np.ndarray | None = None,
                    method: str = 'ridge', ls: str = '-',
-                   flipaxis: bool = False) -> None:
+                   flipaxis: bool = False, vsys_mode: str | None = None) -> None:
+        """Overlay a model without modifying its stored parameters or samples.
+
+        Fold both model branches on log plots so fitted offsets and linear
+        intercepts remain consistent with the image and point velocity reference.
+        Explicit custom models can use the image radius extent before fitting.
+        """
+        self._validate_methods((method,))
         if ax is None:
             print('Please input ax.')
             return -1
+        if vsys_mode is not None:
+            self._set_plot_vsys(vsys_mode)
+        custom_parameters = popt is not None and np.size(popt) > 0
+        if custom_parameters:
+            parameters = np.array(popt, dtype=float, copy=True)
+        else:
+            parameters = self._best_parameters(method)
         if model is None:
             model = self.models[method]
-        if popt == []:
-            popt = self._best_parameters(method)
-            if popt is None:
+        if model is None or parameters is None:
+            return
+        radius_limits = None
+        if custom_parameters:
+            if self.rvlim[method] is not None:
+                radius_limits = self.rvlim[method][0]
+        else:
+            fitted_range = self.get_range()[method]
+            if fitted_range is not None:
+                radius_limits = fitted_range['rlim']
+        if radius_limits is None:
+            radii = np.abs(self.fitsdata.xaxis * self.dist)
+            positive = radii[radii > 0]
+            if not positive.size:
                 return
-            if len(popt) == 5:
-                popt[4] -= self.avevsys
-
-        def fx_model(x: np.ndarray) -> np.ndarray:
-            """Evaluate the selected plotting model with its current parameters.
-
-            Args:
-                x (numpy.ndarray): Signed model positions in au.
-
-            Returns:
-                numpy.ndarray: Model velocities in km/s.
-            """
-            return model(x, *popt)
-
-        if self.rvlim[method] is None:
-            self.get_range()
-        xmin, xmax = self.rvlim[method][0]
+            xmin = max(np.min(positive), abs(self.fitsdata.delx) * self.dist)
+            xmax = np.max(positive)
+        else:
+            xmin, xmax = radius_limits
+        if not np.all(np.isfinite([xmin, xmax])) or xmax <= 0 or xmin > xmax:
+            return
         if loglog:
+            xmin = max(xmin, xmax / 10000.)
             x = np.geomspace(xmin, xmax, 10001)
-            y = (fx_model(x) - fx_model(-x)) / 2.
+            branches = [np.abs(model(x, *parameters) - self.avevsys),
+                        np.abs(model(-x, *parameters) - self.avevsys)]
+            if np.allclose(branches[0], branches[1], equal_nan=True):
+                branches = branches[:1]
         else:
             x = np.linspace(-xmax, xmax, 10001)
-            x[(-xmin < x) * (x < xmin)] = None
-            y = fx_model(self.xsign * x)
-        if flipaxis:
-            x, y = y, x
-        ax.plot(x, y, ls=ls, lw=2, color='gray', zorder=3)
+            x[np.abs(x) < xmin] = np.nan
+            branches = [model(self.xsign * x, *parameters) - self.avevsys]
+        for y in branches:
+            y = np.asarray(y)
+            if loglog:
+                y = np.where(y > 0, y, np.nan)
+            xp, yp = (y, x) if flipaxis else (x, y)
+            ax.plot(xp, yp, ls=ls, lw=2, color='gray', zorder=3)
 
     # Plot results
     def plotresults_pvdiagram(self, outname=None, marker='o', colors=['r'], alpha=1.,
@@ -1938,7 +2015,8 @@ class PVAnalysis():
                               vmin=None, vmax=None, contour=True, clevels=None, pvccolor='k',
                               vrel=False, logscale=False, x_offset=False, ratio=1.2, prop_vkep=None, fontsize=14,
                               lw=1, clip=None, plot_res=True, inmode='fits', xranges=[], yranges=[],
-                              ln_hor=True, ln_var=True, pvalpha=None):
+                              ln_hor=True, ln_var=True, pvalpha=None,
+                              vsys_mode='input', best=None):
         """Plot fitting results on a PV diagram for quick check.
 
 
@@ -1966,72 +2044,45 @@ class PVAnalysis():
                If PVFit object has multiple results, more than one colors
                can be given.
             alpha (float): Transparency alpha for the plot.
+            vsys_mode (str): Same reference choices as plot_fitresult().
+                Applied to relative-velocity plots; absolute velocities stay absolute.
+            best (str or None): Parameter estimator used for fitted velocity offsets.
 
         Return:
             matplotlib ax.
         """
-        # output name
-        if outname:
-            pass
-        else:
-            outname = self.outname + '_pvfit_pvdiagram'
-
-        def plotpoints(ax, x, v, xerr, verr, color, x_offset=False):
-            if x_offset:
-                ax.errorbar(x, v, xerr=xerr, yerr=verr, color=color,
-                            capsize=2., capthick=2., ls='', marker='o')
-            else:
-                ax.errorbar(v, x, xerr=verr, yerr=xerr, color=color,
-                            capsize=2., capthick=2., ls='', marker='o')
-            return ax
+        self._select_best(best)
+        self._set_plot_vsys(vsys_mode)
+        outname = str(outname) if outname is not None else self.outname + '_pvfit_pvdiagram'
 
         # draw pv diagram
         ax = self.fitsdata.draw_pvdiagram(outname, data=None, header=None, ax=ax,
                                           outformat=outformat, color=pvcolor, cmap=cmap,
-                                          vmin=vmin, vmax=vmax, vsys=self.vsys, contour=contour, clevels=clevels,
+                                          vmin=vmin, vmax=vmax, vsys=self.vsys_opt, contour=contour, clevels=clevels,
                                           ccolor=pvccolor, vrel=vrel, logscale=logscale, x_offset=x_offset,
                                           ratio=ratio, prop_vkep=prop_vkep, fontsize=fontsize, lw=lw, clip=clip,
                                           plot_res=plot_res, inmode=inmode, xranges=xranges, yranges=yranges,
                                           ln_hor=ln_hor, ln_var=ln_var, alpha=pvalpha)
 
-        # plot fitting results
-        if self.__sorted:
-            results = copy.deepcopy(self.results_sorted)
-
-            # get them back into arcsec and LSR velocity
-            for i in results:
-                results[i]['red'][0] *= self.xsign/self.dist
-                results[i]['blue'][0] *= -self.xsign/self.dist
-                results[i]['red'][2] *= self.xsign/self.dist
-                results[i]['blue'][2] *= -self.xsign/self.dist
-
-                results[i]['red'][1] = self.vsys + results[i]['red'][1]
-                results[i]['blue'][1] = self.vsys - results[i]['blue'][1]
-
-                colors = {'ridge': {'red': 'red', 'blue': 'blue'},
-                          'edge': {'red': 'pink', 'blue': 'skyblue'}}
-
-                for j in results[i]:
-                    ax = plotpoints(ax, *results[i][j], colors[i][j], x_offset)
-        else:
-            results = self.results
-
-            colors = {'ridge': 'r', 'edge': 'b'}
-            for i in results:
-                # color = colors[i]
-                if self.results[i]['vcut'] is not None:
-                    ax = plotpoints(ax, *self.results[i]['vcut'], colors[i], x_offset)
-
-                if self.results[i]['xcut'] is not None:
-                    ax = plotpoints(ax, *self.results[i]['vcut'], colors[i], x_offset)
-
-        plt.savefig(outname+'.'+outformat, transparent=True)
-        plt.close()
+        point_colors = {'ridge': {'red': 'red', 'blue': 'blue'},
+                        'edge': {'red': 'pink', 'blue': 'skyblue'}}
+        for method in ('edge', 'ridge'):
+            for _, side, points in self._plot_point_groups(method):
+                x, v, dx, dv = points.copy()
+                x, dx = x / self.dist, dx / self.dist
+                v = v - self.avevsys if vrel else v + self.vsys
+                xp, yp, xe, ye = (x, v, dx, dv) if x_offset else (v, x, dv, dx)
+                ax.errorbar(xp, yp, xerr=xe, yerr=ye,
+                            color=point_colors[method][side], capsize=2.,
+                            capthick=2., ls='', marker=marker, alpha=alpha)
+        ax.figure.savefig(outname + '.' + outformat, transparent=True)
+        plt.close(ax.figure)
         return ax
 
     def plotresults_rvplane(self, outname=None, outformat='pdf', ax=None,
                             xlog=True, ylog=True, au=False, marker='o',
-                            capsize=2, capthick=2., colors=None, xlim=[], ylim=[], fontsize=14):
+                            capsize=2, capthick=2., colors=None, xlim=[], ylim=[], fontsize=14,
+                            vsys_mode='input', best=None):
         """Plot edge/ridge in a r-v plane for quick check.
 
         Args:
@@ -2040,7 +2091,10 @@ class PVAnalysis():
             ax (mpl axis): axix object of matplotlib.
             xlog, ylog (bool): In log scale?
             au (bool): In au?
-            Others: options for plot.
+            vsys_mode (str): Same reference choices as plot_fitresult().
+            best (str or None): Parameter estimator used for fitted velocity offsets.
+            Others: options for plot. Points are displayed in au and km/s;
+                the legacy au argument is retained for compatibility.
 
         Return:
             matplotlib ax.
@@ -2052,36 +2106,28 @@ class PVAnalysis():
         plt.rcParams['ytick.direction'] = 'in'     # directions of y ticks ('in'), ('out') or ('inout')
         plt.rcParams['font.size'] = fontsize  # fontsize
 
-        # output name
-        if outname:
-            pass
-        else:
-            outname = self.outname + '_pvfit_rvplane'
-
-        # figure
-        if ax:
-            pass
-        else:
-            fig = plt.figure(figsize=(11.69, 8.27))
-            ax = fig.add_subplot(111)
-
-        if colors:
-            pass
-        else:
+        self._select_best(best)
+        self._set_plot_vsys(vsys_mode)
+        outname = str(outname) if outname is not None else self.outname + '_pvfit_rvplane'
+        if ax is None:
+            _, ax = plt.subplots(figsize=(11.69, 8.27))
+        if colors is None:
             colors = {'ridge': {'red': 'red', 'blue': 'blue'},
                       'edge': {'red': 'pink', 'blue': 'skyblue'}}
-
-        # plot fitting results
-        if not self.__sorted:
-            self.sort_fitresults()
-
-        # plot
-        for i in self.results_sorted:
-            for j in self.results_sorted[i]:
-                # print (self.results_sorted[i][j])
-                ax.errorbar(*self.results_sorted[i][j][0:2], xerr=self.results_sorted[i][j][2],
-                            yerr=self.results_sorted[i][j][3], color=colors[i][j],
-                            marker=marker, capsize=capsize, capthick=capthick, ls='')
+        # Plotting must not refilter points or invalidate fitted models.
+        for method in ('edge', 'ridge'):
+            for _, side, points in self._plot_point_groups(method):
+                x, v, dx, dv = points.copy()
+                x, v = np.abs(x), np.abs(v - self.avevsys)
+                valid = np.all(np.isfinite([x, v, dx, dv]), axis=0)
+                if xlog:
+                    valid &= x > 0
+                if ylog:
+                    valid &= v > 0
+                if np.any(valid):
+                    ax.errorbar(x[valid], v[valid], xerr=dx[valid], yerr=dv[valid],
+                                color=colors[method][side], marker=marker,
+                                capsize=capsize, capthick=capthick, ls='')
 
         ax.tick_params(which='both', direction='in', bottom=True, top=True,
                        left=True, right=True, pad=9)
@@ -2101,8 +2147,8 @@ class PVAnalysis():
         ax.set_xlabel(r'Radius (au)')
         ax.set_ylabel(r'Velocity (km s$^{-1}$)')
 
-        plt.savefig(outname+'.'+outformat, transparent=True)
-        plt.close()
+        ax.figure.savefig(outname + '.' + outformat, transparent=True)
+        plt.close(ax.figure)
         return ax
 
 

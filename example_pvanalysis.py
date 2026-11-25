@@ -23,6 +23,7 @@ include_pin = False  # False means pin=0.5 (Keplerian).
 fixed_pin = 0.5  # Fixed pin when include_pin is False.
 fixed_dp = 0.0  # Fixed dp when include_dp is False.
 show_pv = True  # figures will be made regardless of this option.
+vsys_mode = 'input'  # Plot center: 'input', 'edge', 'ridge', or 'mean'.
 show_corner = True  # Display corner plots.
 save_corner = True  # Save corner plots independently of display.
 minabserr = 0  # minimum absolute errorbar in the unit of bmaj or dv.
@@ -34,6 +35,8 @@ best = 'pmid'  # 'popt': maximum probability; 'pmid': posterior medians.
 
 '-------- HOW TO DO EACH STEP --------'
 impv = PVAnalysis(fitsfile, rms, vsys, dist, incl=incl, pa=None)
+# Image-only plotting is already available here, before extraction or fitting:
+# impv.plot_fitresult(outname='image_only', show=False)
 impv.get_edgeridge(outname, thr=thr, ridgemode=ridgemode,
                    use_position=use_position, use_velocity=use_velocity,
                    Mlim=Mlim, xlim=np.array(xlim) / dist, vlim=vlim,
@@ -56,6 +59,7 @@ impv.output_fitresult()
 impv.plot_fitresult(vlim=vlim_plot, xlim=xlim_plot, flipaxis=False,
                     clevels=[-9, -6, -3, 3, 6, 9], outname=outname,
                     show=show_pv, logcolor=True, Tbcolor=False,
+                    vsys_mode=vsys_mode,
                     kwargs_pcolormesh={'cmap': 'viridis'},
                     kwargs_contour={'colors': 'lime'},
                     fmt={'edge': 'v', 'ridge': 'o'},

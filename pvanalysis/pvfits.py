@@ -296,8 +296,8 @@ class Impvfits:
         velmax = vaxis[-1] + delv*0.5
 
         # set axes
+        data = np.squeeze(data)
         if x_offset:
-            data = data[0, :, :]
             extent = (offmin, offmax, velmin, velmax)
             xlabel = offlabel
             ylabel = vlabel
@@ -308,7 +308,7 @@ class Impvfits:
             res_y = delv
         else:
             # data   = np.rot90(data[0,:,:])
-            data = data[0, :, :].T
+            data = data.T
             extent = (velmin, velmax, offmin, offmax)
             xlabel = vlabel
             ylabel = offlabel

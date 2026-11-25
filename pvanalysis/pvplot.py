@@ -260,12 +260,24 @@ class PVPlot():
                 * lam**2 / 2. / constants.k_B.to('J/K').value / Omega
             d = d * Jy2K
         if log:
-            vmin = kwargs['vmin'] if 'vmin' in kwargs else np.nanstd(d)
+            positive = d[np.isfinite(d) & (d > 0)]
+            if positive.size:
+                default_min = np.nanstd(d)
+                if not np.isfinite(default_min) or default_min <= 0:
+                    default_min = np.min(positive)
+                vmin = kwargs.get('vmin', default_min)
+                vmax = kwargs.get('vmax', np.max(positive))
+                d = np.log10(d.clip(np.min(positive), None))
+            else:
+                # No positive intensities can be represented on a log scale.
+                # Draw an empty map with a finite default color range.
+                vmin = kwargs.get('vmin', 1.)
+                vmax = kwargs.get('vmax', 10.)
+                d = np.ma.masked_all(d.shape, dtype=float)
+            if not np.all(np.isfinite([vmin, vmax])) or vmin <= 0 or vmax <= 0:
+                raise ValueError('Logarithmic color limits must be finite and positive.')
             kwargs['vmin'] = np.log10(vmin)
-            vmax = kwargs['vmax'] if 'vmax' in kwargs else np.nanmax(d)
             kwargs['vmax'] = np.log10(vmax)
-        if log:
-            d = np.log10(d.clip(np.min(d[d > 0]), None))
         kwargs0 = dict(kwargs0, **kwargs)
         ax = self.ax
         if self.flipaxis:

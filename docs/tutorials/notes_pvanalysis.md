@@ -214,4 +214,56 @@ The files contain already-filtered points, so loading cannot recover discarded
 measurements. Calling `sort_fitresults()` explicitly can refilter the surviving
 points; loading itself does not invoke it.
 
-Plotting without fits is a subsequent upgrade stage.
+### Plotting at any workflow stage
+
+`plot_fitresult()` works immediately after constructing `PVAnalysis`, after
+extraction or loading, and after fitting. The PV intensity image and contours
+are always drawn. Available points and fitted models are overlaid according to
+`plotedgepoint`, `plotridgepoint`, `plotedgemodel`, and `plotridgemodel`.
+Unavailable overlays are skipped automatically, including when extraction found
+no points or a fit was skipped or failed. No dummy fit parameters are needed.
+Both linear and log-log PNG files are produced as before.
+
+```python
+impv = PVAnalysis(fitsfile, rms, vsys, dist, incl=incl)
+impv.plot_fitresult(outname='image_only', show=False)
+
+impv.read_edgeridge('saved_points', methods=('ridge',))
+impv.plot_fitresult(outname='ridge_points', show=False)
+# After fitting, the same call also draws the available ridge model.
+```
+
+All high-level plotting methods accept `vsys_mode` and `best`:
+
+| vsys_mode | Velocity reference |
+| --- | --- |
+| `'input'` (default) | Input `vsys`, regardless of fitted offsets |
+| `'edge'` | Input `vsys` plus the selected edge power-law offset |
+| `'ridge'` | Input `vsys` plus the selected ridge power-law offset |
+| `'mean'` | Input `vsys` plus the mean of available successful power-law offsets; input `vsys` if none exist |
+
+Explicit edge/ridge modes raise ValueError if that method has no successful
+power-law fit. Linear-fit intercepts are not treated as systemic offsets.
+`best='pmid'` or `'popt'` selects the fitted offset estimator as well as the model
+parameters. The image, points, and models share the chosen velocity reference.
+The default now uses input `vsys`, replacing the previous automatic averaging
+of edge and ridge offsets; use `vsys_mode='mean'` to request averaging explicitly.
+
+On folded log-log plots, both model branches are drawn when they differ after
+velocity centering. This preserves fitted offsets and linear intercepts instead
+of cancelling them by averaging the branches. Stored parameters, posterior
+samples, and extracted points are never modified by plotting.
+
+`plot_point()` and `plot_model()` also skip unavailable overlays. Their optional
+`vsys_mode=None` retains the current plot reference (initially input `vsys`), so
+both helpers can draw on the same axes. Custom model parameters supplied as a
+list or NumPy array are copied; a custom model can use the image radius extent
+when no fitted range exists.
+
+The older `plotresults_pvdiagram()` and `plotresults_rvplane()` also support
+empty and single-method datasets. They do not refilter points or invalidate fits.
+Relative-velocity quick-look diagrams use the selected center; absolute-velocity
+diagrams retain absolute velocities. Position uncertainties remain nonnegative
+in both quadrants. The legacy image drawer supports 2D and singleton-Stokes PV
+arrays. Blank maps without positive intensities can use logarithmic color
+scaling; their color layer is masked with a finite default color range.
