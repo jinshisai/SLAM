@@ -7,7 +7,6 @@ Made and developed by Yusuke ASO & Jinshi Sai.
 
 
 # modules
-import copy
 import json
 from pathlib import Path
 import numpy as np
@@ -99,6 +98,21 @@ class PVAnalysis():
                 for cut in ('xcut', 'vcut')}
 
     @staticmethod
+    def _valid_points(points, cut):
+        """Keep finite [x, v, dx, dv] rows with a positive measured error.
+
+        The independent coordinate's error must be zero, matching the saved
+        point format. Invalid measured errors are not repaired by error floors.
+        """
+        points = np.asarray(points, dtype=float)
+        valid = np.all(np.isfinite(points), axis=0)
+        if cut == 'xcut':
+            valid &= (points[2] > 0) & (points[3] == 0)
+        else:
+            valid &= (points[3] > 0) & (points[2] == 0)
+        return points[:, valid]
+
+    @staticmethod
     def _validate_methods(methods):
         """Validate method names before changing any analysis state."""
         if isinstance(methods, str):
@@ -161,11 +175,11 @@ class PVAnalysis():
         self.__unit = 1e10 * self.dist * au / Ggrav / Msun / self.sini**2
 
     def _fit_data(self, method):
-        """Return likelihood coordinates without changing the extracted points."""
+        """Return valid likelihood coordinates without changing extracted points."""
         points = self.results_filtered[method]
-        xcut = np.concatenate([points['xcut'][side]
+        xcut = np.concatenate([self._valid_points(points['xcut'][side], 'xcut')
                                for side in ('red', 'blue')], axis=1)
-        vcut = np.concatenate([points['vcut'][side]
+        vcut = np.concatenate([self._valid_points(points['vcut'][side], 'vcut')
                                for side in ('red', 'blue')], axis=1)
         return [xcut[1], self.xsign * xcut[0], xcut[2],
                 self.xsign * vcut[0], vcut[1], vcut[3]]
@@ -243,6 +257,9 @@ class PVAnalysis():
             ``minabserr * resolution``, and ``minrelerr * abs(coordinate)``.
             Both default to 0, imposing no additional floors. Positive values
             limit the weight of precise points and may change fit results.
+            Points must have finite coordinates and a finite positive measured
+            uncertainty before these floors are applied. The independent
+            coordinate's uncertainty must be zero.
         """
         methods = self._validate_methods(methods)
         self._reset_point_results(outname, methods)
@@ -317,6 +334,9 @@ class PVAnalysis():
             ``minabserr * resolution``, and ``minrelerr * abs(coordinate)``.
             Both default to 0, imposing no additional floors. Positive values
             limit the weight of precise points and may change fit results.
+            Points must have finite coordinates and a finite positive measured
+            uncertainty before these floors are applied. The independent
+            coordinate's uncertainty must be zero.
         """
         self._invalidate_fits(('edge', 'ridge'))
         # results are sorted?
@@ -355,7 +375,7 @@ class PVAnalysis():
                         or np.size(self.results[re][xv]) == 0):
                     continue
                 # x, v, err_x, err_v
-                results = copy.deepcopy(self.results[re][xv])
+                results = self._valid_points(self.results[re][xv], xv)
                 results[1] -= self.vsys
                 # clip too small error
                 if xv == 'xcut':
@@ -416,10 +436,9 @@ class PVAnalysis():
             for rb in ['red', 'blue']:
                 if ((np.size(self.results[re]['xcut']) > 0)
                         & (np.size(self.results[re]['vcut']) > 0)):
-                    # remove nan
-                    for xv, ival in zip(['xcut', 'vcut'], [0, 1]):
-                        ref = store[xv][rb]
-                        s = [k[~np.isnan(ref[ival])] for k in ref]
+                    # Remove invalid coordinates and errors after all filtering.
+                    for xv in ['xcut', 'vcut']:
+                        s = self._valid_points(store[xv][rb], xv)
                         store[xv][rb] = s
                         res_f[xv][rb] = s
                     # combine xcut/vcut
@@ -429,13 +448,12 @@ class PVAnalysis():
                          for k in range(4)])
                 elif not ((np.size(self.results[re]['xcut']) == 0)
                           and (np.size(self.results[re]['vcut']) == 0)):
-                    # only remove nan
                     if np.size(self.results[re]['xcut']) > 0:
-                        xv, ival, ref = 'xcut', 0, store['xcut'][rb]
+                        xv = 'xcut'
                     else:
-                        xv, ival, ref = 'vcut', 1, store['vcut'][rb]
-                    res_comb = [k[~np.isnan(ref[ival])] for k in ref]
-                    res_f[xv][rb] = [k[~np.isnan(ref[ival])] for k in ref]
+                        xv = 'vcut'
+                    res_comb = self._valid_points(store[xv][rb], xv)
+                    res_f[xv][rb] = res_comb.copy()
                 else:
                     res_comb = np.empty((4, 0))
 
@@ -1533,7 +1551,10 @@ class PVAnalysis():
 
     def write_edgeridge(self, outname: str | Path = 'pvanalysis',
                         methods: tuple[str, ...] = ('edge', 'ridge')) -> None:
-        """Write filtered points with four numeric columns and format metadata.
+        """Write valid filtered points with four columns and format metadata.
+
+        Unusable coordinates or uncertainties are excluded using the same
+        validity rule as fitting. Raw extraction results are preserved.
 
         Args:
             outname: Prefix for .edge.dat and .ridge.dat files. Columns are
@@ -1546,7 +1567,7 @@ class PVAnalysis():
         filenames = []
         for method in methods:
             internal = np.concatenate([
-                self.results_filtered[method][cut][side]
+                self._valid_points(self.results_filtered[method][cut][side], cut)
                 for cut in ('xcut', 'vcut') for side in ('red', 'blue')
             ], axis=1)
             points = internal[[0, 2, 1, 3]].T.copy()

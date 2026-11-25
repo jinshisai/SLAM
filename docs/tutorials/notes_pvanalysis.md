@@ -130,7 +130,13 @@ previously enabled cuts; unselected methods contain empty arrays.
 Point containers exist immediately after initialization. Empty point arrays have
 shape `(4, 0)` in the existing `[x, v, dx, dv]` order. `point_status` distinguishes
 `not_run`, `disabled`, `no_points`, and `success`. Individual invalid measurements
-may still contain NaNs before filtering.
+may still contain NaNs or infinite uncertainties in the raw extraction results.
+Before filtering and uncertainty floors, points with nonfinite coordinates,
+nonfinite/nonpositive measured uncertainties, or nonzero independent-coordinate
+uncertainties are removed. Error floors apply only to otherwise valid points.
+Fitting and writing enforce the same validity rule. An unusable point in one
+cut does not remove usable points from the other cut; if no valid points remain,
+the method has `no_points` status and writes a header-only point file.
 
 `popt` always has `edge` and `ridge` keys. An unavailable fit is `None`; successful
 entries retain the existing `[parameters, uncertainties]` structure and parameter
