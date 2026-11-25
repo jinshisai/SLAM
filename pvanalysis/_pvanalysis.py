@@ -58,10 +58,68 @@ class PVAnalysis():
         self.dist = dist
         self.incl = incl
         self.sini = np.sin(np.radians(incl))
-        # initialize results
-        self.results = {'ridge': {'vcut': None, 'xcut': None},
-                        'edge': {'vcut': None, 'xcut': None}}
+        # Stable containers exist before extraction or fitting.
+        self.results = {m: {cut: np.empty((4, 0)) for cut in ('xcut', 'vcut')}
+                        for m in ('edge', 'ridge')}
+        self.results_sorted = {m: {side: np.empty((4, 0))
+                                  for side in ('red', 'blue')}
+                               for m in ('edge', 'ridge')}
+        self.results_filtered = {m: self._empty_filtered()
+                                 for m in ('edge', 'ridge')}
+        self.point_status = dict.fromkeys(('edge', 'ridge'), 'not_run')
+        self.fit_status = dict.fromkeys(('edge', 'ridge'), 'not_run')
+        self.popt = dict.fromkeys(('edge', 'ridge'))
+        self.fit_summaries = {}
+        self.mass_samples = {}
+        self.mass_summaries = {}
+        self.chain = dict.fromkeys(('edge', 'ridge'))
+        self.lnp = dict.fromkeys(('edge', 'ridge'))
+        self.rvlim = dict.fromkeys(('edge', 'ridge'))
+        self.chi2r_e = self.chi2r_r = None
+        self.model = None
+        self.best = 'pmid'
+        self.avevsys = 0.
+        self.vsys_opt = self.vsys
+        self.__Es = [np.empty(0) for _ in range(6)]
+        self.__Rs = [np.empty(0) for _ in range(6)]
         self.__sorted = False
+        self.xsign = 1.
+        self.quadrant = None
+        self.res_off = self.fitsdata.res_off
+        self.delv = self.fitsdata.delv
+        self.__use_position = self.__use_velocity = True
+        self.__unit = 1e10 * self.dist * au / Ggrav / Msun / self.sini**2
+
+    @staticmethod
+    def _empty_filtered():
+        return {cut: {side: np.empty((4, 0)) for side in ('red', 'blue')}
+                for cut in ('xcut', 'vcut')}
+
+    @staticmethod
+    def _validate_methods(methods):
+        """Validate method names before changing any analysis state."""
+        if isinstance(methods, str):
+            methods = (methods,)
+        methods = tuple(methods)
+        if (not methods or len(set(methods)) != len(methods)
+                or any(m not in ('edge', 'ridge') for m in methods)):
+            raise ValueError("methods must select 'edge', 'ridge', or both without duplicates")
+        return methods
+
+    def _invalidate_fits(self, methods):
+        """Discard products only for fits whose input data are changing."""
+        for method in methods:
+            self.popt[method] = None
+            self.fit_status[method] = 'not_run'
+            for products in (self.fit_summaries, self.mass_samples,
+                             self.mass_summaries):
+                products.pop(method, None)
+            self.chain[method] = self.lnp[method] = self.rvlim[method] = None
+            setattr(self, 'chi2r_' + method[0], None)
+            setattr(self, '_PVAnalysis__' + ('Es' if method == 'edge' else 'Rs'),
+                    [np.empty(0) for _ in range(6)])
+        self.avevsys = 0.
+        self.vsys_opt = self.vsys
 
     def get_edgeridge(self, outname: str, thr: float = 5.,
                       incl: float | None = None,
@@ -77,10 +135,13 @@ class PVAnalysis():
                       interp_ridge: bool = False,
                       minrelerr: float = 0, minabserr: float = 0,
                       nanbeforemax: bool = True, nanopposite: bool = True,
-                      nanbeforecross: bool = True) -> None:
+                      nanbeforecross: bool = True,
+                      methods: tuple[str, ...] = ('edge', 'ridge')) -> None:
         """Derive edge and ridge points along the position and velocity axes.
 
         Args:
+            methods (tuple[str, ...]): Methods to retain, 'edge', 'ridge', or both.
+                Extraction replaces all previous points and invalidates their fits.
             outname (str): Prefix for diagnostic figures.
             thr (float, optional): Edge and ridge intensity threshold in units
                 of the RMS noise. Defaults to 5.
@@ -127,6 +188,17 @@ class PVAnalysis():
             Both default to 0, imposing no additional floors. Positive values
             limit the weight of precise points and may change fit results.
         """
+        methods = self._validate_methods(methods)
+        # Extraction replaces the complete point dataset, including disabled cuts.
+        self._invalidate_fits(('edge', 'ridge'))
+        self.__sorted = False
+        for method in ('edge', 'ridge'):
+            self.results[method] = {cut: np.empty((4, 0))
+                                    for cut in ('xcut', 'vcut')}
+            self.point_status[method] = 'not_run' if method in methods else 'disabled'
+            self.results_filtered[method] = self._empty_filtered()
+            self.results_sorted[method] = {side: np.empty((4, 0))
+                                           for side in ('red', 'blue')}
         # remember output name
         self.outname = outname
         # data
@@ -194,6 +266,10 @@ class PVAnalysis():
                                     ridgemode=ridgemode, pixrng=pixrng_vcut,
                                     interp_ridge=interp_ridge)
 
+        for method in ('edge', 'ridge'):
+            if method not in methods:
+                self.results[method] = {cut: np.empty((4, 0))
+                                        for cut in ('xcut', 'vcut')}
         # sort results
         self.sort_fitresults(minrelerr=minrelerr, minabserr=minabserr,
                              nanbeforemax=nanbeforemax,
@@ -228,6 +304,7 @@ class PVAnalysis():
             Both default to 0, imposing no additional floors. Positive values
             limit the weight of precise points and may change fit results.
         """
+        self._invalidate_fits(('edge', 'ridge'))
         # results are sorted?
         self.__sorted = True
         # to store
@@ -260,7 +337,8 @@ class PVAnalysis():
             store = {'xcut': {'red': None, 'blue': None},
                      'vcut': {'red': None, 'blue': None}}
             for xv in ['xcut', 'vcut']:
-                if self.results[re][xv] is None:
+                if (self.results[re][xv] is None
+                        or np.size(self.results[re][xv]) == 0):
                     continue
                 # x, v, err_x, err_v
                 results = copy.deepcopy(self.results[re][xv])
@@ -300,8 +378,8 @@ class PVAnalysis():
                 store[xv]['red'] = res_red
                 store[xv]['blue'] = res_blue
             # remove low-velocity positions and inner velocities when using both positions and velocities
-            if ((self.results[re]['xcut'] is not None)
-                    & (self.results[re]['vcut'] is not None)):
+            if ((np.size(self.results[re]['xcut']) > 0)
+                    & (np.size(self.results[re]['vcut']) > 0)):
                 for rb in ['red', 'blue']:
                     if not nanbeforecross:
                         break
@@ -322,8 +400,8 @@ class PVAnalysis():
                      'vcut': {'red': np.array([[], [], [], []]),
                               'blue': np.array([[], [], [], []])}}
             for rb in ['red', 'blue']:
-                if ((self.results[re]['xcut'] is not None)
-                        & (self.results[re]['vcut'] is not None)):
+                if ((np.size(self.results[re]['xcut']) > 0)
+                        & (np.size(self.results[re]['vcut']) > 0)):
                     # remove nan
                     for xv, ival in zip(['xcut', 'vcut'], [0, 1]):
                         ref = store[xv][rb]
@@ -335,19 +413,17 @@ class PVAnalysis():
                         [np.append(store['xcut'][rb][k],
                                    store['vcut'][rb][k])
                          for k in range(4)])
-                elif not ((self.results[re]['xcut'] is None)
-                          and (self.results[re]['vcut'] is None)):
+                elif not ((np.size(self.results[re]['xcut']) == 0)
+                          and (np.size(self.results[re]['vcut']) == 0)):
                     # only remove nan
-                    if self.results[re]['xcut'] is not None:
+                    if np.size(self.results[re]['xcut']) > 0:
                         xv, ival, ref = 'xcut', 0, store['xcut'][rb]
                     else:
                         xv, ival, ref = 'vcut', 1, store['vcut'][rb]
                     res_comb = [k[~np.isnan(ref[ival])] for k in ref]
                     res_f[xv][rb] = [k[~np.isnan(ref[ival])] for k in ref]
                 else:
-                    print('ERROR\tsort_fitresults: '
-                          + 'No fitting results are found.')
-                    return
+                    res_comb = np.empty((4, 0))
 
                 # arcsec --> au
                 res_comb[0] = res_comb[0]*self.dist
@@ -361,6 +437,14 @@ class PVAnalysis():
                 # save
                 self.results_sorted[re][rb] = res_comb
             self.results_filtered[re] = res_f
+            if self.point_status[re] != 'disabled':
+                has_points = any(np.size(res_f[cut][side])
+                                 for cut in ('xcut', 'vcut')
+                                 for side in ('red', 'blue'))
+                if has_points:
+                    self.point_status[re] = 'success'
+                else:
+                    self.point_status[re] = 'no_points'
 
     def get_edgeridge_vcut(self, outname: str, thr: float = 5.,
                            xlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
@@ -869,11 +953,13 @@ class PVAnalysis():
                       return_chain: bool = False,
                       return_lnp: bool = False,
                       calc_evidence: bool = False,
-                      best: str = 'pmid'
-                      ) -> dict[str, dict[str, np.ndarray]] | int:
+                      best: str = 'pmid',
+                      methods: tuple[str, ...] = ('edge', 'ridge')
+                      ) -> dict[str, dict[str, np.ndarray] | None]:
         """Fit the edge and ridge points with a double power law using MCMC.
 
         Args:
+            methods (tuple[str, ...]): Methods to fit. Unselected fits are preserved.
             include_vsys (bool, optional): Whether to fit the systemic-velocity
                 offset. False fixes it at zero. Defaults to False.
             include_dp (bool, optional): Whether to fit the change in power-law
@@ -885,11 +971,11 @@ class PVAnalysis():
             fixed_dp (float, optional): Index change used when ``include_dp``
                 is False. Zero means a single power law. Defaults to 0.
             rb_range (list, numpy.ndarray or None, optional): Prior range of break radius in
-                au, shared by the edge and ridge fits. None uses the combined
-                absolute-radius range of both datasets. Defaults to None.
+                au, shared by the selected fits. None uses the combined
+                absolute-radius range of selected nonempty datasets. Defaults to None.
             vb_range (list, numpy.ndarray or None, optional): Prior range of break velocity
-                in km/s, shared by the edge and ridge fits. None uses the
-                combined absolute-velocity range of both datasets. Defaults
+                in km/s, shared by the selected fits. None uses the
+                combined absolute-velocity range of selected nonempty datasets. Defaults
                 to None.
             pin_range (list or numpy.ndarray, optional): Prior range of the inner index.
                 Defaults to [0.01, 10].
@@ -922,12 +1008,14 @@ class PVAnalysis():
             medians with symmetric half-percentile-width errors regardless of best.
             Full summaries are available in ``self.fit_summaries``.
             Each parameter vector is ``[r_break, v_break, p_in, dp, vsys]``.
-            Returns -1 when no edge or ridge points are available.
+            Unavailable methods have a None result; other methods can still fit.
         """
+        methods = self._validate_methods(methods)
         self._select_best(best)
-        self.fit_summaries = {}
-        self.mass_samples = {}
-        self.mass_summaries = {}
+        self._invalidate_fits(methods)
+        for method in ('edge', 'ridge'):
+            if method not in methods and self.popt[method] is None:
+                self.fit_status[method] = 'disabled'
         res_org = self.results_filtered
         Ds = [None, None]
         for i, er in enumerate(['edge', 'ridge']):
@@ -939,27 +1027,27 @@ class PVAnalysis():
             x0, v1, dv1 = self.xsign * vcut[0], vcut[1], vcut[3]
             Ds[i] = [v0, x1, dx1, x0, v1, dv1]
         Es, Rs = Ds
-        self.__Es = Es
-        self.__Rs = Rs
+        if 'edge' in methods:
+            self.__Es = Es
+        if 'ridge' in methods:
+            self.__Rs = Rs
         self.model = doublepower_v
-        if (len(Es[0]) == 0 and len(Es[3]) == 0) \
-                or (len(Rs[0]) == 0 and len(Rs[3]) == 0):
-            if len(Es[0]) == 0 and len(Es[3]) == 0:
-                print('No edge point was found.')
-            if len(Rs[0]) == 0 and len(Rs[3]) == 0:
-                print('No ridge point was found.')
-            print('Skip the fitting to edge/ridge points.')
-            self.popt = {'edge': [[np.nan] * 5, [np.nan] * 5],
-                         'ridge': [[np.nan] * 5, [np.nan] * 5]}
-            return -1
+        active = [m for m, data in zip(('edge', 'ridge'), Ds)
+                  if m in methods and (len(data[0]) or len(data[3]))]
+        for method in methods:
+            if method not in active:
+                self.fit_status[method] = 'no_points'
+        if not active:
+            return {m: (None if self.popt[m] is None else
+                        {'popt': self.popt[m][0], 'perr': self.popt[m][1]})
+                    for m in ('edge', 'ridge')}
 
         labels = np.array(['Rb', 'Vb', 'p_in', 'dp', 'dVsys'])
         include = [True, include_dp or (fixed_dp != 0), include_pin,
                    include_dp, include_vsys]
         labels = labels[include]
         popt_e, popt_r = [np.empty(5), np.empty(5)], [np.empty(5), np.empty(5)]
-        self.chain = {'edge': None, 'ridge': None} if return_chain else None
-        self.lnp = {'edge': None, 'ridge': None} if return_lnp else None
+        active_data = [d for m, d in zip(('edge', 'ridge'), Ds) if m in active]
 
         def minabs(a: list[np.ndarray], i: int, j: int) -> float:
             """Find the smallest absolute value across two data arrays.
@@ -988,14 +1076,17 @@ class PVAnalysis():
             return float(np.max(np.abs(np.r_[a[i], a[j]])))
 
         if rb_range is None:
-            rb_range = [min(minabs(a, 1, 3) for a in Ds),
-                        max(maxabs(a, 1, 3) for a in Ds)]
+            rb_range = [min(minabs(a, 1, 3) for a in active_data),
+                        max(maxabs(a, 1, 3) for a in active_data)]
         if vb_range is None:
-            vb_range = [min(minabs(a, 0, 4) for a in Ds),
-                        max(maxabs(a, 0, 4) for a in Ds)]
+            vb_range = [min(minabs(a, 0, 4) for a in active_data),
+                        max(maxabs(a, 0, 4) for a in active_data)]
 
         for args, ext, key, res in zip([Es, Rs], ['_e', '_r'],
                                        ['edge', 'ridge'], [popt_e, popt_r]):
+            if key not in active:
+                continue
+            self.fit_status[key] = 'failed'
             plim = np.transpose([rb_range, vb_range, pin_range, dp_range, vsys_range])
             q0 = np.array([0, np.sqrt(plim[0][1] * plim[1][1]),
                            fixed_pin, fixed_dp, 0])
@@ -1091,6 +1182,8 @@ class PVAnalysis():
             (qopt := q0 * 1)[np.isnan(q0)] = popt
             (qerr := q0 * 0)[np.isnan(q0)] = perr
             res[:] = [qopt, qerr]
+            self.popt[key] = res
+            self.fit_status[key] = 'success'
             dof = len(args[0]) + len(args[3]) - len(plim[0])
             chi2 = -2 * lnprob(summaries[self.best][include], *args)
             if ext == '_e':
@@ -1098,10 +1191,11 @@ class PVAnalysis():
             else:
                 self.chi2r_r = chi2 / dof if dof > 0 else np.inf
 
-        print(f'Corner plots in {outname}.corner_e.png '
-              + f'and {outname}.corner_r.png')
-        self.popt = {'edge': popt_e, 'ridge': popt_r}
+        print('Corner plots in ' + ', '.join(f'{outname}.corner_{m[0]}.png'
+                                             for m in active))
         for key, suffix in [('edge', 'e'), ('ridge', 'r')]:
+            if key not in active:
+                continue
             with open(str(outname) + '.popt_' + suffix + '.txt', 'w') as f:
                 f.write('#Rows:Rb,Vb,p_in,dp,dVsys,M_b,M_in,M_out\n')
                 f.write('#Columns:popt,plow,pmid,phigh\n')
@@ -1114,11 +1208,12 @@ class PVAnalysis():
                         + ' are mass-posterior percentiles.\n')
                 np.savetxt(f, np.array([self.mass_summaries[key][name][[2, 0, 1]]
                                         for name in ('popt', 'plow', 'pmid', 'phigh')]).T)
-        print(f'Fitting results in {outname}.popt_e.txt '
-              + f'and {outname}.popt_r.txt.')
+        print('Fitting results in ' + ', '.join(f'{outname}.popt_{m[0]}.txt'
+                                                for m in active))
         self.get_range()
-        result = {'edge': {'popt': popt_e[0], 'perr': popt_e[1]},
-                  'ridge': {'popt': popt_r[0], 'perr': popt_r[1]}}
+        result = {m: (None if self.popt[m] is None else
+                      {'popt': self.popt[m][0], 'perr': self.popt[m][1]})
+                  for m in ('edge', 'ridge')}
         return result
 
     def fit_linear(self, include_intercept: bool = True
@@ -1307,11 +1402,15 @@ class PVAnalysis():
             'rlim' is a list of [r_minimum, r_maximum].
             'vlim' is a list of [v_minimum, v_maximum].
         """
-        lims_e = self._range_for(*self.__Es, self._best_parameters('edge'))
-        lims_r = self._range_for(*self.__Rs, self._best_parameters('ridge'))
-        self.rvlim = {'edge': lims_e, 'ridge': lims_r}
-        result = {'edge': {'rlim': lims_e[0], 'vlim': lims_e[1]},
-                  'ridge': {'rlim': lims_r[0], 'vlim': lims_r[1]}}
+        result = {}
+        for method, data in (('edge', self.__Es), ('ridge', self.__Rs)):
+            if self.popt[method] is None:
+                self.rvlim[method] = None
+                result[method] = None
+                continue
+            lims = self._range_for(*data, self._best_parameters(method))
+            self.rvlim[method] = lims
+            result[method] = {'rlim': lims[0], 'vlim': lims[1]}
         return result
 
     def _range_for(self, v0: np.ndarray, x1: np.ndarray, dx1: np.ndarray,
@@ -1364,6 +1463,8 @@ class PVAnalysis():
         summaries = getattr(self, 'fit_summaries', {})
         if method in summaries:
             return summaries[method][self.best].copy()
+        if self.popt[method] is None:
+            return None
         return np.array(self.popt[method][0], copy=True)
 
     def _masses(self, method, params):
