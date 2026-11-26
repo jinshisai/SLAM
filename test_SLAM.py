@@ -479,8 +479,8 @@ def test_velgrad_filtering_forwards_all_sampler_options(
         assert all(not options["return_chain"] for _, options in vg_sampler[:-1])
 
 
-@pytest.mark.parametrize("voff_fixed", [0.0, None])
-def test_velgrad_mass_fit_forwards_sampler_options(vg_sampler, voff_fixed):
+@pytest.mark.parametrize("voff_fixed", [0.0, 0.2, -0.2, None])
+def test_velgrad_mass_fit_forwards_sampler_options(vg_sampler, voff_fixed, capsys):
     vg = make_synthetic_velgrad()
     radius = np.full(7, np.nan)
     good = vg.v != 0
@@ -500,7 +500,7 @@ def test_velgrad_mass_fit_forwards_sampler_options(vg_sampler, voff_fixed):
     original = copy.deepcopy(settings)
     result = vg.calc_mstar(
         voff_fixed=voff_fixed,
-        print_result=False,
+        print_result=True,
         return_chain=True,
         return_lnp=True,
         kwargs_emcee_corner=settings,
@@ -519,6 +519,14 @@ def test_velgrad_mass_fit_forwards_sampler_options(vg_sampler, voff_fixed):
     assert vg.lnp_mstar.shape == (12,)
     assert result["popt"].shape == (4,)
     assert np.isfinite(result["Mstar"])
+
+    np.testing.assert_equal(vg.popt, result["popt"])
+    np.testing.assert_equal(vg.perr, result["perr"])
+    report = capsys.readouterr().out
+    if voff_fixed is not None:
+        assert result["popt"][-1] == voff_fixed
+        assert result["perr"][-1] == 0.0
+        assert f"voff = {voff_fixed:.3f} +/- 0.000" in report
 
 
 @pytest.mark.parametrize("method", ["filtering", "calc_mstar"])

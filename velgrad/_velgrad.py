@@ -681,8 +681,8 @@ class VelGrad(ReadFits):
             dof = len(v) - len(popt)
             self.chi2r_mstar = -2. * lnprob(popt) / dof if dof > 0 else np.inf
             if voff_fixed is not None:
-                popt = np.r_[popt, 0]
-                perr = np.r_[perr, 0]
+                popt = np.r_[popt, voff_fixed]
+                perr = np.r_[perr, 0.0]
 
             M_p, vb, p_low, voff = popt
             dM_p, dvb, dp_low, dvoff = perr
