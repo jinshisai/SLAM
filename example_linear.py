@@ -16,7 +16,7 @@ vlim = np.array([-1.4, 0, 0, 1.4]) + vsys  # km/s
 Mlim = [0, 10]  # M_sun; to exclude unreasonable points
 xlim_plot = [100.0 / 20.0, 100.0]  # au; [inlim, outlim]
 vlim_plot = [3.0 / 20.0, 3.0]  # km/s
-use_velocity = True  # cuts along the velocity direction
+use_velocity = False  # cuts along the velocity direction
 use_position = True  # cuts along the positional direction
 include_intercept = True  # False means v(x=0) is fixed at 0.
 show_pv = True  # figures will be made regardless of this option.
@@ -27,41 +27,39 @@ minrelerr = 0  # minimum relative errorbar.
 
 '-------- HOW TO DO EACH STEP --------'
 impv = PVAnalysis(fitsfile, rms, vsys, dist, pa=None)
-impv.get_edgeridge(
-    outname,
-    thr=thr,
-    ridgemode=ridgemode,
-    incl=incl,
-    use_position=use_position,
-    use_velocity=use_velocity,
-    Mlim=Mlim,
-    xlim=np.array(xlim) / dist,
-    vlim=vlim,
-    minabserr=minabserr,
-    minrelerr=minrelerr,
-    nanbeforemax=False,
-    nanopposite=False,
-    nanbeforecross=False,
-    methods=methods,
-)
+impv.get_edgeridge(outname,
+                   thr=thr,
+                   ridgemode=ridgemode,
+                   incl=incl,
+                   use_position=use_position,
+                   use_velocity=use_velocity,
+                   Mlim=Mlim,
+                   xlim=np.array(xlim) / dist,
+                   vlim=vlim,
+                   minabserr=minabserr,
+                   minrelerr=minrelerr,
+                   nanbeforemax=False,
+                   nanopposite=False,
+                   nanbeforecross=False,
+                   methods=methods,
+                   )
 impv.write_edgeridge(outname=outname, methods=methods)
 fit_result = impv.fit_linear(include_intercept=include_intercept)
-impv.plot_fitresult(
-    vlim=vlim_plot,
-    xlim=xlim_plot,
-    clevels=[-9, -6, -3, 3, 6, 9],
-    outname=outname,
-    show=show_pv,
-    logcolor=True,
-    Tbcolor=False,
-    kwargs_pcolormesh={'cmap': 'viridis'},
-    kwargs_contour={'colors': 'lime'},
-    fmt={'edge': 'v', 'ridge': 'o'},
-    linestyle={'edge': '--', 'ridge': '-'},
-    plotridgepoint=True,
-    plotedgepoint=False,
-    plotridgemodel=True,
-    plotedgemodel=False,
-    vsys_mode='input',
-)
+impv.plot_fitresult(vlim=vlim_plot,
+                    xlim=xlim_plot,
+                    clevels=[-9, -6, -3, 3, 6, 9],
+                    outname=outname,
+                    show=show_pv,
+                    logcolor=True,
+                    Tbcolor=False,
+                    kwargs_pcolormesh={'cmap': 'viridis', 'vmin': rms},
+                    kwargs_contour={'colors': 'lime'},
+                    fmt={'edge': 'v', 'ridge': 'o'},
+                    linestyle={'edge': '--', 'ridge': '-'},
+                    plotridgepoint=True,
+                    plotedgepoint=False,
+                    plotridgemodel=True,
+                    plotedgemodel=False,
+                    vsys_mode='input',
+                    )
 '-------------------------------------'
