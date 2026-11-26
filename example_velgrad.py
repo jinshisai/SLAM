@@ -31,7 +31,13 @@ vg.read_cubefits(cubefits=cubefits, center=center,
                  vmin=vmin, vmax=vmax)
 vg.get_2Dcenter(cutoff=cutoff, vmask=vmask,
                 minrelerr=minrelerr, minabserr=minabserr, method=method)
-vg.filtering(pa0=pa, filename=filehead)
-vg.calc_mstar(incl=incl)
+vg.filtering(pa0=pa, filename=filehead,
+             kwargs_emcee_corner={'nwalkers_per_ndim': 8,
+                                  'nburnin': 2000,
+                                  'nsteps': 8000})
+vg.calc_mstar(incl=incl,
+              kwargs_emcee_corner={'nwalkers_per_ndim': 8,
+                                   'nburnin': 2000,
+                                   'nsteps': 8000})
 vg.plot_center(filehead=filehead, pa=pa, show_figs=show_figs)
 '-------------------------------------'

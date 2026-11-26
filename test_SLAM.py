@@ -1,3 +1,4 @@
+import copy
 import os
 import tempfile
 from pathlib import Path
@@ -371,6 +372,193 @@ def test_velgrad_center_extraction():
     assert vg.center["yc"].shape == vg.v.shape
     assert np.count_nonzero(np.isfinite(vg.center["xc"])) > 0
     assert np.count_nonzero(np.isfinite(vg.center["yc"])) > 0
+
+
+def make_synthetic_velgrad():
+    vg = VelGrad()
+    vg.v = np.arange(-3.0, 4.0)
+    vg.x = vg.y = np.linspace(-100.0, 100.0, 5)
+    vg.bmaj = 5.0
+    x, y = np.zeros(7), 10.0 * vg.v
+    x[3] = y[3] = np.nan
+    vg.center = {"xc": x, "yc": y, "dxc": np.ones(7), "dyc": np.ones(7)}
+    return vg
+
+
+@pytest.fixture
+def vg_sampler(monkeypatch):
+    import velgrad._velgrad as module
+
+    calls = []
+
+    def sample(bounds, logprob, **kwargs):
+        center = np.mean(bounds, axis=0)
+        assert np.isfinite(logprob(center))
+        calls.append((bounds.copy(), kwargs))
+        result = [center, np.full(len(center), 0.1)]
+        if kwargs["return_chain"]:
+            result.append(np.tile(center[:, None], (1, 12)))
+        if kwargs["return_lnp"]:
+            result.append(np.zeros(12))
+        return result
+
+    monkeypatch.setattr(module, "emcee_corner", sample)
+    return calls
+
+
+@pytest.mark.parametrize("fixcenter", [False, True])
+@pytest.mark.parametrize(
+    "chain, lnp", [(False, False), (True, False), (False, True), (True, True)]
+)
+def test_velgrad_sampler_defaults_and_output_layout(vg_sampler, fixcenter, chain, lnp):
+    from velgrad._velgrad import emcee_custom
+
+    bounds = np.array([[-10.0, -10.0, -90.0], [10.0, 10.0, 90.0]])
+    result = emcee_custom(
+        bounds, lambda p: -np.sum(p**2), fixcenter, return_chain=chain, return_lnp=lnp
+    )
+    sampled = 1 if fixcenter else 3
+    assert len(result) == 2 + chain + lnp
+    assert result[0].shape == result[1].shape == (3,)
+    if fixcenter:
+        np.testing.assert_equal(result[0][:2], [0.0, 0.0])
+        np.testing.assert_equal(result[1][:2], [0.0, 0.0])
+    if chain:
+        assert result[2].shape == (sampled, 12)
+    if lnp:
+        assert result[3 if chain else 2].shape == (12,)
+    used_bounds, options = vg_sampler[0]
+    assert used_bounds.shape == (2, sampled)
+    assert options["nwalkers_per_ndim"] == 8
+    assert options["nburnin"] == 2000 and options["nsteps"] == 8000
+    assert options["simpleoutput"] is True
+
+
+@pytest.mark.parametrize("fixcenter", [False, True])
+@pytest.mark.parametrize("lowvelfilter", [False, True])
+def test_velgrad_filtering_forwards_all_sampler_options(
+    vg_sampler, fixcenter, lowvelfilter
+):
+    vg = make_synthetic_velgrad()
+    labels = ["Angle"] if fixcenter else ["X", "Y", "Angle"]
+    settings = {
+        "nwalkers_per_ndim": 4,
+        "nburnin": 5,
+        "nsteps": 6,
+        "rangelevel": None,
+        "range_corner": {"pa": [-90.0, 90.0], "xoff": [-50.0, 50.0]},
+        "labels": labels,
+        "show_corner": False,
+        "figname": None,
+    }
+    original = copy.deepcopy(settings)
+    result = vg.filtering(
+        fixcenter=fixcenter,
+        lowvelfilter=lowvelfilter,
+        save_points=False,
+        print_result=False,
+        return_chain=True,
+        return_lnp=True,
+        kwargs_emcee_corner=settings,
+    )
+    assert len(vg_sampler) == (5 if lowvelfilter else 1)
+    expected_range = (
+        [[-90.0, 90.0]] if fixcenter else [[-50.0, 50.0], 0.8, [-90.0, 90.0]]
+    )
+    for _, options in vg_sampler:
+        assert options["nsteps"] == 6 and options["nburnin"] == 5
+        assert options["nwalkers_per_ndim"] == 4
+        assert options["labels"] == labels
+        assert options["range_corner"] == expected_range
+        assert options["figname"] is None and options["show_corner"] is False
+    assert settings == original
+    assert vg.chain_grad.shape == (1 if fixcenter else 3, 12)
+    assert vg.lnp_grad.shape == (12,)
+    assert result["pa_grad"] == 0.0
+    if lowvelfilter:
+        assert all(not options["return_chain"] for _, options in vg_sampler[:-1])
+
+
+@pytest.mark.parametrize("voff_fixed", [0.0, None])
+def test_velgrad_mass_fit_forwards_sampler_options(vg_sampler, voff_fixed):
+    vg = make_synthetic_velgrad()
+    radius = np.full(7, np.nan)
+    good = vg.v != 0
+    radius[good] = np.sign(vg.v[good]) * 100.0 / vg.v[good] ** 2
+    vg.kepler = {
+        "xc": vg.center["xc"].copy(),
+        "yc": radius,
+        "dxc": np.ones(7),
+        "dyc": np.ones(7),
+    }
+    vg.pa_grad = 0.0
+    settings = {
+        "nsteps": 15,
+        "nburnin": 5,
+        "range_corner": {"M_p": [1.0, 1000.0], "voff": [-0.5, 0.5]},
+    }
+    original = copy.deepcopy(settings)
+    result = vg.calc_mstar(
+        voff_fixed=voff_fixed,
+        print_result=False,
+        return_chain=True,
+        return_lnp=True,
+        kwargs_emcee_corner=settings,
+    )
+    expected = ["M_p", "v_break", "p_low"]
+    ranges = [[1.0, 1000.0], 0.8, 0.8]
+    if voff_fixed is None:
+        expected.append("voff")
+        ranges.append([-0.5, 0.5])
+    options = vg_sampler[0][1]
+    assert options["nsteps"] == 15 and options["nburnin"] == 5
+    assert options["labels"] == expected
+    assert options["range_corner"] == ranges
+    assert settings == original
+    assert vg.chain_mstar.shape == (len(expected), 12)
+    assert vg.lnp_mstar.shape == (12,)
+    assert result["popt"].shape == (4,)
+    assert np.isfinite(result["Mstar"])
+
+
+@pytest.mark.parametrize("method", ["filtering", "calc_mstar"])
+@pytest.mark.parametrize(
+    "key",
+    ["bounds", "log_prob_fn", "args", "simpleoutput", "return_chain", "return_lnp"],
+)
+def test_velgrad_rejects_protected_options_before_work(method, key):
+    vg = VelGrad()
+    with pytest.raises(ValueError, match=key):
+        getattr(vg, method)(kwargs_emcee_corner={key: None})
+
+
+def test_velgrad_real_sampler_options_and_corner(tmp_path):
+    vg = make_synthetic_velgrad()
+    output = str(tmp_path / "gradient.corner.png")
+    vg.filtering(
+        save_points=False,
+        print_result=False,
+        return_chain=True,
+        kwargs_emcee_corner={
+            "nwalkers_per_ndim": 8,
+            "nburnin": 8,
+            "nsteps": 16,
+            "figname": output,
+            "range_corner": {"pa": [-90.0, 90.0]},
+        },
+    )
+    assert vg.chain_grad.shape == (1, 128)
+    assert Path(output).stat().st_size > 1000
+    result = vg.calc_mstar(
+        voff_fixed=None,
+        print_result=False,
+        return_chain=True,
+        return_lnp=True,
+        kwargs_emcee_corner={"nwalkers_per_ndim": 8, "nburnin": 8, "nsteps": 16},
+    )
+    assert vg.chain_mstar.shape == (4, 512)
+    assert vg.lnp_mstar.shape == (512,)
+    assert np.isfinite(result["Mstar"])
 
 
 def test_pvfitting_loads_pv_and_generates_mock_diagrams():

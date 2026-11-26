@@ -52,9 +52,23 @@ def gauss2d(xy: tuple[np.ndarray, np.ndarray] | np.ndarray,
     return np.ravel(peak * np.exp2(-s**2 / wx**2 - t**2 / wy**2))
 
 
+def _emcee_options(kwargs_emcee_corner):
+    """Copy sampler options and protect the velocity-gradient output contract."""
+    options = dict(kwargs_emcee_corner or {})
+    protected = {'bounds', 'log_prob_fn', 'args', 'simpleoutput',
+                 'return_chain', 'return_lnp'}
+    conflicts = protected.intersection(options)
+    if conflicts:
+        names = ', '.join(sorted(conflicts))
+        raise ValueError(f'kwargs_emcee_corner cannot override internal arguments: {names}')
+    return options
+
+
 def emcee_custom(plim: np.ndarray, lnprob: Callable[[np.ndarray], float],
                  fixcenter: bool, return_chain: bool = False,
-                 return_lnp: bool = False) -> list[np.ndarray]:
+                 return_lnp: bool = False,
+                 kwargs_emcee_corner: dict[str, object] | None = None,
+                 parameter_names: tuple[str, ...] | None = None) -> list[np.ndarray]:
     """Run MCMC with the sampling settings used by velocity-gradient fits.
 
     Args:
@@ -68,19 +82,35 @@ def emcee_custom(plim: np.ndarray, lnprob: Callable[[np.ndarray], float],
             returned list. Defaults to False.
         return_lnp (bool, optional): Append sampled log probabilities to the
             returned list, after the chain if requested. Defaults to False.
+        kwargs_emcee_corner (dict or None): Options overriding the sampling
+            defaults. Bounds, likelihood arguments, simpleoutput, return_chain,
+            and return_lnp are controlled internally or by explicit arguments.
+        parameter_names (tuple or None): Canonical names for all prior columns.
+            Used as default labels and for named corner ranges. With fixcenter,
+            only the final name is sampled. Missing named ranges default to 0.8.
 
     Returns:
         list: Fitted parameters and uncertainties, followed by any requested
         chain and log probabilities. Optional sampling outputs retain only
         sampled parameters; they are not padded with fixed center offsets.
     """
+    options = {'nwalkers_per_ndim': 8, 'nburnin': 2000, 'nsteps': 8000}
+    if parameter_names is not None:
+        if len(parameter_names) != plim.shape[1]:
+            raise ValueError('parameter_names must match the prior columns')
+        parameter_names = parameter_names[-1:] if fixcenter else parameter_names
+        options['labels'] = list(parameter_names)
+    options.update(_emcee_options(kwargs_emcee_corner))
+    named_ranges = options.get('range_corner')
+    if isinstance(named_ranges, dict):
+        if parameter_names is None:
+            raise ValueError('Named corner ranges require parameter_names')
+        options['range_corner'] = [named_ranges.get(name, 0.8)
+                                   for name in parameter_names]
     mcmc = emcee_corner(plim[:, -1:] if fixcenter else plim,
-                        lnprob,
-                        nwalkers_per_ndim=8,
-                        nburnin=2000, nsteps=8000,
-                        simpleoutput=True,
+                        lnprob, simpleoutput=True,
                         return_chain=return_chain,
-                        return_lnp=return_lnp)
+                        return_lnp=return_lnp, **options)
     popt, perr = mcmc[:2]
     i_mcmc = 2
     if fixcenter:
@@ -216,7 +246,8 @@ class VelGrad(ReadFits):
                   save_points: bool = True,
                   print_result: bool = True,
                   return_chain: bool = False,
-                  return_lnp: bool = False
+                  return_lnp: bool = False,
+                  kwargs_emcee_corner: dict[str, object] | None = None
                   ) -> dict[str, float | dict[str, np.ndarray]]:
         """Fit a velocity-gradient axis and filter inconsistent channels.
 
@@ -240,11 +271,21 @@ class VelGrad(ReadFits):
                 ``self.chain_grad``. Defaults to False.
             return_lnp (bool, optional): Whether to store log probabilities in
                 ``self.lnp_grad``. Defaults to False.
+            kwargs_emcee_corner (dict or None): Options passed to emcee_corner
+                for every preliminary and final gradient fit, overriding the
+                defaults (8 walkers per dimension, 2000 burn-in, 8000 steps).
+                Set figname/show_corner to save/display corner plots. A reused
+                figname is overwritten by subsequent filtering passes. Named
+                range_corner keys are xoff, yoff, pa; fixed offsets are omitted,
+                missing entries use 0.8, and custom labels do not change keys.
+                Use return_chain/return_lnp above to retain sampling outputs.
+                The supplied dictionary is not modified. Defaults to None.
 
         Returns:
             dict: Best-fit center and position angle, their uncertainties, the
                 reduced chi-square, and retained channel centers.
         """
+        kwargs_emcee_corner = _emcee_options(kwargs_emcee_corner)
         xc = self.center['xc'] * 1
         yc = self.center['yc'] * 1
         dxc = self.center['dxc'] * 1
@@ -409,7 +450,10 @@ class VelGrad(ReadFits):
                                 float: Minus half the fitting objective for the current channel subset.
                             """
                             return -0.5 * chi2(p, *args)
-                    popt, perr = emcee_custom(plim, lnprob, fixcenter)
+                    popt, perr = emcee_custom(
+                        plim, lnprob, fixcenter,
+                        kwargs_emcee_corner=kwargs_emcee_corner,
+                        parameter_names=('xoff', 'yoff', 'pa'))
                     xoff, yoff, pa_grad = popt
                     if print_result:
                         print('xoff, yoff, pa ='
@@ -445,7 +489,9 @@ class VelGrad(ReadFits):
                     return -0.5 * chi2(p, *args)
             mcmc = emcee_custom(plim, lnprob, fixcenter,
                                 return_chain=return_chain,
-                                return_lnp=return_lnp)
+                                return_lnp=return_lnp,
+                                kwargs_emcee_corner=kwargs_emcee_corner,
+                                parameter_names=('xoff', 'yoff', 'pa'))
             popt, perr = mcmc[:2]
             i_mcmc = 2
             if return_chain:
@@ -513,7 +559,8 @@ class VelGrad(ReadFits):
                    minabserr: float = 0, minrelerr: float = 0,
                    print_result: bool = True,
                    return_chain: bool = False,
-                   return_lnp: bool = False
+                   return_lnp: bool = False,
+                   kwargs_emcee_corner: dict[str, object] | None = None
                    ) -> dict[str, float | np.ndarray | None]:
         """Fit a rotation profile and estimate the central stellar mass.
 
@@ -534,6 +581,15 @@ class VelGrad(ReadFits):
                 ``self.chain_mstar``. Defaults to False.
             return_lnp (bool, optional): Whether to store log probabilities in
                 ``self.lnp_mstar``. Defaults to False.
+            kwargs_emcee_corner (dict or None): Options passed to emcee_corner,
+                overriding the defaults (8 walkers per dimension, 2000 burn-in,
+                8000 steps). Set figname/show_corner to save/display plots.
+                Named range_corner keys are M_p, v_break, p_low, voff; fixed
+                voff is omitted and missing entries use 0.8. p_low is sampled
+                as the radius-versus-speed exponent, before the reciprocal
+                used for terminal reporting. Use return_chain/return_lnp above
+                to retain sampling outputs. The dictionary is not modified.
+                Defaults to None.
 
         Returns:
             dict: Stellar mass and uncertainty, characteristic radius and
@@ -546,6 +602,7 @@ class VelGrad(ReadFits):
             Both default to 0, imposing no additional floors. Positive values
             limit the weight of precise points and may change fit results.
         """
+        kwargs_emcee_corner = _emcee_options(kwargs_emcee_corner)
         self.incl = incl
         sini2 = np.sin(np.radians(incl))**2
         xc = self.kepler['xc'] * 1
@@ -609,7 +666,11 @@ class VelGrad(ReadFits):
                 plim = plim[:, :-1]
             mcmc = emcee_custom(plim, lnprob, False,
                                 return_chain=return_chain,
-                                return_lnp=return_lnp)
+                                return_lnp=return_lnp,
+                                kwargs_emcee_corner=kwargs_emcee_corner,
+                                parameter_names=(('M_p', 'v_break', 'p_low', 'voff')
+                                                 if voff_fixed is None else
+                                                 ('M_p', 'v_break', 'p_low')))
             popt, perr = mcmc[:2]
             i_mcmc = 2
             if return_chain:
