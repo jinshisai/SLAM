@@ -39,7 +39,7 @@ Velocity-gradient analysis
 ``filtering()`` and ``calc_mstar()`` accept ``kwargs_emcee_corner`` to configure
 sampling and corner plots. For example, pass
 ``kwargs_emcee_corner={'nburnin': 500, 'nsteps': 1000}`` to either method.
-Omitting it retains 8 walkers per dimension, 2000 burn-in steps, and 8000
+Omitting it uses 16 walkers per dimension, 2000 burn-in steps, and 2000
 production steps. ``figname`` and ``show_corner`` control saving and display.
 Filtering applies these options to every preliminary and final fit, so a shared
 filename is overwritten by subsequent passes.

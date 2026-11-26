@@ -429,8 +429,8 @@ def test_velgrad_sampler_defaults_and_output_layout(vg_sampler, fixcenter, chain
         assert result[3 if chain else 2].shape == (12,)
     used_bounds, options = vg_sampler[0]
     assert used_bounds.shape == (2, sampled)
-    assert options["nwalkers_per_ndim"] == 8
-    assert options["nburnin"] == 2000 and options["nsteps"] == 8000
+    assert options["nwalkers_per_ndim"] == 16
+    assert options["nburnin"] == 2000 and options["nsteps"] == 2000
     assert options["simpleoutput"] is True
 
 
