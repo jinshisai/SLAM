@@ -94,7 +94,7 @@ def emcee_custom(plim: np.ndarray, lnprob: Callable[[np.ndarray], float],
         chain and log probabilities. Optional sampling outputs retain only
         sampled parameters; they are not padded with fixed center offsets.
     """
-    options = {'nwalkers_per_ndim': 8, 'nburnin': 2000, 'nsteps': 8000}
+    options = {'nwalkers_per_ndim': 16, 'nburnin': 2000, 'nsteps': 2000}
     if parameter_names is not None:
         if len(parameter_names) != plim.shape[1]:
             raise ValueError('parameter_names must match the prior columns')
