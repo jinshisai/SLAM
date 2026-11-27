@@ -28,7 +28,7 @@ def read_velgrad_test_cube(vg):
         center="04h39m53.878s +26d03m09.43s",
         vsys=5.9,
         dist=DIST,
-        sigma=SIGMA,
+        rms=SIGMA,
         xmin=-RMAX,
         xmax=RMAX,
         ymin=-RMAX,
@@ -38,7 +38,7 @@ def read_velgrad_test_cube(vg):
     )
 
 
-def make_test_channelfit():
+def make_test_channelfit(noise_name="rms"):
     chan = ChannelFit(scaling="uniform", progressbar=False)
     chan.makegrid(
         cubefits=DATA / "test.cube.fits",
@@ -47,7 +47,7 @@ def make_test_channelfit():
         incl=85.0,
         vsys=5.9,
         dist=DIST,
-        sigma=SIGMA,
+        **{noise_name: SIGMA},
         rmax=RMAX,
         vlim=[-3.6, -2.0, 2.0, 3.6],
         nlayer=2,
@@ -103,7 +103,8 @@ def pv_sampler(monkeypatch):
     return calls
 
 
-def test_pvanalysis_edgeridge_workflow(tmp_path, monkeypatch):
+@pytest.mark.parametrize("cutoff_name", ["cutoff", "thr"])
+def test_pvanalysis_edgeridge_workflow(tmp_path, monkeypatch, cutoff_name):
     from matplotlib.figure import Figure
 
     monkeypatch.setattr(Figure, "savefig", lambda self, *args, **kwargs: None)
@@ -113,7 +114,7 @@ def test_pvanalysis_edgeridge_workflow(tmp_path, monkeypatch):
 
     impv.get_edgeridge(
         str(outname),
-        thr=5.0,
+        **{cutoff_name: 5.0},
         ridgemode="mean",
         use_position=True,
         use_velocity=True,
@@ -579,7 +580,7 @@ def test_pvfitting_loads_pv_and_generates_mock_diagrams():
         rmax=RMAX,
         vmin=-3.6,
         vmax=3.6,
-        sigma=SIGMA,
+        rms=SIGMA,
         skipto=5,
     )
 
@@ -615,8 +616,10 @@ def test_pvfitting_loads_pv_and_generates_mock_diagrams():
     assert np.nanmax(minor) > 0
 
 
-def test_channelfit_makegrid_builds_deterministic_state():
-    chan = make_test_channelfit()
+@pytest.mark.parametrize("noise_name", ["rms", "sigma"])
+def test_channelfit_makegrid_builds_deterministic_state(noise_name):
+    chan = make_test_channelfit(noise_name)
+    assert chan.rms == chan.sigma == SIGMA
 
     assert chan.data_valid.shape[0] == len(chan.v_valid)
     assert chan.mom0.shape == (len(chan.y), len(chan.x))
@@ -624,3 +627,104 @@ def test_channelfit_makegrid_builds_deterministic_state():
     assert chan.gaussbeam.ndim == 2
     assert chan.xnest.shape[0] == 2
     assert np.count_nonzero(np.isfinite(chan.mom0)) > 0
+
+
+@pytest.mark.parametrize("analysis", [PVAnalysis, PVFitting, ChannelFit, VelGrad])
+def test_noise_attribute_aliases(analysis):
+    obj = analysis.__new__(analysis)
+    obj.rms = 0.1
+    assert obj.sigma == 0.1
+    obj.sigma = 0.2
+    assert obj.rms == 0.2
+    obj.rms = 0.3
+    assert obj.sigma == 0.3
+
+
+@pytest.mark.parametrize("reader", ["read_cubefits", "read_pvfits"])
+@pytest.mark.parametrize("mode", ["rms", "sigma", "positional", "automatic"])
+def test_fits_noise_input_aliases(reader, mode):
+    from utils import ReadFits
+
+    obj = ReadFits()
+    cube = reader == "read_cubefits"
+    path = DATA / ("test.cube.fits" if cube else "test.pvfitting.major.fits")
+    method = getattr(obj, reader)
+    if mode == "positional":
+        args = ([path, None, 1, 0] + [None] * 6 + [1, 1, SIGMA] if cube
+                else [path, 1, 0] + [None] * 4 + [1, SIGMA])
+        result = method(*args)
+    else:
+        result = method(path, **({} if mode == "automatic" else {mode: SIGMA}))
+    assert result["rms"] == result["sigma"] == obj.rms == obj.sigma
+    assert np.isfinite(obj.rms)
+    if mode != "automatic":
+        assert obj.rms == SIGMA
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_pvfitting_noise_alias(legacy):
+    obj = PVFitting()
+    obj.put_PV(DATA / "test.pvfitting.major.fits",
+               DATA / "test.pvfitting.minor.fits", DIST, 5.9, RMAX, -3.6, 3.6,
+               **{"sigma" if legacy else "rms": SIGMA})
+    assert obj.rms == obj.sigma == SIGMA
+    assert obj.dpvmajor.shape == obj.dpvminor.shape
+
+
+def test_channel_helper_aliases():
+    from channelfit._channelfit import makemom012, clean, estimate_noise
+
+    data = np.arange(12.0).reshape(3, 2, 2)
+    v = np.arange(3.0)
+    canonical = makemom012(data, v, rms=0.1, cutoff=2)
+    for result in [makemom012(data, v, sigma=0.1, threshold=2),
+                   makemom012(data, v, 0.1, 2)]:
+        for key in canonical:
+            np.testing.assert_equal(result[key], canonical[key])
+    image = np.ones((3, 3))
+    beam = np.ones((1, 1))
+    np.testing.assert_equal(clean(image, beam, rms=1, cutoff=2),
+                            clean(image, beam, sigma=1, threshold=2))
+    noise = np.linspace(-1, 1, 30)
+    assert estimate_noise(noise, cutoff=3) == estimate_noise(noise, thr=3)
+
+
+def renamed_parameters():
+    from utils import ReadFits
+    from channelfit._channelfit import makemom012, clean, modeldeconvolve, estimate_noise
+
+    return [
+        (ReadFits.read_cubefits, "sigma", "rms"),
+        (ReadFits.read_pvfits, "sigma", "rms"),
+        (PVFitting.put_PV, "sigma", "rms"),
+        (ChannelFit.makegrid, "sigma", "rms"),
+        (PVAnalysis.get_edgeridge, "thr", "cutoff"),
+        (PVAnalysis.get_edgeridge_xcut, "thr", "cutoff"),
+        (PVAnalysis.get_edgeridge_vcut, "thr", "cutoff"),
+        (makemom012, "sigma", "rms"),
+        (makemom012, "threshold", "cutoff"),
+        (clean, "sigma", "rms"),
+        (clean, "threshold", "cutoff"),
+        (modeldeconvolve, "sigma", "rms"),
+        (estimate_noise, "thr", "cutoff"),
+    ]
+
+
+@pytest.mark.parametrize("function, old, new", renamed_parameters())
+@pytest.mark.parametrize("positional", [False, True])
+def test_parameter_alias_conflicts(function, old, new, positional):
+    from inspect import signature
+
+    # Reject ambiguity before any file access or processing, including an
+    # explicitly supplied default and an alias for a positional argument.
+    args = []
+    kwargs = {old: None}
+    if positional:
+        for name in signature(function).parameters:
+            args.append(None)
+            if name == new:
+                break
+    else:
+        kwargs[new] = None
+    with pytest.raises(TypeError, match=f"both '{new}' and its alias '{old}'"):
+        function(*args, **kwargs)

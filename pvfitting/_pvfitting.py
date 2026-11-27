@@ -14,7 +14,7 @@ from astropy.io import fits
 from astropy import wcs
 import warnings
 from tqdm import tqdm
-from utils import emcee_corner, ReadFits
+from utils import emcee_corner, ReadFits, keyword_aliases
 from pvfitting.mockpvd import MockPVD
 
 warnings.simplefilter('ignore', RuntimeWarning)
@@ -23,11 +23,12 @@ warnings.simplefilter('ignore', RuntimeWarning)
 class PVFitting(ReadFits):
     """Fit a Keplerian disk and infalling envelope model to major/minor PV diagrams."""
 
+    @keyword_aliases(sigma='rms')
     def put_PV(self, pvmajorfits: str, pvminorfits: str,
                dist: float, vsys: float,
                rmax: float | None,
                vmin: float | None, vmax: float | None,
-               sigma: float | None,
+               rms: float | None,
                xskip: int = 1, skipto: int | None = None) -> None:
         """Read and prepare observed major- and minor-axis PV diagrams.
 
@@ -42,7 +43,7 @@ class PVFitting(ReadFits):
                 km/s.
             vmax (float or None): Maximum velocity relative to ``vsys`` in
                 km/s.
-            sigma (float or None): RMS noise of the PV diagrams. None means
+            rms (float or None): RMS noise of the PV diagrams. None means
                 automatic estimation.
             xskip (int, optional): Pixel stride along the position axis.
                 Defaults to 1.
@@ -53,7 +54,7 @@ class PVFitting(ReadFits):
         d = []
         for pvfits in [pvmajorfits, pvminorfits]:
             self.read_pvfits(pvfits=pvfits, dist=dist, vsys=vsys,
-                             xmin=xmin, xmax=rmax, xskip=xskip, sigma=sigma)
+                             xmin=xmin, xmax=rmax, xskip=xskip, rms=rms)
             if type(skipto) is int:
                 iskip = int(self.bmin / (np.abs(self.dx) / xskip) / skipto)
                 if iskip == 0:
@@ -68,7 +69,7 @@ class PVFitting(ReadFits):
                 iskip = xskip
             self.vorg = self.v
             self.read_pvfits(pvfits=pvfits, dist=dist, vsys=vsys,
-                             xmin=xmin, xmax=rmax, xskip=iskip, sigma=sigma,
+                             xmin=xmin, xmax=rmax, xskip=iskip, rms=rms,
                              vmin=vmin, vmax=vmax)
             d.append(self.data)
         self.dpvmajor, self.dpvminor = d
@@ -197,7 +198,7 @@ class PVFitting(ReadFits):
         mask = (vmask[0] < v) * (v < vmask[1])
         majobs = np.where(mask, np.nan, majobs)
         minobs = np.where(mask, np.nan, minobs)
-        majsig, minsig = self.sigma, self.sigma
+        majsig, minsig = self.rms, self.rms
 
         # get quadrant
         majquad = getquad(self.dpvmajor) if signmajor is None else signmajor
@@ -456,7 +457,7 @@ class PVFitting(ReadFits):
         # grid/data/mask/sigma
         x, v = np.meshgrid(self.x, self.v)
         mask = (vmask[0] < v) * (v < vmask[1])  # velocity mask
-        majsig, minsig = self.sigma, self.sigma
+        majsig, minsig = self.rms, self.rms
 
         if 'model' in [color, contour]:
             # check if fitting result exists
@@ -478,7 +479,7 @@ class PVFitting(ReadFits):
             outlabel = '.obs'
 
         if clevels is None:
-            clevels = (2**np.arange(0, 10) if log else np.arange(1, 11)) * 3 * self.sigma
+            clevels = (2**np.arange(0, 10) if log else np.arange(1, 11)) * 3 * self.rms
 
         def makeplots(data_color: list[np.ndarray],
                       data_contour: list[np.ndarray], cmap: str,
@@ -512,7 +513,7 @@ class PVFitting(ReadFits):
             cblabel = r'Jy beam$^{-1}$' if mode == 'model' else r'Noise level ($\sigma$)'
             # major
             if log and mode == 'model':
-                vmin_plot = np.log10(2 * self.sigma) if vmin is None else np.log10(vmin)
+                vmin_plot = np.log10(2 * self.rms) if vmin is None else np.log10(vmin)
                 vmax_plot = None if vmax is None else np.log10(vmax)
             elif mode == 'residual':
                 vabsmax = None
@@ -579,7 +580,7 @@ class PVFitting(ReadFits):
 
         figs = []
         # main plot
-        vmin = 2 * self.sigma if log else np.nanmin(np.array(d_col))
+        vmin = 2 * self.rms if log else np.nanmin(np.array(d_col))
         vmax = np.nanmax(np.array(d_col))
         vmask_plot = vmask if vmask[1] > vmask[0] else None
         fig = makeplots(d_col, d_con, cmap, vmin=vmin, vmax=vmax,

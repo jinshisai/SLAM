@@ -26,7 +26,7 @@ Extract and save once:
 
 ```python
 impv = PVAnalysis(fitsfile, rms, vsys, dist, incl=incl)
-impv.get_edgeridge('points', thr=5.)
+impv.get_edgeridge('points', cutoff=5.)
 impv.write_edgeridge('points')
 ```
 

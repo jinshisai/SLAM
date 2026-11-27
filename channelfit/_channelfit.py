@@ -17,7 +17,7 @@ from scipy.optimize import curve_fit
 from scipy.special import erf
 import warnings
 from tqdm import tqdm
-from utils import emcee_corner, ReadFits, rot
+from utils import emcee_corner, ReadFits, keyword_aliases, rot
 
 warnings.simplefilter('ignore', RuntimeWarning)
 
@@ -42,16 +42,17 @@ def avefour(a: np.ndarray) -> np.ndarray:
     return b
 
 
-def makemom012(d: np.ndarray, v: np.ndarray, sigma: float,
-               threshold: float = 3) -> dict[str, np.ndarray | float]:
+@keyword_aliases(sigma='rms', threshold='cutoff')
+def makemom012(d: np.ndarray, v: np.ndarray, rms: float,
+               cutoff: float = 3) -> dict[str, np.ndarray | float]:
     """Calculate integrated intensity, mean velocity, and velocity dispersion.
 
     Args:
         d (numpy.ndarray): Channel cube with shape (len(v), ny, nx).
         v (numpy.ndarray): Increasing channel velocities, assumed uniformly
             spaced. Their units set the velocity units of the output maps.
-        sigma (float): RMS noise per channel in the same intensity units as d.
-        threshold (float, optional): Noise multiplier for masking moments 1
+        rms (float): RMS noise per channel in the same intensity units as d.
+        cutoff (float, optional): Noise multiplier for masking moments 1
             and 2 in both channel intensity and integrated intensity.
             Moment 0 uses all channels. Defaults to 3.
 
@@ -62,15 +63,15 @@ def makemom012(d: np.ndarray, v: np.ndarray, sigma: float,
     dmasked = np.nan_to_num(d)
     dv = np.min(v[1:] - v[:-1])
     mom0 = np.sum(dmasked, axis=0) * dv
-    sigma_mom0 = sigma * dv * np.sqrt(len(d))
-    dmasked[dmasked < threshold * sigma] = 0
+    sigma_mom0 = rms * dv * np.sqrt(len(d))
+    dmasked[dmasked < cutoff * rms] = 0
     dsum = np.sum(dmasked, axis=0)
     with np.errstate(divide='ignore', invalid='ignore'):
         mom1 = np.sum(dmasked * v[:, None, None], axis=0) / dsum
         Iv2 = np.sum(dmasked * (v[:, None, None] - mom1)**2, axis=0)
         mom2 = np.sqrt(Iv2 / dsum)
-    mom1[mom0 < threshold * sigma_mom0] = np.nan
-    mom2[mom0 < threshold * sigma_mom0] = np.nan
+    mom1[mom0 < cutoff * sigma_mom0] = np.nan
+    mom2[mom0 < cutoff * sigma_mom0] = np.nan
     return {'mom0': mom0, 'mom1': mom1, 'mom2': mom2,
             'sigma_mom0': sigma_mom0}
 
@@ -125,8 +126,9 @@ def cosine_taper_2d(f: np.ndarray, x: np.ndarray, y: np.ndarray,
     return f * taper
 
 
-def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
-          threshold: float = 2, gain: float = 0.01,
+@keyword_aliases(sigma='rms', threshold='cutoff')
+def clean(data: np.ndarray, beam: np.ndarray, rms: float,
+          cutoff: float = 2, gain: float = 0.01,
           weakestcomponent: float = 0.3,
           savetxt: str | None = None, loadtxt: str | None = None) -> np.ndarray:
     """Deconvolve an image by iteratively subtracting positive beam components.
@@ -135,13 +137,13 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
         data (numpy.ndarray): 2D image to deconvolve.
         beam (numpy.ndarray): 2D beam kernel whose sum gives the beam area
             in pixels.
-        sigma (float): RMS noise in the same units as data.
-        threshold (float, optional): Stop when the residual peak is below
-            this multiple of sigma. Defaults to 2.
+        rms (float): RMS noise in the same units as data.
+        cutoff (float, optional): Stop when the residual peak is below
+            this multiple of rms. Defaults to 2.
         gain (float, optional): Fraction of the residual peak removed per
             iteration, subject to weakestcomponent. Defaults to 0.01.
         weakestcomponent (float, optional): Minimum subtraction amplitude
-            in units of sigma before beam-area normalization. Defaults to 0.3.
+            in units of rms before beam-area normalization. Defaults to 0.3.
         savetxt (str or None, optional): Output text file for the deconvolved
             image. Defaults to None.
         loadtxt (str or None, optional): Text file to load instead of running
@@ -161,23 +163,23 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     cleanresidual = data * 1
     beamarea = np.sum(beam)  # pixel/beam
     cc0 = np.zeros_like(data)
-    rms = 10000 * sigma
+    residual_rms = 10000 * rms
     for i in range(10000000):
         if i == 10000000 - 1:
             print('\n10,000,000 iterations achived in CLEAN.')
             break
-        if (peak := np.nanmax(cleanresidual)) < threshold * sigma:
+        if (peak := np.nanmax(cleanresidual)) < cutoff * rms:
             print('\nThreshold achieved in CLEAN. '
-                  f'(rms={rms / sigma:.2f}sigma, '
-                  f'peak={peak / sigma:.2f}sigma)')
+                  f'(rms={residual_rms / rms:.2f}rms, '
+                  f'peak={peak / rms:.2f}rms)')
             break
-        print(f'\rCLEAN reached {peak / sigma:.2f}sigma in Moment 0.  ', end='')
+        print(f'\rCLEAN reached {peak / rms:.2f}rms in Moment 0.  ', end='')
         ip, jp = np.unravel_index(np.nanargmax(cleanresidual), shape)
         cc = cc0 * 1  # for deep copy
         lp = cleanresidual[ip, jp]
-        cc[ip, jp] = max(gain * lp, weakestcomponent * sigma) / beamarea  # Jy/pixel
+        cc[ip, jp] = max(gain * lp, weakestcomponent * rms) / beamarea  # Jy/pixel
         newresidual = cleanresidual - convolve(cc, beam, mode='same')
-        rms = np.sqrt(np.nanmean(newresidual**2))
+        residual_rms = np.sqrt(np.nanmean(newresidual**2))
         cleancomponent = cleancomponent + cc
         cleanresidual = newresidual
     cleancomponent = cleancomponent + cleanresidual / beamarea
@@ -186,8 +188,9 @@ def clean(data: np.ndarray, beam: np.ndarray, sigma: float,
     return cleancomponent
 
 
+@keyword_aliases(sigma='rms')
 def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
-                    bmaj: float, bmin: float, bpa: float, sigma: float,
+                    bmaj: float, bmin: float, bpa: float, rms: float,
                     savetxt: str | None = None, loadtxt: str | None = None,
                     direct: bool = False, progressbar: bool = True
                     ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -202,7 +205,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
         bmin (float): Beam minor-axis FWHM in coordinate units. Must span at
             least two x pixels for the model-grid stride to be nonzero.
         bpa (float): Beam position angle in degrees.
-        sigma (float): RMS noise in the same units as data, used by the
+        rms (float): RMS noise in the same units as data, used by the
             iterative fit for thresholding and uncertainties.
         savetxt (str or None, optional): Text file for the flattened fitted
             model-grid intensities. Defaults to None.
@@ -288,7 +291,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                         bar.update(1)
                     p0 = Par0[i_p, j_p]
                     dd = drot[i_d, j_d]
-                    if dd < 2 * sigma:
+                    if dd < 2 * rms:
                         Par0[i_p, j_p] = 0
                     else:
                         bounds = [0, dd]
@@ -311,7 +314,7 @@ def modeldeconvolve(data: np.ndarray, x: np.ndarray, y: np.ndarray,
                             gg = np.roll(g, (i_d - nyh, j_d - nxh), axis=(0, 1))
                             return np.sum(ff * gg)
                         popt, _ = curve_fit(model, [Yi, Xi], dd, p0=p0,
-                                            sigma=[sigma], absolute_sigma=True,
+                                            sigma=[rms], absolute_sigma=True,
                                             bounds=bounds)
                         Par0[i_p, j_p] = popt[0]
         print('Found a deconvolved solution.')
@@ -767,20 +770,21 @@ def _diagnose_gpdeconvolution(result, data, outname=None):
     plt.close()
 
 
-def estimate_noise(_d, nitr=1000, thr=2.):
+@keyword_aliases(thr='cutoff')
+def estimate_noise(_d, nitr=1000, cutoff=2.):
     '''
     Estimate map noise
 
     _d (array): Data
     nitr (int): Number of the maximum iteration
-    thr (float): Threshold of the each iteration
+    cutoff (float): Threshold of the each iteration
     '''
 
     d = _d.copy().ravel()
     rms = np.sqrt(np.nanmean(d*d))
     for i in range(nitr):
         rms_p = rms
-        d[d >= thr*rms] = np.nan
+        d[d >= cutoff*rms] = np.nan
         rms = np.sqrt(np.nanmean(d*d))
 
         if (rms - rms_p)*(rms - rms_p) < 1e-20:
@@ -857,12 +861,13 @@ class ChannelFit(ReadFits):
         self.progressbar = progressbar
         self.scaling_gp_args = scaling_gp_args
 
+    @keyword_aliases(sigma='rms')
     def makegrid(self, cubefits: str,
                  pa: float = 0, incl: float = 90, dist: float = 1,
                  center: str | None = None, vsys: float = 0,
                  rmax: float = 1e4,
                  vlim: list[float] = [-100, 0, 0, 100],
-                 sigma: float | None = None, nlayer: int = 3,
+                 rms: float | None = None, nlayer: int = 3,
                  xskip: int = 1, yskip: int = 1,
                  skipto: int | bool | None = False,
                  gaussmargin: float = 1.6,
@@ -888,7 +893,7 @@ class ChannelFit(ReadFits):
             vlim (list, optional): Boundaries of the fitted blue and red
                 velocity ranges, relative to ``vsys``, in km/s. Defaults to
                 [-100, 0, 0, 100].
-            sigma (float or None, optional): RMS noise of the cube. None means
+            rms (float or None, optional): RMS noise of the cube. None means
                 automatic estimation. Defaults to None.
             nlayer (int, optional): Number of nested model-grid layers.
                 Defaults to 3.
@@ -924,7 +929,7 @@ class ChannelFit(ReadFits):
             raise ValueError('cubefits must be supplied.')
         self.read_cubefits(cubefits, center, dist, vsys,
                            -rmax, rmax, -rmax, rmax, None, None,
-                           xskip, yskip, sigma)
+                           xskip, yskip, rms)
         dpix = min([np.abs(self.dx), np.abs(self.dy)])
         if type(skipto) is int:
             iskip = int(self.bmin / (dpix / xskip) / skipto)
@@ -933,7 +938,7 @@ class ChannelFit(ReadFits):
                 iskip = 1
             self.read_cubefits(cubefits, center, dist, vsys,
                                -rmax, rmax, -rmax, rmax, None, None,
-                               iskip, iskip, sigma)
+                               iskip, iskip, rms)
             dpix = min([np.abs(self.dx), np.abs(self.dy)])
             ibmaj = self.bmaj / dpix
             ibmin = self.bmin / dpix
@@ -958,7 +963,7 @@ class ChannelFit(ReadFits):
         self.data_red = self.data[(vlim[2] <= v) * (v <= vlim[3])]
         self.data_valid = np.append(self.data_blue, self.data_red, axis=0)
 
-        m = makemom012(self.data_valid, self.v_valid, self.sigma)
+        m = makemom012(self.data_valid, self.v_valid, self.rms)
         self.mom0 = m['mom0']
         self.mom1 = m['mom1']
         self.mom2 = m['mom2']
@@ -1030,13 +1035,13 @@ class ChannelFit(ReadFits):
             self.gaussbeam = self.gaussbeam[:, ::-1]
         if self.scaling == 'mom0clean':
             self.mom0decon = clean(data=self.mom0, beam=self.gaussbeam,
-                                   sigma=self.sigma_mom0, threshold=2,
+                                   rms=self.sigma_mom0, cutoff=2,
                                    savetxt=savedeconvolved,
                                    loadtxt=loaddeconvolved)
         elif self.scaling == 'mom0model':
             d = modeldeconvolve(x=self.x, y=self.y, data=self.mom0,
                                 bmaj=self.bmaj, bmin=self.bmin, bpa=self.bpa,
-                                sigma=self.sigma_mom0,
+                                rms=self.sigma_mom0,
                                 savetxt=savedeconvolved,
                                 loadtxt=loaddeconvolved,
                                 progressbar=self.progressbar)
@@ -1058,8 +1063,8 @@ class ChannelFit(ReadFits):
             self.resdecon = self.mom0 - c
             maxres = np.max(self.resdecon) / self.sigma_mom0
             rmsres = np.sqrt(np.mean(self.resdecon**2)) / self.sigma_mom0
-            print(f'Max and rms are {maxres:.1f}sigma '
-                  + f'and {rmsres:.1f}sigma in Moment 0 residual.')
+            print(f'Max and rms are {maxres:.1f}rms '
+                  + f'and {rmsres:.1f}rms in Moment 0 residual.')
 
     def diagnose_gpdeconvolution(self, outname: str | None = None) -> None:
         res = gpdeconvolve(self.mom0, self.sigma_mom0,
@@ -1467,7 +1472,7 @@ class ChannelFit(ReadFits):
             if not np.all(np.isfinite(model)):
                 return np.inf
             return np.nansum((self.data_valid - model)**2) \
-                / self.sigma**2 / self.pixperbeam
+                / self.rms**2 / self.pixperbeam
 
         def reduced_chi2(q: list[float] | np.ndarray) -> float:
             """Divide chi-square by the effective number of degrees of freedom.
@@ -1737,7 +1742,7 @@ class ChannelFit(ReadFits):
             if kwargs != {}:
                 self.popt = kwargs
             d = self.cubemodel(**self.popt)
-            m = makemom012(d, self.v_valid, self.sigma)
+            m = makemom012(d, self.v_valid, self.rms)
         if 'obs' in mode:
             mom0 = self.mom0
             mom1 = self.mom1

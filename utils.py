@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import emcee
 import corner
 from collections.abc import Callable
+from functools import wraps
+from inspect import signature
 from multiprocessing import Pool
 from dynesty import DynamicNestedSampler as DNS
 from dynesty import utils as dyfunc
@@ -304,16 +306,58 @@ def dynesty_corner(bounds: list[list[float]] | np.ndarray,
         return [popt, plow, pmid, phigh]
 
 
-class ReadFits:
+def keyword_aliases(**aliases):
+    """Accept legacy keyword names without changing positional arguments."""
+    def decorate(function):
+        sig = signature(function)
+
+        @wraps(function)
+        def wrapped(*args, **kwargs):
+            supplied = sig.bind_partial(*args, **{
+                key: value for key, value in kwargs.items() if key not in aliases
+            }).arguments
+            for old, new in aliases.items():
+                if old in kwargs:
+                    if new in supplied:
+                        raise TypeError(
+                            f"{function.__name__}() received both '{new}' and its alias '{old}'"
+                        )
+                    kwargs[new] = kwargs.pop(old)
+                    supplied[new] = kwargs[new]
+            return function(*args, **kwargs)
+
+        notes = '; '.join(f"{old}= is an alias for {new}=" for old, new in aliases.items())
+        wrapped.__doc__ = (function.__doc__ or '') + (
+            '\n\n    Compatibility: ' + notes + '. Supplying both names raises TypeError.'
+        )
+        return wrapped
+    return decorate
+
+
+class RMSNoise:
+    """Store RMS noise with a synchronized legacy sigma attribute."""
+
+    @property
+    def sigma(self):
+        """Compatibility alias for rms."""
+        return self.rms
+
+    @sigma.setter
+    def sigma(self, value):
+        self.rms = value
+
+
+class ReadFits(RMSNoise):
     """Provide FITS-reading methods and store the resulting data as attributes."""
 
+    @keyword_aliases(sigma='rms')
     def read_cubefits(self, cubefits: str, center: str | None = None,
                       dist: float = 1, vsys: float = 0,
                       xmin: float | None = None, xmax: float | None = None,
                       ymin: float | None = None, ymax: float | None = None,
                       vmin: float | None = None, vmax: float | None = None,
                       xskip: int = 1, yskip: int = 1,
-                      sigma: float | None = None
+                      rms: float | None = None
                       ) -> dict[str, np.ndarray | fits.Header | float]:
         """Read channel maps in the FITS format.
 
@@ -342,13 +386,14 @@ class ReadFits:
             yskip (int, optional): Positive pixel stride along the y axis.
                 The returned header is updated to describe the subsampled
                 axis. Defaults to 1.
-            sigma (float or None, optional): RMS noise of the FITS data. None
+            rms (float or None, optional): RMS noise of the FITS data. None
                 means automatic estimation. Defaults to None.
 
         Returns:
             dict: Coordinates ``x`` and ``y`` in au, velocity ``v`` relative
                 to ``vsys`` in km/s, the ``(v, y, x)`` data cube, the updated
-                FITS ``header``, and RMS noise ``sigma``.
+                FITS ``header``, and RMS noise ``rms`` (also returned under the
+                legacy key ``sigma``).
 
         Notes:
             The selected coordinates, sampling intervals, data, beam, header,
@@ -369,9 +414,9 @@ class ReadFits:
             c3 = c1.spherical_offsets_to(SkyCoord(center, frame='icrs'))
             cx = c3[0].degree
             cy = c3[1].degree
-        if sigma is None:
-            sigma = np.mean([np.nanstd(d[:2]), np.std(d[-2:])])
-            print(f'sigma = {sigma:.3e}')
+        if rms is None:
+            rms = np.mean([np.nanstd(d[:2]), np.std(d[-2:])])
+            print(f'rms = {rms:.3e}')
         x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
         y = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
         v = (np.arange(h['NAXIS3']) - h['CRPIX3'] + 1) * h['CDELT3']
@@ -425,19 +470,20 @@ class ReadFits:
         self.x, self.dx, self.nx = x, dx, len(x)
         self.y, self.dy, self.ny = y, dy, len(y)
         self.v, self.dv, self.nv = v, dv, len(v)
-        sigma = float(sigma)
-        self.data, self.header, self.sigma = d, h, sigma
+        rms = float(rms)
+        self.data, self.header, self.rms = d, h, rms
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.beam = np.array([bmaj, bmin, bpa])
         self.cubefits, self.dist, self.vsys = cubefits, dist, vsys
-        return {'x': x, 'y': y, 'v': v, 'data': d, 'header': h, 'sigma': sigma}
+        return {'x': x, 'y': y, 'v': v, 'data': d, 'header': h, 'rms': rms, 'sigma': rms}
 
+    @keyword_aliases(sigma='rms')
     def read_pvfits(self, pvfits: str,
                     dist: float = 1, vsys: float = 0,
                     xmin: float | None = None, xmax: float | None = None,
                     vmin: float | None = None, vmax: float | None = None,
                     xskip: int = 1,
-                    sigma: float | None = None
+                    rms: float | None = None
                     ) -> dict[str, np.ndarray | fits.Header | float]:
         """Read a position-velocity diagram in the FITS format.
 
@@ -457,13 +503,14 @@ class ReadFits:
             xskip (int, optional): Positive pixel stride along the position
                 axis. The returned header is updated to describe the
                 subsampled axis. Defaults to 1.
-            sigma (float or None, optional): RMS noise of the FITS data. None
+            rms (float or None, optional): RMS noise of the FITS data. None
                 means automatic estimation from its edges. Defaults to None.
 
         Returns:
             dict: Position ``x`` in au, velocity ``v`` relative to ``vsys`` in
                 km/s, the ``(v, x)`` data array, the updated FITS ``header``,
-                and RMS noise ``sigma``.
+                and RMS noise ``rms`` (also returned under the legacy key
+                ``sigma``).
 
         Notes:
             The selected coordinates, sampling intervals, data, beam, header,
@@ -473,10 +520,10 @@ class ReadFits:
         cc = constants.c.si.value
         f = fits.open(pvfits)[0]
         d, h = np.squeeze(f.data), f.header
-        if sigma is None:
-            sigma = np.mean([np.std(d[:2, 10:-10]), np.std(d[-2:, 10:-10]),
+        if rms is None:
+            rms = np.mean([np.std(d[:2, 10:-10]), np.std(d[-2:, 10:-10]),
                              np.std(d[2:-2, :10]), np.std(d[2:-2, -10:])])
-            print(f'sigma = {sigma:.3e}')
+            print(f'rms = {rms:.3e}')
         x = (np.arange(h['NAXIS1']) - h['CRPIX1'] + 1) * h['CDELT1']
         v = (np.arange(h['NAXIS2']) - h['CRPIX2'] + 1) * h['CDELT2']
         crpix = int(h['CRPIX1']) - 1
@@ -517,12 +564,12 @@ class ReadFits:
             print('No valid beam in the FITS file.')
         self.x, self.dx, self.nx = x, dx, len(x)
         self.v, self.dv, self.nv = v, dv, len(v)
-        sigma = float(sigma)
-        self.data, self.header, self.sigma = d, h, sigma
+        rms = float(rms)
+        self.data, self.header, self.rms = d, h, rms
         self.bmaj, self.bmin, self.bpa = bmaj, bmin, bpa
         self.beam = np.array([bmaj, bmin, bpa])
         self.pvfits, self.dist, self.vsys = pvfits, dist, vsys
-        return {'x': x, 'v': v, 'data': d, 'header': h, 'sigma': sigma}
+        return {'x': x, 'v': v, 'data': d, 'header': h, 'rms': rms, 'sigma': rms}
 
 
 def rot(x: float | np.ndarray, y: float | np.ndarray,

@@ -9,7 +9,7 @@ incl = 48.0  # deg
 vsys = 6.4  # km/s
 dist = 140.0  # pc
 rms = 1.7e-3  # Jy/beam
-thr = 5.0  # rms
+cutoff = 5.0  # rms
 ridgemode = 'mean'  # 'mean' or 'gauss'
 xlim = [-200, 0, 0, 200]  # au; [-outlim, -inlim, inlim, outlim]
 vlim = np.array([-5, 0, 0, 5]) + vsys  # km/s
@@ -37,7 +37,7 @@ best = 'pmid'  # 'popt': maximum probability; 'pmid': posterior medians.
 '-------- HOW TO DO EACH STEP --------'
 impv = PVAnalysis(fitsfile, rms, vsys, dist, incl=incl, pa=None)
 impv.get_edgeridge(outname,
-                   thr=thr,
+                   cutoff=cutoff,
                    ridgemode=ridgemode,
                    use_position=use_position,
                    use_velocity=use_velocity,

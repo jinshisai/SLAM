@@ -9,7 +9,7 @@ incl = 65.0  # deg
 vsys = 4.0  # km/s
 dist = 139.0  # pc
 rms = 2.4e-3  # Jy/beam
-thr = 5.0  # rms
+cutoff = 5.0  # rms
 ridgemode = 'mean'  # 'mean' or 'gauss'
 xlim = [-70, 0, 0, 70]  # au; [-outlim, -inlim, inlim, outlim]
 vlim = np.array([-1.4, 0, 0, 1.4]) + vsys  # km/s
@@ -28,7 +28,7 @@ minrelerr = 0  # minimum relative errorbar.
 '-------- HOW TO DO EACH STEP --------'
 impv = PVAnalysis(fitsfile, rms, vsys, dist, pa=None)
 impv.get_edgeridge(outname,
-                   thr=thr,
+                   cutoff=cutoff,
                    ridgemode=ridgemode,
                    incl=incl,
                    use_position=use_position,

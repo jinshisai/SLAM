@@ -100,3 +100,25 @@ Shared utilities
 .. automodule:: utils
    :members:
    :show-inheritance:
+
+Noise and intensity cutoffs
+--------------------------
+
+All four analysis modules use ``rms`` for the RMS noise in the same intensity
+units as the input data. ``cutoff`` is a dimensionless noise multiplier: the
+intensity threshold is ``cutoff * rms``. A noise input of ``None`` retains
+automatic estimation where it was previously supported.
+
+Existing ``sigma=`` noise inputs remain accepted as aliases for ``rms=``.
+The edge/ridge extraction methods accept ``thr=`` as an alias for ``cutoff=``;
+channel-map moment and CLEAN helpers also retain ``threshold=`` as an alias.
+Positional arguments and defaults are unchanged. Supplying both names for one
+parameter raises ``TypeError``, even if their values match. Aliases currently
+produce no deprecation warnings.
+
+Noise is stored as ``self.rms``. The compatibility property ``self.sigma``
+reads and writes the same value. FITS-reader result dictionaries include both
+``rms`` and the legacy ``sigma`` key. Existing moment-noise names such as
+``sigma_mom0`` are unchanged. Gaussian widths, statistical uncertainties,
+regularization thresholds, and arguments belonging to external functions keep
+their existing names.

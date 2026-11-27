@@ -7,8 +7,8 @@ pa = 2.0  # deg
 incl = 85  # deg
 vsys = 5.9  # km/s
 dist = 140  # pc
-sigma = 1.7e-3  # Jy/beam
-cutoff = 5.0  # sigma
+rms = 1.7e-3  # Jy/beam
+cutoff = 5.0  # rms
 xmax = 200  # au; The fitted area is [-xmax, xamx] x [-ymax, ymax].
 ymax = xmax  # au The fitted area is [-xmax, xamx] x [-ymax, ymax].
 vmax = 3.6  # km/s; relative to vsys.
@@ -25,7 +25,7 @@ method = 'mean'  # mean or gauss
 filehead = 'test.velgrad'
 vg = VelGrad()
 vg.read_cubefits(cubefits=cubefits, center=center,
-                 vsys=vsys, dist=dist, sigma=sigma,
+                 vsys=vsys, dist=dist, rms=rms,
                  xmin=-xmax, xmax=xmax,
                  ymin=-ymax, ymax=ymax,
                  vmin=vmin, vmax=vmax)

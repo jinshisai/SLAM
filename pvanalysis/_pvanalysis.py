@@ -21,7 +21,7 @@ from pvanalysis.analysis_tools import (doublepower_r,
                                        doublepower_v_error,
                                        doublepower_r_error,
                                        p_inout)
-from utils import emcee_corner, dynesty_corner
+from utils import emcee_corner, dynesty_corner, keyword_aliases, RMSNoise
 
 
 # Constants (in cgs)
@@ -31,7 +31,7 @@ au = units.au.to('cm')         # au (cm)
 clight = constants.c.cgs.value     # light speed (cm s^-1)
 
 
-class PVAnalysis():
+class PVAnalysis(RMSNoise):
     """Perform fitting to a radial profile of the rotational velocity using a PV diagram.
 
     Args:
@@ -191,7 +191,8 @@ class PVAnalysis():
                           'perr': self.popt[method][1]})
                 for method in ('edge', 'ridge')}
 
-    def get_edgeridge(self, outname: str, thr: float = 5.,
+    @keyword_aliases(thr='cutoff')
+    def get_edgeridge(self, outname: str, cutoff: float = 5.,
                       incl: float | None = None,
                       quadrant: str | None = None,
                       ridgemode: str = 'mean',
@@ -213,7 +214,7 @@ class PVAnalysis():
             methods (tuple[str, ...]): Methods to retain, 'edge', 'ridge', or both.
                 Extraction replaces all previous points and invalidates their fits.
             outname (str): Prefix for diagnostic figures.
-            thr (float, optional): Edge and ridge intensity threshold in units
+            cutoff (float, optional): Edge and ridge intensity threshold in units
                 of the RMS noise. Defaults to 5.
             incl (float or None, optional): Inclination angle in degrees. None
                 uses the value given at initialization. Defaults to None.
@@ -287,12 +288,12 @@ class PVAnalysis():
 
         # Get rigde/edge
         if use_position:
-            self.get_edgeridge_xcut(outname, thr=thr,
+            self.get_edgeridge_xcut(outname, cutoff=cutoff,
                                     xlim=xlim, vlim=vlim, Mlim=Mlim,
                                     ridgemode=ridgemode, pixrng=pixrng_xcut,
                                     interp_ridge=interp_ridge)
         if use_velocity:
-            self.get_edgeridge_vcut(outname, thr=thr,
+            self.get_edgeridge_vcut(outname, cutoff=cutoff,
                                     xlim=xlim, vlim=vlim, Mlim=Mlim,
                                     ridgemode=ridgemode, pixrng=pixrng_vcut,
                                     interp_ridge=interp_ridge)
@@ -478,7 +479,8 @@ class PVAnalysis():
                 else:
                     self.point_status[re] = 'no_points'
 
-    def get_edgeridge_vcut(self, outname: str, thr: float = 5.,
+    @keyword_aliases(thr='cutoff')
+    def get_edgeridge_vcut(self, outname: str, cutoff: float = 5.,
                            xlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
                            vlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
                            Mlim: list[float] | np.ndarray = [0, 1e10],
@@ -493,7 +495,7 @@ class PVAnalysis():
 
         Args:
             outname (str): Output file name.
-            thr (float): Edge level and intensity threshold for
+            cutoff (float): Edge level and intensity threshold for
                ridge in the unit of 'rms' Defaults to 5.
                xlim, vlim: x and v ranges for the fitting. Must be given
                as a list, [outlimit1, inlimit1, inlimit2, outlimit2].
@@ -627,7 +629,7 @@ class PVAnalysis():
                 v_i = vi_interp
             # get ridge value
             if ridgemode == 'mean':
-                c = (d_i >= thr * rms)
+                c = (d_i >= cutoff * rms)
                 v_i, d_i = v_i[c], d_i[c]
                 mv, mv_err = ridge_mean(v_i, d_i, rms)
                 # plot
@@ -636,7 +638,7 @@ class PVAnalysis():
                               color='r', ls='--', alpha=0.8)
             elif ridgemode == 'gauss':
                 # get peak indices
-                peaks, _ = find_peaks(d_i, height=thr * rms,
+                peaks, _ = find_peaks(d_i, height=cutoff * rms,
                                       prominence=prominence * rms)
                 # determining used data range
                 if pixrng:
@@ -658,7 +660,7 @@ class PVAnalysis():
                         d_i, v_i = d_i[v0:v1], v_i[v0:v1]
                         # nd_i = len(d_i)
 
-                if np.nanmax(d_i) >= thr * rms:
+                if np.nanmax(d_i) >= cutoff * rms:
                     popt, perr = gaussfit(v_i, d_i, rms)
                 else:
                     popt, perr = np.full(3, np.nan), np.full(3, np.nan)
@@ -696,7 +698,7 @@ class PVAnalysis():
             mass_est = kepler_mass(x_i, vi_interp-self.vsys, self.__unit)
             goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
             edgesign = x_i * self.xsign
-            mv, mv_err = edge(vi_interp, di_interp, rms, rms*thr,
+            mv, mv_err = edge(vi_interp, di_interp, rms, rms*cutoff,
                               goodflag=goodflag, edgesign=edgesign)
             if not (vlim[0] < mv < vlim[1] or vlim[2] < mv < vlim[3]):
                 mv, mv_err = np.nan, np.nan
@@ -724,7 +726,8 @@ class PVAnalysis():
         fig.savefig(outname + ".pvfit.vcut.png")
         plt.close()
 
-    def get_edgeridge_xcut(self, outname: str, thr: float = 5.,
+    @keyword_aliases(thr='cutoff')
+    def get_edgeridge_xcut(self, outname: str, cutoff: float = 5.,
                            xlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
                            vlim: list[float] | np.ndarray = [-1e10, 0, 0, 1e10],
                            Mlim: list[float] | np.ndarray = [0, 1e10],
@@ -738,7 +741,7 @@ class PVAnalysis():
 
         Args:
             outname (str): Output file name.
-            thr (float): Edge level and intensity threshold for
+            cutoff (float): Edge level and intensity threshold for
                ridge in the unit of 'rms' Defaults to 5.
                xlim, vlim: x and v ranges for the fitting. Must be given
                as a list, [outlimit1, inlimit1, inlimit2, outlimit2].
@@ -867,7 +870,7 @@ class PVAnalysis():
                 x_i = xi_interp
             # get ridge value
             if ridgemode == 'mean':
-                c = (d_i >= thr*rms)
+                c = (d_i >= cutoff*rms)
                 x_i, d_i = x_i[c], d_i[c]
                 mx, mx_err = ridge_mean(x_i, d_i, corrected_rms)
                 # plot
@@ -876,7 +879,7 @@ class PVAnalysis():
                               ls='--', alpha=0.8)
             elif ridgemode == 'gauss':
                 # get peak indices
-                peaks, _ = find_peaks(d_i, height=thr * rms,
+                peaks, _ = find_peaks(d_i, height=cutoff * rms,
                                       prominence=prominence * rms)
                 # determining used data range
                 if pixrng:
@@ -898,7 +901,7 @@ class PVAnalysis():
                         # nd_i = len(d_i)
                 else:
                     x_i = xaxis_fit.copy()
-                if np.nanmax(d_i) >= thr * rms:
+                if np.nanmax(d_i) >= cutoff * rms:
                     popt, perr = gaussfit(x_i, d_i, corrected_rms)
                 else:
                     popt, perr = np.full(3, np.nan), np.full(3, np.nan)
@@ -937,7 +940,7 @@ class PVAnalysis():
             mass_est = kepler_mass(xi_interp, v_i - self.vsys, self.__unit)
             goodflag = between(mass_est, Mlim) if len(Mlim) == 2 else None
             edgesign = (v_i - self.vsys) * self.xsign
-            mx, mx_err = edge(xi_interp, di_interp, rms, rms*thr,
+            mx, mx_err = edge(xi_interp, di_interp, rms, rms*cutoff,
                               goodflag=goodflag, edgesign=edgesign)
             if not (xlim[0] < mx < xlim[1] or xlim[2] < mx < xlim[3]):
                 mx, mx_err = np.nan, np.nan

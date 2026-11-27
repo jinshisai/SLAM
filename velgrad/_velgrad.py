@@ -177,7 +177,7 @@ class VelGrad(ReadFits):
         """
         dx, dy = self.dx, self.dy
         xmax, ymax = np.max(self.x), np.max(self.y)
-        sigma, data = self.sigma, self.data
+        rms, data = self.rms, self.data
 
         def clipped_error(err: float, val: float) -> float:
             """Apply the relative and beam-based floors to a center uncertainty.
@@ -195,26 +195,26 @@ class VelGrad(ReadFits):
         X_org, Y_org = np.meshgrid(self.x, self.y)
         xc, yc, dxc, dyc = [], [], [], []
         for d_org, v in zip(data, self.v):
-            cond = d_org > cutoff * sigma
+            cond = d_org > cutoff * rms
             d, X, Y = d_org[cond], X_org[cond], Y_org[cond]
             xval, xerr, yval, yerr = np.nan, np.nan, np.nan, np.nan
             if (len(np.unique(X)) > 1 and len(np.unique(Y)) > 1
                     and (v < vmask[0] or vmask[1] < v)):
                 beamarea = np.pi * self.bmaj * self.bmin / 4 / np.log(2)
                 beamarea = beamarea / np.abs(self.dx * self.dy)  # pixel/beam
-                corrected_sigma = sigma * np.sqrt(beamarea)
+                corrected_rms = rms * np.sqrt(beamarea)
                 if method == 'mean':
                     xval = np.sum(d * X) / np.sum(d)
-                    xerr = corrected_sigma \
+                    xerr = corrected_rms \
                         * np.sqrt(np.sum((X - xval)**2)) / np.sum(d)
                     yval = np.sum(d * Y) / np.sum(d)
-                    yerr = corrected_sigma \
+                    yerr = corrected_rms \
                         * np.sqrt(np.sum((Y - yval)**2)) / np.sum(d)
                 elif method == 'peak':
                     xval = X[np.argmax(d)]
-                    xerr = self.bmaj / (np.max(d) / sigma)
+                    xerr = self.bmaj / (np.max(d) / rms)
                     yval = Y[np.argmax(d)]
-                    yerr = self.bmaj / (np.max(d) / sigma)
+                    yerr = self.bmaj / (np.max(d) / rms)
                 elif method == 'gauss':
                     if len(d) < 7:
                         continue
@@ -224,7 +224,7 @@ class VelGrad(ReadFits):
                         popt, pcov = curve_fit(gauss2d,
                                                (X.ravel(), Y.ravel()),
                                                d.ravel(), max_nfev=1000,
-                                               sigma=X.ravel() * 0 + corrected_sigma,
+                                               sigma=X.ravel() * 0 + corrected_rms,
                                                absolute_sigma=True,
                                                bounds=bounds)
                         xval, yval = popt[[1, 2]]
@@ -759,7 +759,7 @@ class VelGrad(ReadFits):
         if np.any(kep):
             x, y = self.x, self.y
             z = np.sum(self.data[kep], axis=0) * self.dv
-            mom0sigma = self.sigma * self.dv * np.sqrt(len(kep))
+            mom0sigma = self.rms * self.dv * np.sqrt(len(kep))
             levels = np.array([3, 6, 12, 24, 48, 96, 192]) * mom0sigma
             ax.contour(x, y, z, levels=levels, colors='gray', linewidths=2)
         x = self.kepler['xc'] + self.xoff
