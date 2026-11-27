@@ -5,6 +5,7 @@ import corner
 from collections.abc import Callable
 from functools import wraps
 from inspect import signature
+import warnings
 from multiprocessing import Pool
 from dynesty import DynamicNestedSampler as DNS
 from dynesty import utils as dyfunc
@@ -316,19 +317,27 @@ def keyword_aliases(**aliases):
             supplied = sig.bind_partial(*args, **{
                 key: value for key, value in kwargs.items() if key not in aliases
             }).arguments
+            used_aliases = [old for old in aliases if old in kwargs]
+            for old in used_aliases:
+                new = aliases[old]
+                if new in supplied:
+                    raise TypeError(
+                        f"{function.__name__}() received both '{new}' and its alias '{old}'"
+                    )
             for old, new in aliases.items():
                 if old in kwargs:
-                    if new in supplied:
-                        raise TypeError(
-                            f"{function.__name__}() received both '{new}' and its alias '{old}'"
-                        )
+                    warnings.warn(
+                        f"'{old}' is a legacy alias; use '{new}' instead.",
+                        FutureWarning, stacklevel=2,
+                    )
                     kwargs[new] = kwargs.pop(old)
                     supplied[new] = kwargs[new]
             return function(*args, **kwargs)
 
         notes = '; '.join(f"{old}= is an alias for {new}=" for old, new in aliases.items())
         wrapped.__doc__ = (function.__doc__ or '') + (
-            '\n\n    Compatibility: ' + notes + '. Supplying both names raises TypeError.'
+            '\n\n    Compatibility: ' + notes + '. Legacy keywords emit FutureWarning.'
+            ' Supplying both names raises TypeError.'
         )
         return wrapped
     return decorate

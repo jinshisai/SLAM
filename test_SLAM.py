@@ -1,6 +1,8 @@
 import copy
 import os
 import tempfile
+import warnings
+from contextlib import contextmanager
 from pathlib import Path
 
 os.environ.setdefault(
@@ -20,6 +22,17 @@ DATA = Path(__file__).parent / "testfits"
 DIST = 140.0
 SIGMA = 1.7e-3
 RMAX = 200.0
+
+
+@contextmanager
+def expected_alias_warnings(*pairs):
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", FutureWarning)
+        yield
+    messages = [str(item.message) for item in caught
+                if issubclass(item.category, FutureWarning)]
+    assert messages == [f"'{old}' is a legacy alias; use '{new}' instead."
+                        for old, new in pairs]
 
 
 def read_velgrad_test_cube(vg):
@@ -112,16 +125,17 @@ def test_pvanalysis_edgeridge_workflow(tmp_path, monkeypatch, cutoff_name):
     outname = tmp_path / "pvanalysis"
     impv = make_test_pvanalysis()
 
-    impv.get_edgeridge(
-        str(outname),
-        **{cutoff_name: 5.0},
-        ridgemode="mean",
-        use_position=True,
-        use_velocity=True,
-        Mlim=[0, 10],
-        xlim=np.array([-RMAX, 0, 0, RMAX]) / DIST,
-        vlim=np.array([-5, 0, 0, 5]) + 6.4,
-    )
+    with expected_alias_warnings(*([(cutoff_name, "cutoff")] if cutoff_name == "thr" else [])):
+        impv.get_edgeridge(
+            str(outname),
+            **{cutoff_name: 5.0},
+            ridgemode="mean",
+            use_position=True,
+            use_velocity=True,
+            Mlim=[0, 10],
+            xlim=np.array([-RMAX, 0, 0, RMAX]) / DIST,
+            vlim=np.array([-5, 0, 0, 5]) + 6.4,
+        )
     impv.write_edgeridge(str(outname))
 
     assert (tmp_path / "pvanalysis.edge.dat").exists()
@@ -618,7 +632,8 @@ def test_pvfitting_loads_pv_and_generates_mock_diagrams():
 
 @pytest.mark.parametrize("noise_name", ["rms", "sigma"])
 def test_channelfit_makegrid_builds_deterministic_state(noise_name):
-    chan = make_test_channelfit(noise_name)
+    with expected_alias_warnings(*([("sigma", "rms")] if noise_name == "sigma" else [])):
+        chan = make_test_channelfit(noise_name)
     assert chan.rms == chan.sigma == SIGMA
 
     assert chan.data_valid.shape[0] == len(chan.v_valid)
@@ -649,12 +664,13 @@ def test_fits_noise_input_aliases(reader, mode):
     cube = reader == "read_cubefits"
     path = DATA / ("test.cube.fits" if cube else "test.pvfitting.major.fits")
     method = getattr(obj, reader)
-    if mode == "positional":
-        args = ([path, None, 1, 0] + [None] * 6 + [1, 1, SIGMA] if cube
-                else [path, 1, 0] + [None] * 4 + [1, SIGMA])
-        result = method(*args)
-    else:
-        result = method(path, **({} if mode == "automatic" else {mode: SIGMA}))
+    with expected_alias_warnings(*([("sigma", "rms")] if mode == "sigma" else [])):
+        if mode == "positional":
+            args = ([path, None, 1, 0] + [None] * 6 + [1, 1, SIGMA] if cube
+                    else [path, 1, 0] + [None] * 4 + [1, SIGMA])
+            result = method(*args)
+        else:
+            result = method(path, **({} if mode == "automatic" else {mode: SIGMA}))
     assert result["rms"] == result["sigma"] == obj.rms == obj.sigma
     assert np.isfinite(obj.rms)
     if mode != "automatic":
@@ -664,9 +680,10 @@ def test_fits_noise_input_aliases(reader, mode):
 @pytest.mark.parametrize("legacy", [False, True])
 def test_pvfitting_noise_alias(legacy):
     obj = PVFitting()
-    obj.put_PV(DATA / "test.pvfitting.major.fits",
-               DATA / "test.pvfitting.minor.fits", DIST, 5.9, RMAX, -3.6, 3.6,
-               **{"sigma" if legacy else "rms": SIGMA})
+    with expected_alias_warnings(*([("sigma", "rms")] if legacy else [])):
+        obj.put_PV(DATA / "test.pvfitting.major.fits",
+                   DATA / "test.pvfitting.minor.fits", DIST, 5.9, RMAX, -3.6, 3.6,
+                   **{"sigma" if legacy else "rms": SIGMA})
     assert obj.rms == obj.sigma == SIGMA
     assert obj.dpvmajor.shape == obj.dpvminor.shape
 
@@ -677,16 +694,22 @@ def test_channel_helper_aliases():
     data = np.arange(12.0).reshape(3, 2, 2)
     v = np.arange(3.0)
     canonical = makemom012(data, v, rms=0.1, cutoff=2)
-    for result in [makemom012(data, v, sigma=0.1, threshold=2),
-                   makemom012(data, v, 0.1, 2)]:
+    with expected_alias_warnings(("sigma", "rms"), ("threshold", "cutoff")):
+        legacy = makemom012(data, v, sigma=0.1, threshold=2)
+    with expected_alias_warnings():
+        positional = makemom012(data, v, 0.1, 2)
+    for result in [legacy, positional]:
         for key in canonical:
             np.testing.assert_equal(result[key], canonical[key])
     image = np.ones((3, 3))
     beam = np.ones((1, 1))
-    np.testing.assert_equal(clean(image, beam, rms=1, cutoff=2),
-                            clean(image, beam, sigma=1, threshold=2))
+    with expected_alias_warnings(("sigma", "rms"), ("threshold", "cutoff")):
+        legacy = clean(image, beam, sigma=1, threshold=2)
+    np.testing.assert_equal(clean(image, beam, rms=1, cutoff=2), legacy)
     noise = np.linspace(-1, 1, 30)
-    assert estimate_noise(noise, cutoff=3) == estimate_noise(noise, thr=3)
+    with expected_alias_warnings(("thr", "cutoff")):
+        legacy = estimate_noise(noise, thr=3)
+    assert estimate_noise(noise, cutoff=3) == legacy
 
 
 def renamed_parameters():
@@ -726,5 +749,34 @@ def test_parameter_alias_conflicts(function, old, new, positional):
                 break
     else:
         kwargs[new] = None
-    with pytest.raises(TypeError, match=f"both '{new}' and its alias '{old}'"):
+    with expected_alias_warnings(), pytest.raises(
+        TypeError, match=f"both '{new}' and its alias '{old}'"
+    ):
         function(*args, **kwargs)
+
+
+@pytest.mark.parametrize("old, new", [("sigma", "rms"), ("thr", "cutoff"), ("threshold", "cutoff")])
+def test_legacy_warning_points_to_caller(old, new):
+    from inspect import currentframe
+    from utils import keyword_aliases
+
+    @keyword_aliases(**{old: new})
+    def echo(rms=None, cutoff=None):
+        return {new: rms if new == "rms" else cutoff}
+
+    with pytest.warns(FutureWarning, match=f"'{old}'.*'{new}'") as caught:
+        line = currentframe().f_lineno + 1
+        result = echo(**{old: 3})
+    assert result == {new: 3}
+    assert len(caught) == 1
+    assert Path(caught[0].filename).resolve() == Path(__file__).resolve()
+    assert caught[0].lineno == line
+    with expected_alias_warnings():
+        assert echo(**{new: 3}) == result
+
+
+def test_alias_conflicts_do_not_emit_partial_warnings():
+    from channelfit._channelfit import makemom012
+
+    with expected_alias_warnings(), pytest.raises(TypeError, match="both 'cutoff'"):
+        makemom012(None, None, sigma=1, threshold=2, cutoff=2)

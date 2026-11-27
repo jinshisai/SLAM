@@ -113,8 +113,9 @@ Existing ``sigma=`` noise inputs remain accepted as aliases for ``rms=``.
 The edge/ridge extraction methods accept ``thr=`` as an alias for ``cutoff=``;
 channel-map moment and CLEAN helpers also retain ``threshold=`` as an alias.
 Positional arguments and defaults are unchanged. Supplying both names for one
-parameter raises ``TypeError``, even if their values match. Aliases currently
-produce no deprecation warnings.
+parameter raises ``TypeError``, even if their values match. Legacy keyword
+names emit ``FutureWarning`` recommending the preferred name; they remain
+supported.
 
 Noise is stored as ``self.rms``. The compatibility property ``self.sigma``
 reads and writes the same value. FITS-reader result dictionaries include both
