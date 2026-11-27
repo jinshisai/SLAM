@@ -117,8 +117,10 @@ parameter raises ``TypeError``, even if their values match. Legacy keyword
 names emit ``FutureWarning`` recommending the preferred name; they remain
 supported.
 
-Noise is stored as ``self.rms``. The compatibility property ``self.sigma``
-reads and writes the same value. FITS-reader result dictionaries include both
+Noise is stored as ``self.rms``. In PVFitting, ChannelFit, and VelGrad, the
+compatibility property ``self.sigma`` reads and writes the same value.
+PVAnalysis has always used ``self.rms`` and has no ``self.sigma`` alias.
+FITS-reader result dictionaries include both
 ``rms`` and the legacy ``sigma`` key. Existing moment-noise names such as
 ``sigma_mom0`` are unchanged. Gaussian widths, statistical uncertainties,
 regularization thresholds, and arguments belonging to external functions keep

@@ -21,7 +21,7 @@ from pvanalysis.analysis_tools import (doublepower_r,
                                        doublepower_v_error,
                                        doublepower_r_error,
                                        p_inout)
-from utils import emcee_corner, dynesty_corner, keyword_aliases, RMSNoise
+from utils import emcee_corner, dynesty_corner, keyword_aliases
 
 
 # Constants (in cgs)
@@ -31,7 +31,7 @@ au = units.au.to('cm')         # au (cm)
 clight = constants.c.cgs.value     # light speed (cm s^-1)
 
 
-class PVAnalysis(RMSNoise):
+class PVAnalysis:
     """Perform fitting to a radial profile of the rotational velocity using a PV diagram.
 
     Args:

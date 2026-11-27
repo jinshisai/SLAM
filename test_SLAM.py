@@ -644,7 +644,7 @@ def test_channelfit_makegrid_builds_deterministic_state(noise_name):
     assert np.count_nonzero(np.isfinite(chan.mom0)) > 0
 
 
-@pytest.mark.parametrize("analysis", [PVAnalysis, PVFitting, ChannelFit, VelGrad])
+@pytest.mark.parametrize("analysis", [PVFitting, ChannelFit, VelGrad])
 def test_noise_attribute_aliases(analysis):
     obj = analysis.__new__(analysis)
     obj.rms = 0.1
@@ -653,6 +653,12 @@ def test_noise_attribute_aliases(analysis):
     assert obj.rms == 0.2
     obj.rms = 0.3
     assert obj.sigma == 0.3
+
+
+def test_pvanalysis_noise_attribute():
+    obj = make_test_pvanalysis()
+    assert obj.rms == SIGMA
+    assert not hasattr(obj, "sigma")
 
 
 @pytest.mark.parametrize("reader", ["read_cubefits", "read_pvfits"])
